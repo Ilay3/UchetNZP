@@ -18,6 +18,8 @@ public class WipLaunchOperation
 
     public decimal Hours { get; set; }
 
+    public decimal NormHours { get; set; }
+
     public virtual WipLaunch? WipLaunch { get; set; }
 
     public virtual Operation? Operation { get; set; }

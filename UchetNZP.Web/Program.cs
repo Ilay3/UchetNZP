@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Services;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,11 +11,14 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<IWipService, WipService>();
 builder.Services.AddScoped<ILaunchService, LaunchService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 var app = builder.Build();
 

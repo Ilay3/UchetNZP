@@ -20,6 +20,7 @@
     const hoursLabel = document.getElementById("launchHoursLabel");
     const normLabel = document.getElementById("launchNormLabel");
     const quantityInput = document.getElementById("launchQuantityInput");
+    const documentInput = document.getElementById("launchDocumentInput");
     const commentInput = document.getElementById("launchCommentInput");
     const dateInput = document.getElementById("launchDateInput");
     const addButton = document.getElementById("launchAddButton");
@@ -240,6 +241,7 @@
 
     function resetForm() {
         quantityInput.value = "";
+        documentInput.value = "";
         commentInput.value = "";
         dateInput.value = today;
         selectedOperation = null;
@@ -308,6 +310,7 @@
             toOp: lastOp,
             date,
             quantity,
+            documentNumber: documentInput.value || null,
             comment: commentInput.value || null,
             hours,
             sumNorm: tailSummary.sumNormHours ?? 0,
@@ -323,7 +326,7 @@
 
     function renderCart() {
         if (!cart.length) {
-            cartTableBody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center text-muted\">Добавьте операции запуска для сохранения.</td></tr>";
+            cartTableBody.innerHTML = "<tr><td colspan=\"8\" class=\"text-center text-muted\">Добавьте операции запуска для сохранения.</td></tr>";
             return;
         }
 
@@ -336,6 +339,7 @@
                 <td>${item.fromOp.toString().padStart(3, "0")} / ${item.toOp.toString().padStart(3, "0")}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.hours.toFixed(3)}</td>
+                <td>${item.documentNumber ?? ""}</td>
                 <td>${item.comment ?? ""}</td>
                 <td class="text-center">
                     <button type="button" class="btn btn-link btn-lg text-decoration-none" data-action="edit" data-index="${index}" aria-label="Изменить запись">✎</button>
@@ -376,6 +380,7 @@
         renderCart();
 
         partLookup.setSelected({ id: item.partId, name: item.partName, code: item.partCode });
+        documentInput.value = item.documentNumber ?? "";
         commentInput.value = item.comment ?? "";
         quantityInput.value = item.quantity;
         dateInput.value = item.date;
@@ -419,7 +424,8 @@
                 fromOpNumber: item.fromOp,
                 launchDate: item.date,
                 quantity: item.quantity,
-                documentNumber: item.comment,
+                documentNumber: item.documentNumber,
+                comment: item.comment,
             })),
         };
 

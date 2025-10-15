@@ -129,7 +129,7 @@ public class WipLaunchesController : Controller
         }
 
         var dtos = request.Items
-            .Select(x => new LaunchItemDto(x.PartId, x.FromOpNumber, x.LaunchDate, x.Quantity, x.DocumentNumber))
+            .Select(x => new LaunchItemDto(x.PartId, x.FromOpNumber, x.LaunchDate, x.Quantity, x.DocumentNumber, x.Comment))
             .ToList();
 
         var summary = await _launchService.AddLaunchesBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
@@ -158,5 +158,6 @@ public class WipLaunchesController : Controller
         int FromOpNumber,
         DateTime LaunchDate,
         decimal Quantity,
-        string? DocumentNumber);
+        string? DocumentNumber,
+        string? Comment);
 }

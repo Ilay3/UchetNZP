@@ -133,6 +133,7 @@ public class WipReceiptsController : Controller
             x.SectionId,
             x.ReceiptDate,
             x.Quantity,
+            x.DocumentNumber,
             x.Comment)).ToList();
 
         var summary = await _wipService.AddReceiptsBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
@@ -154,5 +155,6 @@ public class WipReceiptsController : Controller
         int OpNumber,
         DateTime ReceiptDate,
         decimal Quantity,
+        string? DocumentNumber,
         string? Comment);
 }

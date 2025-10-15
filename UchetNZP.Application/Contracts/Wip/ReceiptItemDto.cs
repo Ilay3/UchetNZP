@@ -6,5 +6,6 @@ public record ReceiptItemDto(
     Guid SectionId,
     DateTime ReceiptDate,
     decimal Quantity,
-    string? DocumentNumber
+    string? DocumentNumber,
+    string? Comment
 );

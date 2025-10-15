@@ -12,11 +12,13 @@ public class LaunchService : ILaunchService
 {
     private readonly AppDbContext _dbContext;
     private readonly IRouteService _routeService;
+    private readonly ICurrentUserService _currentUserService;
 
-    public LaunchService(AppDbContext dbContext, IRouteService routeService)
+    public LaunchService(AppDbContext dbContext, IRouteService routeService, ICurrentUserService currentUserService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _routeService = routeService ?? throw new ArgumentNullException(nameof(routeService));
+        _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
     }
 
     public async Task<LaunchBatchSummaryDto> AddLaunchesBatchAsync(IEnumerable<LaunchItemDto> items, CancellationToken cancellationToken = default)
@@ -40,6 +42,9 @@ public class LaunchService : ILaunchService
 
             foreach (var item in materialized)
             {
+                var userId = _currentUserService.UserId;
+                var now = DateTime.UtcNow;
+
                 if (item.Quantity <= 0)
                 {
                     throw new InvalidOperationException($"Количество запуска должно быть больше нуля для детали {item.PartId}.");
@@ -88,11 +93,15 @@ public class LaunchService : ILaunchService
                 var launch = new WipLaunch
                 {
                     Id = Guid.NewGuid(),
+                    UserId = userId,
                     PartId = item.PartId,
                     SectionId = routeStart.SectionId,
+                    FromOpNumber = item.FromOpNumber,
                     LaunchDate = item.LaunchDate,
+                    CreatedAt = now,
                     Quantity = item.Quantity,
                     DocumentNumber = item.DocumentNumber,
+                    Comment = item.Comment,
                     SumHoursToFinish = sumHours,
                 };
 
@@ -110,6 +119,7 @@ public class LaunchService : ILaunchService
                         PartRouteId = operation.Id,
                         Quantity = item.Quantity,
                         Hours = operation.NormHours * item.Quantity,
+                        NormHours = operation.NormHours,
                     };
 
                     await _dbContext.WipLaunchOperations.AddAsync(launchOperation, cancellationToken).ConfigureAwait(false);
