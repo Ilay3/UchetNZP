@@ -5,5 +5,6 @@ public record LaunchItemDto(
     int FromOpNumber,
     DateTime LaunchDate,
     decimal Quantity,
-    string? DocumentNumber
+    string? DocumentNumber,
+    string? Comment
 );

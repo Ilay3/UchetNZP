@@ -12,10 +12,16 @@ public class WipReceiptConfiguration : IEntityTypeConfiguration<WipReceipt>
 
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.UserId)
+            .IsRequired();
+
         builder.Property(x => x.OpNumber)
             .IsRequired();
 
         builder.Property(x => x.ReceiptDate)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedAt)
             .IsRequired();
 
         builder.Property(x => x.Quantity)
@@ -23,6 +29,9 @@ public class WipReceiptConfiguration : IEntityTypeConfiguration<WipReceipt>
 
         builder.Property(x => x.DocumentNumber)
             .HasMaxLength(64);
+
+        builder.Property(x => x.Comment)
+            .HasMaxLength(256);
 
         builder.HasIndex(x => new { x.PartId, x.SectionId, x.OpNumber, x.ReceiptDate });
 

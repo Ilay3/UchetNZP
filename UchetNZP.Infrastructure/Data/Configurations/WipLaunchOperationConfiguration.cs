@@ -21,6 +21,9 @@ public class WipLaunchOperationConfiguration : IEntityTypeConfiguration<WipLaunc
         builder.Property(x => x.Hours)
             .HasPrecision(12, 3);
 
+        builder.Property(x => x.NormHours)
+            .HasPrecision(12, 3);
+
         builder.HasIndex(x => new { x.WipLaunchId, x.OpNumber })
             .IsUnique();
 

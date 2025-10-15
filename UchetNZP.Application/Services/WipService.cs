@@ -10,10 +10,12 @@ namespace UchetNZP.Application.Services;
 public class WipService : IWipService
 {
     private readonly AppDbContext _dbContext;
+    private readonly ICurrentUserService _currentUserService;
 
-    public WipService(AppDbContext dbContext)
+    public WipService(AppDbContext dbContext, ICurrentUserService currentUserService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
     }
 
     public async Task<ReceiptBatchSummaryDto> AddReceiptsBatchAsync(IEnumerable<ReceiptItemDto> items, CancellationToken cancellationToken = default)
@@ -37,6 +39,9 @@ public class WipService : IWipService
 
             foreach (var item in materialized)
             {
+                var now = DateTime.UtcNow;
+                var userId = _currentUserService.UserId;
+
                 if (item.Quantity <= 0)
                 {
                     throw new InvalidOperationException($"Количество для детали {item.PartId} и операции {item.OpNumber} должно быть больше нуля.");
@@ -83,12 +88,15 @@ public class WipService : IWipService
                 var receipt = new WipReceipt
                 {
                     Id = Guid.NewGuid(),
+                    UserId = userId,
                     PartId = item.PartId,
                     SectionId = item.SectionId,
                     OpNumber = item.OpNumber,
                     ReceiptDate = item.ReceiptDate,
+                    CreatedAt = now,
                     Quantity = item.Quantity,
                     DocumentNumber = item.DocumentNumber,
+                    Comment = item.Comment,
                 };
 
                 await _dbContext.WipReceipts.AddAsync(receipt, cancellationToken).ConfigureAwait(false);

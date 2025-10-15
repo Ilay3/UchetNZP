@@ -1,6 +1,7 @@
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Launches;
 using UchetNZP.Application.Services;
 using UchetNZP.Domain.Entities;
@@ -50,11 +51,11 @@ public class LaunchServiceTests
         await dbContext.SaveChangesAsync();
 
         var routeService = new RouteService(dbContext);
-        var launchService = new LaunchService(dbContext, routeService);
+        var launchService = new LaunchService(dbContext, routeService, new TestCurrentUserService());
 
         var launchDate = new DateTime(2025, 1, 1);
         var summary = await launchService.AddLaunchesBatchAsync(
-            new[] { new LaunchItemDto(partId, 15, launchDate, 40m, "Партия-1") });
+            new[] { new LaunchItemDto(partId, 15, launchDate, 40m, "Партия-1", null) });
 
         // Assert
         Assert.Equal(1, summary.Saved);
@@ -96,5 +97,9 @@ public class LaunchServiceTests
             .Options;
 
         return new AppDbContext(options);
+    }
+    private sealed class TestCurrentUserService : ICurrentUserService
+    {
+        public Guid UserId { get; } = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     }
 }

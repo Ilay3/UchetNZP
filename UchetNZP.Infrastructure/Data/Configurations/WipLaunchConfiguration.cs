@@ -12,7 +12,16 @@ public class WipLaunchConfiguration : IEntityTypeConfiguration<WipLaunch>
 
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.UserId)
+            .IsRequired();
+
         builder.Property(x => x.LaunchDate)
+            .IsRequired();
+
+        builder.Property(x => x.CreatedAt)
+            .IsRequired();
+
+        builder.Property(x => x.FromOpNumber)
             .IsRequired();
 
         builder.Property(x => x.Quantity)
@@ -23,6 +32,9 @@ public class WipLaunchConfiguration : IEntityTypeConfiguration<WipLaunch>
 
         builder.Property(x => x.DocumentNumber)
             .HasMaxLength(64);
+
+        builder.Property(x => x.Comment)
+            .HasMaxLength(256);
 
         builder.HasIndex(x => new { x.PartId, x.SectionId, x.LaunchDate });
 
