@@ -17,14 +17,17 @@ public class ReportService : IReportService
 
     public async Task<byte[]> ExportLaunchesToExcelAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
-        if (from > to)
+        var fromUtc = NormalizeToUtc(from);
+        var toUtc = NormalizeToUtc(to);
+
+        if (fromUtc > toUtc)
         {
             throw new ArgumentException("Дата начала периода не может быть больше даты окончания.", nameof(from));
         }
 
         var launches = await _dbContext.WipLaunches
             .AsNoTracking()
-            .Where(x => x.LaunchDate >= from && x.LaunchDate <= to)
+            .Where(x => x.LaunchDate >= fromUtc && x.LaunchDate <= toUtc)
             .Include(x => x.Part)
             .Include(x => x.Section)
             .Include(x => x.Operations)
@@ -107,5 +110,15 @@ public class ReportService : IReportService
         using var memoryStream = new MemoryStream();
         workbook.SaveAs(memoryStream);
         return memoryStream.ToArray();
+    }
+
+    private static DateTime NormalizeToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
     }
 }
