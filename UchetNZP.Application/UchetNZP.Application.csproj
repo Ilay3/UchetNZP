@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\UchetNZP.Domain\UchetNZP.Domain.csproj" />
+  </ItemGroup>
+
 </Project>
