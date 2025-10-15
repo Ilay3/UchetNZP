@@ -41,6 +41,7 @@ public class WipService : IWipService
             {
                 var now = DateTime.UtcNow;
                 var userId = _currentUserService.UserId;
+                var receiptDate = NormalizeToUtc(item.ReceiptDate);
 
                 if (item.Quantity <= 0)
                 {
@@ -92,7 +93,7 @@ public class WipService : IWipService
                     PartId = item.PartId,
                     SectionId = item.SectionId,
                     OpNumber = item.OpNumber,
-                    ReceiptDate = item.ReceiptDate,
+                    ReceiptDate = receiptDate,
                     CreatedAt = now,
                     Quantity = item.Quantity,
                     DocumentNumber = item.DocumentNumber,
@@ -122,5 +123,15 @@ public class WipService : IWipService
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private static DateTime NormalizeToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
     }
 }
