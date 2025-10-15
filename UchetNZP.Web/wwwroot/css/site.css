@@ -1,10 +1,10 @@
 html {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 @media (min-width: 768px) {
   html {
-    font-size: 16px;
+    font-size: 18px;
   }
 }
 
@@ -19,4 +19,35 @@ html {
 
 body {
   margin-bottom: 60px;
+  background-color: #f7f8fb;
+}
+
+.btn {
+  min-height: 48px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+}
+
+.form-control,
+.form-select {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.card {
+  border-radius: 1rem;
+  border: none;
+}
+
+.card-header {
+  border-bottom: none;
+}
+
+table {
+  font-size: 1rem;
+}
+
+.page-header {
+  border-left: 6px solid #0d6efd;
+  padding-left: 1rem;
 }
