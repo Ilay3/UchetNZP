@@ -1,8 +1,13 @@
+@using System.Linq
 @model UchetNZP.Web.Models.RouteListViewModel
-@{
+@{ 
     ViewData["Title"] = "Маршруты деталей";
     var searchValue = Model.Filter.Search ?? string.Empty;
     var selectedSectionId = Model.Filter.SectionId;
+    var groupedRoutes = Model.Routes
+        .GroupBy(route => new { route.PartId, route.PartDisplayName })
+        .Select(group => group.OrderBy(r => r.OpNumber).ToList())
+        .ToList();
 }
 
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
@@ -83,21 +88,43 @@ else
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var route in Model.Routes)
+                        @foreach (var partRoutes in groupedRoutes)
                         {
+                            if (partRoutes.Count == 0)
+                            {
+                                continue;
+                            }
+
+                            var first = partRoutes[0];
                             <tr>
-                                <td class="fw-semibold">@route.PartDisplayName</td>
-                                <td>@route.OperationDisplay</td>
-                                <td>@route.NormHours.ToString("0.###")</td>
-                                <td>@route.SectionName</td>
+                                <th scope="rowgroup" class="fw-semibold align-middle" rowspan="@partRoutes.Count">@first.PartDisplayName</th>
+                                <td>@first.OperationDisplay</td>
+                                <td>@first.NormHours.ToString("0.###")</td>
+                                <td>@first.SectionName</td>
                                 <td class="text-end text-nowrap">
-                                    <a class="btn btn-link text-decoration-none" asp-action="Edit" asp-route-id="@route.Id">Изменить</a>
-                                    <form asp-action="Delete" asp-route-id="@route.Id" method="post" class="d-inline">
+                                    <a class="btn btn-link text-decoration-none" asp-action="Edit" asp-route-id="@first.Id">Изменить</a>
+                                    <form asp-action="Delete" asp-route-id="@first.Id" method="post" class="d-inline">
                                         @Html.AntiForgeryToken()
                                         <button type="submit" class="btn btn-link text-danger text-decoration-none" onclick="return confirm('Удалить выбранный маршрут?');">Удалить</button>
                                     </form>
                                 </td>
                             </tr>
+
+                            foreach (var route in partRoutes.Skip(1))
+                            {
+                                <tr>
+                                    <td>@route.OperationDisplay</td>
+                                    <td>@route.NormHours.ToString("0.###")</td>
+                                    <td>@route.SectionName</td>
+                                    <td class="text-end text-nowrap">
+                                        <a class="btn btn-link text-decoration-none" asp-action="Edit" asp-route-id="@route.Id">Изменить</a>
+                                        <form asp-action="Delete" asp-route-id="@route.Id" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-link text-danger text-decoration-none" onclick="return confirm('Удалить выбранный маршрут?');">Удалить</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>
