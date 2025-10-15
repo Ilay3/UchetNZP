@@ -12,13 +12,26 @@ public class ImportJobConfiguration : IEntityTypeConfiguration<ImportJob>
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.Type)
+        builder.Property(x => x.Ts)
             .IsRequired()
-            .HasMaxLength(128);
+            .HasColumnType("timestamp with time zone");
 
-        builder.Property(x => x.Status)
+        builder.Property(x => x.UserId)
             .IsRequired()
-            .HasMaxLength(128);
+            .HasColumnType("uuid");
+
+        builder.Property(x => x.FileName)
+            .IsRequired()
+            .HasMaxLength(256);
+
+        builder.Property(x => x.TotalRows)
+            .IsRequired();
+
+        builder.Property(x => x.Succeeded)
+            .IsRequired();
+
+        builder.Property(x => x.Skipped)
+            .IsRequired();
 
         builder.Property(x => x.ErrorMessage)
             .HasMaxLength(1024);

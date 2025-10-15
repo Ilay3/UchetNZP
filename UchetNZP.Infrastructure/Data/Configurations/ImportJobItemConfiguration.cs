@@ -12,21 +12,18 @@ public class ImportJobItemConfiguration : IEntityTypeConfiguration<ImportJobItem
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.ExternalId)
+        builder.Property(x => x.RowIndex)
             .IsRequired()
-            .HasMaxLength(128);
+            .HasColumnType("integer");
 
         builder.Property(x => x.Status)
             .IsRequired()
             .HasMaxLength(128);
 
-        builder.Property(x => x.Payload)
-            .HasMaxLength(4096);
-
-        builder.Property(x => x.ErrorMessage)
+        builder.Property(x => x.Message)
             .HasMaxLength(1024);
 
-        builder.HasIndex(x => new { x.ImportJobId, x.ExternalId })
+        builder.HasIndex(x => new { x.ImportJobId, x.RowIndex })
             .IsUnique();
     }
 }

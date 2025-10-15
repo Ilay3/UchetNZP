@@ -1,7 +1,7 @@
 namespace UchetNZP.Application.Contracts.Imports;
 
 public record ImportItemResultDto(
-    int RowNumber,
+    int RowIndex,
     string Status,
     string? Message
 );

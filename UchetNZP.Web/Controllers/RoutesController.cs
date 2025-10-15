@@ -129,7 +129,7 @@ public class RoutesController : Controller
         }
 
         await using var stream = file.OpenReadStream();
-        var summary = await _importService.ImportRoutesExcelAsync(stream, cancellationToken).ConfigureAwait(false);
+        var summary = await _importService.ImportRoutesExcelAsync(stream, file.FileName, cancellationToken).ConfigureAwait(false);
 
         return Ok(summary);
     }
