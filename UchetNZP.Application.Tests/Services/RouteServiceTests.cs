@@ -56,6 +56,29 @@ public class RouteServiceTests
         Assert.Equal(new[] { "015", "020" }, opNumbers);
     }
 
+    [Fact]
+    public async Task GetTailToFinish_ReturnsTailIncludingLargerNumbers()
+    {
+        // Arrange
+        var partId = Guid.NewGuid();
+        await using var dbContext = CreateContext();
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(partId, 15),
+            CreateRoute(partId, 30),
+            CreateRoute(partId, 35),
+            CreateRoute(partId, 45));
+        await dbContext.SaveChangesAsync();
+
+        var service = new RouteService(dbContext);
+
+        // Act
+        var tail = await service.GetTailToFinishAsync(partId, "015");
+
+        // Assert
+        var opNumbers = tail.Select(x => x.OpNumber.ToString("D3")).ToArray();
+        Assert.Equal(new[] { "015", "030", "035", "045" }, opNumbers);
+    }
+
     private static AppDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()

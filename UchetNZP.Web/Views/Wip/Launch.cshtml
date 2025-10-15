@@ -1,0 +1,176 @@
+@{
+    ViewData["Title"] = "Запуск НЗП";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Запуск НЗП</h1>
+    <p class="lead">Выберите деталь и операцию, рассчитайте хвост и добавьте запуск в корзину.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Шаг 1. Заполните параметры запуска</div>
+    <div class="card-body">
+        <form id="launchForm" class="row g-4" autocomplete="off">
+            <div class="col-lg-4">
+                <label class="form-label" for="launchPartInput">Деталь</label>
+                <input id="launchPartInput" class="form-control form-control-lg" type="text" list="launchPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
+                <datalist id="launchPartOptions"></datalist>
+                <input type="hidden" id="launchPartId" />
+                <div class="form-text">Выберите деталь для запуска.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="launchOperationInput">Операция (№ | Наименование | Норматив | Остаток)</label>
+                <input id="launchOperationInput" class="form-control form-control-lg" type="text" list="launchOperationOptions" placeholder="Выберите операцию" autocomplete="off" />
+                <datalist id="launchOperationOptions"></datalist>
+                <input type="hidden" id="launchOperationNumber" />
+                <div class="form-text">Поиск доступен по номеру и названию операции.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="launchDateInput">Дата запуска</label>
+                <input id="launchDateInput" class="form-control form-control-lg" type="date" />
+                <div class="form-text">Дата устанавливается на сегодня и может быть скорректирована.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="launchQuantityInput">Запустить (шт)</label>
+                <input id="launchQuantityInput" class="form-control form-control-lg" type="number" min="0" step="1" />
+                <div class="form-text">Количество не должно превышать остаток по операции.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="launchCommentInput">Комментарий / документ</label>
+                <input id="launchCommentInput" class="form-control form-control-lg" type="text" maxlength="120" />
+                <div class="form-text">Укажите номер заказа или документ, если необходимо.</div>
+            </div>
+            <div class="col-lg-4 d-flex align-items-end">
+                <div>
+                    <div class="fw-semibold text-uppercase small text-muted">Доступно на операции</div>
+                    <div class="display-6" id="launchRemainderLabel">0 шт</div>
+                    <div class="form-text">Остаток обновляется при выборе операции.</div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Шаг 2. Расчёт до конца маршрута</div>
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-12 col-xl-6">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle" id="launchTailTable" aria-describedby="launchTailCaption">
+                        <caption id="launchTailCaption" class="visually-hidden">Операции до завершения маршрута</caption>
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">№ операции</th>
+                                <th scope="col">Наименование</th>
+                                <th scope="col">Норматив, н/ч</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">Выберите операцию, чтобы увидеть хвост маршрута.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-12 col-xl-6">
+                <div class="p-4 bg-light rounded-3 h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <h2 class="h4 fw-semibold">Суммарное время</h2>
+                        <p class="text-muted">Расчёт выполняется автоматически: Количество × сумма нормативов хвоста.</p>
+                    </div>
+                    <div>
+                        <div class="fs-2" id="launchHoursLabel">0 ч</div>
+                        <div class="text-muted">Сумма нормативов: <span id="launchNormLabel">0 н/ч</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex flex-column flex-md-row gap-3 mt-4">
+            <button type="button" class="btn btn-primary btn-lg" id="launchAddButton">Добавить в корзину (Enter)</button>
+            <button type="button" class="btn btn-outline-secondary btn-lg" id="launchResetButton">Очистить форму (Esc)</button>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-5">
+    <div class="card-header bg-light fw-semibold d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <span class="fs-4">Корзина запусков</span>
+            <div class="d-flex gap-2">
+                <div>
+                    <label class="form-label mb-1" for="launchExportFrom">Период с</label>
+                    <input id="launchExportFrom" class="form-control form-control-lg" type="date" />
+                </div>
+                <div>
+                    <label class="form-label mb-1" for="launchExportTo">по</label>
+                    <input id="launchExportTo" class="form-control form-control-lg" type="date" />
+                </div>
+            </div>
+        </div>
+        <div class="d-flex flex-column flex-md-row gap-3">
+            <button type="button" class="btn btn-outline-primary btn-lg" id="launchExportButton">Экспорт в Excel</button>
+            <button type="button" class="btn btn-success btn-lg" id="launchSaveButton">Сохранить все запуски (Ctrl+S)</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle" id="launchCartTable" aria-describedby="launchCartCaption">
+                <caption id="launchCartCaption" class="visually-hidden">Запуски, подготовленные к сохранению</caption>
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Дата</th>
+                        <th scope="col">Деталь</th>
+                        <th scope="col">От / до операции</th>
+                        <th scope="col">Количество</th>
+                        <th scope="col">Часы</th>
+                        <th scope="col">Комментарий</th>
+                        <th scope="col" class="text-center">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">Добавьте операции запуска для сохранения.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="launchSummaryModal" tabindex="-1" aria-labelledby="launchSummaryTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h4" id="launchSummaryTitle">Сводка по сохранённым запускам</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3" id="launchSummaryIntro"></p>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle" id="launchSummaryTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Деталь</th>
+                                <th scope="col">От операции</th>
+                                <th scope="col">Количество</th>
+                                <th scope="col">Остаток</th>
+                                <th scope="col">Часы до конца</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary btn-lg" data-bs-dismiss="modal">Понятно</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script src="~/js/launch.js" asp-append-version="true"></script>
+}

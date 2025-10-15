@@ -1,0 +1,158 @@
+@{
+    ViewData["Title"] = "Приход НЗП";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Приход НЗП</h1>
+    <p class="lead">Заполните поля ниже, чтобы добавить приход НЗП и сохранить его одной партией.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Шаг 1. Параметры прихода</div>
+    <div class="card-body">
+        <form id="receiptForm" class="row g-4" autocomplete="off">
+            <div class="col-lg-4">
+                <label class="form-label" for="receiptSectionInput">Участок</label>
+                <input id="receiptSectionInput" class="form-control form-control-lg" type="text" list="receiptSectionOptions" placeholder="Начните вводить название участка" autocomplete="off" />
+                <datalist id="receiptSectionOptions"></datalist>
+                <input type="hidden" id="receiptSectionId" />
+                <div class="form-text">Введите минимум 2 символа для поиска участка.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="receiptPartInput">Деталь</label>
+                <input id="receiptPartInput" class="form-control form-control-lg" type="text" list="receiptPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
+                <datalist id="receiptPartOptions"></datalist>
+                <input type="hidden" id="receiptPartId" />
+                <div class="form-text">Ищите по наименованию или обозначению.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="receiptDateInput">Дата</label>
+                <input id="receiptDateInput" class="form-control form-control-lg" type="date" />
+                <div class="form-text">Дата прихода устанавливается автоматически на сегодня и может быть изменена.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="receiptQuantityInput">Пришло (шт)</label>
+                <input id="receiptQuantityInput" class="form-control form-control-lg" type="number" min="1" step="1" />
+                <div class="form-text">Количество должно быть не меньше 1.</div>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="receiptCommentInput">Комментарий / документ</label>
+                <input id="receiptCommentInput" class="form-control form-control-lg" type="text" maxlength="120" />
+                <div class="form-text">Укажите номер документа или короткий комментарий при необходимости.</div>
+            </div>
+            <div class="col-lg-4 d-flex align-items-end">
+                <div>
+                    <div class="fw-semibold text-uppercase small text-muted">Сейчас на участке</div>
+                    <div class="display-6" id="receiptBalanceLabel">0 шт</div>
+                    <div class="form-text">Остаток обновляется при выборе операции.</div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+        <span>Шаг 2. Выберите операцию детали</span>
+        <div class="small text-muted">Выберите одну операцию из списка ниже.</div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="receiptOperationsTable" aria-describedby="receiptOperationsCaption">
+                <caption id="receiptOperationsCaption" class="visually-hidden">Список операций выбранной детали</caption>
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" class="text-center">Выбор</th>
+                        <th scope="col">№ операции</th>
+                        <th scope="col">Наименование</th>
+                        <th scope="col">Норматив, н/ч</th>
+                        <th scope="col">Участок</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Выберите деталь, чтобы увидеть операции.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex flex-column flex-md-row gap-3 mt-3">
+            <button type="button" class="btn btn-primary btn-lg" id="receiptAddButton">
+                Добавить в корзину (Enter)
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-lg" id="receiptResetButton">
+                Очистить форму (Esc)
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-5">
+    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+        <span>Корзина приходов</span>
+        <button type="button" class="btn btn-success btn-lg" id="receiptSaveButton">
+            Сохранить все приходы (Ctrl+S)
+        </button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle" id="receiptCartTable" aria-describedby="receiptCartCaption">
+                <caption id="receiptCartCaption" class="visually-hidden">Приходы, подготовленные к сохранению</caption>
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Дата</th>
+                        <th scope="col">Участок</th>
+                        <th scope="col">Деталь</th>
+                        <th scope="col">Операция</th>
+                        <th scope="col">Было</th>
+                        <th scope="col">Пришло</th>
+                        <th scope="col">Станет</th>
+                        <th scope="col">Комментарий</th>
+                        <th scope="col" class="text-center">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">Добавьте операции в корзину для сохранения.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="receiptSummaryModal" tabindex="-1" aria-labelledby="receiptSummaryTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h4" id="receiptSummaryTitle">Сводка по сохранённым приходам</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3" id="receiptSummaryIntro"></p>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle" id="receiptSummaryTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Деталь</th>
+                                <th scope="col">Операция</th>
+                                <th scope="col">Было</th>
+                                <th scope="col">Пришло</th>
+                                <th scope="col">Станет</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary btn-lg" data-bs-dismiss="modal">Понятно</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script src="~/js/receipts.js" asp-append-version="true"></script>
+}

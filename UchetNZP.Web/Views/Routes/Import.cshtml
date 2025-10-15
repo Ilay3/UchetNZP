@@ -1,0 +1,78 @@
+@{
+    ViewData["Title"] = "Маршруты: добавление и импорт";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Маршруты: ручное добавление и импорт</h1>
+    <p class="lead">Добавьте новый маршрут вручную или импортируйте несколько записей из Excel.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Шаг 1. Ручное добавление или обновление маршрута</div>
+    <div class="card-body">
+        <form id="routeForm" class="row g-4" autocomplete="off">
+            <div class="col-xl-4">
+                <label class="form-label" for="routePartNameInput">Деталь</label>
+                <input id="routePartNameInput" class="form-control form-control-lg" type="text" list="routePartOptions" placeholder="Наименование детали" autocomplete="off" />
+                <datalist id="routePartOptions"></datalist>
+                <div class="form-text">Введите новое имя или выберите существующее.</div>
+            </div>
+            <div class="col-xl-2">
+                <label class="form-label" for="routePartCodeInput">Обозначение</label>
+                <input id="routePartCodeInput" class="form-control form-control-lg" type="text" placeholder="Например, Д-123" />
+                <div class="form-text">Поле необязательное, если нет обозначения.</div>
+            </div>
+            <div class="col-xl-3">
+                <label class="form-label" for="routeOperationNameInput">Операция</label>
+                <input id="routeOperationNameInput" class="form-control form-control-lg" type="text" list="routeOperationOptions" placeholder="Наименование операции" autocomplete="off" />
+                <datalist id="routeOperationOptions"></datalist>
+                <div class="form-text">Введите название операции или выберите из списка.</div>
+            </div>
+            <div class="col-xl-1">
+                <label class="form-label" for="routeOpNumberInput">№</label>
+                <input id="routeOpNumberInput" class="form-control form-control-lg" type="number" min="1" step="1" />
+                <div class="form-text">Порядковый номер операции.</div>
+            </div>
+            <div class="col-xl-2">
+                <label class="form-label" for="routeNormInput">Норматив (н/ч)</label>
+                <input id="routeNormInput" class="form-control form-control-lg" type="number" min="0" step="0.001" />
+                <div class="form-text">Три знака после запятой, больше нуля.</div>
+            </div>
+            <div class="col-xl-4">
+                <label class="form-label" for="routeSectionNameInput">Участок</label>
+                <input id="routeSectionNameInput" class="form-control form-control-lg" type="text" list="routeSectionOptions" placeholder="Наименование участка" autocomplete="off" />
+                <datalist id="routeSectionOptions"></datalist>
+                <div class="form-text">Укажите или выберите участок, на котором выполняется операция.</div>
+            </div>
+            <div class="col-12">
+                <div class="d-flex flex-column flex-md-row gap-3">
+                    <button type="button" class="btn btn-primary btn-lg" id="routeSaveButton">Сохранить маршрут (Ctrl+S)</button>
+                    <button type="button" class="btn btn-outline-secondary btn-lg" id="routeResetButton">Очистить форму (Esc)</button>
+                </div>
+            </div>
+        </form>
+        <div id="routeSaveMessage" class="alert alert-success mt-4 d-none" role="status"></div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-5">
+    <div class="card-header bg-light fw-semibold">Шаг 2. Импорт маршрутов из Excel</div>
+    <div class="card-body">
+        <form id="routeImportForm" class="row g-3" enctype="multipart/form-data">
+            <div class="col-lg-6">
+                <label class="form-label" for="routeFileInput">Файл Excel</label>
+                <input id="routeFileInput" class="form-control form-control-lg" type="file" accept=".xlsx,.xls" />
+                <div class="form-text">Используйте шаблон с колонками: Наименование детали, Обозначение, Наименование операции, № операции, Утвержденный норматив (н/ч), Участок.</div>
+            </div>
+            <div class="col-lg-6 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-primary btn-lg" id="routeImportButton">Импортировать файл</button>
+            </div>
+        </form>
+        <div id="routeImportSummary" class="mt-4"></div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script src="~/js/routes-import.js" asp-append-version="true"></script>
+}
