@@ -26,6 +26,10 @@ public class AppDbContext : DbContext
 
     public DbSet<WipLaunchOperation> WipLaunchOperations => Set<WipLaunchOperation>();
 
+    public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
+
+    public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

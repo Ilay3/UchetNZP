@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace UchetNZP.Domain.Entities;
 
 public class Section

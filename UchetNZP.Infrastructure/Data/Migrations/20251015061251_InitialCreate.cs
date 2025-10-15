@@ -6,18 +6,35 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace UchetNZP.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class Init : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "ImportJobs",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Type = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Status = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ErrorMessage = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ImportJobs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Operations",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Code = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Code = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -28,9 +45,9 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 name: "Parts",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Code = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Code = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -41,9 +58,9 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 name: "Sections",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Code = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Code = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -51,15 +68,39 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ImportJobItems",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ImportJobId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ExternalId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Status = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Payload = table.Column<string>(type: "character varying(4096)", maxLength: 4096, nullable: true),
+                    ErrorMessage = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ImportJobItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ImportJobItems_ImportJobs_ImportJobId",
+                        column: x => x.ImportJobId,
+                        principalTable: "ImportJobs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PartRoutes",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    PartId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    OpNumber = table.Column<int>(type: "int", nullable: false),
-                    OperationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    SectionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    NormHours = table.Column<decimal>(type: "decimal(10,3)", precision: 10, scale: 3, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PartId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OpNumber = table.Column<int>(type: "integer", nullable: false),
+                    OperationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SectionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    NormHours = table.Column<decimal>(type: "numeric(10,3)", precision: 10, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -88,11 +129,11 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 name: "WipBalances",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    PartId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    SectionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    OpNumber = table.Column<int>(type: "int", nullable: false),
-                    Quantity = table.Column<decimal>(type: "decimal(12,3)", precision: 12, scale: 3, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PartId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SectionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OpNumber = table.Column<int>(type: "integer", nullable: false),
+                    Quantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -115,12 +156,13 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 name: "WipLaunches",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    PartId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    SectionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    LaunchDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Quantity = table.Column<decimal>(type: "decimal(12,3)", precision: 12, scale: 3, nullable: false),
-                    DocumentNumber = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PartId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SectionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    LaunchDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Quantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    DocumentNumber = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    SumHoursToFinish = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -143,13 +185,13 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 name: "WipReceipts",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    PartId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    SectionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    OpNumber = table.Column<int>(type: "int", nullable: false),
-                    ReceiptDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    Quantity = table.Column<decimal>(type: "decimal(12,3)", precision: 12, scale: 3, nullable: false),
-                    DocumentNumber = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    PartId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SectionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OpNumber = table.Column<int>(type: "integer", nullable: false),
+                    ReceiptDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Quantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    DocumentNumber = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -172,14 +214,14 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 name: "WipLaunchOperations",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    WipLaunchId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    OperationId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    SectionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    OpNumber = table.Column<int>(type: "int", nullable: false),
-                    PartRouteId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    Quantity = table.Column<decimal>(type: "decimal(12,3)", precision: 12, scale: 3, nullable: false),
-                    Hours = table.Column<decimal>(type: "decimal(12,3)", precision: 12, scale: 3, nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    WipLaunchId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OperationId = table.Column<Guid>(type: "uuid", nullable: false),
+                    SectionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OpNumber = table.Column<int>(type: "integer", nullable: false),
+                    PartRouteId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Quantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    Hours = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -211,11 +253,16 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_ImportJobItems_ImportJobId_ExternalId",
+                table: "ImportJobItems",
+                columns: new[] { "ImportJobId", "ExternalId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Operations_Code",
                 table: "Operations",
                 column: "Code",
-                unique: true,
-                filter: "[Code] IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_PartRoutes_OperationId",
@@ -237,15 +284,13 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 name: "IX_Parts_Code",
                 table: "Parts",
                 column: "Code",
-                unique: true,
-                filter: "[Code] IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Sections_Code",
                 table: "Sections",
                 column: "Code",
-                unique: true,
-                filter: "[Code] IS NOT NULL");
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_WipBalances_PartId_SectionId_OpNumber",
@@ -304,6 +349,9 @@ namespace UchetNZP.Infrastructure.Data.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "ImportJobItems");
+
+            migrationBuilder.DropTable(
                 name: "WipBalances");
 
             migrationBuilder.DropTable(
@@ -311,6 +359,9 @@ namespace UchetNZP.Infrastructure.Data.Migrations
 
             migrationBuilder.DropTable(
                 name: "WipReceipts");
+
+            migrationBuilder.DropTable(
+                name: "ImportJobs");
 
             migrationBuilder.DropTable(
                 name: "PartRoutes");

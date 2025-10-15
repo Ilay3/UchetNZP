@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace UchetNZP.Domain.Entities;
 
 public class WipLaunch
@@ -13,6 +15,8 @@ public class WipLaunch
     public decimal Quantity { get; set; }
 
     public string? DocumentNumber { get; set; }
+
+    public decimal SumHoursToFinish { get; set; }
 
     public virtual Part? Part { get; set; }
 

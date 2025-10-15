@@ -1,15 +1,32 @@
+using Microsoft.EntityFrameworkCore;
+using UchetNZP.Application.Abstractions;
+using UchetNZP.Application.Services;
+using UchetNZP.Infrastructure.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllersWithViews();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
+
+builder.Services.AddScoped<IRouteService, RouteService>();
+builder.Services.AddScoped<IWipService, WipService>();
+builder.Services.AddScoped<ILaunchService, LaunchService>();
+builder.Services.AddScoped<IImportService, ImportService>();
+builder.Services.AddScoped<IReportService, ReportService>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
