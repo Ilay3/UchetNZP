@@ -12,7 +12,7 @@ public class WipLaunch
 
     public decimal Quantity { get; set; }
 
-    public string? DocumentNumber { get; set; } // Ограничение длины -> Fluent API
+    public string? DocumentNumber { get; set; }
 
     public virtual Part? Part { get; set; }
 
