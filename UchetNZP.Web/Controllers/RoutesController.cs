@@ -24,6 +24,30 @@ public class RoutesController : Controller
         _importService = importService ?? throw new ArgumentNullException(nameof(importService));
     }
 
+    [HttpGet("")]
+    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    {
+        var parts = await _dbContext.Parts
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Select(x => new PartWithOperationsViewModel(
+                x.Id,
+                x.Name,
+                x.Code,
+                x.Routes
+                    .OrderBy(r => r.OpNumber)
+                    .Select(r => new PartOperationItemViewModel(
+                        r.OpNumber,
+                        r.Operation != null ? r.Operation.Name : string.Empty,
+                        r.Section != null ? r.Section.Name : string.Empty,
+                        r.NormHours))
+                    .ToList()))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return View("~/Views/Routes/List.cshtml", parts);
+    }
+
     [HttpGet("import")]
     public IActionResult Import()
     {

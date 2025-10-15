@@ -43,11 +43,22 @@ public class ImportService : IImportService
         var worksheet = workbook.Worksheets.First();
         var headerRow = worksheet.FirstRowUsed() ?? throw new InvalidOperationException("Пустой файл Excel.");
 
-        var headers = headerRow.CellsUsed()
-            .ToDictionary(
-                cell => cell.GetString().Trim(),
-                cell => cell.Address.ColumnNumber,
-                StringComparer.OrdinalIgnoreCase);
+        var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var cell in headerRow.CellsUsed())
+        {
+            var headerText = cell.GetString().Trim();
+
+            if (string.IsNullOrEmpty(headerText))
+            {
+                continue;
+            }
+
+            if (!headers.ContainsKey(headerText))
+            {
+                headers[headerText] = cell.Address.ColumnNumber;
+            }
+        }
 
         int Require(string name)
         {

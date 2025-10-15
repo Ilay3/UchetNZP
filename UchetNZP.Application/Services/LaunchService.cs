@@ -44,6 +44,7 @@ public class LaunchService : ILaunchService
             {
                 var userId = _currentUserService.UserId;
                 var now = DateTime.UtcNow;
+                var launchDate = NormalizeToUtc(item.LaunchDate);
 
                 if (item.Quantity <= 0)
                 {
@@ -97,7 +98,7 @@ public class LaunchService : ILaunchService
                     PartId = item.PartId,
                     SectionId = routeStart.SectionId,
                     FromOpNumber = item.FromOpNumber,
-                    LaunchDate = item.LaunchDate,
+                    LaunchDate = launchDate,
                     CreatedAt = now,
                     Quantity = item.Quantity,
                     DocumentNumber = item.DocumentNumber,
@@ -147,5 +148,15 @@ public class LaunchService : ILaunchService
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private static DateTime NormalizeToUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+        };
     }
 }

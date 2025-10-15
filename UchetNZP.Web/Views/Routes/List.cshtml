@@ -1,0 +1,72 @@
+@model IReadOnlyList<UchetNZP.Web.Models.PartWithOperationsViewModel>
+@{
+    ViewData["Title"] = "Маршруты деталей";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+    <h1 class="mb-0">Маршруты деталей</h1>
+    <a class="btn btn-outline-primary" asp-controller="Routes" asp-action="Import">Импорт и редактирование</a>
+</div>
+
+<p class="text-muted fs-5">Ниже приведён перечень всех деталей и прикреплённых к ним операций маршрута. Операции отсортированы по возрастанию номера.</p>
+
+@if (Model.Count == 0)
+{
+    <div class="alert alert-info fs-5" role="status">
+        Справочник маршрутов пока пуст. Добавьте операции вручную или с помощью импорта Excel.
+    </div>
+}
+else
+{
+    <div class="accordion" id="partsAccordion">
+        @for (var i = 0; i < Model.Count; i++)
+        {
+            var part = Model[i];
+            var collapseId = $"part-{i}";
+            var headingId = $"part-heading-{i}";
+            <div class="accordion-item mb-3 border rounded-3 shadow-sm">
+                <h2 class="accordion-header" id="@headingId">
+                    <button class="accordion-button fs-5" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="@(i == 0 ? "true" : "false")" aria-controls="@collapseId">
+                        <span class="fw-semibold">@part.DisplayName</span>
+                        <span class="ms-3 badge bg-light text-dark">Операций: @part.Operations.Count</span>
+                        <span class="ms-3 badge bg-secondary">Σ норматив: @part.TotalNormHours.ToString("0.###") ч</span>
+                    </button>
+                </h2>
+                <div id="@collapseId" class="accordion-collapse collapse @(i == 0 ? "show" : string.Empty)" aria-labelledby="@headingId" data-bs-parent="#partsAccordion">
+                    <div class="accordion-body">
+                        @if (part.Operations.Count == 0)
+                        {
+                            <div class="alert alert-warning fs-6 mb-0">Для детали пока не добавлены операции маршрута.</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-striped align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col" class="text-nowrap">№ операции</th>
+                                            <th scope="col">Наименование операции</th>
+                                            <th scope="col">Участок</th>
+                                            <th scope="col" class="text-nowrap">Норматив, ч</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var operation in part.Operations)
+                                        {
+                                            <tr>
+                                                <td class="fw-semibold">@operation.OpNumber.ToString("D3")</td>
+                                                <td>@operation.OperationName</td>
+                                                <td>@operation.SectionName</td>
+                                                <td>@operation.NormHours.ToString("0.###")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
