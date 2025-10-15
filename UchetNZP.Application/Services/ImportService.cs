@@ -60,22 +60,44 @@ public class ImportService : IImportService
             }
         }
 
-        int Require(string name)
+        int Require(params string[] names)
         {
-            if (!headers.TryGetValue(name, out var column))
+            foreach (var name in names)
             {
-                throw new InvalidOperationException($"Не найден столбец '{name}'.");
+                if (headers.TryGetValue(name, out var column))
+                {
+                    return column;
+                }
             }
 
-            return column;
+            if (names.Length == 0)
+            {
+                throw new InvalidOperationException("Не указаны имена столбцов.");
+            }
+
+            var display = string.Join("' или '", names);
+            throw new InvalidOperationException($"Не найден столбец '{display}'.");
+        }
+
+        int Optional(params string[] names)
+        {
+            foreach (var name in names)
+            {
+                if (headers.TryGetValue(name, out var column))
+                {
+                    return column;
+                }
+            }
+
+            return -1;
         }
 
         var colPartName = Require("Наименование детали");
-        var colPartCode = headers.TryGetValue("Обозначение", out var tmpPartCode) ? tmpPartCode : -1;
+        var colPartCode = Optional("Обозначение", "№ чертежа");
         var colOperationName = Require("Наименование операции");
         var colOpNumber = Require("№ операции");
-        var colNorm = Require("Утвержденный норматив (н/ч)");
-        var colSection = Require("Участок");
+        var colNorm = Require("Утвержденный норматив (н/ч)", "Технологический процесс");
+        var colSection = Optional("Участок");
 
         var rows = worksheet.RangeUsed()?.RowsUsed().Skip(1).ToList() ?? new List<IXLRangeRow>();
 
@@ -118,12 +140,13 @@ public class ImportService : IImportService
                     return column > 0 ? row.Cell(column).GetString().Trim() : string.Empty;
                 }
 
-                var partName = GetString(colPartName);
+                var rawPartName = GetString(colPartName);
                 var partCode = GetString(colPartCode);
+                var partName = CombinePartName(rawPartName, partCode);
                 var operationName = GetString(colOperationName);
                 var opNumberText = GetString(colOpNumber);
                 var normText = GetString(colNorm);
-                var sectionName = GetString(colSection);
+                var sectionName = GetSectionName(row, colSection, operationName);
 
                 if (string.IsNullOrWhiteSpace(partName) || string.IsNullOrWhiteSpace(operationName) || string.IsNullOrWhiteSpace(opNumberText) || string.IsNullOrWhiteSpace(normText) || string.IsNullOrWhiteSpace(sectionName))
                 {
@@ -220,6 +243,35 @@ public class ImportService : IImportService
             Status = status,
             Message = message,
         };
+    }
+
+    private static string CombinePartName(string name, string code)
+    {
+        name = name?.Trim() ?? string.Empty;
+        code = code?.Trim() ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return code;
+        }
+
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return name;
+        }
+
+        return $"{name} {code}";
+    }
+
+    private static string GetSectionName(IXLRangeRow row, int column, string operationName)
+    {
+        if (column <= 0)
+        {
+            return operationName;
+        }
+
+        var value = row.Cell(column).GetString().Trim();
+        return string.IsNullOrWhiteSpace(value) ? operationName : value;
     }
 
     private async Task<Part> ResolvePartAsync(string name, string code, Dictionary<string, Part> cache, CancellationToken cancellationToken)
