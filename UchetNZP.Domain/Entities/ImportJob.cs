@@ -6,15 +6,17 @@ public class ImportJob
 {
     public Guid Id { get; set; }
 
-    public string Type { get; set; } = string.Empty; // Ограничение длины -> Fluent API
+    public DateTime Ts { get; set; }
 
-    public string Status { get; set; } = string.Empty; // Ограничение длины -> Fluent API
+    public Guid UserId { get; set; }
 
-    public DateTime CreatedAt { get; set; }
+    public string FileName { get; set; } = string.Empty; // Ограничение длины -> Fluent API
 
-    public DateTime? StartedAt { get; set; }
+    public int TotalRows { get; set; }
 
-    public DateTime? CompletedAt { get; set; }
+    public int Succeeded { get; set; }
+
+    public int Skipped { get; set; }
 
     public string? ErrorMessage { get; set; } // Ограничение длины -> Fluent API
 

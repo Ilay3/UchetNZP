@@ -4,8 +4,9 @@ namespace UchetNZP.Application.Contracts.Imports;
 
 public record ImportSummaryDto(
     Guid JobId,
-    int Processed,
-    int Saved,
+    string FileName,
+    int TotalRows,
+    int Succeeded,
     int Skipped,
     IReadOnlyList<ImportItemResultDto> Items
 );

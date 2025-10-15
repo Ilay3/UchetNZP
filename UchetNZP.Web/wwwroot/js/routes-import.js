@@ -161,7 +161,18 @@
 
         const header = document.createElement("div");
         header.className = "alert alert-info";
-        header.textContent = `Обработано: ${summary.processed}, сохранено: ${summary.saved}, пропущено: ${summary.skipped}.`;
+
+        const fileLine = document.createElement("div");
+        const fileLabel = document.createElement("strong");
+        fileLabel.textContent = "Файл:";
+        fileLine.appendChild(fileLabel);
+        fileLine.appendChild(document.createTextNode(` ${summary.fileName}`));
+
+        const totalsLine = document.createElement("div");
+        totalsLine.textContent = `Всего строк: ${summary.totalRows}, успешно: ${summary.succeeded}, пропущено: ${summary.skipped}.`;
+
+        header.appendChild(fileLine);
+        header.appendChild(totalsLine);
 
         const table = document.createElement("table");
         table.className = "table table-bordered table-sm mt-3";
@@ -179,11 +190,14 @@
         (summary.items ?? []).forEach(item => {
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td>${item.rowNumber}</td>
+                <td>${item.rowIndex}</td>
                 <td>${item.status}</td>
                 <td>${item.message ?? ""}</td>`;
             if (item.status === "Skipped") {
                 row.classList.add("table-warning");
+            }
+            if (item.status === "Succeeded") {
+                row.classList.add("table-success");
             }
             body.appendChild(row);
         });

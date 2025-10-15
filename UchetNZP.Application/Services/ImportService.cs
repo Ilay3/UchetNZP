@@ -1,6 +1,6 @@
 using System.Globalization;
+using System.IO;
 using System.Linq;
-using System.Text.Json;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -12,20 +12,31 @@ namespace UchetNZP.Application.Services;
 
 public class ImportService : IImportService
 {
-    private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
-
     private readonly AppDbContext _dbContext;
+    private readonly ICurrentUserService _currentUserService;
 
-    public ImportService(AppDbContext dbContext)
+    public ImportService(AppDbContext dbContext, ICurrentUserService currentUserService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
     }
 
-    public async Task<ImportSummaryDto> ImportRoutesExcelAsync(Stream stream, CancellationToken cancellationToken = default)
+    public async Task<ImportSummaryDto> ImportRoutesExcelAsync(Stream stream, string fileName, CancellationToken cancellationToken = default)
     {
         if (stream is null)
         {
             throw new ArgumentNullException(nameof(stream));
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            throw new ArgumentException("Имя файла не заполнено.", nameof(fileName));
+        }
+
+        var resolvedFileName = Path.GetFileName(fileName.Trim());
+        if (string.IsNullOrEmpty(resolvedFileName))
+        {
+            throw new ArgumentException("Имя файла не заполнено.", nameof(fileName));
         }
 
         using var workbook = new XLWorkbook(stream);
@@ -61,10 +72,12 @@ public class ImportService : IImportService
         var job = new ImportJob
         {
             Id = Guid.NewGuid(),
-            Type = "RoutesExcel",
-            Status = "InProgress",
-            CreatedAt = now,
-            StartedAt = now,
+            Ts = now,
+            UserId = _currentUserService.UserId,
+            FileName = resolvedFileName,
+            TotalRows = rows.Count,
+            Succeeded = 0,
+            Skipped = 0,
         };
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
@@ -79,7 +92,8 @@ public class ImportService : IImportService
             var routeCache = new Dictionary<string, PartRoute>(StringComparer.OrdinalIgnoreCase);
 
             var results = new List<ImportItemResultDto>();
-            var saved = 0;
+            var items = new List<ImportJobItem>();
+            var succeeded = 0;
             var skipped = 0;
 
             foreach (var row in rows)
@@ -100,20 +114,10 @@ public class ImportService : IImportService
                 var normText = GetString(colNorm);
                 var sectionName = GetString(colSection);
 
-                var payload = JsonSerializer.Serialize(new
-                {
-                    partName,
-                    partCode,
-                    operationName,
-                    opNumber = opNumberText,
-                    norm = normText,
-                    sectionName,
-                }, SerializerOptions);
-
                 if (string.IsNullOrWhiteSpace(partName) || string.IsNullOrWhiteSpace(operationName) || string.IsNullOrWhiteSpace(opNumberText) || string.IsNullOrWhiteSpace(normText) || string.IsNullOrWhiteSpace(sectionName))
                 {
                     const string reason = "Пропущены обязательные поля.";
-                    await AddJobItemAsync(job.Id, rowNumber, payload, reason, false, now, cancellationToken).ConfigureAwait(false);
+                    items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
                     results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
                     skipped++;
                     continue;
@@ -122,7 +126,7 @@ public class ImportService : IImportService
                 if (!int.TryParse(opNumberText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var opNumber))
                 {
                     const string reason = "Некорректный номер операции.";
-                    await AddJobItemAsync(job.Id, rowNumber, payload, reason, false, now, cancellationToken).ConfigureAwait(false);
+                    items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
                     results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
                     skipped++;
                     continue;
@@ -131,7 +135,7 @@ public class ImportService : IImportService
                 if (!TryParseDecimal(normText, out var normHours))
                 {
                     const string reason = "Некорректный норматив.";
-                    await AddJobItemAsync(job.Id, rowNumber, payload, reason, false, now, cancellationToken).ConfigureAwait(false);
+                    items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
                     results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
                     skipped++;
                     continue;
@@ -169,18 +173,24 @@ public class ImportService : IImportService
                 route.SectionId = section.Id;
                 route.NormHours = normHours;
 
-                await AddJobItemAsync(job.Id, rowNumber, payload, null, true, now, cancellationToken).ConfigureAwait(false);
-                results.Add(new ImportItemResultDto(rowNumber, "Saved", null));
-                saved++;
+                items.Add(CreateJobItem(job.Id, rowNumber, "Succeeded", null));
+                results.Add(new ImportItemResultDto(rowNumber, "Succeeded", null));
+                succeeded++;
             }
 
-            job.Status = skipped > 0 ? "CompletedWithWarnings" : "Completed";
-            job.CompletedAt = DateTime.UtcNow;
+            job.TotalRows = rows.Count;
+            job.Succeeded = succeeded;
+            job.Skipped = skipped;
+
+            if (items.Count > 0)
+            {
+                await _dbContext.ImportJobItems.AddRangeAsync(items, cancellationToken).ConfigureAwait(false);
+            }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
-            return new ImportSummaryDto(job.Id, rows.Count, saved, skipped, results);
+            return new ImportSummaryDto(job.Id, job.FileName, job.TotalRows, job.Succeeded, job.Skipped, results);
         }
         catch
         {
@@ -189,21 +199,16 @@ public class ImportService : IImportService
         }
     }
 
-    private async Task AddJobItemAsync(Guid jobId, int rowNumber, string payload, string? error, bool saved, DateTime now, CancellationToken cancellationToken)
+    private static ImportJobItem CreateJobItem(Guid jobId, int rowIndex, string status, string? message)
     {
-        var item = new ImportJobItem
+        return new ImportJobItem
         {
             Id = Guid.NewGuid(),
             ImportJobId = jobId,
-            ExternalId = rowNumber.ToString(CultureInfo.InvariantCulture),
-            Status = saved ? "Saved" : "Skipped",
-            Payload = payload,
-            ErrorMessage = error,
-            CreatedAt = now,
-            ProcessedAt = now,
+            RowIndex = rowIndex,
+            Status = status,
+            Message = message,
         };
-
-        await _dbContext.ImportJobItems.AddAsync(item, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<Part> ResolvePartAsync(string name, string code, Dictionary<string, Part> cache, CancellationToken cancellationToken)
