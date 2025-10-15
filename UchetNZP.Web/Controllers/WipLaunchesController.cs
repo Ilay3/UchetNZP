@@ -87,12 +87,12 @@ public class WipLaunchesController : Controller
                                   section != null ? section.Name : string.Empty,
                                   balance != null ? balance.Quantity : 0m);
 
-        var operations = await operationsQuery
+        var operationItems = await operationsQuery
             .Take(100)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return Ok(operations);
+        return Ok(operationItems);
     }
 
     [HttpGet("tail")]
