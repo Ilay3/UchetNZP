@@ -4,13 +4,9 @@ public class Part
 {
     public Guid Id { get; set; }
 
-    public string Code { get; set; } = string.Empty; // Ограничение длины -> Fluent API
+    public string Name { get; set; } = string.Empty;
 
-    public string Name { get; set; } = string.Empty; // Ограничение длины -> Fluent API
-
-    public Guid SectionId { get; set; }
-
-    public virtual Section? Section { get; set; }
+    public string? Code { get; set; }
 
     public virtual ICollection<PartRoute> Routes { get; set; } = new List<PartRoute>();
 

@@ -4,9 +4,9 @@ public class Operation
 {
     public Guid Id { get; set; }
 
-    public string Code { get; set; } = string.Empty; // Ограничение длины -> Fluent API
+    public string Name { get; set; } = string.Empty;
 
-    public string Name { get; set; } = string.Empty; // Ограничение длины -> Fluent API
+    public string? Code { get; set; }
 
     public virtual ICollection<PartRoute> PartRoutes { get; set; } = new List<PartRoute>();
 

@@ -8,7 +8,7 @@ public class WipBalance
 
     public Guid SectionId { get; set; }
 
-    public DateOnly Period { get; set; }
+    public int OpNumber { get; set; }
 
     public decimal Quantity { get; set; }
 
