@@ -5,10 +5,12 @@ namespace UchetNZP.Infrastructure.Data;
 
 public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
 {
+    private const string DefaultConnection = "Host=localhost;Port=5432;Database=UchetNZP;Username=postgres;Password=postgres";
+
     public AppDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=UchetNZP;Trusted_Connection=True;MultipleActiveResultSets=true");
+        optionsBuilder.UseNpgsql(DefaultConnection);
 
         return new AppDbContext(optionsBuilder.Options);
     }
