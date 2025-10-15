@@ -48,7 +48,7 @@ public class RouteListViewModel
     public int Total => Routes.Count;
 }
 
-public class RouteEditInputModel
+public class RouteEditInputModel : IValidatableObject
 {
     public Guid? Id { get; set; }
 
@@ -66,7 +66,6 @@ public class RouteEditInputModel
     [Display(Name = "№ операции")]
     public int OpNumber { get; set; }
 
-    [Range(typeof(decimal), "0.001", "79228162514264337593543950335", ErrorMessage = "Норматив должен быть больше нуля.")]
     [Display(Name = "Норматив (н/ч)")]
     public decimal NormHours { get; set; }
 
@@ -76,4 +75,14 @@ public class RouteEditInputModel
     public string SectionName { get; set; } = string.Empty;
 
     public string Title => Id.HasValue ? "Редактирование маршрута" : "Добавление маршрута";
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (NormHours <= 0)
+        {
+            yield return new ValidationResult(
+                "Норматив должен быть больше нуля.",
+                new[] { nameof(NormHours) });
+        }
+    }
 }

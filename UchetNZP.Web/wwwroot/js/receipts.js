@@ -55,6 +55,7 @@
     });
 
     sectionLookup.inputElement?.addEventListener("lookup:selected", () => {
+        renderOperations();
         updateBalanceLabel();
     });
 
@@ -66,6 +67,7 @@
     });
 
     sectionLookup.inputElement?.addEventListener("input", () => {
+        renderOperations();
         updateBalanceLabel();
     });
 
@@ -98,13 +100,23 @@
             return;
         }
 
-        const selectedSectionId = sectionLookup.hiddenInput?.value;
+        const selectedSectionId = sectionLookup.hiddenInput?.value || "";
+        const normalizedSectionId = selectedSectionId.length ? selectedSectionId : null;
+
+        if (selectedOperation && normalizedSectionId && selectedOperation.sectionId !== normalizedSectionId) {
+            selectedOperation = null;
+        }
+
         operationsTableBody.innerHTML = "";
         operations.forEach(operation => {
             const row = document.createElement("tr");
-            const belongsToSection = !selectedSectionId || selectedSectionId === operation.sectionId;
+            const belongsToSection = !normalizedSectionId || normalizedSectionId === operation.sectionId;
             if (!belongsToSection) {
                 row.classList.add("table-warning");
+            }
+
+            if (!belongsToSection && selectedOperation && selectedOperation.opNumber === operation.opNumber) {
+                selectedOperation = null;
             }
 
             const choiceCell = document.createElement("td");
@@ -114,10 +126,25 @@
             radio.name = "receiptOperation";
             radio.classList.add("form-check-input", "fs-4");
             radio.setAttribute("aria-label", `Выбрать операцию ${operation.opNumber}`);
+            radio.dataset.opNumber = String(operation.opNumber);
+            radio.disabled = !belongsToSection;
+            if (!belongsToSection) {
+                radio.setAttribute("title", "Операция относится к другому участку");
+            }
+
             radio.addEventListener("change", () => {
+                if (radio.disabled) {
+                    return;
+                }
+
                 selectedOperation = operation;
                 updateBalanceLabel();
             });
+
+            if (selectedOperation && selectedOperation.opNumber === operation.opNumber) {
+                radio.checked = true;
+            }
+
             choiceCell.appendChild(radio);
 
             const numberCell = document.createElement("td");
@@ -274,15 +301,7 @@
 
         await loadOperations(item.partId);
         selectedOperation = operations.find(op => op.opNumber === item.opNumber) ?? null;
-        if (selectedOperation) {
-            const rows = operationsTableBody.querySelectorAll("input[type=radio]");
-            rows.forEach((radio, idx) => {
-                if (operations[idx] && operations[idx].opNumber === selectedOperation.opNumber) {
-                    radio.checked = true;
-                }
-            });
-        }
-
+        renderOperations();
         renderCart();
         updateBalanceLabel();
     }
