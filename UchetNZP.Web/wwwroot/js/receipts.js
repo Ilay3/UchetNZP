@@ -29,7 +29,6 @@
 
     const dateInput = document.getElementById("receiptDateInput");
     const quantityInput = document.getElementById("receiptQuantityInput");
-    const documentInput = document.getElementById("receiptDocumentInput");
     const commentInput = document.getElementById("receiptCommentInput");
     const addButton = document.getElementById("receiptAddButton");
     const saveButton = document.getElementById("receiptSaveButton");
@@ -190,7 +189,7 @@
 
     function renderCart() {
         if (!cart.length) {
-            cartTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
+            cartTableBody.innerHTML = "<tr><td colspan=\"9\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
             return;
         }
 
@@ -206,7 +205,6 @@
                 <td>${item.was.toFixed(3)}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>
-                <td>${item.documentNumber ?? ""}</td>
                 <td>${item.comment ?? ""}</td>
                 <td class="text-center">
                     <button type="button" class="btn btn-link btn-lg text-decoration-none" data-action="edit" data-index="${index}" aria-label="Изменить запись">✎</button>
@@ -271,7 +269,6 @@
         partLookup.setSelected({ id: item.partId, name: item.partName, code: item.partCode });
         sectionLookup.setSelected({ id: item.sectionId, name: item.sectionName, code: null });
         quantityInput.value = item.quantity;
-        documentInput.value = item.documentNumber ?? "";
         commentInput.value = item.comment ?? "";
         dateInput.value = item.date;
 
@@ -297,7 +294,6 @@
     function resetForm() {
         editingIndex = null;
         quantityInput.value = "";
-        documentInput.value = "";
         commentInput.value = "";
         dateInput.value = new Date().toISOString().slice(0, 10);
         selectedOperation = null;
@@ -364,7 +360,7 @@
             operationDisplay,
             date,
             quantity,
-            documentNumber: documentInput.value || null,
+            documentNumber: null,
             comment: commentInput.value || null,
             was,
             become,

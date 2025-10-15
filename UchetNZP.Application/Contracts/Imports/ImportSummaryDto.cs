@@ -8,5 +8,7 @@ public record ImportSummaryDto(
     int TotalRows,
     int Succeeded,
     int Skipped,
-    IReadOnlyList<ImportItemResultDto> Items
+    IReadOnlyList<ImportItemResultDto> Items,
+    string? ErrorFileName,
+    byte[]? ErrorFileContent
 );

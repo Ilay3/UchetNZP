@@ -18,14 +18,14 @@
                 <input type="hidden" id="launchPartId" />
                 <div class="form-text">Выберите деталь для запуска.</div>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-5 col-xl-6">
                 <label class="form-label" for="launchOperationInput">Операция (№ | Наименование | Норматив | Остаток)</label>
                 <input id="launchOperationInput" class="form-control form-control-lg" type="text" list="launchOperationOptions" placeholder="Выберите операцию" autocomplete="off" />
                 <datalist id="launchOperationOptions"></datalist>
                 <input type="hidden" id="launchOperationNumber" />
                 <div class="form-text">Поиск доступен по номеру и названию операции.</div>
             </div>
-            <div class="col-lg-4">
+            <div class="col-lg-3 col-xl-2">
                 <label class="form-label" for="launchDateInput">Дата запуска</label>
                 <input id="launchDateInput" class="form-control form-control-lg" type="date" />
                 <div class="form-text">Дата устанавливается на сегодня и может быть скорректирована.</div>
@@ -35,12 +35,7 @@
                 <input id="launchQuantityInput" class="form-control form-control-lg" type="number" min="0" step="1" />
                 <div class="form-text">Количество не должно превышать остаток по операции.</div>
             </div>
-            <div class="col-lg-4">
-                <label class="form-label" for="launchDocumentInput">Документ</label>
-                <input id="launchDocumentInput" class="form-control form-control-lg" type="text" maxlength="64" />
-                <div class="form-text">Укажите номер заказа или сопроводительного документа, если необходимо.</div>
-            </div>
-            <div class="col-lg-4">
+            <div class="col-lg-5">
                 <label class="form-label" for="launchCommentInput">Комментарий</label>
                 <input id="launchCommentInput" class="form-control form-control-lg" type="text" maxlength="256" />
                 <div class="form-text">Добавьте пояснение к запуску при необходимости.</div>
@@ -130,14 +125,13 @@
                         <th scope="col">От / до операции</th>
                         <th scope="col">Количество</th>
                         <th scope="col">Часы</th>
-                        <th scope="col">Документ</th>
                         <th scope="col">Комментарий</th>
                         <th scope="col" class="text-center">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="8" class="text-center text-muted">Добавьте операции запуска для сохранения.</td>
+                        <td colspan="7" class="text-center text-muted">Добавьте операции запуска для сохранения.</td>
                     </tr>
                 </tbody>
             </table>
