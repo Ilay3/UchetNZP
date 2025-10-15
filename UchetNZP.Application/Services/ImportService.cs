@@ -42,6 +42,40 @@ public class ImportService : IImportService
         using var workbook = new XLWorkbook(stream);
         var worksheet = workbook.Worksheets.First();
         var headerRow = worksheet.FirstRowUsed() ?? throw new InvalidOperationException("Пустой файл Excel.");
+        var headerCells = headerRow.CellsUsed().OrderBy(cell => cell.Address.ColumnNumber).ToList();
+
+        using var errorWorkbook = new XLWorkbook();
+        var errorWorksheet = errorWorkbook.Worksheets.Add("Ошибки");
+        var errorRowIndex = 2;
+        var hasErrors = false;
+
+        void RegisterErrorRow(IXLRangeRow row, string reason, int rowNumber)
+        {
+            if (!hasErrors)
+            {
+                var header = errorWorksheet.Row(1);
+                header.Cell(1).Value = "Номер строки";
+                var headerColumn = 2;
+                foreach (var cell in headerCells)
+                {
+                    header.Cell(headerColumn++).Value = cell.GetString();
+                }
+
+                header.Cell(headerColumn).Value = "Ошибка";
+                hasErrors = true;
+            }
+
+            var targetRow = errorWorksheet.Row(errorRowIndex++);
+            targetRow.Cell(1).Value = rowNumber;
+
+            var columnIndex = 2;
+            foreach (var cell in headerCells)
+            {
+                targetRow.Cell(columnIndex++).Value = row.Cell(cell.Address.ColumnNumber).Value;
+            }
+
+            targetRow.Cell(columnIndex).Value = reason;
+        }
 
         var headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -153,6 +187,7 @@ public class ImportService : IImportService
                     const string reason = "Пропущены обязательные поля.";
                     items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
                     results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
+                    RegisterErrorRow(row, reason, rowNumber);
                     skipped++;
                     continue;
                 }
@@ -162,6 +197,7 @@ public class ImportService : IImportService
                     const string reason = "Некорректный номер операции.";
                     items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
                     results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
+                    RegisterErrorRow(row, reason, rowNumber);
                     skipped++;
                     continue;
                 }
@@ -171,6 +207,7 @@ public class ImportService : IImportService
                     const string reason = "Некорректный норматив.";
                     items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
                     results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
+                    RegisterErrorRow(row, reason, rowNumber);
                     skipped++;
                     continue;
                 }
@@ -224,7 +261,19 @@ public class ImportService : IImportService
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
-            return new ImportSummaryDto(job.Id, job.FileName, job.TotalRows, job.Succeeded, job.Skipped, results);
+            byte[]? errorFileContent = null;
+            string? errorFileName = null;
+
+            if (hasErrors)
+            {
+                errorWorksheet.Columns().AdjustToContents();
+                using var errorStream = new MemoryStream();
+                errorWorkbook.SaveAs(errorStream);
+                errorFileContent = errorStream.ToArray();
+                errorFileName = $"{Path.GetFileNameWithoutExtension(job.FileName)}_Ошибки.xlsx";
+            }
+
+            return new ImportSummaryDto(job.Id, job.FileName, job.TotalRows, job.Succeeded, job.Skipped, results, errorFileName, errorFileContent);
         }
         catch
         {

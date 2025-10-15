@@ -28,7 +28,6 @@
         minLength: 2,
     });
 
-    const partCodeInput = document.getElementById("routePartCodeInput");
     const opNumberInput = document.getElementById("routeOpNumberInput");
     const normInput = document.getElementById("routeNormInput");
     const saveButton = document.getElementById("routeSaveButton");
@@ -38,6 +37,7 @@
     const fileInput = document.getElementById("routeFileInput");
     const importButton = document.getElementById("routeImportButton");
     const importSummaryContainer = document.getElementById("routeImportSummary");
+    let lastDownloadedJobId = null;
 
     saveButton.addEventListener("click", () => saveRoute());
     resetButton.addEventListener("click", () => resetForm());
@@ -76,7 +76,7 @@
 
         const payload = {
             partName,
-            partCode: partCodeInput.value.trim() || null,
+            partCode: null,
             operationName,
             opNumber,
             normHours,
@@ -111,7 +111,6 @@
 
     function resetForm() {
         partLookup.setSelected(null);
-        partCodeInput.value = "";
         operationLookup.setSelected(null);
         opNumberInput.value = "";
         normInput.value = "";
@@ -159,52 +158,41 @@
             return;
         }
 
-        const header = document.createElement("div");
-        header.className = "alert alert-info";
+        const summaryCard = document.createElement("div");
+        summaryCard.className = "alert alert-info";
 
         const fileLine = document.createElement("div");
-        const fileLabel = document.createElement("strong");
-        fileLabel.textContent = "Файл:";
-        fileLine.appendChild(fileLabel);
-        fileLine.appendChild(document.createTextNode(` ${summary.fileName}`));
+        fileLine.innerHTML = `<strong>Файл:</strong> ${summary.fileName}`;
 
         const totalsLine = document.createElement("div");
         totalsLine.textContent = `Всего строк: ${summary.totalRows}, успешно: ${summary.succeeded}, пропущено: ${summary.skipped}.`;
 
-        header.appendChild(fileLine);
-        header.appendChild(totalsLine);
+        summaryCard.appendChild(fileLine);
+        summaryCard.appendChild(totalsLine);
 
-        const table = document.createElement("table");
-        table.className = "table table-bordered table-sm mt-3";
-        table.innerHTML = `
-            <thead class=\"table-light\">
-                <tr>
-                    <th scope=\"col\">Строка</th>
-                    <th scope=\"col\">Статус</th>
-                    <th scope=\"col\">Комментарий</th>
-                </tr>
-            </thead>
-            <tbody></tbody>`;
+        if (summary.skipped > 0) {
+            const hint = document.createElement("p");
+            hint.className = "mt-3 mb-0";
+            hint.textContent = "Найденные ошибки можно скачать отдельным Excel-файлом.";
+            summaryCard.appendChild(hint);
 
-        const body = table.querySelector("tbody");
-        (summary.items ?? []).forEach(item => {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${item.rowIndex}</td>
-                <td>${item.status}</td>
-                <td>${item.message ?? ""}</td>`;
-            if (item.status === "Skipped") {
-                row.classList.add("table-warning");
+            if (summary.errorFileContent) {
+                const downloadButton = document.createElement("button");
+                downloadButton.type = "button";
+                downloadButton.className = "btn btn-outline-danger btn-lg mt-3";
+                downloadButton.textContent = "Скачать отчёт об ошибках";
+                downloadButton.addEventListener("click", () => downloadErrorReport(summary));
+                summaryCard.appendChild(downloadButton);
             }
-            if (item.status === "Succeeded") {
-                row.classList.add("table-success");
-            }
-            body.appendChild(row);
-        });
+        }
 
         importSummaryContainer.innerHTML = "";
-        importSummaryContainer.appendChild(header);
-        importSummaryContainer.appendChild(table);
+        importSummaryContainer.appendChild(summaryCard);
+
+        if (summary.skipped > 0 && summary.errorFileContent && summary.jobId !== lastDownloadedJobId) {
+            downloadErrorReport(summary);
+            lastDownloadedJobId = summary.jobId;
+        }
     }
 
     namespace.bindHotkeys({
@@ -212,4 +200,37 @@
         onSave: () => saveRoute(),
         onCancel: () => resetForm(),
     });
+
+    function downloadErrorReport(summary) {
+        if (!summary || !summary.errorFileContent) {
+            return;
+        }
+
+        try {
+            const binary = atob(summary.errorFileContent);
+            const length = binary.length;
+            const bytes = new Uint8Array(length);
+            for (let i = 0; i < length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+
+            const blob = new Blob([bytes], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = summary.errorFileName || `Ошибки_${summary.fileName}`;
+            document.body.appendChild(link);
+            link.click();
+            requestAnimationFrame(() => {
+                URL.revokeObjectURL(url);
+                link.remove();
+            });
+        }
+        catch (error) {
+            console.error("Не удалось подготовить файл ошибок", error);
+        }
+    }
 })();
