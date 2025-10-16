@@ -89,7 +89,6 @@
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
-                                        <th scope="col">Время</th>
                                         <th scope="col">Деталь</th>
                                         <th scope="col">Участок</th>
                                         <th scope="col">Операции</th>
@@ -102,7 +101,6 @@
                                     @foreach (var launch in dateGroup.Launches)
                                     {
                                         <tr>
-                                            <td>@launch.LaunchDate.ToString("HH:mm")</td>
                                             <td>
                                                 <div class="fw-semibold">@launch.PartDisplayName</div>
                                                 <div class="text-muted small">ID: @launch.Id</div>
