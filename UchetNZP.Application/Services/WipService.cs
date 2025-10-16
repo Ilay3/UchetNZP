@@ -96,7 +96,6 @@ public class WipService : IWipService
                     ReceiptDate = receiptDate,
                     CreatedAt = now,
                     Quantity = item.Quantity,
-                    DocumentNumber = item.DocumentNumber,
                     Comment = item.Comment,
                 };
 

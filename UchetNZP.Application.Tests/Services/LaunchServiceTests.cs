@@ -55,7 +55,7 @@ public class LaunchServiceTests
 
         var launchDate = new DateTime(2025, 1, 1);
         var summary = await launchService.AddLaunchesBatchAsync(
-            new[] { new LaunchItemDto(partId, 15, launchDate, 40m, "Партия-1", null) });
+            new[] { new LaunchItemDto(partId, 15, launchDate, 40m, null) });
 
         // Assert
         Assert.Equal(1, summary.Saved);

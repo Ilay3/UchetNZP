@@ -20,8 +20,6 @@ public class WipLaunch
 
     public decimal Quantity { get; set; }
 
-    public string? DocumentNumber { get; set; }
-
     public string? Comment { get; set; }
 
     public decimal SumHoursToFinish { get; set; }

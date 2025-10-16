@@ -30,9 +30,6 @@ public class WipLaunchConfiguration : IEntityTypeConfiguration<WipLaunch>
         builder.Property(x => x.SumHoursToFinish)
             .HasPrecision(12, 3);
 
-        builder.Property(x => x.DocumentNumber)
-            .HasMaxLength(64);
-
         builder.Property(x => x.Comment)
             .HasMaxLength(256);
 

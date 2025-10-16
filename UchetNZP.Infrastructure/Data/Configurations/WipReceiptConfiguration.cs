@@ -27,9 +27,6 @@ public class WipReceiptConfiguration : IEntityTypeConfiguration<WipReceipt>
         builder.Property(x => x.Quantity)
             .HasPrecision(12, 3);
 
-        builder.Property(x => x.DocumentNumber)
-            .HasMaxLength(64);
-
         builder.Property(x => x.Comment)
             .HasMaxLength(256);
 

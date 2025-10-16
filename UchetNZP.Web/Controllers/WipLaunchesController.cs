@@ -55,6 +55,8 @@ public class WipLaunchesController : Controller
             .Include(x => x.Section)
             .Include(x => x.Operations)
                 .ThenInclude(o => o.Operation)
+            .Include(x => x.Operations)
+                .ThenInclude(o => o.Section)
             .OrderBy(x => x.LaunchDate)
             .ThenBy(x => x.Part != null ? x.Part.Name : string.Empty)
             .ToListAsync(cancellationToken)
@@ -70,13 +72,13 @@ public class WipLaunchesController : Controller
                 x.FromOpNumber,
                 x.Quantity,
                 x.SumHoursToFinish,
-                x.DocumentNumber,
                 x.Comment,
                 x.Operations
                     .OrderBy(o => o.OpNumber)
                     .Select(o => new LaunchHistoryOperationViewModel(
                         o.OpNumber,
                         o.Operation != null ? o.Operation.Name : string.Empty,
+                        o.Section != null ? o.Section.Name : string.Empty,
                         o.NormHours,
                         o.Hours))
                     .ToList()))
@@ -85,12 +87,27 @@ public class WipLaunchesController : Controller
         var grouped = items
             .GroupBy(x => x.Date)
             .OrderByDescending(g => g.Key)
-            .Select(g => new LaunchHistoryDateGroupViewModel(
-                DateTime.SpecifyKind(g.Key, DateTimeKind.Unspecified),
-                g.Count(),
-                g.Sum(i => i.Quantity),
-                g.Sum(i => i.Hours),
-                g.OrderBy(i => i.LaunchDate).ToList()))
+            .Select(g =>
+            {
+                var launches = g.OrderBy(i => i.LaunchDate).ToList();
+                var sectionSummaries = launches
+                    .SelectMany(i => i.Operations)
+                    .GroupBy(op => op.SectionName)
+                    .Select(opGroup => new LaunchHistorySectionSummaryViewModel(
+                        opGroup.Key,
+                        opGroup.Sum(o => o.Hours)))
+                    .OrderByDescending(x => x.Hours)
+                    .ThenBy(x => x.SectionName, StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+
+                return new LaunchHistoryDateGroupViewModel(
+                    DateTime.SpecifyKind(g.Key, DateTimeKind.Unspecified),
+                    launches.Count,
+                    launches.Sum(i => i.Quantity),
+                    launches.Sum(i => i.Hours),
+                    launches,
+                    sectionSummaries);
+            })
             .ToList();
 
         var filter = new LaunchHistoryFilterViewModel
@@ -196,7 +213,7 @@ public class WipLaunchesController : Controller
         }
 
         var dtos = request.Items
-            .Select(x => new LaunchItemDto(x.PartId, x.FromOpNumber, x.LaunchDate, x.Quantity, x.DocumentNumber, x.Comment))
+            .Select(x => new LaunchItemDto(x.PartId, x.FromOpNumber, x.LaunchDate, x.Quantity, x.Comment))
             .ToList();
 
         var summary = await _launchService.AddLaunchesBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
@@ -222,6 +239,20 @@ public class WipLaunchesController : Controller
         return File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
+    [HttpGet("history/export-by-date")]
+    public async Task<IActionResult> ExportByDate([FromQuery] DateTime date, CancellationToken cancellationToken)
+    {
+        if (date == default)
+        {
+            return BadRequest("Не указана дата для экспорта.");
+        }
+
+        var normalizedDate = date.Date;
+        var file = await _reportService.ExportLaunchesByDateAsync(normalizedDate, cancellationToken).ConfigureAwait(false);
+        var fileName = $"Запуски_{normalizedDate:yyyyMMdd}.xlsx";
+        return File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
     public record LaunchSaveRequest(IReadOnlyList<LaunchSaveItem> Items);
 
     public record LaunchSaveItem(
@@ -229,7 +260,6 @@ public class WipLaunchesController : Controller
         int FromOpNumber,
         DateTime LaunchDate,
         decimal Quantity,
-        string? DocumentNumber,
         string? Comment);
 
     private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)

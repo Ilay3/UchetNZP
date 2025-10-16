@@ -379,7 +379,6 @@
             operationDisplay,
             date,
             quantity,
-            documentNumber: null,
             comment: commentInput.value || null,
             was,
             become,
@@ -408,7 +407,6 @@
                 opNumber: item.opNumber,
                 receiptDate: item.date,
                 quantity: item.quantity,
-                documentNumber: item.documentNumber,
                 comment: item.comment,
             })),
         };

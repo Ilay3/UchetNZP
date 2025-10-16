@@ -13,10 +13,11 @@ public class LaunchHistoryFilterViewModel
 
 public class LaunchHistoryOperationViewModel
 {
-    public LaunchHistoryOperationViewModel(int opNumber, string operationName, decimal normHours, decimal hours)
+    public LaunchHistoryOperationViewModel(int opNumber, string operationName, string sectionName, decimal normHours, decimal hours)
     {
         OpNumber = opNumber;
         OperationName = operationName ?? string.Empty;
+        SectionName = sectionName ?? string.Empty;
         NormHours = normHours;
         Hours = hours;
     }
@@ -24,6 +25,8 @@ public class LaunchHistoryOperationViewModel
     public int OpNumber { get; }
 
     public string OperationName { get; }
+
+    public string SectionName { get; }
 
     public decimal NormHours { get; }
 
@@ -41,7 +44,6 @@ public class LaunchHistoryItemViewModel
         int fromOperation,
         decimal quantity,
         decimal hours,
-        string? documentNumber,
         string? comment,
         IReadOnlyList<LaunchHistoryOperationViewModel> operations)
     {
@@ -53,7 +55,6 @@ public class LaunchHistoryItemViewModel
         FromOperation = fromOperation;
         Quantity = quantity;
         Hours = hours;
-        DocumentNumber = documentNumber;
         Comment = comment;
         Operations = operations ?? Array.Empty<LaunchHistoryOperationViewModel>();
     }
@@ -73,8 +74,6 @@ public class LaunchHistoryItemViewModel
     public decimal Quantity { get; }
 
     public decimal Hours { get; }
-
-    public string? DocumentNumber { get; }
 
     public string? Comment { get; }
 
@@ -105,8 +104,6 @@ public class LaunchHistoryItemViewModel
         }
     }
 
-    public bool HasDocument => !string.IsNullOrWhiteSpace(DocumentNumber);
-
     public bool HasComment => !string.IsNullOrWhiteSpace(Comment);
 }
 
@@ -117,13 +114,15 @@ public class LaunchHistoryDateGroupViewModel
         int launchCount,
         decimal quantity,
         decimal hours,
-        IReadOnlyList<LaunchHistoryItemViewModel> launches)
+        IReadOnlyList<LaunchHistoryItemViewModel> launches,
+        IReadOnlyList<LaunchHistorySectionSummaryViewModel> sectionSummaries)
     {
         Date = date;
         LaunchCount = launchCount;
         Quantity = quantity;
         Hours = hours;
         Launches = launches ?? Array.Empty<LaunchHistoryItemViewModel>();
+        SectionSummaries = sectionSummaries ?? Array.Empty<LaunchHistorySectionSummaryViewModel>();
     }
 
     public DateTime Date { get; }
@@ -135,6 +134,21 @@ public class LaunchHistoryDateGroupViewModel
     public decimal Hours { get; }
 
     public IReadOnlyList<LaunchHistoryItemViewModel> Launches { get; }
+
+    public IReadOnlyList<LaunchHistorySectionSummaryViewModel> SectionSummaries { get; }
+}
+
+public class LaunchHistorySectionSummaryViewModel
+{
+    public LaunchHistorySectionSummaryViewModel(string sectionName, decimal hours)
+    {
+        SectionName = string.IsNullOrWhiteSpace(sectionName) ? "Не указан" : sectionName;
+        Hours = hours;
+    }
+
+    public string SectionName { get; }
+
+    public decimal Hours { get; }
 }
 
 public class LaunchHistoryViewModel
