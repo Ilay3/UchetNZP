@@ -342,7 +342,7 @@ public class RoutesController : Controller
     public record RouteUpsertRequest(
         string PartName,
         string? PartCode,
-        string OperationName,
+        string? OperationName,
         int OpNumber,
         decimal NormHours,
         string SectionName);

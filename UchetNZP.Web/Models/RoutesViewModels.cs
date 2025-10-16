@@ -57,10 +57,9 @@ public class RouteEditInputModel : IValidatableObject
     [Display(Name = "Деталь")]
     public string PartName { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Укажите наименование операции.")]
-    [StringLength(256, ErrorMessage = "Наименование операции не должно превышать 256 символов.")]
-    [Display(Name = "Операция")]
-    public string OperationName { get; set; } = string.Empty;
+    [Display(Name = "Наименование операции")]
+    public string? OperationName { get; set; }
+        = string.Empty;
 
     [Range(1, int.MaxValue, ErrorMessage = "Номер операции должен быть больше нуля.")]
     [Display(Name = "№ операции")]

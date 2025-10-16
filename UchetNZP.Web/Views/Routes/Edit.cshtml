@@ -4,19 +4,17 @@
     var formAction = Model.Id.HasValue ? "Edit" : "Create";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-    <div>
-        <h1 class="mb-1">@Model.Title</h1>
-        <p class="text-muted mb-0">Заполните обязательные поля и сохраните изменения.</p>
-    </div>
-    <a class="btn btn-outline-secondary" asp-action="Index">К списку маршрутов</a>
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">@Model.Title</h1>
+    <p class="text-muted mb-0">Укажите ключевые параметры маршрута и сохраните изменения.</p>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm mb-4">
     <div class="card-body">
         <form asp-action="@formAction" asp-controller="Routes" asp-route-id="@Model.Id" method="post" class="row g-4" autocomplete="off">
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="OperationName" />
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
             <div class="col-lg-6">
@@ -35,14 +33,23 @@
                 <span asp-validation-for="NormHours" class="text-danger"></span>
             </div>
             <div class="col-lg-6">
-                <label asp-for="OperationName" class="form-label"></label>
-                <input asp-for="OperationName" class="form-control form-control-lg" placeholder="Наименование операции" />
-                <span asp-validation-for="OperationName" class="text-danger"></span>
-            </div>
-            <div class="col-lg-6">
                 <label asp-for="SectionName" class="form-label"></label>
                 <input asp-for="SectionName" class="form-control form-control-lg" placeholder="Наименование участка" />
                 <span asp-validation-for="SectionName" class="text-danger"></span>
+            </div>
+            <div class="col-lg-6">
+                <div class="alert alert-info h-100 mb-0">
+                    <div class="fw-semibold">Наименование операции</div>
+                    <p class="mb-1 small">Поле скрыто из формы: оно заполняется автоматически по номеру операции.</p>
+                    @if (!string.IsNullOrWhiteSpace(Model.OperationName))
+                    {
+                        <div class="small text-muted">Текущее значение: <span class="fw-semibold">@Model.OperationName</span></div>
+                    }
+                    else
+                    {
+                        <div class="small text-muted">При сохранении будет создано стандартное название.</div>
+                    }
+                </div>
             </div>
             <div class="col-12 d-flex flex-column flex-md-row gap-3">
                 <button type="submit" class="btn btn-primary btn-lg">Сохранить</button>
@@ -50,6 +57,10 @@
             </div>
         </form>
     </div>
+</div>
+
+<div class="d-flex justify-content-end">
+    <a class="btn btn-link" asp-action="Index">← Вернуться к списку маршрутов</a>
 </div>
 
 @section Scripts

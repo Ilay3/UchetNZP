@@ -47,7 +47,7 @@ public class RouteService : IRouteService
     public async Task<PartRoute> UpsertRouteAsync(
         string partName,
         string? partCode,
-        string operationName,
+        string? operationName,
         int opNumber,
         decimal normHours,
         string sectionName,
@@ -56,11 +56,6 @@ public class RouteService : IRouteService
         if (string.IsNullOrWhiteSpace(partName))
         {
             throw new ArgumentException("Наименование детали обязательно.", nameof(partName));
-        }
-
-        if (string.IsNullOrWhiteSpace(operationName))
-        {
-            throw new ArgumentException("Наименование операции обязательно.", nameof(operationName));
         }
 
         if (string.IsNullOrWhiteSpace(sectionName))
@@ -85,12 +80,15 @@ public class RouteService : IRouteService
         try
         {
             var part = await ResolvePartAsync(partName, partCode, cancellationToken).ConfigureAwait(false);
-            var operation = await ResolveOperationAsync(operationName, cancellationToken).ConfigureAwait(false);
-            var section = await ResolveSectionAsync(sectionName, cancellationToken).ConfigureAwait(false);
 
             var route = await _dbContext.PartRoutes
+                .Include(x => x.Operation)
                 .FirstOrDefaultAsync(x => x.PartId == part.Id && x.OpNumber == opNumber, cancellationToken)
                 .ConfigureAwait(false);
+
+            var resolvedOperationName = ResolveOperationName(operationName, route, opNumber);
+            var operation = await ResolveOperationAsync(resolvedOperationName, cancellationToken).ConfigureAwait(false);
+            var section = await ResolveSectionAsync(sectionName, cancellationToken).ConfigureAwait(false);
 
             if (route is null)
             {
@@ -126,6 +124,21 @@ public class RouteService : IRouteService
             .Where(x => x.PartId == partId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    private static string ResolveOperationName(string? requestedName, PartRoute? existingRoute, int opNumber)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedName))
+        {
+            return requestedName.Trim();
+        }
+
+        if (existingRoute?.Operation is not null && !string.IsNullOrWhiteSpace(existingRoute.Operation.Name))
+        {
+            return existingRoute.Operation.Name;
+        }
+
+        return $"Операция {opNumber:D3}";
     }
 
     private async Task<Part> ResolvePartAsync(string name, string? code, CancellationToken cancellationToken)
