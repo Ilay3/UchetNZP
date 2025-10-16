@@ -29,27 +29,6 @@
 
 @if (Model.HasData)
 {
-    <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="stat-card bg-primary text-white">
-                <div class="stat-card__label">Всего запусков</div>
-                <div class="stat-card__value">@Model.TotalLaunchCount</div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-card bg-success text-white">
-                <div class="stat-card__label">Изделий запущено</div>
-                <div class="stat-card__value">@Model.TotalQuantity.ToString("0.###")</div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="stat-card bg-secondary text-white">
-                <div class="stat-card__label">Сумма часов</div>
-                <div class="stat-card__value">@Model.TotalHours.ToString("0.###")</div>
-            </div>
-        </div>
-    </div>
-
     <div class="accordion" id="launchHistoryAccordion">
         @for (var i = 0; i < Model.Dates.Count; i++)
         {

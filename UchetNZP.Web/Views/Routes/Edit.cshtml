@@ -37,20 +37,6 @@
                 <input asp-for="SectionName" class="form-control form-control-lg" placeholder="Наименование участка" />
                 <span asp-validation-for="SectionName" class="text-danger"></span>
             </div>
-            <div class="col-lg-6">
-                <div class="alert alert-info h-100 mb-0">
-                    <div class="fw-semibold">Наименование операции</div>
-                    <p class="mb-1 small">Поле скрыто из формы: оно заполняется автоматически по номеру операции.</p>
-                    @if (!string.IsNullOrWhiteSpace(Model.OperationName))
-                    {
-                        <div class="small text-muted">Текущее значение: <span class="fw-semibold">@Model.OperationName</span></div>
-                    }
-                    else
-                    {
-                        <div class="small text-muted">При сохранении будет создано стандартное название.</div>
-                    }
-                </div>
-            </div>
             <div class="col-12 d-flex flex-column flex-md-row gap-3">
                 <button type="submit" class="btn btn-primary btn-lg">Сохранить</button>
                 <a asp-action="Index" class="btn btn-outline-secondary btn-lg">Отмена</a>
