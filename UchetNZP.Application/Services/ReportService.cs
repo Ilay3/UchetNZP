@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
@@ -142,18 +143,30 @@ public class ReportService : IReportService
 
         worksheet.Cell(3, 1).Value = "Деталь";
         worksheet.Cell(3, 2).Value = "Количество в запуске";
-        worksheet.Cell(3, 3).Value = "Операция и участок";
-        worksheet.Cell(3, 4).Value = "Время на 1 деталь, ч";
-        worksheet.Cell(3, 5).Value = "Количество незавершённых деталей";
-        worksheet.Cell(3, 6).Value = "Часы по операции";
+        worksheet.Cell(3, 3).Value = "Операция";
+        worksheet.Cell(3, 4).Value = "Участок";
+        worksheet.Cell(3, 5).Value = "Время на 1 деталь, ч";
+        worksheet.Cell(3, 6).Value = "Количество незавершённых деталей";
+        worksheet.Cell(3, 7).Value = "Часы по операции";
 
         var rowIndex = 4;
         decimal totalHours = 0m;
+        var sectionSummaries = launches
+            .SelectMany(x => x.Operations)
+            .GroupBy(x => x.Section?.Name ?? "Участок не задан")
+            .Select(g => new
+            {
+                Section = g.Key,
+                Hours = g.Sum(o => o.Hours),
+            })
+            .OrderByDescending(x => x.Hours)
+            .ThenBy(x => x.Section, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
 
         if (launches.Count == 0)
         {
             worksheet.Cell(rowIndex, 1).Value = "За выбранную дату данных нет.";
-            worksheet.Range(rowIndex, 1, rowIndex, 6).Merge();
+            worksheet.Range(rowIndex, 1, rowIndex, 7).Merge();
             worksheet.Row(rowIndex).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
         }
         else
@@ -176,6 +189,7 @@ public class ReportService : IReportService
                         SectionName = o.Section?.Name ?? string.Empty,
                         o.NormHours,
                         o.Quantity,
+                        o.Hours,
                     })
                     .ToList();
 
@@ -185,13 +199,15 @@ public class ReportService : IReportService
                     worksheet.Cell(row, 1).Value = displayName;
                     worksheet.Cell(row, 2).Value = quantity;
                     worksheet.Cell(row, 2).Style.NumberFormat.Format = "0.###";
-                    worksheet.Cell(row, 3).Value = $"{launch.FromOpNumber:D3} — {(launch.Section?.Name ?? "Участок не задан")}";
-                    worksheet.Cell(row, 4).Value = 0m;
-                    worksheet.Cell(row, 4).Style.NumberFormat.Format = "0.###";
-                    worksheet.Cell(row, 5).Value = quantity;
+                    worksheet.Cell(row, 3).Value = launch.FromOpNumber;
+                    worksheet.Cell(row, 3).Style.NumberFormat.Format = "000";
+                    worksheet.Cell(row, 4).Value = launch.Section?.Name ?? "Участок не задан";
+                    worksheet.Cell(row, 5).Value = 0m;
                     worksheet.Cell(row, 5).Style.NumberFormat.Format = "0.###";
-                    worksheet.Cell(row, 6).Value = 0m;
+                    worksheet.Cell(row, 6).Value = quantity;
                     worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
+                    worksheet.Cell(row, 7).Value = 0m;
+                    worksheet.Cell(row, 7).Style.NumberFormat.Format = "0.###";
                 }
                 else
                 {
@@ -199,8 +215,9 @@ public class ReportService : IReportService
                     {
                         var op = operations[operationIndex];
                         var row = rowIndex++;
+                        var isFirstOperation = operationIndex == 0;
 
-                        if (operationIndex == 0)
+                        if (isFirstOperation)
                         {
                             worksheet.Cell(row, 1).Value = displayName;
                             worksheet.Cell(row, 2).Value = quantity;
@@ -213,16 +230,27 @@ public class ReportService : IReportService
                         }
 
                         var sectionName = string.IsNullOrWhiteSpace(op.SectionName) ? "Участок не задан" : op.SectionName;
-                        worksheet.Cell(row, 3).Value = $"{op.OpNumber:D3} — {sectionName}";
-                        worksheet.Cell(row, 4).Value = op.NormHours;
-                        worksheet.Cell(row, 4).Style.NumberFormat.Format = "0.###";
-                        worksheet.Cell(row, 5).Value = op.Quantity;
+                        worksheet.Cell(row, 3).Value = op.OpNumber;
+                        worksheet.Cell(row, 3).Style.NumberFormat.Format = "000";
+                        worksheet.Cell(row, 4).Value = sectionName;
+                        worksheet.Cell(row, 5).Value = op.NormHours;
                         worksheet.Cell(row, 5).Style.NumberFormat.Format = "0.###";
 
-                        var hours = op.NormHours * op.Quantity;
+                        var remainingQuantity = op.Quantity;
+                        if (remainingQuantity > 0m)
+                        {
+                            worksheet.Cell(row, 6).Value = remainingQuantity;
+                            worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
+                        }
+                        else
+                        {
+                            worksheet.Cell(row, 6).Value = string.Empty;
+                        }
+
+                        var hours = op.Hours;
                         totalHours += hours;
-                        worksheet.Cell(row, 6).Value = hours;
-                        worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
+                        worksheet.Cell(row, 7).Value = hours;
+                        worksheet.Cell(row, 7).Style.NumberFormat.Format = "0.###";
                     }
                 }
 
@@ -235,9 +263,25 @@ public class ReportService : IReportService
 
         var summaryRow = rowIndex + 1;
         worksheet.Cell(summaryRow, 1).Value = "Итого часов";
-        worksheet.Cell(summaryRow, 6).Value = totalHours;
-        worksheet.Cell(summaryRow, 6).Style.NumberFormat.Format = "0.###";
+        worksheet.Cell(summaryRow, 7).Value = totalHours;
+        worksheet.Cell(summaryRow, 7).Style.NumberFormat.Format = "0.###";
         worksheet.Row(summaryRow).Style.Font.SetBold(true);
+
+        if (sectionSummaries.Count > 0)
+        {
+            var sectionHeaderRow = summaryRow + 2;
+            worksheet.Cell(sectionHeaderRow, 1).Value = "Часы по участкам";
+            worksheet.Row(sectionHeaderRow).Style.Font.SetBold(true);
+
+            var sectionRow = sectionHeaderRow + 1;
+            foreach (var summary in sectionSummaries)
+            {
+                worksheet.Cell(sectionRow, 2).Value = summary.Section;
+                worksheet.Cell(sectionRow, 3).Value = summary.Hours;
+                worksheet.Cell(sectionRow, 3).Style.NumberFormat.Format = "0.###";
+                sectionRow++;
+            }
+        }
 
         worksheet.Columns().AdjustToContents();
 
