@@ -1,0 +1,168 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace UchetNZP.Web.Models;
+
+public class LaunchHistoryFilterViewModel
+{
+    public DateTime From { get; init; }
+
+    public DateTime To { get; init; }
+}
+
+public class LaunchHistoryOperationViewModel
+{
+    public LaunchHistoryOperationViewModel(int opNumber, string operationName, decimal normHours, decimal hours)
+    {
+        OpNumber = opNumber;
+        OperationName = operationName ?? string.Empty;
+        NormHours = normHours;
+        Hours = hours;
+    }
+
+    public int OpNumber { get; }
+
+    public string OperationName { get; }
+
+    public decimal NormHours { get; }
+
+    public decimal Hours { get; }
+}
+
+public class LaunchHistoryItemViewModel
+{
+    public LaunchHistoryItemViewModel(
+        Guid id,
+        DateTime launchDate,
+        string partName,
+        string? partCode,
+        string sectionName,
+        int fromOperation,
+        decimal quantity,
+        decimal hours,
+        string? documentNumber,
+        string? comment,
+        IReadOnlyList<LaunchHistoryOperationViewModel> operations)
+    {
+        Id = id;
+        LaunchDate = launchDate;
+        PartName = partName ?? string.Empty;
+        PartCode = partCode;
+        SectionName = sectionName ?? string.Empty;
+        FromOperation = fromOperation;
+        Quantity = quantity;
+        Hours = hours;
+        DocumentNumber = documentNumber;
+        Comment = comment;
+        Operations = operations ?? Array.Empty<LaunchHistoryOperationViewModel>();
+    }
+
+    public Guid Id { get; }
+
+    public DateTime LaunchDate { get; }
+
+    public string PartName { get; }
+
+    public string? PartCode { get; }
+
+    public string SectionName { get; }
+
+    public int FromOperation { get; }
+
+    public decimal Quantity { get; }
+
+    public decimal Hours { get; }
+
+    public string? DocumentNumber { get; }
+
+    public string? Comment { get; }
+
+    public IReadOnlyList<LaunchHistoryOperationViewModel> Operations { get; }
+
+    public DateTime Date => LaunchDate.Date;
+
+    public string PartDisplayName => string.IsNullOrWhiteSpace(PartCode)
+        ? PartName
+        : $"{PartName} ({PartCode})";
+
+    public string OperationRange
+    {
+        get
+        {
+            if (Operations.Count == 0)
+            {
+                return $"{FromOperation:D3}";
+            }
+
+            var lastOp = Operations[^1].OpNumber;
+            if (lastOp == FromOperation)
+            {
+                return $"{FromOperation:D3}";
+            }
+
+            return $"{FromOperation:D3} → {lastOp:D3}";
+        }
+    }
+
+    public bool HasDocument => !string.IsNullOrWhiteSpace(DocumentNumber);
+
+    public bool HasComment => !string.IsNullOrWhiteSpace(Comment);
+}
+
+public class LaunchHistoryDateGroupViewModel
+{
+    public LaunchHistoryDateGroupViewModel(
+        DateTime date,
+        int launchCount,
+        decimal quantity,
+        decimal hours,
+        IReadOnlyList<LaunchHistoryItemViewModel> launches)
+    {
+        Date = date;
+        LaunchCount = launchCount;
+        Quantity = quantity;
+        Hours = hours;
+        Launches = launches ?? Array.Empty<LaunchHistoryItemViewModel>();
+    }
+
+    public DateTime Date { get; }
+
+    public int LaunchCount { get; }
+
+    public decimal Quantity { get; }
+
+    public decimal Hours { get; }
+
+    public IReadOnlyList<LaunchHistoryItemViewModel> Launches { get; }
+}
+
+public class LaunchHistoryViewModel
+{
+    public LaunchHistoryViewModel(
+        LaunchHistoryFilterViewModel filter,
+        IReadOnlyList<LaunchHistoryDateGroupViewModel> dates)
+    {
+        Filter = filter ?? throw new ArgumentNullException(nameof(filter));
+        Dates = dates ?? throw new ArgumentNullException(nameof(dates));
+    }
+
+    public LaunchHistoryFilterViewModel Filter { get; }
+
+    public IReadOnlyList<LaunchHistoryDateGroupViewModel> Dates { get; }
+
+    public int TotalLaunchCount => Dates.Sum(x => x.LaunchCount);
+
+    public decimal TotalQuantity => Dates.Sum(x => x.Quantity);
+
+    public decimal TotalHours => Dates.Sum(x => x.Hours);
+
+    public bool HasData => Dates.Count > 0;
+}
+
+public class LaunchHistoryQuery
+{
+    public DateTime? From { get; set; }
+
+    public DateTime? To { get; set; }
+}

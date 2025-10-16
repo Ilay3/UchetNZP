@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -35,6 +36,72 @@ public class WipLaunchesController : Controller
     public IActionResult Index()
     {
         return View("~/Views/Wip/Launch.cshtml");
+    }
+
+    [HttpGet("history")]
+    public async Task<IActionResult> History([FromQuery] LaunchHistoryQuery? query, CancellationToken cancellationToken)
+    {
+        var now = DateTime.Now.Date;
+        var defaultFrom = now.AddDays(-13);
+        var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
+
+        var fromUtc = ToUtcStartOfDay(fromDate);
+        var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
+
+        var launches = await _dbContext.WipLaunches
+            .AsNoTracking()
+            .Where(x => x.LaunchDate >= fromUtc && x.LaunchDate < toUtcExclusive)
+            .Include(x => x.Part)
+            .Include(x => x.Section)
+            .Include(x => x.Operations)
+                .ThenInclude(o => o.Operation)
+            .OrderBy(x => x.LaunchDate)
+            .ThenBy(x => x.Part != null ? x.Part.Name : string.Empty)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = launches
+            .Select(x => new LaunchHistoryItemViewModel(
+                x.Id,
+                ToLocalDateTime(x.LaunchDate),
+                x.Part != null ? x.Part.Name : string.Empty,
+                x.Part?.Code,
+                x.Section != null ? x.Section.Name : string.Empty,
+                x.FromOpNumber,
+                x.Quantity,
+                x.SumHoursToFinish,
+                x.DocumentNumber,
+                x.Comment,
+                x.Operations
+                    .OrderBy(o => o.OpNumber)
+                    .Select(o => new LaunchHistoryOperationViewModel(
+                        o.OpNumber,
+                        o.Operation != null ? o.Operation.Name : string.Empty,
+                        o.NormHours,
+                        o.Hours))
+                    .ToList()))
+            .ToList();
+
+        var grouped = items
+            .GroupBy(x => x.Date)
+            .OrderByDescending(g => g.Key)
+            .Select(g => new LaunchHistoryDateGroupViewModel(
+                DateTime.SpecifyKind(g.Key, DateTimeKind.Unspecified),
+                g.Count(),
+                g.Sum(i => i.Quantity),
+                g.Sum(i => i.Hours),
+                g.OrderBy(i => i.LaunchDate).ToList()))
+            .ToList();
+
+        var filter = new LaunchHistoryFilterViewModel
+        {
+            From = DateTime.SpecifyKind(fromDate, DateTimeKind.Unspecified),
+            To = DateTime.SpecifyKind(toDate, DateTimeKind.Unspecified),
+        };
+
+        var model = new LaunchHistoryViewModel(filter, grouped);
+
+        return View("~/Views/Wip/LaunchHistory.cshtml", model);
     }
 
     [HttpGet("parts")]
@@ -146,8 +213,12 @@ public class WipLaunchesController : Controller
     [HttpGet("export")]
     public async Task<IActionResult> Export([FromQuery] DateTime from, [FromQuery] DateTime to, CancellationToken cancellationToken)
     {
-        var file = await _reportService.ExportLaunchesToExcelAsync(from, to, cancellationToken).ConfigureAwait(false);
-        var fileName = $"Запуски_{from:yyyyMMdd}_{to:yyyyMMdd}.xlsx";
+        var (fromDate, toDate) = NormalizePeriod(from, to);
+        var fromUtc = ToUtcStartOfDay(fromDate);
+        var toUtc = ToUtcStartOfDay(toDate.AddDays(1)).AddTicks(-1);
+
+        var file = await _reportService.ExportLaunchesToExcelAsync(fromUtc, toUtc, cancellationToken).ConfigureAwait(false);
+        var fileName = $"Запуски_{fromDate:yyyyMMdd}_{toDate:yyyyMMdd}.xlsx";
         return File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
@@ -160,4 +231,30 @@ public class WipLaunchesController : Controller
         decimal Quantity,
         string? DocumentNumber,
         string? Comment);
+
+    private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)
+    {
+        var normalizedFrom = from.Date;
+        var normalizedTo = to.Date;
+
+        if (normalizedFrom > normalizedTo)
+        {
+            (normalizedFrom, normalizedTo) = (normalizedTo, normalizedFrom);
+        }
+
+        return (normalizedFrom, normalizedTo);
+    }
+
+    private static DateTime ToUtcStartOfDay(DateTime date)
+    {
+        var local = DateTime.SpecifyKind(date.Date, DateTimeKind.Local);
+        return local.ToUniversalTime();
+    }
+
+    private static DateTime ToLocalDateTime(DateTime value)
+    {
+        var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        var local = utcValue.ToLocalTime();
+        return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+    }
 }

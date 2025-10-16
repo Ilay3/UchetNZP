@@ -1,0 +1,147 @@
+@model UchetNZP.Web.Models.LaunchHistoryViewModel
+@{
+    ViewData["Title"] = "История запусков";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">История запусков НЗП</h1>
+    <p class="lead">Отслеживайте ежедневные запуски: фильтруйте по датам, просматривайте детали и выгружайте отчёт в Excel.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end" autocomplete="off">
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" for="historyFromInput">Период с</label>
+                <input id="historyFromInput" class="form-control form-control-lg" type="date" name="from" value="@Model.Filter.From:yyyy-MM-dd" />
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label" for="historyToInput">по</label>
+                <input id="historyToInput" class="form-control form-control-lg" type="date" name="to" value="@Model.Filter.To:yyyy-MM-dd" />
+            </div>
+            <div class="col-md-6 col-lg-4 d-flex flex-wrap gap-3">
+                <button type="submit" class="btn btn-primary btn-lg flex-grow-1">Показать</button>
+                <a class="btn btn-outline-primary btn-lg flex-grow-1" asp-action="Export" asp-route-from="@Model.Filter.From:yyyy-MM-dd" asp-route-to="@Model.Filter.To:yyyy-MM-dd">Экспорт в Excel</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.HasData)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="stat-card bg-primary text-white">
+                <div class="stat-card__label">Всего запусков</div>
+                <div class="stat-card__value">@Model.TotalLaunchCount</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card bg-success text-white">
+                <div class="stat-card__label">Изделий запущено</div>
+                <div class="stat-card__value">@Model.TotalQuantity:0.###</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="stat-card bg-secondary text-white">
+                <div class="stat-card__label">Сумма часов</div>
+                <div class="stat-card__value">@Model.TotalHours:0.###</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="accordion" id="launchHistoryAccordion">
+        @for (var i = 0; i < Model.Dates.Count; i++)
+        {
+            var dateGroup = Model.Dates[i];
+            var collapseId = $"historyDay{i}";
+            var headingId = $"historyHeading{i}";
+            <div class="accordion-item mb-3 border-0 shadow-sm rounded-4">
+                <h2 class="accordion-header" id="@headingId">
+                    <button class="accordion-button d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="@(i == 0 ? "true" : "false")" aria-controls="@collapseId">
+                        <span class="fs-4">@dateGroup.Date:dd.MM.yyyy</span>
+                        <span class="badge bg-light text-dark">Запусков: @dateGroup.LaunchCount</span>
+                        <span class="badge bg-light text-dark">Изделий: @dateGroup.Quantity:0.###</span>
+                        <span class="badge bg-light text-dark">Часы: @dateGroup.Hours:0.###</span>
+                    </button>
+                </h2>
+                <div id="@collapseId" class="accordion-collapse collapse @(i == 0 ? "show" : string.Empty)" aria-labelledby="@headingId" data-bs-parent="#launchHistoryAccordion">
+                    <div class="accordion-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th scope="col">Время</th>
+                                        <th scope="col">Деталь</th>
+                                        <th scope="col">Участок</th>
+                                        <th scope="col">Операции</th>
+                                        <th scope="col">Количество</th>
+                                        <th scope="col">Часы</th>
+                                        <th scope="col">Документ</th>
+                                        <th scope="col">Комментарий</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var launch in dateGroup.Launches)
+                                    {
+                                        <tr>
+                                            <td>@launch.LaunchDate:HH:mm</td>
+                                            <td>
+                                                <div class="fw-semibold">@launch.PartDisplayName</div>
+                                                <div class="text-muted small">ID: @launch.Id</div>
+                                            </td>
+                                            <td>@(string.IsNullOrWhiteSpace(launch.SectionName) ? "—" : launch.SectionName)</td>
+                                            <td>
+                                                <div class="fw-semibold">@launch.OperationRange</div>
+                                                @if (launch.Operations.Count > 0)
+                                                {
+                                                    <details class="mt-1">
+                                                        <summary class="small text-muted">Операции маршрута</summary>
+                                                        <ul class="small mt-2 mb-0">
+                                                            @foreach (var op in launch.Operations)
+                                                            {
+                                                                <li><strong>@op.OpNumber:D3</strong> — @(string.IsNullOrWhiteSpace(op.OperationName) ? "Без названия" : op.OperationName) (норма: @op.NormHours:0.###, часы: @op.Hours:0.###)</li>
+                                                            }
+                                                        </ul>
+                                                    </details>
+                                                }
+                                                else
+                                                {
+                                                    <div class="text-muted small">Данные об операциях отсутствуют.</div>
+                                                }
+                                            </td>
+                                            <td>@launch.Quantity:0.###</td>
+                                            <td>@launch.Hours:0.###</td>
+                                            <td>
+                                                @if (launch.HasDocument)
+                                                {
+                                                    <span class="badge bg-light text-primary border border-primary fw-normal">@launch.DocumentNumber</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">—</span>
+                                                }
+                                            </td>
+                                            <td>@(launch.HasComment ? launch.Comment : "—")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="alert alert-light border shadow-sm">
+        <div class="fw-semibold mb-1">За выбранный период запусков не найдено.</div>
+        <p class="mb-0">Попробуйте изменить даты или убедитесь, что данные о запуске были сохранены.</p>
+    </div>
+}
+
+<div class="d-flex justify-content-end mt-4">
+    <a class="btn btn-link" asp-action="Index">← Вернуться к запуску НЗП</a>
+</div>

@@ -51,3 +51,25 @@ table {
   border-left: 6px solid #0d6efd;
   padding-left: 1rem;
 }
+
+.stat-card {
+  border-radius: 1rem;
+  padding: 1.5rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 0.5rem 1rem rgba(13, 37, 62, 0.15);
+}
+
+.stat-card__label {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-card__value {
+  font-size: 2rem;
+  font-weight: 600;
+}
