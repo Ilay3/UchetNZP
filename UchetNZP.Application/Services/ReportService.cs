@@ -28,89 +28,20 @@ public class ReportService : IReportService
             throw new ArgumentException("Дата начала периода не может быть больше даты окончания.", nameof(from));
         }
 
-        var launches = await _dbContext.WipLaunches
-            .AsNoTracking()
-            .Where(x => x.LaunchDate >= fromUtc && x.LaunchDate <= toUtc)
-            .Include(x => x.Part)
-            .Include(x => x.Section)
-            .Include(x => x.Operations)
-                .ThenInclude(o => o.Operation)
-            .OrderBy(x => x.LaunchDate)
-            .ThenBy(x => x.Part!.Name)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var toUtcExclusive = toUtc == DateTime.MaxValue ? toUtc : toUtc.AddTicks(1);
 
-        var groupedByDateAndSection = launches
-            .GroupBy(x => new
-            {
-                Date = x.LaunchDate.Date,
-                Section = x.Section?.Name ?? "Не указан"
-            })
-            .Select(g => new
-            {
-                g.Key.Date,
-                Section = g.Key.Section,
-                LaunchCount = g.Count(),
-                Quantity = g.Sum(x => x.Quantity),
-                Hours = g.Sum(x => x.SumHoursToFinish)
-            })
-            .OrderBy(x => x.Date)
-            .ThenBy(x => x.Section)
-            .ToList();
+        var launches = await GetLaunchesAsync(fromUtc, toUtcExclusive, cancellationToken).ConfigureAwait(false);
+        var balanceLookup = await BuildBalanceLookupAsync(launches, cancellationToken).ConfigureAwait(false);
 
-        var totalsByDate = groupedByDateAndSection
-            .GroupBy(x => x.Date)
-            .ToDictionary(
-                g => g.Key,
-                g => new LaunchDateTotal(
-                    g.Sum(x => x.LaunchCount),
-                    g.Sum(x => x.Quantity),
-                    g.Sum(x => x.Hours)));
+        var fromLocal = DateTime.SpecifyKind(fromUtc, DateTimeKind.Utc).ToLocalTime();
+        var toLocal = DateTime.SpecifyKind(toUtc, DateTimeKind.Utc).ToLocalTime();
 
-        using var workbook = new XLWorkbook();
-        var summarySheet = workbook.AddWorksheet("Запуски по датам");
-
-        summarySheet.Cell(1, 1).Value = "Дата";
-        summarySheet.Cell(1, 2).Value = "Участок";
-        summarySheet.Cell(1, 3).Value = "Количество запусков";
-        summarySheet.Cell(1, 4).Value = "Количество изделий";
-        summarySheet.Cell(1, 5).Value = "Сумма часов";
-
-        var rowIndex = 2;
-        DateTime? currentDate = null;
-
-        foreach (var item in groupedByDateAndSection)
-        {
-            if (currentDate.HasValue && currentDate.Value != item.Date)
-            {
-                WriteTotalRow(summarySheet, ref rowIndex, currentDate.Value, totalsByDate[currentDate.Value]);
-            }
-
-            currentDate = item.Date;
-
-            var dateValue = DateTime.SpecifyKind(item.Date, DateTimeKind.Unspecified);
-            summarySheet.Cell(rowIndex, 1).Value = dateValue;
-            summarySheet.Cell(rowIndex, 1).Style.DateFormat.Format = "yyyy-MM-dd";
-            summarySheet.Cell(rowIndex, 2).Value = item.Section;
-            summarySheet.Cell(rowIndex, 3).Value = item.LaunchCount;
-            summarySheet.Cell(rowIndex, 4).Value = item.Quantity;
-            summarySheet.Cell(rowIndex, 4).Style.NumberFormat.Format = "0.###";
-            summarySheet.Cell(rowIndex, 5).Value = item.Hours;
-            summarySheet.Cell(rowIndex, 5).Style.NumberFormat.Format = "0.###";
-
-            rowIndex++;
-        }
-
-        if (currentDate.HasValue)
-        {
-            WriteTotalRow(summarySheet, ref rowIndex, currentDate.Value, totalsByDate[currentDate.Value]);
-        }
-
-        summarySheet.Columns().AdjustToContents();
-
-        using var memoryStream = new MemoryStream();
-        workbook.SaveAs(memoryStream);
-        return memoryStream.ToArray();
+        return BuildLaunchesWorkbook(
+            launches,
+            balanceLookup,
+            $"Запуски НЗП за период {fromLocal:dd.MM.yyyy} - {toLocal:dd.MM.yyyy}",
+            fromLocal,
+            toLocal);
     }
 
     public async Task<byte[]> ExportLaunchesByDateAsync(DateTime date, CancellationToken cancellationToken = default)
@@ -121,6 +52,21 @@ public class ReportService : IReportService
         var fromUtc = localDate.ToUniversalTime();
         var toUtcExclusive = nextLocalDate.ToUniversalTime();
 
+        var launches = await GetLaunchesAsync(fromUtc, toUtcExclusive, cancellationToken).ConfigureAwait(false);
+        var balanceLookup = await BuildBalanceLookupAsync(launches, cancellationToken).ConfigureAwait(false);
+
+        var displayDate = DateTime.SpecifyKind(localDate, DateTimeKind.Local);
+
+        return BuildLaunchesWorkbook(
+            launches,
+            balanceLookup,
+            $"Запуски НЗП за {displayDate:dd.MM.yyyy}",
+            displayDate,
+            displayDate);
+    }
+
+    private async Task<List<WipLaunch>> GetLaunchesAsync(DateTime fromUtc, DateTime toUtcExclusive, CancellationToken cancellationToken)
+    {
         var launches = await _dbContext.WipLaunches
             .AsNoTracking()
             .Where(x => x.LaunchDate >= fromUtc && x.LaunchDate < toUtcExclusive)
@@ -135,154 +81,60 @@ public class ReportService : IReportService
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var balanceLookup = await BuildBalanceLookupAsync(launches, cancellationToken).ConfigureAwait(false);
+        return launches;
+    }
 
+    private static byte[] BuildLaunchesWorkbook(
+        IReadOnlyList<WipLaunch> launches,
+        IReadOnlyDictionary<(Guid PartId, Guid SectionId, int OpNumber), decimal> balanceLookup,
+        string title,
+        DateTime? periodFrom,
+        DateTime? periodTo)
+    {
         using var workbook = new XLWorkbook();
         var worksheet = workbook.AddWorksheet("Запуски");
 
-        worksheet.Cell(1, 1).Value = "Дата";
-        var displayDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
-        worksheet.Cell(1, 2).Value = displayDate;
-        worksheet.Cell(1, 2).Style.DateFormat.Format = "dd.MM.yyyy";
+        var rowIndex = 1;
+        worksheet.Cell(rowIndex, 1).Value = title;
+        worksheet.Row(rowIndex).Style.Font.SetBold(true);
+        worksheet.Row(rowIndex).Style.Font.FontSize = 14;
+        rowIndex += 2;
 
-        worksheet.Cell(3, 1).Value = "Деталь";
-        worksheet.Cell(3, 2).Value = "Количество в запуске";
-        worksheet.Cell(3, 3).Value = "Операция";
-        worksheet.Cell(3, 4).Value = "Участок";
-        worksheet.Cell(3, 5).Value = "Время на 1 деталь, ч";
-        worksheet.Cell(3, 6).Value = "Количество незавершённых деталей";
-        worksheet.Cell(3, 7).Value = "Часы по операции";
-
-        var rowIndex = 4;
-        decimal totalHours = 0m;
-        var sectionSummaries = launches
-            .SelectMany(x => x.Operations)
-            .GroupBy(x => x.Section?.Name ?? "Участок не задан")
-            .Select(g => new
+        if (periodFrom.HasValue && periodTo.HasValue)
+        {
+            worksheet.Cell(rowIndex, 1).Value = "Период";
+            worksheet.Cell(rowIndex, 1).Style.Font.SetBold(true);
+            if (periodFrom.Value.Date == periodTo.Value.Date)
             {
-                Section = g.Key,
-                Hours = g.Sum(o => o.Hours),
-            })
-            .OrderByDescending(x => x.Hours)
-            .ThenBy(x => x.Section, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+                var display = DateTime.SpecifyKind(periodFrom.Value.Date, DateTimeKind.Unspecified);
+                worksheet.Cell(rowIndex, 2).Value = display;
+                worksheet.Cell(rowIndex, 2).Style.DateFormat.Format = "dd.MM.yyyy";
+            }
+            else
+            {
+                var fromDisplay = DateTime.SpecifyKind(periodFrom.Value.Date, DateTimeKind.Unspecified);
+                var toDisplay = DateTime.SpecifyKind(periodTo.Value.Date, DateTimeKind.Unspecified);
+                worksheet.Cell(rowIndex, 2).Value = fromDisplay;
+                worksheet.Cell(rowIndex, 2).Style.DateFormat.Format = "dd.MM.yyyy";
+                worksheet.Cell(rowIndex, 3).Value = toDisplay;
+                worksheet.Cell(rowIndex, 3).Style.DateFormat.Format = "dd.MM.yyyy";
+            }
+
+            rowIndex += 2;
+        }
 
         if (launches.Count == 0)
         {
-            worksheet.Cell(rowIndex, 1).Value = "За выбранную дату данных нет.";
-            worksheet.Range(rowIndex, 1, rowIndex, 7).Merge();
-            worksheet.Row(rowIndex).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+            worksheet.Cell(rowIndex, 1).Value = "За выбранный период данных нет.";
+            worksheet.Row(rowIndex).Style.Font.SetItalic(true);
+            worksheet.Row(rowIndex).Style.Font.FontColor = XLColor.FromTheme(XLThemeColor.Text1, 0.5);
         }
         else
         {
-            for (var launchIndex = 0; launchIndex < launches.Count; launchIndex++)
+            foreach (var launch in launches)
             {
-                var launch = launches[launchIndex];
-                var isLastLaunch = launchIndex == launches.Count - 1;
-
-                var partName = launch.Part?.Name ?? string.Empty;
-                var partCode = launch.Part?.Code;
-                var displayName = string.IsNullOrWhiteSpace(partCode) ? partName : $"{partName} ({partCode})";
-                var quantity = launch.Quantity;
-
-                var operations = launch.Operations
-                    .OrderBy(o => o.OpNumber)
-                    .Select(o => new
-                    {
-                        o.OpNumber,
-                        o.SectionId,
-                        SectionName = o.Section?.Name ?? string.Empty,
-                        o.NormHours,
-                        o.Hours,
-                    })
-                    .ToList();
-
-                if (operations.Count == 0)
-                {
-                    var row = rowIndex++;
-                    worksheet.Cell(row, 1).Value = displayName;
-                    worksheet.Cell(row, 2).Value = quantity;
-                    worksheet.Cell(row, 2).Style.NumberFormat.Format = "0.###";
-                    worksheet.Cell(row, 3).Value = launch.FromOpNumber;
-                    worksheet.Cell(row, 3).Style.NumberFormat.Format = "000";
-                    worksheet.Cell(row, 4).Value = launch.Section?.Name ?? "Участок не задан";
-                    worksheet.Cell(row, 5).Value = 0m;
-                    worksheet.Cell(row, 5).Style.NumberFormat.Format = "0.###";
-                    worksheet.Cell(row, 6).Value = quantity;
-                    worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
-                    worksheet.Cell(row, 7).Value = 0m;
-                    worksheet.Cell(row, 7).Style.NumberFormat.Format = "0.###";
-                }
-                else
-                {
-                    for (var operationIndex = 0; operationIndex < operations.Count; operationIndex++)
-                    {
-                        var op = operations[operationIndex];
-                        var row = rowIndex++;
-                        var isFirstOperation = operationIndex == 0;
-
-                        if (isFirstOperation)
-                        {
-                            worksheet.Cell(row, 1).Value = displayName;
-                            worksheet.Cell(row, 2).Value = quantity;
-                            worksheet.Cell(row, 2).Style.NumberFormat.Format = "0.###";
-                        }
-                        else
-                        {
-                            worksheet.Cell(row, 1).Value = string.Empty;
-                            worksheet.Cell(row, 2).Value = string.Empty;
-                        }
-
-                        var sectionName = string.IsNullOrWhiteSpace(op.SectionName) ? "Участок не задан" : op.SectionName;
-                        worksheet.Cell(row, 3).Value = op.OpNumber;
-                        worksheet.Cell(row, 3).Style.NumberFormat.Format = "000";
-                        worksheet.Cell(row, 4).Value = sectionName;
-                        worksheet.Cell(row, 5).Value = op.NormHours;
-                        worksheet.Cell(row, 5).Style.NumberFormat.Format = "0.###";
-
-                        if (balanceLookup.TryGetValue((launch.PartId, op.SectionId, op.OpNumber), out var remainingQuantity) && remainingQuantity > 0m)
-                        {
-                            worksheet.Cell(row, 6).Value = remainingQuantity;
-                            worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
-                        }
-                        else
-                        {
-                            worksheet.Cell(row, 6).Value = string.Empty;
-                        }
-
-                        var hours = op.Hours;
-                        totalHours += hours;
-                        worksheet.Cell(row, 7).Value = hours;
-                        worksheet.Cell(row, 7).Style.NumberFormat.Format = "0.###";
-                    }
-                }
-
-                if (!isLastLaunch)
-                {
-                    rowIndex++;
-                }
-            }
-        }
-
-        var summaryRow = rowIndex + 1;
-        worksheet.Cell(summaryRow, 1).Value = "Итого часов";
-        worksheet.Cell(summaryRow, 7).Value = totalHours;
-        worksheet.Cell(summaryRow, 7).Style.NumberFormat.Format = "0.###";
-        worksheet.Row(summaryRow).Style.Font.SetBold(true);
-
-        if (sectionSummaries.Count > 0)
-        {
-            var sectionHeaderRow = summaryRow + 2;
-            worksheet.Cell(sectionHeaderRow, 1).Value = "Часы по участкам";
-            worksheet.Row(sectionHeaderRow).Style.Font.SetBold(true);
-
-            var sectionRow = sectionHeaderRow + 1;
-            foreach (var summary in sectionSummaries)
-            {
-                worksheet.Cell(sectionRow, 2).Value = summary.Section;
-                worksheet.Cell(sectionRow, 3).Value = summary.Hours;
-                worksheet.Cell(sectionRow, 3).Style.NumberFormat.Format = "0.###";
-                sectionRow++;
+                rowIndex = WriteLaunchBlock(worksheet, rowIndex, launch, balanceLookup);
+                rowIndex += 2;
             }
         }
 
@@ -293,23 +145,139 @@ public class ReportService : IReportService
         return memoryStream.ToArray();
     }
 
-    private static void WriteTotalRow(IXLWorksheet worksheet, ref int rowIndex, DateTime date, LaunchDateTotal total)
+    private static int WriteLaunchBlock(
+        IXLWorksheet worksheet,
+        int startRow,
+        WipLaunch launch,
+        IReadOnlyDictionary<(Guid PartId, Guid SectionId, int OpNumber), decimal> balanceLookup)
     {
-        worksheet.Cell(rowIndex, 1).Clear();
-        worksheet.Cell(rowIndex, 2).Value = $"Итого за {date:dd.MM.yyyy}";
-        worksheet.Cell(rowIndex, 3).Value = total.LaunchCount;
-        worksheet.Cell(rowIndex, 4).Value = total.Quantity;
-        worksheet.Cell(rowIndex, 4).Style.NumberFormat.Format = "0.###";
-        worksheet.Cell(rowIndex, 5).Value = total.Hours;
-        worksheet.Cell(rowIndex, 5).Style.NumberFormat.Format = "0.###";
-        worksheet.Row(rowIndex).Style.Font.SetBold(true);
+        var row = startRow;
 
-        rowIndex++;
-        worksheet.Row(rowIndex).Clear();
-        rowIndex++;
+        var launchDateLocal = ConvertToLocal(launch.LaunchDate);
+        var partName = launch.Part?.Name ?? string.Empty;
+        var partCode = launch.Part?.Code;
+        var partDisplay = string.IsNullOrWhiteSpace(partCode) ? partName : $"{partName} ({partCode})";
+        var sectionName = launch.Section?.Name ?? "Участок не задан";
+        var comment = string.IsNullOrWhiteSpace(launch.Comment) ? null : launch.Comment;
+
+        WriteLabelValue(worksheet, row++, "Дата запуска", launchDateLocal, cell => cell.Style.DateFormat.Format = "dd.MM.yyyy HH:mm");
+        WriteLabelValue(worksheet, row++, "ID запуска", launch.Id);
+        WriteLabelValue(worksheet, row++, "Деталь", partDisplay);
+        WriteLabelValue(worksheet, row++, "Участок", sectionName);
+        WriteLabelValue(worksheet, row++, "Операция запуска", launch.FromOpNumber, cell => cell.Style.NumberFormat.Format = "000");
+        WriteLabelValue(worksheet, row++, "Количество запуска", launch.Quantity, cell => cell.Style.NumberFormat.Format = "0.###");
+        WriteLabelValue(worksheet, row++, "Часы до завершения", launch.SumHoursToFinish, cell => cell.Style.NumberFormat.Format = "0.###");
+
+        if (!string.IsNullOrWhiteSpace(comment))
+        {
+            WriteLabelValue(worksheet, row++, "Комментарий", comment);
+        }
+
+        row++;
+
+        var operations = launch.Operations
+            .OrderBy(o => o.OpNumber)
+            .Select(o => new
+            {
+                o.OpNumber,
+                OperationName = o.Operation != null ? o.Operation.Name : string.Empty,
+                o.SectionId,
+                SectionName = o.Section != null ? o.Section.Name : string.Empty,
+                o.NormHours,
+                o.Hours
+            })
+            .ToList();
+
+        var operationsHeaderRow = row;
+        worksheet.Cell(operationsHeaderRow, 1).Value = "Операция";
+        worksheet.Cell(operationsHeaderRow + 1, 1).Value = "Норма, н/ч";
+        worksheet.Cell(operationsHeaderRow + 2, 1).Value = "Количество на операции";
+        worksheet.Cell(operationsHeaderRow + 3, 1).Value = "Часы по операции";
+        worksheet.Range(operationsHeaderRow, 1, operationsHeaderRow + 3, 1).Style.Font.SetBold(true);
+
+        var column = 2;
+
+        if (operations.Count == 0)
+        {
+            worksheet.Cell(operationsHeaderRow, column).Value = "Операции не найдены";
+            worksheet.Range(operationsHeaderRow, column, operationsHeaderRow, column + 1).Merge();
+            worksheet.Row(operationsHeaderRow).Style.Font.SetItalic(true);
+        }
+        else
+        {
+            foreach (var operation in operations)
+            {
+                var operationDisplay = string.IsNullOrWhiteSpace(operation.OperationName)
+                    ? $"{operation.OpNumber:000}"
+                    : $"{operation.OpNumber:000} — {operation.OperationName}";
+
+                if (!string.IsNullOrWhiteSpace(operation.SectionName))
+                {
+                    operationDisplay += $" ({operation.SectionName})";
+                }
+
+                worksheet.Cell(operationsHeaderRow, column).Value = operationDisplay;
+                worksheet.Cell(operationsHeaderRow + 1, column).Value = operation.NormHours;
+                worksheet.Cell(operationsHeaderRow + 1, column).Style.NumberFormat.Format = "0.###";
+
+                if (operation.SectionId != Guid.Empty &&
+                    balanceLookup.TryGetValue((launch.PartId, operation.SectionId, operation.OpNumber), out var balance) &&
+                    balance > 0m)
+                {
+                    worksheet.Cell(operationsHeaderRow + 2, column).Value = balance;
+                    worksheet.Cell(operationsHeaderRow + 2, column).Style.NumberFormat.Format = "0.###";
+                }
+
+                worksheet.Cell(operationsHeaderRow + 3, column).Value = operation.Hours;
+                worksheet.Cell(operationsHeaderRow + 3, column).Style.NumberFormat.Format = "0.###";
+
+                column++;
+            }
+        }
+
+        return operationsHeaderRow + 4;
     }
 
-    private sealed record LaunchDateTotal(int LaunchCount, decimal Quantity, decimal Hours);
+    private static void WriteLabelValue(
+        IXLWorksheet worksheet,
+        int row,
+        string label,
+        object? value,
+        Action<IXLCell>? configure = null)
+    {
+        worksheet.Cell(row, 1).Value = label;
+        worksheet.Cell(row, 1).Style.Font.SetBold(true);
+        var cell = worksheet.Cell(row, 2);
+        switch (value)
+        {
+            case null:
+                cell.Clear();
+                break;
+            case DateTime dateValue:
+                cell.Value = dateValue;
+                break;
+            case decimal decimalValue:
+                cell.Value = decimalValue;
+                break;
+            case int intValue:
+                cell.Value = intValue;
+                break;
+            case Guid guidValue:
+                cell.Value = guidValue.ToString();
+                break;
+            default:
+                cell.Value = value.ToString();
+                break;
+        }
+        configure?.Invoke(cell);
+    }
+
+    private static DateTime ConvertToLocal(DateTime value)
+    {
+        var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        var local = utcValue.ToLocalTime();
+        return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+    }
 
     private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), decimal>> BuildBalanceLookupAsync(
         IReadOnlyCollection<WipLaunch> launches,

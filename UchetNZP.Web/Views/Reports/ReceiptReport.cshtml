@@ -1,0 +1,103 @@
+@model UchetNZP.Web.Models.ReceiptReportViewModel
+@{
+    ViewData["Title"] = "Отчёт по приходу НЗП";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Отчёт по приходу НЗП</h1>
+    <p class="lead mb-0">Анализируйте приходы НЗП по датам, участкам и деталям. Используйте фильтры ниже и выгружайте данные при необходимости.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3" autocomplete="off">
+            <div class="col-md-3">
+                <label class="form-label" for="receiptsFromInput">Период с</label>
+                <input id="receiptsFromInput" class="form-control form-control-lg" type="date" name="from" value='@Model.Filter.From.ToString("yyyy-MM-dd")' />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="receiptsToInput">по</label>
+                <input id="receiptsToInput" class="form-control form-control-lg" type="date" name="to" value='@Model.Filter.To.ToString("yyyy-MM-dd")' />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="receiptsSectionInput">Участок</label>
+                <input id="receiptsSectionInput" class="form-control form-control-lg" type="text" name="section" value='@Model.Filter.Section' placeholder="Название или код участка" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="receiptsPartInput">Деталь</label>
+                <input id="receiptsPartInput" class="form-control form-control-lg" type="text" name="part" value='@Model.Filter.Part' placeholder="Наименование или обозначение детали" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="receiptsMinQuantityInput">Мин. количество</label>
+                <input id="receiptsMinQuantityInput" class="form-control form-control-lg" type="number" step="0.001" name="minQuantity" value='@(Model.Filter.MinQuantity?.ToString())' />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="receiptsMaxQuantityInput">Макс. количество</label>
+                <input id="receiptsMaxQuantityInput" class="form-control form-control-lg" type="number" step="0.001" name="maxQuantity" value='@(Model.Filter.MaxQuantity?.ToString())' />
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <div class="d-flex flex-wrap gap-3 w-100">
+                    <button type="submit" class="btn btn-primary btn-lg flex-grow-1">Применить</button>
+                    <a class="btn btn-outline-secondary btn-lg flex-grow-1" asp-action="ReceiptReport" asp-route-from='@DateTime.Now.AddDays(-29).ToString("yyyy-MM-dd")' asp-route-to='@DateTime.Now.ToString("yyyy-MM-dd")'>Сбросить</a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.HasData)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+            <span>Найдено записей: @Model.Items.Count</span>
+            <span>Суммарное количество: @Model.TotalQuantity.ToString("0.###")</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped align-middle" aria-describedby="receiptReportCaption">
+                    <caption id="receiptReportCaption" class="visually-hidden">Результаты отчёта по приходу НЗП</caption>
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Дата</th>
+                            <th scope="col">Участок</th>
+                            <th scope="col">Деталь</th>
+                            <th scope="col">Операция</th>
+                            <th scope="col">Количество</th>
+                            <th scope="col">Комментарий</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Items)
+                        {
+                            <tr>
+                                <td>@item.Date.ToString("dd.MM.yyyy")</td>
+                                <td>@item.SectionName</td>
+                                <td>
+                                    <div class="fw-semibold">@item.PartName</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.PartCode))
+                                    {
+                                        <div class="text-muted small">@item.PartCode</div>
+                                    }
+                                </td>
+                                <td>@item.OpNumber.ToString("D3")</td>
+                                <td>@item.Quantity.ToString("0.###")</td>
+                                <td>@(string.IsNullOrWhiteSpace(item.Comment) ? "—" : item.Comment)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-light border shadow-sm">
+        <div class="fw-semibold mb-1">По выбранным условиям приходов не найдено.</div>
+        <p class="mb-0">Попробуйте расширить период или изменить параметры фильтра.</p>
+    </div>
+}
+
+<div class="d-flex justify-content-end mt-4">
+    <a class="btn btn-link" asp-controller="Home" asp-action="Index">← Вернуться на главную</a>
+</div>
