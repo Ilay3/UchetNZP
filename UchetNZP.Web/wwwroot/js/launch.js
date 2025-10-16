@@ -308,7 +308,6 @@
             toOp: lastOp,
             date,
             quantity,
-            documentNumber: null,
             comment: commentInput.value || null,
             hours,
             sumNorm: tailSummary.sumNormHours ?? 0,
@@ -420,7 +419,6 @@
                 fromOpNumber: item.fromOp,
                 launchDate: item.date,
                 quantity: item.quantity,
-                documentNumber: item.documentNumber,
                 comment: item.comment,
             })),
         };

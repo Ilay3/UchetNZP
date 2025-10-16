@@ -101,7 +101,6 @@ public class LaunchService : ILaunchService
                     LaunchDate = launchDate,
                     CreatedAt = now,
                     Quantity = item.Quantity,
-                    DocumentNumber = item.DocumentNumber,
                     Comment = item.Comment,
                     SumHoursToFinish = sumHours,
                 };

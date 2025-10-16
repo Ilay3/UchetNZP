@@ -18,8 +18,6 @@ public class WipReceipt
 
     public decimal Quantity { get; set; }
 
-    public string? DocumentNumber { get; set; }
-
     public string? Comment { get; set; }
 
     public virtual Part? Part { get; set; }

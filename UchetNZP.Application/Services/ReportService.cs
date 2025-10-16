@@ -110,6 +110,142 @@ public class ReportService : IReportService
         return memoryStream.ToArray();
     }
 
+    public async Task<byte[]> ExportLaunchesByDateAsync(DateTime date, CancellationToken cancellationToken = default)
+    {
+        var localDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Local);
+        var nextLocalDate = localDate.AddDays(1);
+
+        var fromUtc = localDate.ToUniversalTime();
+        var toUtcExclusive = nextLocalDate.ToUniversalTime();
+
+        var launches = await _dbContext.WipLaunches
+            .AsNoTracking()
+            .Where(x => x.LaunchDate >= fromUtc && x.LaunchDate < toUtcExclusive)
+            .Include(x => x.Part)
+            .Include(x => x.Section)
+            .Include(x => x.Operations)
+                .ThenInclude(o => o.Operation)
+            .Include(x => x.Operations)
+                .ThenInclude(o => o.Section)
+            .OrderBy(x => x.LaunchDate)
+            .ThenBy(x => x.Part != null ? x.Part.Name : string.Empty)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Запуски");
+
+        worksheet.Cell(1, 1).Value = "Дата";
+        var displayDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
+        worksheet.Cell(1, 2).Value = displayDate;
+        worksheet.Cell(1, 2).Style.DateFormat.Format = "dd.MM.yyyy";
+
+        worksheet.Cell(3, 1).Value = "Деталь";
+        worksheet.Cell(3, 2).Value = "Количество в запуске";
+        worksheet.Cell(3, 3).Value = "Операция и участок";
+        worksheet.Cell(3, 4).Value = "Время на 1 деталь, ч";
+        worksheet.Cell(3, 5).Value = "Количество незавершённых деталей";
+        worksheet.Cell(3, 6).Value = "Часы по операции";
+
+        var rowIndex = 4;
+        decimal totalHours = 0m;
+
+        if (launches.Count == 0)
+        {
+            worksheet.Cell(rowIndex, 1).Value = "За выбранную дату данных нет.";
+            worksheet.Range(rowIndex, 1, rowIndex, 6).Merge();
+            worksheet.Row(rowIndex).Style.Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+        }
+        else
+        {
+            for (var launchIndex = 0; launchIndex < launches.Count; launchIndex++)
+            {
+                var launch = launches[launchIndex];
+                var isLastLaunch = launchIndex == launches.Count - 1;
+
+                var partName = launch.Part?.Name ?? string.Empty;
+                var partCode = launch.Part?.Code;
+                var displayName = string.IsNullOrWhiteSpace(partCode) ? partName : $"{partName} ({partCode})";
+                var quantity = launch.Quantity;
+
+                var operations = launch.Operations
+                    .OrderBy(o => o.OpNumber)
+                    .Select(o => new
+                    {
+                        o.OpNumber,
+                        SectionName = o.Section?.Name ?? string.Empty,
+                        o.NormHours,
+                        o.Quantity,
+                    })
+                    .ToList();
+
+                if (operations.Count == 0)
+                {
+                    var row = rowIndex++;
+                    worksheet.Cell(row, 1).Value = displayName;
+                    worksheet.Cell(row, 2).Value = quantity;
+                    worksheet.Cell(row, 2).Style.NumberFormat.Format = "0.###";
+                    worksheet.Cell(row, 3).Value = $"{launch.FromOpNumber:D3} — {(launch.Section?.Name ?? "Участок не задан")}";
+                    worksheet.Cell(row, 4).Value = 0m;
+                    worksheet.Cell(row, 4).Style.NumberFormat.Format = "0.###";
+                    worksheet.Cell(row, 5).Value = quantity;
+                    worksheet.Cell(row, 5).Style.NumberFormat.Format = "0.###";
+                    worksheet.Cell(row, 6).Value = 0m;
+                    worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
+                }
+                else
+                {
+                    for (var operationIndex = 0; operationIndex < operations.Count; operationIndex++)
+                    {
+                        var op = operations[operationIndex];
+                        var row = rowIndex++;
+
+                        if (operationIndex == 0)
+                        {
+                            worksheet.Cell(row, 1).Value = displayName;
+                            worksheet.Cell(row, 2).Value = quantity;
+                            worksheet.Cell(row, 2).Style.NumberFormat.Format = "0.###";
+                        }
+                        else
+                        {
+                            worksheet.Cell(row, 1).Value = string.Empty;
+                            worksheet.Cell(row, 2).Value = string.Empty;
+                        }
+
+                        var sectionName = string.IsNullOrWhiteSpace(op.SectionName) ? "Участок не задан" : op.SectionName;
+                        worksheet.Cell(row, 3).Value = $"{op.OpNumber:D3} — {sectionName}";
+                        worksheet.Cell(row, 4).Value = op.NormHours;
+                        worksheet.Cell(row, 4).Style.NumberFormat.Format = "0.###";
+                        worksheet.Cell(row, 5).Value = op.Quantity;
+                        worksheet.Cell(row, 5).Style.NumberFormat.Format = "0.###";
+
+                        var hours = op.NormHours * op.Quantity;
+                        totalHours += hours;
+                        worksheet.Cell(row, 6).Value = hours;
+                        worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
+                    }
+                }
+
+                if (!isLastLaunch)
+                {
+                    rowIndex++;
+                }
+            }
+        }
+
+        var summaryRow = rowIndex + 1;
+        worksheet.Cell(summaryRow, 1).Value = "Итого часов";
+        worksheet.Cell(summaryRow, 6).Value = totalHours;
+        worksheet.Cell(summaryRow, 6).Style.NumberFormat.Format = "0.###";
+        worksheet.Row(summaryRow).Style.Font.SetBold(true);
+
+        worksheet.Columns().AdjustToContents();
+
+        using var memoryStream = new MemoryStream();
+        workbook.SaveAs(memoryStream);
+        return memoryStream.ToArray();
+    }
+
     private static void WriteTotalRow(IXLWorksheet worksheet, ref int rowIndex, DateTime date, LaunchDateTotal total)
     {
         worksheet.Cell(rowIndex, 1).Clear();
