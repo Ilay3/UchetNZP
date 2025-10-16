@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
+using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 
 namespace UchetNZP.Application.Services;
@@ -133,6 +135,8 @@ public class ReportService : IReportService
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var balanceLookup = await BuildBalanceLookupAsync(launches, cancellationToken).ConfigureAwait(false);
+
         using var workbook = new XLWorkbook();
         var worksheet = workbook.AddWorksheet("Запуски");
 
@@ -186,9 +190,9 @@ public class ReportService : IReportService
                     .Select(o => new
                     {
                         o.OpNumber,
+                        o.SectionId,
                         SectionName = o.Section?.Name ?? string.Empty,
                         o.NormHours,
-                        o.Quantity,
                         o.Hours,
                     })
                     .ToList();
@@ -236,8 +240,7 @@ public class ReportService : IReportService
                         worksheet.Cell(row, 5).Value = op.NormHours;
                         worksheet.Cell(row, 5).Style.NumberFormat.Format = "0.###";
 
-                        var remainingQuantity = op.Quantity;
-                        if (remainingQuantity > 0m)
+                        if (balanceLookup.TryGetValue((launch.PartId, op.SectionId, op.OpNumber), out var remainingQuantity) && remainingQuantity > 0m)
                         {
                             worksheet.Cell(row, 6).Value = remainingQuantity;
                             worksheet.Cell(row, 6).Style.NumberFormat.Format = "0.###";
@@ -307,6 +310,47 @@ public class ReportService : IReportService
     }
 
     private sealed record LaunchDateTotal(int LaunchCount, decimal Quantity, decimal Hours);
+
+    private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), decimal>> BuildBalanceLookupAsync(
+        IReadOnlyCollection<WipLaunch> launches,
+        CancellationToken cancellationToken)
+    {
+        if (launches.Count == 0)
+        {
+            return new();
+        }
+
+        var partIds = launches
+            .Select(x => x.PartId)
+            .Distinct()
+            .ToList();
+
+        var opNumbers = launches
+            .SelectMany(x => x.Operations)
+            .Select(x => x.OpNumber)
+            .Distinct()
+            .ToList();
+
+        if (partIds.Count == 0 || opNumbers.Count == 0)
+        {
+            return new();
+        }
+
+        var balances = await _dbContext.WipBalances
+            .AsNoTracking()
+            .Where(x => partIds.Contains(x.PartId) && opNumbers.Contains(x.OpNumber))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var result = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber), decimal>(balances.Count);
+
+        foreach (var balance in balances)
+        {
+            result[(balance.PartId, balance.SectionId, balance.OpNumber)] = balance.Quantity;
+        }
+
+        return result;
+    }
 
     private static DateTime NormalizeToUtc(DateTime value)
     {
