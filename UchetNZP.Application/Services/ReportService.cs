@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -173,19 +174,18 @@ public class ReportService : IReportService
         var row = startRow;
 
         var partName = launch.Part?.Name ?? string.Empty;
-        var partCode = launch.Part?.Code;
-        var partDisplay = string.IsNullOrWhiteSpace(partCode) ? partName : $"{partName} ({partCode})";
+        var partCode = launch.Part?.Code ?? string.Empty;
+        var partDisplay = string.IsNullOrWhiteSpace(partName)
+            ? partCode
+            : partName;
+        partDisplay = RemoveParenthetical(partDisplay);
         var comment = string.IsNullOrWhiteSpace(launch.Comment) ? null : launch.Comment;
-
-        WriteLabelValue(worksheet, row++, "Количество запуска", launch.Quantity, cell => cell.Style.NumberFormat.Format = "0.###");
-        WriteLabelValue(worksheet, row++, "Часы до завершения", launch.SumHoursToFinish, cell => cell.Style.NumberFormat.Format = "0.###");
 
         if (!string.IsNullOrWhiteSpace(comment))
         {
             WriteLabelValue(worksheet, row++, "Комментарий", comment);
+            row++;
         }
-
-        row++;
 
         var operations = launch.Operations
             .OrderBy(o => o.OpNumber)
@@ -206,6 +206,41 @@ public class ReportService : IReportService
         const int labelColumn = 2;
         const int firstDataColumn = 3;
 
+        var launchQuantity = launch.Quantity;
+
+        var launchQuantitiesByOperation = operations
+            .Where(o => o.Quantity > 0m)
+            .GroupBy(o => o.OpNumber)
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        var launchQuantityTargets = new HashSet<int>();
+        decimal? uniformLaunchQuantity = null;
+
+        if (launchQuantitiesByOperation.Count == 0)
+        {
+            if (launchQuantity > 0m)
+            {
+                launchQuantityTargets.Add(launch.FromOpNumber);
+                uniformLaunchQuantity = launchQuantity;
+            }
+        }
+        else
+        {
+            var operationsWithPositiveQuantity = launchQuantitiesByOperation.Count;
+            if (operationsWithPositiveQuantity == operations.Count && launchQuantitiesByOperation.Values.Distinct().Count() == 1)
+            {
+                launchQuantityTargets.Add(launch.FromOpNumber);
+                uniformLaunchQuantity = launchQuantitiesByOperation.Values.First();
+            }
+            else
+            {
+                foreach (var opNumber in launchQuantitiesByOperation.Keys)
+                {
+                    launchQuantityTargets.Add(opNumber);
+                }
+            }
+        }
+
         worksheet.Cell(operationsHeaderRow, detailColumn).Value = partDisplay;
         worksheet.Cell(operationsHeaderRow, labelColumn).Value = "Операция";
         worksheet.Cell(operationsHeaderRow + 1, labelColumn).Value = "Норма, н/ч";
@@ -218,7 +253,6 @@ public class ReportService : IReportService
 
         decimal totalNormHours = 0m;
         decimal totalOperationQuantity = 0m;
-        decimal totalLaunchQuantity = 0m;
 
         if (operations.Count == 0)
         {
@@ -230,9 +264,10 @@ public class ReportService : IReportService
         {
             foreach (var operation in operations)
             {
-                var operationDisplay = string.IsNullOrWhiteSpace(operation.OperationName)
+                var operationName = RemoveParenthetical(operation.OperationName);
+                var operationDisplay = string.IsNullOrWhiteSpace(operationName)
                     ? $"{operation.OpNumber:000}"
-                    : $"{operation.OpNumber:000} — {operation.OperationName}";
+                    : $"{operation.OpNumber:000} — {operationName}";
 
                 worksheet.Cell(operationsHeaderRow, column).Value = operationDisplay;
                 worksheet.Cell(operationsHeaderRow + 1, column).Value = operation.NormHours;
@@ -248,11 +283,17 @@ public class ReportService : IReportService
                     totalOperationQuantity += balance;
                 }
 
-                if (operation.Quantity > 0m)
+                if (launchQuantityTargets.Contains(operation.OpNumber))
                 {
-                    worksheet.Cell(operationsHeaderRow + 3, column).Value = operation.Quantity;
-                    worksheet.Cell(operationsHeaderRow + 3, column).Style.NumberFormat.Format = "0.###";
-                    totalLaunchQuantity += operation.Quantity;
+                    var quantityToDisplay = launchQuantitiesByOperation.TryGetValue(operation.OpNumber, out var operationLaunchQuantity)
+                        ? operationLaunchQuantity
+                        : uniformLaunchQuantity ?? launchQuantity;
+
+                    if (quantityToDisplay > 0m)
+                    {
+                        worksheet.Cell(operationsHeaderRow + 3, column).Value = quantityToDisplay;
+                        worksheet.Cell(operationsHeaderRow + 3, column).Style.NumberFormat.Format = "0.###";
+                    }
                 }
 
                 var sectionKey = string.IsNullOrWhiteSpace(operation.SectionName)
@@ -281,9 +322,9 @@ public class ReportService : IReportService
                 worksheet.Cell(operationsHeaderRow + 2, column).Style.NumberFormat.Format = "0.###";
             }
 
-            if (totalLaunchQuantity > 0m)
+            if (launchQuantity > 0m)
             {
-                worksheet.Cell(operationsHeaderRow + 3, column).Value = totalLaunchQuantity;
+                worksheet.Cell(operationsHeaderRow + 3, column).Value = launchQuantity;
                 worksheet.Cell(operationsHeaderRow + 3, column).Style.NumberFormat.Format = "0.###";
             }
         }
@@ -364,6 +405,43 @@ public class ReportService : IReportService
         }
 
         return result;
+    }
+
+    private static string RemoveParenthetical(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder(value.Length);
+        var depth = 0;
+
+        foreach (var symbol in value)
+        {
+            if (symbol == '(')
+            {
+                depth++;
+                continue;
+            }
+
+            if (symbol == ')')
+            {
+                if (depth > 0)
+                {
+                    depth--;
+                    continue;
+                }
+            }
+
+            if (depth == 0)
+            {
+                builder.Append(symbol);
+            }
+        }
+
+        var result = builder.ToString().Trim();
+        return string.Join(' ', result.Split(' ', StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static DateTime NormalizeToUtc(DateTime value)
