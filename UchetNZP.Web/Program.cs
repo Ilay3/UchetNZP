@@ -20,6 +20,7 @@ builder.Services.AddScoped<ILaunchService, LaunchService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IAdminWipService, AdminWipService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IScrapReportExcelExporter, ScrapReportExcelExporter>();
 
