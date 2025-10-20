@@ -63,9 +63,9 @@
         }
 
         const opNumberText = opNumberInput.value.trim();
-        const opNumberPattern = new RegExp(opNumberInput.dataset.pattern ?? "^\\d{1,10}$");
+        const opNumberPattern = new RegExp(opNumberInput.dataset.pattern ?? "^\\d{1,10}(?:/\\d{1,5})?$");
         if (!opNumberPattern.test(opNumberText)) {
-            alert("Номер операции должен состоять из 1–10 цифр.");
+            alert("Номер операции должен состоять из 1–10 цифр и может содержать дробную часть через «/».");
             return;
         }
 

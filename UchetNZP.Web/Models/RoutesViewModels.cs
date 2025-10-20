@@ -65,7 +65,7 @@ public class RouteEditInputModel : IValidatableObject
     public const string OpNumberPattern = OperationNumber.AllowedPattern;
 
     [Required(ErrorMessage = "Укажите номер операции.")]
-    [RegularExpression(OpNumberPattern, ErrorMessage = "Номер операции должен состоять из 1–10 цифр.")]
+    [RegularExpression(OpNumberPattern, ErrorMessage = "Номер операции должен состоять из 1–10 цифр и может содержать дробную часть через «/».")]
     [Display(Name = "№ операции")]
     public string OpNumber { get; set; } = string.Empty;
 
