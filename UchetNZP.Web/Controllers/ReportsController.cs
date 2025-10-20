@@ -101,6 +101,96 @@ public class ReportsController : Controller
         return View("~/Views/Reports/ReceiptReport.cshtml", model);
     }
 
+    [HttpGet("scrap")]
+    public async Task<IActionResult> ScrapReport([FromQuery] ScrapReportQuery? query, CancellationToken cancellationToken)
+    {
+        var now = DateTime.Now.Date;
+        var defaultFrom = now.AddDays(-29);
+        var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
+
+        var fromUtc = ToUtcStartOfDay(fromDate);
+        var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
+
+        IQueryable<WipScrap> scrapsQuery = _dbContext.WipScraps
+            .AsNoTracking()
+            .Where(x => x.RecordedAt >= fromUtc && x.RecordedAt < toUtcExclusive);
+
+        if (!string.IsNullOrWhiteSpace(query?.Section))
+        {
+            var term = query.Section.Trim().ToLowerInvariant();
+            scrapsQuery = scrapsQuery.Where(x =>
+                x.Section != null &&
+                (x.Section.Name.ToLower().Contains(term) ||
+                 (x.Section.Code != null && x.Section.Code.ToLower().Contains(term))));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query?.Part))
+        {
+            var term = query.Part.Trim().ToLowerInvariant();
+            scrapsQuery = scrapsQuery.Where(x =>
+                x.Part != null &&
+                (x.Part.Name.ToLower().Contains(term) ||
+                 (x.Part.Code != null && x.Part.Code.ToLower().Contains(term))));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query?.ScrapType))
+        {
+            var scrapTypeText = query.ScrapType.Trim();
+            if (Enum.TryParse<ScrapType>(scrapTypeText, true, out var scrapType))
+            {
+                scrapsQuery = scrapsQuery.Where(x => x.ScrapType == scrapType);
+            }
+        }
+
+        var scraps = await scrapsQuery
+            .Include(x => x.Part)
+            .Include(x => x.Section)
+            .Include(x => x.Transfer)
+            .OrderByDescending(x => x.RecordedAt)
+            .ThenBy(x => x.Part != null ? x.Part.Name : string.Empty)
+            .ThenBy(x => x.OpNumber)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(query?.Employee))
+        {
+            var employeeTerm = query.Employee.Trim();
+            scraps = scraps
+                .Where(x => ContainsUserId(x.UserId, employeeTerm) || (x.Transfer != null && ContainsUserId(x.Transfer.UserId, employeeTerm)))
+                .ToList();
+        }
+
+        var items = scraps
+            .Select(x => new ScrapReportItemViewModel(
+                ConvertToLocal(x.RecordedAt),
+                x.Section != null ? x.Section.Name : "Участок не задан",
+                x.Part != null ? x.Part.Name : string.Empty,
+                x.Part?.Code,
+                x.OpNumber,
+                x.Quantity,
+                GetScrapTypeDisplayName(x.ScrapType),
+                FormatEmployee(x.UserId),
+                string.IsNullOrWhiteSpace(x.Comment) ? null : x.Comment))
+            .ToList();
+
+        var filter = new ScrapReportFilterViewModel
+        {
+            From = DateTime.SpecifyKind(fromDate, DateTimeKind.Unspecified),
+            To = DateTime.SpecifyKind(toDate, DateTimeKind.Unspecified),
+            Section = query?.Section,
+            Part = query?.Part,
+            ScrapType = query?.ScrapType,
+            Employee = query?.Employee,
+        };
+
+        var model = new ScrapReportViewModel(
+            filter,
+            items,
+            items.Sum(x => x.Quantity));
+
+        return View("~/Views/Reports/ScrapReport.cshtml", model);
+    }
+
     [HttpGet("wip-summary")]
     public async Task<IActionResult> WipSummary([FromQuery] WipSummaryQuery? query, CancellationToken cancellationToken)
     {
@@ -337,6 +427,14 @@ public class ReportsController : Controller
         decimal? MinQuantity,
         decimal? MaxQuantity);
 
+    public sealed record ScrapReportQuery(
+        DateTime? From,
+        DateTime? To,
+        string? Section,
+        string? Part,
+        string? ScrapType,
+        string? Employee);
+
     public sealed record WipSummaryQuery(
         DateTime? From,
         DateTime? To,
@@ -365,4 +463,18 @@ public class ReportsController : Controller
 
         public decimal Balance { get; set; }
     }
+
+    private static string GetScrapTypeDisplayName(ScrapType scrapType)
+        => scrapType switch
+        {
+            ScrapType.Technological => "Технологический",
+            ScrapType.EmployeeFault => "По вине сотрудника",
+            _ => scrapType.ToString(),
+        };
+
+    private static string FormatEmployee(Guid userId)
+        => userId == Guid.Empty ? "Не указан" : userId.ToString();
+
+    private static bool ContainsUserId(Guid userId, string term)
+        => userId != Guid.Empty && userId.ToString().IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0;
 }

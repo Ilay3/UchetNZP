@@ -64,3 +64,37 @@ public record WipSummaryViewModel(
 {
     public bool HasData => Items.Count > 0;
 }
+
+public class ScrapReportFilterViewModel
+{
+    public DateTime From { get; init; }
+
+    public DateTime To { get; init; }
+
+    public string? Section { get; init; }
+
+    public string? Part { get; init; }
+
+    public string? ScrapType { get; init; }
+
+    public string? Employee { get; init; }
+}
+
+public record ScrapReportItemViewModel(
+    DateTime Date,
+    string SectionName,
+    string PartName,
+    string? PartCode,
+    int OpNumber,
+    decimal Quantity,
+    string ScrapType,
+    string Employee,
+    string? Comment);
+
+public record ScrapReportViewModel(
+    ScrapReportFilterViewModel Filter,
+    IReadOnlyList<ScrapReportItemViewModel> Items,
+    decimal TotalQuantity)
+{
+    public bool HasData => Items.Count > 0;
+}
