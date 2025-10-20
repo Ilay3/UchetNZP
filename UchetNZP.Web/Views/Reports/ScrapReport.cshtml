@@ -109,7 +109,7 @@
                                         <div class="text-muted small">@item.PartCode</div>
                                     }
                                 </td>
-                                <td>@item.OpNumber.ToString("D3")</td>
+                                <td>@item.OpNumber</td>
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@item.ScrapType</td>
                                 <td>@(string.IsNullOrWhiteSpace(item.Comment) ? "—" : item.Comment)</td>

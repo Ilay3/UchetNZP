@@ -1,4 +1,5 @@
 @using System.Globalization
+@using UchetNZP.Shared
 @model AdminWipIndexViewModel
 @{
     ViewData["Title"] = "Администрирование остатков НЗП";
@@ -39,7 +40,7 @@
             </div>
             <div class="col-lg-2">
                 <label class="form-label" for="adminWipOpInput">№ операции</label>
-                <input id="adminWipOpInput" class="form-control" type="number" name="opNumber" value="@(Model.SelectedOpNumber?.ToString(CultureInfo.InvariantCulture))" min="0" step="1" />
+                <input id="adminWipOpInput" class="form-control" type="text" name="opNumber" value="@Model.SelectedOpNumber" pattern="@OperationNumber.AllowedPattern" inputmode="numeric" />
             </div>
             <div class="col-lg-2 d-flex gap-2">
                 <button type="submit" class="btn btn-primary flex-grow-1">Применить</button>

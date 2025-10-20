@@ -9,6 +9,7 @@ using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
 using UchetNZP.Web.Services;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -81,7 +82,7 @@ public class ReportsController : Controller
                 x.Section != null ? x.Section.Name : "Участок не задан",
                 x.Part != null ? x.Part.Name : string.Empty,
                 x.Part?.Code,
-                x.OpNumber,
+                OperationNumber.Format(x.OpNumber),
                 x.Quantity,
                 string.IsNullOrWhiteSpace(x.Comment) ? null : x.Comment))
             .ToList();
@@ -187,7 +188,7 @@ public class ReportsController : Controller
                 x.Section != null ? x.Section.Name : "Участок не задан",
                 x.Part != null ? x.Part.Name : string.Empty,
                 x.Part?.Code,
-                x.OpNumber,
+                OperationNumber.Format(x.OpNumber),
                 x.Quantity,
                 GetScrapTypeDisplayName(x.ScrapType),
                 FormatEmployee(x.UserId),
@@ -346,17 +347,17 @@ public class ReportsController : Controller
         }
 
         var items = combined.Values
+            .OrderBy(x => x.PartName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.SectionName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(x => x.OpNumber)
             .Select(builder => new WipSummaryItemViewModel(
                 builder.PartName,
                 builder.PartCode,
                 builder.SectionName,
-                builder.OpNumber,
+                OperationNumber.Format(builder.OpNumber),
                 builder.Receipt,
                 builder.Launch,
                 builder.Balance))
-            .OrderBy(x => x.PartName, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(x => x.SectionName, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(x => x.OpNumber)
             .ToList();
 
         var model = BuildWipSummaryModel(query, fromDate, toDate, items);

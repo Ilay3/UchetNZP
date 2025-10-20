@@ -13,7 +13,7 @@ public class LaunchHistoryFilterViewModel
 
 public class LaunchHistoryOperationViewModel
 {
-    public LaunchHistoryOperationViewModel(int opNumber, string operationName, string sectionName, decimal normHours, decimal hours)
+    public LaunchHistoryOperationViewModel(string opNumber, string operationName, string sectionName, decimal normHours, decimal hours)
     {
         OpNumber = opNumber;
         OperationName = operationName ?? string.Empty;
@@ -22,7 +22,7 @@ public class LaunchHistoryOperationViewModel
         Hours = hours;
     }
 
-    public int OpNumber { get; }
+    public string OpNumber { get; }
 
     public string OperationName { get; }
 
@@ -41,7 +41,7 @@ public class LaunchHistoryItemViewModel
         string partName,
         string? partCode,
         string sectionName,
-        int fromOperation,
+        string fromOperation,
         decimal quantity,
         decimal hours,
         string? comment,
@@ -69,7 +69,7 @@ public class LaunchHistoryItemViewModel
 
     public string SectionName { get; }
 
-    public int FromOperation { get; }
+    public string FromOperation { get; }
 
     public decimal Quantity { get; }
 
@@ -91,16 +91,16 @@ public class LaunchHistoryItemViewModel
         {
             if (Operations.Count == 0)
             {
-                return $"{FromOperation:D3}";
+                return FromOperation;
             }
 
             var lastOp = Operations[^1].OpNumber;
             if (lastOp == FromOperation)
             {
-                return $"{FromOperation:D3}";
+                return FromOperation;
             }
 
-            return $"{FromOperation:D3} → {lastOp:D3}";
+            return $"{FromOperation} → {lastOp}";
         }
     }
 
@@ -185,7 +185,7 @@ public record LaunchDeleteResponseModel(
     Guid LaunchId,
     Guid PartId,
     Guid SectionId,
-    int FromOperation,
+    string FromOperation,
     decimal Remaining,
     string Message
 );
