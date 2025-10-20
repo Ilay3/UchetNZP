@@ -88,12 +88,13 @@
                         <th scope="col">Остаток до (было → станет)</th>
                         <th scope="col">Остаток после (было → станет)</th>
                         <th scope="col">Комментарий</th>
+                        <th scope="col">Брак</th>
                         <th scope="col" class="text-center">Действия</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="9" class="text-center text-muted">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td>
+                        <td colspan="10" class="text-center text-muted">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td>
                     </tr>
                 </tbody>
             </table>
@@ -118,6 +119,7 @@
                                 <th scope="col">Операция до</th>
                                 <th scope="col">Операция после</th>
                                 <th scope="col">Количество</th>
+                                <th scope="col">Брак</th>
                                 <th scope="col">ID передачи</th>
                             </tr>
                         </thead>
@@ -127,6 +129,40 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-primary btn-lg" data-bs-dismiss="modal">Понятно</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="transferScrapModal" tabindex="-1" aria-labelledby="transferScrapTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-2" id="transferScrapTitle">Разберёмся с оставшимся количеством</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="fs-4 mb-3" id="transferScrapIntro">На выбранной операции остался остаток. Что будем делать?</p>
+                <p class="text-muted fs-5">Если сомневаетесь, позовите коллегу. Кнопки ниже крупные, чтобы вам было удобно нажимать даже без очков.</p>
+                <div class="d-grid gap-3" id="transferScrapPrimaryActions">
+                    <button type="button" class="btn btn-danger btn-lg py-3" id="transferScrapMarkButton">Остаток — это брак</button>
+                    <button type="button" class="btn btn-outline-success btn-lg py-3" id="transferScrapKeepButton">Остаток остаётся</button>
+                </div>
+                <div id="transferScrapDetails" class="mt-4 d-none">
+                    <p class="fs-5 fw-semibold">Выберите тип брака:</p>
+                    <div class="d-flex flex-column flex-md-row gap-3" role="group" aria-label="Тип брака">
+                        <button type="button" class="btn btn-outline-danger btn-lg flex-fill py-3" data-scrap-type="technological">Технологический</button>
+                        <button type="button" class="btn btn-outline-danger btn-lg flex-fill py-3" data-scrap-type="employee">По вине сотрудника</button>
+                    </div>
+                    <p class="text-muted fs-6 mt-3">Уточните, что произошло, чтобы коллеги могли быстро разобраться и помочь вам.</p>
+                    <label for="transferScrapComment" class="form-label fs-5 mt-2">Коротко опишите ситуацию</label>
+                    <textarea id="transferScrapComment" class="form-control form-control-lg" rows="3" maxlength="256" placeholder="Например: не прошла проверку качества"></textarea>
+                    <p class="text-muted mt-2">Если нажмёте &laquo;Остаток остаётся&raquo;, данные о браке не сохранятся.</p>
+                </div>
+            </div>
+            <div class="modal-footer flex-column flex-sm-row gap-3">
+                <button type="button" class="btn btn-outline-secondary btn-lg w-100 w-sm-auto" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-danger btn-lg w-100 w-sm-auto" id="transferScrapConfirmButton" disabled>Списать остаток как брак</button>
             </div>
         </div>
     </div>

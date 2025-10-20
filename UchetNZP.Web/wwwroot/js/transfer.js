@@ -30,8 +30,26 @@
     const summaryModalElement = document.getElementById("transferSummaryModal");
     const summaryTableBody = document.querySelector("#transferSummaryTable tbody");
     const summaryIntro = document.getElementById("transferSummaryIntro");
+    const scrapModalElement = document.getElementById("transferScrapModal");
+    const scrapIntro = document.getElementById("transferScrapIntro");
+    const scrapPrimaryActions = document.getElementById("transferScrapPrimaryActions");
+    const scrapDetails = document.getElementById("transferScrapDetails");
+    const scrapMarkButton = document.getElementById("transferScrapMarkButton");
+    const scrapKeepButton = document.getElementById("transferScrapKeepButton");
+    const scrapConfirmButton = document.getElementById("transferScrapConfirmButton");
+    const scrapCommentInput = document.getElementById("transferScrapComment");
+    const scrapTypeButtons = Array.from(scrapDetails?.querySelectorAll("[data-scrap-type]") ?? []);
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
+    const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
+
+    const scrapTypeOptions = {
+        technological: { value: "Technological", label: "Технологический" },
+        employee: { value: "EmployeeFault", label: "По вине сотрудника" },
+    };
+
+    let scrapModalResolver = null;
+    let scrapSelectedTypeKey = null;
 
     const today = new Date().toISOString().slice(0, 10);
     if (dateInput) {
@@ -148,6 +166,116 @@
             void editCartItem(index);
         }
     });
+
+    scrapMarkButton?.addEventListener("click", () => {
+        if (!scrapDetails || !scrapPrimaryActions) {
+            return;
+        }
+
+        scrapPrimaryActions.classList.add("d-none");
+        scrapDetails.classList.remove("d-none");
+        scrapSelectedTypeKey = null;
+        updateScrapTypeButtons();
+        if (scrapConfirmButton) {
+            scrapConfirmButton.disabled = true;
+        }
+    });
+
+    scrapKeepButton?.addEventListener("click", () => {
+        resolveScrapModal({ confirmed: false });
+        scrapModal?.hide();
+    });
+
+    scrapConfirmButton?.addEventListener("click", () => {
+        if (!scrapSelectedTypeKey) {
+            return;
+        }
+
+        const option = scrapTypeOptions[scrapSelectedTypeKey];
+        resolveScrapModal({
+            confirmed: true,
+            typeKey: scrapSelectedTypeKey,
+            typeValue: option?.value ?? scrapSelectedTypeKey,
+            typeLabel: option?.label ?? scrapSelectedTypeKey,
+            comment: scrapCommentInput?.value?.trim() ?? "",
+        });
+        scrapModal?.hide();
+    });
+
+    scrapTypeButtons.forEach(button => {
+        button.addEventListener("click", () => {
+            scrapSelectedTypeKey = button.dataset.scrapType ?? null;
+            updateScrapTypeButtons();
+            if (scrapConfirmButton) {
+                scrapConfirmButton.disabled = !scrapSelectedTypeKey;
+            }
+        });
+    });
+
+    scrapModalElement?.addEventListener("show.bs.modal", () => {
+        if (!scrapPrimaryActions || !scrapDetails || !scrapConfirmButton) {
+            return;
+        }
+
+        scrapPrimaryActions.classList.remove("d-none");
+        scrapDetails.classList.add("d-none");
+        scrapConfirmButton.disabled = true;
+        scrapSelectedTypeKey = null;
+        if (scrapCommentInput) {
+            scrapCommentInput.value = "";
+        }
+        updateScrapTypeButtons();
+    });
+
+    scrapModalElement?.addEventListener("hidden.bs.modal", () => {
+        resolveScrapModal({ confirmed: false }, true);
+        scrapSelectedTypeKey = null;
+        updateScrapTypeButtons();
+    });
+
+    function updateScrapTypeButtons() {
+        scrapTypeButtons.forEach(button => {
+            const isSelected = button.dataset.scrapType === scrapSelectedTypeKey;
+            button.classList.toggle("btn-danger", isSelected);
+            button.classList.toggle("btn-outline-danger", !isSelected);
+            if (isSelected) {
+                button.classList.add("fw-semibold");
+            }
+            else {
+                button.classList.remove("fw-semibold");
+            }
+        });
+    }
+
+    function resolveScrapModal(result, silent = false) {
+        if (!scrapModalResolver) {
+            return;
+        }
+
+        if (silent && result.confirmed) {
+            return;
+        }
+
+        const resolver = scrapModalResolver;
+        scrapModalResolver = null;
+        resolver(result);
+    }
+
+    function askScrapDecision(context) {
+        if (!scrapModal || !scrapIntro) {
+            return Promise.resolve({ confirmed: false });
+        }
+
+        const leftoverText = Number(context.leftover).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        const partText = context.partDisplay ? ` для ${context.partDisplay}` : "";
+        const fromText = context.fromOperation ? ` на операции ${context.fromOperation}` : "";
+        scrapIntro.textContent = `Осталось ${leftoverText} шт${partText}${fromText}. Решите, что сделать с остатком.`;
+
+        return new Promise(resolve => {
+            scrapModalResolver = resolve;
+            scrapModal.show();
+        });
+    }
 
     function formatOperation(operation) {
         const parts = [operation.opNumber.toString().padStart(3, "0")];
@@ -375,9 +503,38 @@
             fromBalanceAfter: fromAvailable - quantity,
             toBalanceBefore: toAvailable,
             toBalanceAfter: toAvailable + quantity,
+            scrapType: null,
+            scrapTypeLabel: null,
+            scrapQuantity: 0,
+            scrapComment: null,
+            scrap: null,
         };
 
-        applyPendingChange(part.id, selectedFromOperation.opNumber, -quantity);
+        const leftover = item.fromBalanceAfter;
+        let fromDelta = -quantity;
+        if (leftover > 1e-9) {
+            const decision = await askScrapDecision({
+                leftover,
+                partDisplay: item.partDisplay,
+                fromOperation: `${selectedFromOperation.opNumber.toString().padStart(3, "0")} ${selectedFromOperation.operationName ?? ""}`.trim(),
+            });
+
+            if (decision?.confirmed) {
+                item.scrapType = decision.typeValue;
+                item.scrapTypeLabel = decision.typeLabel;
+                item.scrapQuantity = leftover;
+                item.scrapComment = decision.comment ? decision.comment : null;
+                item.scrap = {
+                    type: item.scrapType,
+                    quantity: item.scrapQuantity,
+                    comment: item.scrapComment,
+                };
+                item.fromBalanceAfter = 0;
+                fromDelta -= leftover;
+            }
+        }
+
+        applyPendingChange(part.id, selectedFromOperation.opNumber, fromDelta);
         applyPendingChange(part.id, selectedToOperation.opNumber, quantity);
         cart.push(item);
         renderCart();
@@ -387,7 +544,7 @@
 
     function renderCart() {
         if (!cart.length) {
-            cartTableBody.innerHTML = "<tr><td colspan=\"9\" class=\"text-center text-muted\">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td></tr>";
+            cartTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td></tr>";
             return;
         }
 
@@ -409,6 +566,7 @@
                 <td>${formatBalanceChange(item.fromBalanceBefore, item.fromBalanceAfter)}</td>
                 <td>${formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter)}</td>
                 <td>${item.comment ? escapeHtml(item.comment) : ""}</td>
+                <td>${formatScrapCell(item)}</td>
                 <td class="text-center">
                     <button type="button" class="btn btn-link btn-lg text-decoration-none" data-action="edit" data-index="${index}" aria-label="Изменить запись">✎</button>
                     <button type="button" class="btn btn-link btn-lg text-decoration-none text-danger" data-action="remove" data-index="${index}" aria-label="Удалить запись">✖</button>
@@ -429,11 +587,97 @@
         return element.innerHTML;
     }
 
+    function getScrapLabel(type, fallbackLabel) {
+        if (!type && !fallbackLabel) {
+            return "";
+        }
+
+        const option = Object.values(scrapTypeOptions).find(entry => entry.value === type);
+        if (option) {
+            return option.label;
+        }
+
+        return fallbackLabel ?? type ?? "";
+    }
+
+    function formatScrapCell(item) {
+        if (!item?.scrapType || !item?.scrapQuantity || item.scrapQuantity <= 0) {
+            return "<span class=\"text-muted\">Остаток остаётся на операции</span>";
+        }
+
+        const quantityText = Number(item.scrapQuantity).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        const commentHtml = item.scrapComment ? `<div class=\"mt-2 text-muted\">${escapeHtml(item.scrapComment)}</div>` : "";
+        const label = getScrapLabel(item.scrapType, item.scrapTypeLabel);
+        return `
+            <div class="d-flex align-items-start gap-3">
+                <div class="display-6" aria-hidden="true">⚠️</div>
+                <div>
+                    <div class="fw-semibold text-danger">Брак: ${escapeHtml(label)}</div>
+                    <div>Количество: ${quantityText} шт</div>
+                    ${commentHtml}
+                </div>
+            </div>`;
+    }
+
+    function extractScrapSource(source) {
+        if (!source) {
+            return null;
+        }
+
+        if (source.scrap) {
+            return source.scrap;
+        }
+
+        if (source.scrapQuantity || source.scrapType || source.scrapComment || source.scrapTypeLabel) {
+            return {
+                quantity: source.scrapQuantity,
+                type: source.scrapType,
+                comment: source.scrapComment,
+                typeLabel: source.scrapTypeLabel,
+            };
+        }
+
+        return null;
+    }
+
+    function normalizeScrapInfo(raw) {
+        if (!raw) {
+            return null;
+        }
+
+        const type = raw.type ?? raw.typeValue ?? raw.scrapType ?? null;
+        const quantityRaw = raw.quantity ?? raw.scrapQuantity ?? 0;
+        const parsedQuantity = Number(quantityRaw);
+        const quantity = Number.isFinite(parsedQuantity) ? parsedQuantity : 0;
+        const commentRaw = raw.comment ?? raw.scrapComment ?? null;
+        const comment = commentRaw !== null && commentRaw !== undefined ? String(commentRaw) : null;
+        const label = getScrapLabel(type, raw.typeLabel ?? raw.scrapTypeLabel ?? null);
+
+        if (!type || !(quantity > 0)) {
+            return {
+                scrapType: type,
+                scrapTypeLabel: label,
+                scrapQuantity: quantity,
+                scrapComment: comment,
+            };
+        }
+
+        return {
+            scrapType: type,
+            scrapTypeLabel: label,
+            scrapQuantity: quantity,
+            scrapComment: comment,
+        };
+    }
+
     function removeCartItem(index) {
         const [removed] = cart.splice(index, 1);
         if (removed) {
             applyPendingChange(removed.partId, removed.fromOpNumber, removed.quantity);
             applyPendingChange(removed.partId, removed.toOpNumber, -removed.quantity);
+            if (removed.scrapQuantity && removed.scrapQuantity > 0) {
+                applyPendingChange(removed.partId, removed.fromOpNumber, removed.scrapQuantity);
+            }
         }
 
         renderCart();
@@ -448,6 +692,9 @@
 
         applyPendingChange(item.partId, item.fromOpNumber, item.quantity);
         applyPendingChange(item.partId, item.toOpNumber, -item.quantity);
+        if (item.scrapQuantity && item.scrapQuantity > 0) {
+            applyPendingChange(item.partId, item.fromOpNumber, item.scrapQuantity);
+        }
 
         renderCart();
 
@@ -496,6 +743,13 @@
                 transferDate: item.date,
                 quantity: item.quantity,
                 comment: item.comment,
+                scrap: item.scrap ?? (item.scrapType && item.scrapQuantity > 0
+                    ? {
+                        type: item.scrapType,
+                        quantity: item.scrapQuantity,
+                        comment: item.scrapComment,
+                    }
+                    : null),
             })),
         };
 
@@ -597,14 +851,18 @@
         (summary?.items ?? []).forEach((item, index) => {
             const row = document.createElement("tr");
             const cartItem = cart[index];
-            const partDisplay = cartItem ? cartItem.partDisplay : item.partId;
+            const partDisplay = cartItem?.partDisplay ?? item.partDisplay ?? item.partName ?? item.partId;
             const fromText = `${item.fromOpNumber.toString().padStart(3, "0")}: ${Number(item.fromBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.fromBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
             const toText = `${item.toOpNumber.toString().padStart(3, "0")}: ${Number(item.toBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.toBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+            const scrapSource = extractScrapSource(item) ?? extractScrapSource(cartItem);
+            const scrapInfo = normalizeScrapInfo(scrapSource);
+            const scrapCell = formatScrapCell(scrapInfo ?? {});
             row.innerHTML = `
                 <td>${partDisplay}</td>
                 <td>${fromText}</td>
                 <td>${toText}</td>
                 <td>${Number(item.quantity).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
+                <td>${scrapCell}</td>
                 <td>${item.transferId}</td>`;
             summaryTableBody.appendChild(row);
         });
