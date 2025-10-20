@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Services;
@@ -8,6 +9,15 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Host.UseWindowsService();
+
+builder.Services
+    .AddAuthentication(options =>
+    {
+        options.DefaultScheme = "Dummy";
+        options.DefaultChallengeScheme = "Dummy";
+        options.DefaultForbidScheme = "Dummy";
+    })
+    .AddScheme<AuthenticationSchemeOptions, DummyAuthenticationHandler>("Dummy", _ => { });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
@@ -43,6 +53,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
