@@ -19,6 +19,68 @@ public class ReportService : IReportService
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
+    public async Task<byte[]> ExportRoutesToExcelAsync(string? search, Guid? sectionId, CancellationToken cancellationToken = default)
+    {
+        var normalizedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        Guid? normalizedSectionId = null;
+
+        if (sectionId.HasValue && sectionId.Value != Guid.Empty)
+        {
+            normalizedSectionId = sectionId.Value;
+        }
+
+        var routesQuery = from route in _dbContext.PartRoutes.AsNoTracking()
+                          join part in _dbContext.Parts.AsNoTracking() on route.PartId equals part.Id
+                          join operation in _dbContext.Operations.AsNoTracking() on route.OperationId equals operation.Id into operations
+                          from operation in operations.DefaultIfEmpty()
+                          join section in _dbContext.Sections.AsNoTracking() on route.SectionId equals section.Id into sections
+                          from section in sections.DefaultIfEmpty()
+                          select new { route, part, operation, section };
+
+        if (!string.IsNullOrEmpty(normalizedSearch))
+        {
+            var term = normalizedSearch.ToLowerInvariant();
+            routesQuery = routesQuery.Where(x =>
+                x.part.Name.ToLower().Contains(term) ||
+                (x.part.Code != null && x.part.Code.ToLower().Contains(term)) ||
+                (x.operation != null && x.operation.Name.ToLower().Contains(term)) ||
+                (x.section != null && x.section.Name.ToLower().Contains(term)));
+        }
+
+        if (normalizedSectionId.HasValue)
+        {
+            var sectionFilterId = normalizedSectionId.Value;
+            routesQuery = routesQuery.Where(x => x.section != null && x.section.Id == sectionFilterId);
+        }
+
+        var routes = await routesQuery
+            .OrderBy(x => x.part.Name)
+            .ThenBy(x => x.route.OpNumber)
+            .Select(x => new RouteExportRow(
+                x.part.Name,
+                x.part.Code,
+                x.route.OpNumber,
+                x.operation != null ? x.operation.Name : string.Empty,
+                x.section != null ? x.section.Name : string.Empty,
+                x.route.NormHours))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        string? sectionDisplay = null;
+
+        if (normalizedSectionId.HasValue)
+        {
+            sectionDisplay = await _dbContext.Sections
+                .AsNoTracking()
+                .Where(x => x.Id == normalizedSectionId.Value)
+                .Select(x => string.IsNullOrWhiteSpace(x.Code) ? x.Name : $"{x.Name} ({x.Code})")
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return BuildRoutesWorkbook(routes, normalizedSearch, sectionDisplay);
+    }
+
     public async Task<byte[]> ExportLaunchesToExcelAsync(DateTime from, DateTime to, CancellationToken cancellationToken = default)
     {
         var fromUtc = NormalizeToUtc(from);
@@ -65,6 +127,87 @@ public class ReportService : IReportService
             displayDate,
             displayDate);
     }
+
+    private static byte[] BuildRoutesWorkbook(
+        IReadOnlyList<RouteExportRow> routes,
+        string? search,
+        string? sectionDisplay)
+    {
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Маршруты");
+
+        var rowIndex = 1;
+        worksheet.Cell(rowIndex, 1).Value = "Маршруты деталей";
+        worksheet.Row(rowIndex).Style.Font.SetBold(true);
+        worksheet.Row(rowIndex).Style.Font.FontSize = 14;
+        rowIndex += 2;
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            rowIndex = WriteFilterRow(worksheet, rowIndex, "Поиск", search);
+        }
+
+        if (!string.IsNullOrWhiteSpace(sectionDisplay))
+        {
+            rowIndex = WriteFilterRow(worksheet, rowIndex, "Участок", sectionDisplay!);
+        }
+
+        if (rowIndex > 3)
+        {
+            rowIndex++;
+        }
+
+        worksheet.Cell(rowIndex, 1).Value = "Деталь";
+        worksheet.Cell(rowIndex, 2).Value = "Код детали";
+        worksheet.Cell(rowIndex, 3).Value = "№ операции";
+        worksheet.Cell(rowIndex, 4).Value = "Операция";
+        worksheet.Cell(rowIndex, 5).Value = "Участок";
+        worksheet.Cell(rowIndex, 6).Value = "Норматив, н/ч";
+        worksheet.Row(rowIndex).Style.Font.SetBold(true);
+        rowIndex++;
+
+        if (routes.Count == 0)
+        {
+            worksheet.Cell(rowIndex, 1).Value = "По выбранным условиям данные не найдены.";
+            worksheet.Row(rowIndex).Style.Font.SetItalic(true);
+        }
+        else
+        {
+            foreach (var route in routes)
+            {
+                worksheet.Cell(rowIndex, 1).Value = route.PartName;
+                worksheet.Cell(rowIndex, 2).Value = route.PartCode ?? string.Empty;
+                worksheet.Cell(rowIndex, 3).Value = route.OpNumber.ToString("D3");
+                worksheet.Cell(rowIndex, 4).Value = route.OperationName;
+                worksheet.Cell(rowIndex, 5).Value = route.SectionName;
+                worksheet.Cell(rowIndex, 6).Value = route.NormHours;
+                worksheet.Cell(rowIndex, 6).Style.NumberFormat.Format = "0.###";
+                rowIndex++;
+            }
+        }
+
+        worksheet.Columns().AdjustToContents();
+
+        using var memoryStream = new MemoryStream();
+        workbook.SaveAs(memoryStream);
+        return memoryStream.ToArray();
+    }
+
+    private static int WriteFilterRow(IXLWorksheet worksheet, int rowIndex, string label, string value)
+    {
+        worksheet.Cell(rowIndex, 1).Value = label;
+        worksheet.Cell(rowIndex, 1).Style.Font.SetBold(true);
+        worksheet.Cell(rowIndex, 2).Value = value;
+        return rowIndex + 1;
+    }
+
+    private sealed record RouteExportRow(
+        string PartName,
+        string? PartCode,
+        int OpNumber,
+        string OperationName,
+        string SectionName,
+        decimal NormHours);
 
     private async Task<List<WipLaunch>> GetLaunchesAsync(DateTime fromUtc, DateTime toUtcExclusive, CancellationToken cancellationToken)
     {
