@@ -29,4 +29,6 @@ public class WipTransfer
     public virtual Part? Part { get; set; }
 
     public virtual ICollection<WipTransferOperation> Operations { get; set; } = new List<WipTransferOperation>();
+
+    public virtual WipScrap? Scrap { get; set; }
 }

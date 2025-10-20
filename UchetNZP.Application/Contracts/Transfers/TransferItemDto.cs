@@ -6,5 +6,6 @@ public record TransferItemDto(
     int ToOpNumber,
     DateTime TransferDate,
     decimal Quantity,
-    string? Comment
+    string? Comment,
+    TransferScrapDto? Scrap
 );

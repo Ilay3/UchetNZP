@@ -123,7 +123,13 @@ public class TransferService : ITransferService
                 }
 
                 var fromBalanceBefore = fromBalance.Quantity;
-                fromBalance.Quantity = fromBalanceBefore - item.Quantity;
+                var remainingAfterTransfer = fromBalanceBefore - item.Quantity;
+                if (remainingAfterTransfer < 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Остаток НЗП для операции {item.FromOpNumber} детали {item.PartId} не может стать отрицательным.");
+                }
+
                 toBalance.Quantity = toBalance.Quantity + item.Quantity;
 
                 var transferDate = NormalizeToUtc(item.TransferDate);
@@ -169,6 +175,46 @@ public class TransferService : ITransferService
 
                 await _dbContext.WipTransferOperations.AddRangeAsync(new[] { fromOperation, toOperation }, cancellationToken).ConfigureAwait(false);
 
+                TransferScrapSummaryDto? scrapSummary = null;
+
+                if (item.Scrap is not null)
+                {
+                    if (item.Scrap.Quantity <= 0)
+                    {
+                        throw new InvalidOperationException($"Количество брака должно быть положительным для детали {item.PartId}.");
+                    }
+
+                    if (remainingAfterTransfer != item.Scrap.Quantity)
+                    {
+                        throw new InvalidOperationException(
+                            $"Количество брака ({item.Scrap.Quantity}) не совпадает с остатком ({remainingAfterTransfer}) для операции {item.FromOpNumber} детали {item.PartId}.");
+                    }
+
+                    fromBalance.Quantity = 0m;
+
+                    var scrap = new WipScrap
+                    {
+                        Id = Guid.NewGuid(),
+                        PartId = item.PartId,
+                        SectionId = fromRoute.SectionId,
+                        OpNumber = item.FromOpNumber,
+                        Quantity = item.Scrap.Quantity,
+                        ScrapType = item.Scrap.ScrapType,
+                        RecordedAt = now,
+                        UserId = userId,
+                        Comment = item.Scrap.Comment,
+                        TransferId = transfer.Id,
+                    };
+
+                    await _dbContext.WipScraps.AddAsync(scrap, cancellationToken).ConfigureAwait(false);
+
+                    scrapSummary = new TransferScrapSummaryDto(scrap.Id, scrap.ScrapType, scrap.Quantity, scrap.Comment);
+                }
+                else
+                {
+                    fromBalance.Quantity = remainingAfterTransfer;
+                }
+
                 results.Add(new TransferItemSummaryDto(
                     item.PartId,
                     item.FromOpNumber,
@@ -180,7 +226,8 @@ public class TransferService : ITransferService
                     toBalanceBefore,
                     toBalance.Quantity,
                     item.Quantity,
-                    transfer.Id));
+                    transfer.Id,
+                    scrapSummary));
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

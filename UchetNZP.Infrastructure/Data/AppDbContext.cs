@@ -30,6 +30,8 @@ public class AppDbContext : DbContext
 
     public DbSet<WipTransferOperation> WipTransferOperations => Set<WipTransferOperation>();
 
+    public DbSet<WipScrap> WipScraps => Set<WipScrap>();
+
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
     public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();
