@@ -82,7 +82,6 @@
                             <th scope="col">Операция</th>
                             <th scope="col">Количество</th>
                             <th scope="col">Тип брака</th>
-                            <th scope="col">Ответственный</th>
                             <th scope="col">Комментарий</th>
                         </tr>
                     </thead>
@@ -102,9 +101,6 @@
                                 <td>@item.OpNumber.ToString("D3")</td>
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@item.ScrapType</td>
-                                <td>
-                                    <span class="badge text-bg-secondary fs-6">@item.Employee</span>
-                                </td>
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(item.Comment))
                                     {
