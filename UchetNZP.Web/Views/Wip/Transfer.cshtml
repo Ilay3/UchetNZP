@@ -4,9 +4,135 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Передача НЗП</h1>
-    <p class="lead">Выберите деталь и отразите передачу между операциями.</p>
+    <p class="lead">Выберите деталь, укажите операции и количество, чтобы передать НЗП между участками.</p>
 </div>
 
-<div class="alert alert-info" role="status">
-    Функциональность пользовательского интерфейса для передачи НЗП будет добавлена позднее.
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Шаг 1. Заполните данные передачи</div>
+    <div class="card-body">
+        <form id="transferForm" class="row g-4" autocomplete="off">
+            <div class="col-12 col-xl-4">
+                <label class="form-label" for="transferPartInput">Деталь</label>
+                <input id="transferPartInput" class="form-control form-control-lg" type="text" list="transferPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
+                <datalist id="transferPartOptions"></datalist>
+                <input type="hidden" id="transferPartId" />
+                <div class="form-text">Введите минимум 2 символа наименования или обозначения.</div>
+            </div>
+            <div class="col-12 col-lg-6 col-xl-4">
+                <label class="form-label" for="transferFromOperationInput">Операция до</label>
+                <input id="transferFromOperationInput" class="form-control form-control-lg" type="text" list="transferFromOperationOptions" placeholder="Выберите операцию, откуда снимается НЗП" autocomplete="off" />
+                <datalist id="transferFromOperationOptions"></datalist>
+                <input type="hidden" id="transferFromOperationNumber" />
+                <div class="form-text">Доступен поиск по номеру и названию операции.</div>
+            </div>
+            <div class="col-12 col-lg-6 col-xl-4">
+                <label class="form-label" for="transferToOperationInput">Операция после</label>
+                <input id="transferToOperationInput" class="form-control form-control-lg" type="text" list="transferToOperationOptions" placeholder="Выберите следующую операцию" autocomplete="off" />
+                <datalist id="transferToOperationOptions"></datalist>
+                <input type="hidden" id="transferToOperationNumber" />
+                <div class="form-text">Выберите операцию, на которую передаётся НЗП.</div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <label class="form-label" for="transferDateInput">Дата передачи</label>
+                <input id="transferDateInput" class="form-control form-control-lg" type="date" />
+                <div class="form-text">По умолчанию устанавливается сегодняшняя дата, её можно изменить.</div>
+            </div>
+            <div class="col-sm-6 col-lg-4">
+                <label class="form-label" for="transferQuantityInput">Количество (шт)</label>
+                <input id="transferQuantityInput" class="form-control form-control-lg" type="number" min="0" step="0.001" />
+                <div class="form-text">Количество не может превышать остаток на выбранной операции до.</div>
+            </div>
+            <div class="col-lg-8">
+                <label class="form-label" for="transferCommentInput">Комментарий</label>
+                <input id="transferCommentInput" class="form-control form-control-lg" type="text" maxlength="256" />
+                <div class="form-text">Добавьте пояснение для коллег, если нужно.</div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="border rounded-3 p-3 h-100 bg-light">
+                    <div class="fw-semibold text-uppercase small text-muted">На операции до</div>
+                    <div class="display-6" id="transferFromBalanceLabel">0 шт</div>
+                    <div class="form-text">Остаток учитывает выбранные записи в корзине.</div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="border rounded-3 p-3 h-100 bg-light">
+                    <div class="fw-semibold text-uppercase small text-muted">На операции после</div>
+                    <div class="display-6" id="transferToBalanceLabel">0 шт</div>
+                    <div class="form-text">Остаток увеличивается с учётом готовых к передаче позиций.</div>
+                </div>
+            </div>
+        </form>
+        <div class="d-flex flex-column flex-md-row gap-3 mt-4">
+            <button type="button" class="btn btn-primary btn-lg" id="transferAddButton">Добавить в корзину (Enter)</button>
+            <button type="button" class="btn btn-outline-secondary btn-lg" id="transferResetButton">Очистить форму (Esc)</button>
+        </div>
+    </div>
 </div>
+
+<div class="card shadow-sm mb-5">
+    <div class="card-header bg-light fw-semibold d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
+        <span class="fs-4">Корзина передач</span>
+        <button type="button" class="btn btn-success btn-lg" id="transferSaveButton">Сохранить все передачи (Ctrl+S)</button>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle" id="transferCartTable" aria-describedby="transferCartCaption">
+                <caption id="transferCartCaption" class="visually-hidden">Передачи НЗП, подготовленные к сохранению</caption>
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Дата</th>
+                        <th scope="col">Деталь</th>
+                        <th scope="col">Операция до</th>
+                        <th scope="col">Операция после</th>
+                        <th scope="col">Количество</th>
+                        <th scope="col">Остаток до (было → станет)</th>
+                        <th scope="col">Остаток после (было → станет)</th>
+                        <th scope="col">Комментарий</th>
+                        <th scope="col" class="text-center">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="transferSummaryModal" tabindex="-1" aria-labelledby="transferSummaryTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h4" id="transferSummaryTitle">Сводка по сохранённым передачам</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3" id="transferSummaryIntro"></p>
+                <div class="table-responsive">
+                    <table class="table table-bordered align-middle" id="transferSummaryTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Деталь</th>
+                                <th scope="col">Операция до</th>
+                                <th scope="col">Операция после</th>
+                                <th scope="col">Количество</th>
+                                <th scope="col">ID передачи</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary btn-lg" data-bs-dismiss="modal">Понятно</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script src="~/js/transfer.js" asp-append-version="true"></script>
+}
