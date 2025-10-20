@@ -6,7 +6,7 @@
     var selectedSectionId = Model.Filter.SectionId;
     var groupedRoutes = Model.Routes
         .GroupBy(route => new { route.PartId, route.PartDisplayName })
-        .Select(group => group.OrderBy(r => r.OpNumber).ToList())
+        .Select(group => group.OrderBy(r => r.OpNumber, StringComparer.Ordinal).ToList())
         .ToList();
 }
 

@@ -7,6 +7,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Services;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
 using UchetNZP.Web.Controllers;
 using UchetNZP.Web.Models;
 using Xunit;
@@ -135,7 +136,7 @@ public class WipLaunchesControllerTests
         var okResult = Assert.IsType<OkObjectResult>(actionResult);
         var response = Assert.IsType<LaunchDeleteResponseModel>(okResult.Value);
         Assert.Equal(launchId, response.LaunchId);
-        Assert.Equal(20, response.FromOperation);
+        Assert.Equal(OperationNumber.Format(20), response.FromOperation);
         Assert.Equal(20m, response.Remaining);
         Assert.Contains("успешно", response.Message, StringComparison.OrdinalIgnoreCase);
 

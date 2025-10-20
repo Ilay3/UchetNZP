@@ -23,7 +23,7 @@ public record ReceiptReportItemViewModel(
     string SectionName,
     string PartName,
     string? PartCode,
-    int OpNumber,
+    string OpNumber,
     decimal Quantity,
     string? Comment);
 
@@ -50,7 +50,7 @@ public record WipSummaryItemViewModel(
     string PartName,
     string? PartCode,
     string SectionName,
-    int OpNumber,
+    string OpNumber,
     decimal Receipt,
     decimal Launch,
     decimal Balance);
@@ -85,7 +85,7 @@ public record ScrapReportItemViewModel(
     string SectionName,
     string PartName,
     string? PartCode,
-    int OpNumber,
+    string OpNumber,
     decimal Quantity,
     string ScrapType,
     string Employee,

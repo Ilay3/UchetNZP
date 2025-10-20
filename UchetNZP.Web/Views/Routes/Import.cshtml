@@ -1,3 +1,4 @@
+@using UchetNZP.Shared
 @{
     ViewData["Title"] = "Маршруты: добавление и импорт";
 }
@@ -25,7 +26,7 @@
             </div>
             <div class="col-xl-1">
                 <label class="form-label" for="routeOpNumberInput">№</label>
-                <input id="routeOpNumberInput" class="form-control form-control-lg" type="text" inputmode="numeric" pattern="^\d{1,10}$" data-pattern="^\d{1,10}$" maxlength="10" />
+                <input id="routeOpNumberInput" class="form-control form-control-lg" type="text" inputmode="numeric" pattern="@OperationNumber.AllowedPattern" data-pattern="@OperationNumber.AllowedPattern" maxlength="10" />
                 <div class="form-text">Допустимы 1–10 цифр, например: 7, 015, 000123.</div>
             </div>
             <div class="col-xl-2">

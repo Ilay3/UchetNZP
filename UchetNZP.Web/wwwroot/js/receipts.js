@@ -148,7 +148,7 @@
             choiceCell.appendChild(radio);
 
             const numberCell = document.createElement("td");
-            numberCell.textContent = operation.opNumber.toString().padStart(3, "0");
+            numberCell.textContent = operation.opNumber;
 
             const nameCell = document.createElement("td");
             nameCell.textContent = operation.operationName || "Без названия";
@@ -365,7 +365,7 @@
         pendingAdjustments.set(key, pending + quantity);
 
         const partDisplay = part.code ? `${part.name} (${part.code})` : part.name;
-        const operationDisplay = `${selectedOperation.opNumber.toString().padStart(3, "0")} ${selectedOperation.operationName ?? ""}`.trim();
+        const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
 
         const item = {
             partId: part.id,
@@ -471,7 +471,7 @@
 
             row.innerHTML = `
                 <td>${matchingCartItem ? matchingCartItem.partDisplay : item.partId}</td>
-                <td>${matchingCartItem ? matchingCartItem.operationDisplay : item.opNumber.toString().padStart(3, "0")}</td>
+                <td>${matchingCartItem ? matchingCartItem.operationDisplay : item.opNumber}</td>
                 <td>${item.was.toFixed(3)}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>`;

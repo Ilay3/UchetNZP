@@ -9,7 +9,7 @@ public class AdminWipIndexViewModel
 
     public Guid? SelectedSectionId { get; init; }
 
-    public int? SelectedOpNumber { get; init; }
+    public string? SelectedOpNumber { get; init; }
 
     public IReadOnlyCollection<SelectListItem> Parts { get; init; } = Array.Empty<SelectListItem>();
 
@@ -34,7 +34,7 @@ public class AdminWipBalanceRowViewModel
 
     public string SectionDisplay { get; init; } = string.Empty;
 
-    public int OpNumber { get; init; }
+    public string OpNumber { get; init; } = string.Empty;
 
     public decimal Quantity { get; init; }
 }
@@ -54,5 +54,5 @@ public class AdminWipAdjustmentInputModel
 
     public Guid? FilterSectionId { get; set; }
 
-    public int? FilterOpNumber { get; set; }
+    public string? FilterOpNumber { get; set; }
 }

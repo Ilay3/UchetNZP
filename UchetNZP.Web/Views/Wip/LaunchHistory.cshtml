@@ -95,7 +95,7 @@
                                                         <ul class="small mt-2 mb-0">
                                                             @foreach (var op in launch.Operations)
                                                             {
-                                                                <li><strong>@op.OpNumber.ToString("D3")</strong> — @(string.IsNullOrWhiteSpace(op.OperationName) ? "Без названия" : op.OperationName) (@(string.IsNullOrWhiteSpace(op.SectionName) ? "Участок не задан" : op.SectionName)) (норма: @op.NormHours.ToString("0.###"), часы: @op.Hours.ToString("0.###"))</li>
+                                                                <li><strong>@op.OpNumber</strong> — @(string.IsNullOrWhiteSpace(op.OperationName) ? "Без названия" : op.OperationName) (@(string.IsNullOrWhiteSpace(op.SectionName) ? "Участок не задан" : op.SectionName)) (норма: @op.NormHours.ToString("0.###"), часы: @op.Hours.ToString("0.###"))</li>
                                                             }
                                                         </ul>
                                                     </details>

@@ -10,6 +10,7 @@ using UchetNZP.Application.Contracts.Transfers;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -72,7 +73,7 @@ public class WipTransfersController : Controller
                               from balance in balances.DefaultIfEmpty()
                               orderby route.OpNumber
                               select new TransferOperationLookupViewModel(
-                                  route.OpNumber,
+                                  OperationNumber.Format(route.OpNumber),
                                   operation != null ? operation.Name : string.Empty,
                                   route.NormHours,
                                   balance != null ? balance.Quantity : 0m);
@@ -88,24 +89,36 @@ public class WipTransfersController : Controller
     [HttpGet("balances")]
     public async Task<IActionResult> GetBalances(
         [FromQuery] Guid partId,
-        [FromQuery] int fromOpNumber,
-        [FromQuery] int toOpNumber,
+        [FromQuery] string? fromOpNumber,
+        [FromQuery] string? toOpNumber,
         CancellationToken cancellationToken)
     {
-        if (partId == Guid.Empty || fromOpNumber <= 0 || toOpNumber <= 0)
+        if (partId == Guid.Empty || string.IsNullOrWhiteSpace(fromOpNumber) || string.IsNullOrWhiteSpace(toOpNumber))
         {
             return BadRequest("Недостаточно данных для определения остатков.");
         }
 
+        int fromOp;
+        int toOp;
+        try
+        {
+            fromOp = OperationNumber.Parse(fromOpNumber, nameof(fromOpNumber));
+            toOp = OperationNumber.Parse(toOpNumber, nameof(toOpNumber));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
         var routeSections = await _dbContext.PartRoutes
             .AsNoTracking()
-            .Where(x => x.PartId == partId && (x.OpNumber == fromOpNumber || x.OpNumber == toOpNumber))
+            .Where(x => x.PartId == partId && (x.OpNumber == fromOp || x.OpNumber == toOp))
             .Select(x => new { x.OpNumber, x.SectionId })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var fromRoute = routeSections.FirstOrDefault(x => x.OpNumber == fromOpNumber);
-        var toRoute = routeSections.FirstOrDefault(x => x.OpNumber == toOpNumber);
+        var fromRoute = routeSections.FirstOrDefault(x => x.OpNumber == fromOp);
+        var toRoute = routeSections.FirstOrDefault(x => x.OpNumber == toOp);
 
         if (fromRoute is null || toRoute is null)
         {
@@ -116,25 +129,25 @@ public class WipTransfersController : Controller
             .AsNoTracking()
             .Where(x =>
                 x.PartId == partId &&
-                ((x.OpNumber == fromOpNumber && x.SectionId == fromRoute.SectionId) ||
-                 (x.OpNumber == toOpNumber && x.SectionId == toRoute.SectionId)))
+                ((x.OpNumber == fromOp && x.SectionId == fromRoute.SectionId) ||
+                 (x.OpNumber == toOp && x.SectionId == toRoute.SectionId)))
             .Select(x => new { x.OpNumber, x.SectionId, x.Quantity })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
         decimal fromBalance = balances
-            .Where(x => x.OpNumber == fromOpNumber && x.SectionId == fromRoute.SectionId)
+            .Where(x => x.OpNumber == fromOp && x.SectionId == fromRoute.SectionId)
             .Select(x => x.Quantity)
             .FirstOrDefault();
 
         decimal toBalance = balances
-            .Where(x => x.OpNumber == toOpNumber && x.SectionId == toRoute.SectionId)
+            .Where(x => x.OpNumber == toOp && x.SectionId == toRoute.SectionId)
             .Select(x => x.Quantity)
             .FirstOrDefault();
 
         var model = new TransferBalancesViewModel(
-            new TransferOperationBalanceViewModel(fromOpNumber, fromRoute.SectionId, fromBalance),
-            new TransferOperationBalanceViewModel(toOpNumber, toRoute.SectionId, toBalance));
+            new TransferOperationBalanceViewModel(OperationNumber.Format(fromOp), fromRoute.SectionId, fromBalance),
+            new TransferOperationBalanceViewModel(OperationNumber.Format(toOp), toRoute.SectionId, toBalance));
 
         return Ok(model);
     }
@@ -147,18 +160,26 @@ public class WipTransfersController : Controller
             return BadRequest("Список передач пуст.");
         }
 
-        var dtos = request.Items
-            .Select(x => new TransferItemDto(
-                x.PartId,
-                x.FromOpNumber,
-                x.ToOpNumber,
-                x.TransferDate,
-                x.Quantity,
-                x.Comment,
-                x.Scrap is null
-                    ? null
-                    : new TransferScrapDto(x.Scrap.ScrapType, x.Scrap.Quantity, x.Scrap.Comment)))
-            .ToList();
+        List<TransferItemDto> dtos;
+        try
+        {
+            dtos = request.Items
+                .Select(x => new TransferItemDto(
+                    x.PartId,
+                    OperationNumber.Parse(x.FromOpNumber, nameof(TransferSaveItem.FromOpNumber)),
+                    OperationNumber.Parse(x.ToOpNumber, nameof(TransferSaveItem.ToOpNumber)),
+                    x.TransferDate,
+                    x.Quantity,
+                    x.Comment,
+                    x.Scrap is null
+                        ? null
+                        : new TransferScrapDto(x.Scrap.ScrapType, x.Scrap.Quantity, x.Scrap.Comment)))
+                .ToList();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
 
         var summary = await _transferService.AddTransfersBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
 
@@ -167,11 +188,11 @@ public class WipTransfersController : Controller
             summary.Items
                 .Select(x => new TransferSummaryItemViewModel(
                     x.PartId,
-                    x.FromOpNumber,
+                    OperationNumber.Format(x.FromOpNumber),
                     x.FromSectionId,
                     x.FromBalanceBefore,
                     x.FromBalanceAfter,
-                    x.ToOpNumber,
+                    OperationNumber.Format(x.ToOpNumber),
                     x.ToSectionId,
                     x.ToBalanceBefore,
                     x.ToBalanceAfter,
@@ -189,8 +210,8 @@ public class WipTransfersController : Controller
 
     public record TransferSaveItem(
         Guid PartId,
-        int FromOpNumber,
-        int ToOpNumber,
+        string FromOpNumber,
+        string ToOpNumber,
         DateTime TransferDate,
         decimal Quantity,
         string? Comment,

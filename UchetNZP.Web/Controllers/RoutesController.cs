@@ -1,14 +1,13 @@
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -72,7 +71,7 @@ public class RoutesController : Controller
                 x.part.Id,
                 x.part.Name,
                 x.part.Code,
-                x.route.OpNumber,
+                OperationNumber.Format(x.route.OpNumber),
                 x.operation != null ? x.operation.Name : string.Empty,
                 x.section != null ? x.section.Id : Guid.Empty,
                 x.section != null ? x.section.Name : string.Empty,
@@ -163,7 +162,7 @@ public class RoutesController : Controller
             Id = route.Id,
             PartName = route.Part != null ? route.Part.Name : string.Empty,
             OperationName = route.Operation != null ? route.Operation.Name : string.Empty,
-            OpNumber = route.OpNumber.ToString(CultureInfo.InvariantCulture),
+            OpNumber = OperationNumber.Format(route.OpNumber),
             NormHours = route.NormHours,
             SectionName = route.Section != null ? route.Section.Name : string.Empty,
         };
@@ -335,7 +334,7 @@ public class RoutesController : Controller
         int opNumber;
         try
         {
-            opNumber = ParseOpNumber(request.OpNumber);
+            opNumber = OperationNumber.Parse(request.OpNumber, nameof(request.OpNumber));
         }
         catch (ArgumentException ex)
         {
@@ -384,20 +383,5 @@ public class RoutesController : Controller
         decimal NormHours,
         string SectionName);
 
-    private static int ParseOpNumber(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new ArgumentException("Номер операции не заполнен.", nameof(value));
-        }
-
-        var trimmed = value.Trim();
-
-        if (!Regex.IsMatch(trimmed, RouteEditInputModel.OpNumberPattern))
-        {
-            throw new ArgumentException("Номер операции должен состоять из 1–10 цифр.", nameof(value));
-        }
-
-        return int.Parse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture);
-    }
+    private static int ParseOpNumber(string? value) => OperationNumber.Parse(value, nameof(value));
 }

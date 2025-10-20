@@ -104,7 +104,7 @@
         if (operation) {
             selectedFromOperation = operation;
             fromOperationNumberInput.value = operation.opNumber;
-            if (selectedToOperation && selectedToOperation.opNumber <= operation.opNumber) {
+            if (selectedToOperation && parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(operation.opNumber)) {
                 selectedToOperation = null;
                 toOperationInput.value = "";
                 toOperationNumberInput.value = "";
@@ -130,7 +130,7 @@
             return;
         }
 
-        if (selectedFromOperation && operation.opNumber <= selectedFromOperation.opNumber) {
+        if (selectedFromOperation && parseOpNumber(operation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
             alert("Операция после должна быть позже операции до.");
             toOperationInput.value = "";
             toOperationNumberInput.value = "";
@@ -277,8 +277,12 @@
         });
     }
 
+    function parseOpNumber(value) {
+        return Number(value ?? 0);
+    }
+
     function formatOperation(operation) {
-        const parts = [operation.opNumber.toString().padStart(3, "0")];
+        const parts = [operation.opNumber];
         if (operation.operationName) {
             parts.push(operation.operationName);
         }
@@ -364,7 +368,7 @@
         toOperationOptions.innerHTML = "";
         const fromNumber = selectedFromOperation?.opNumber ?? null;
         operations
-            .filter(operation => !fromNumber || operation.opNumber > fromNumber)
+            .filter(operation => !fromNumber || parseOpNumber(operation.opNumber) > parseOpNumber(fromNumber))
             .forEach(operation => {
                 const option = document.createElement("option");
                 option.value = formatOperation(operation);
@@ -460,7 +464,7 @@
             return;
         }
 
-        if (selectedToOperation.opNumber <= selectedFromOperation.opNumber) {
+        if (parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
             alert("Операция после должна быть позже операции до.");
             return;
         }
@@ -516,7 +520,7 @@
             const decision = await askScrapDecision({
                 leftover,
                 partDisplay: item.partDisplay,
-                fromOperation: `${selectedFromOperation.opNumber.toString().padStart(3, "0")} ${selectedFromOperation.operationName ?? ""}`.trim(),
+                fromOperation: `${selectedFromOperation.opNumber} ${selectedFromOperation.operationName ?? ""}`.trim(),
             });
 
             if (decision?.confirmed) {
@@ -555,11 +559,11 @@
                 <td>${item.date}</td>
                 <td>${item.partDisplay}</td>
                 <td>
-                    <div class="fw-semibold">${item.fromOpNumber.toString().padStart(3, "0")}</div>
+                    <div class="fw-semibold">${item.fromOpNumber}</div>
                     <div class="small text-muted">${item.fromOperationName ?? ""}</div>
                 </td>
                 <td>
-                    <div class="fw-semibold">${item.toOpNumber.toString().padStart(3, "0")}</div>
+                    <div class="fw-semibold">${item.toOpNumber}</div>
                     <div class="small text-muted">${item.toOperationName ?? ""}</div>
                 </td>
                 <td>${item.quantity.toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
@@ -852,8 +856,8 @@
             const row = document.createElement("tr");
             const cartItem = cart[index];
             const partDisplay = cartItem?.partDisplay ?? item.partDisplay ?? item.partName ?? item.partId;
-            const fromText = `${item.fromOpNumber.toString().padStart(3, "0")}: ${Number(item.fromBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.fromBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
-            const toText = `${item.toOpNumber.toString().padStart(3, "0")}: ${Number(item.toBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.toBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+            const fromText = `${item.fromOpNumber}: ${Number(item.fromBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.fromBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+            const toText = `${item.toOpNumber}: ${Number(item.toBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.toBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
             const scrapSource = extractScrapSource(item) ?? extractScrapSource(cartItem);
             const scrapInfo = normalizeScrapInfo(scrapSource);
             const scrapCell = formatScrapCell(scrapInfo ?? {});

@@ -88,7 +88,7 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
                 worksheet.Cell(rowIndex, 2).Value = item.SectionName;
                 worksheet.Cell(rowIndex, 3).Value = item.PartName;
                 worksheet.Cell(rowIndex, 4).Value = item.PartCode ?? string.Empty;
-                worksheet.Cell(rowIndex, 5).Value = item.OpNumber.ToString("D3");
+                worksheet.Cell(rowIndex, 5).Value = item.OpNumber;
                 worksheet.Cell(rowIndex, 6).Value = item.Quantity;
                 worksheet.Cell(rowIndex, 6).Style.NumberFormat.Format = "0.###";
                 worksheet.Cell(rowIndex, 7).Value = item.ScrapType;
