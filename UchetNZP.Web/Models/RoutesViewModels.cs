@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 
 namespace UchetNZP.Web.Models;
 
@@ -61,9 +62,12 @@ public class RouteEditInputModel : IValidatableObject
     public string? OperationName { get; set; }
         = string.Empty;
 
-    [Range(1, int.MaxValue, ErrorMessage = "Номер операции должен быть больше нуля.")]
+    public const string OpNumberPattern = @"^\d{1,10}$";
+
+    [Required(ErrorMessage = "Укажите номер операции.")]
+    [RegularExpression(OpNumberPattern, ErrorMessage = "Номер операции должен состоять из 1–10 цифр.")]
     [Display(Name = "№ операции")]
-    public int OpNumber { get; set; }
+    public string OpNumber { get; set; } = string.Empty;
 
     [Display(Name = "Норматив (н/ч)")]
     public decimal NormHours { get; set; }
@@ -83,5 +87,15 @@ public class RouteEditInputModel : IValidatableObject
                 "Норматив должен быть больше нуля.",
                 new[] { nameof(NormHours) });
         }
+    }
+
+    public int GetOpNumberValue()
+    {
+        if (string.IsNullOrWhiteSpace(OpNumber))
+        {
+            throw new ValidationException("Номер операции не заполнен.");
+        }
+
+        return int.Parse(OpNumber, NumberStyles.None, CultureInfo.InvariantCulture);
     }
 }

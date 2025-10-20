@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -124,11 +126,13 @@ public class RoutesController : Controller
             return View("~/Views/Routes/Edit.cshtml", model);
         }
 
+        var opNumber = model.GetOpNumberValue();
+
         await _routeService.UpsertRouteAsync(
             model.PartName,
             null,
             model.OperationName,
-            model.OpNumber,
+            opNumber,
             model.NormHours,
             model.SectionName,
             cancellationToken).ConfigureAwait(false);
@@ -159,7 +163,7 @@ public class RoutesController : Controller
             Id = route.Id,
             PartName = route.Part != null ? route.Part.Name : string.Empty,
             OperationName = route.Operation != null ? route.Operation.Name : string.Empty,
-            OpNumber = route.OpNumber,
+            OpNumber = route.OpNumber.ToString(CultureInfo.InvariantCulture),
             NormHours = route.NormHours,
             SectionName = route.Section != null ? route.Section.Name : string.Empty,
         };
@@ -181,6 +185,8 @@ public class RoutesController : Controller
             return View("~/Views/Routes/Edit.cshtml", model);
         }
 
+        var opNumber = model.GetOpNumberValue();
+
         var existingRoute = await _dbContext.PartRoutes
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             .ConfigureAwait(false);
@@ -194,7 +200,7 @@ public class RoutesController : Controller
             model.PartName,
             null,
             model.OperationName,
-            model.OpNumber,
+            opNumber,
             model.NormHours,
             model.SectionName,
             cancellationToken).ConfigureAwait(false);
@@ -326,11 +332,21 @@ public class RoutesController : Controller
             return BadRequest("Данные маршрута не заполнены.");
         }
 
+        int opNumber;
+        try
+        {
+            opNumber = ParseOpNumber(request.OpNumber);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
         await _routeService.UpsertRouteAsync(
             request.PartName,
             request.PartCode,
             request.OperationName,
-            request.OpNumber,
+            opNumber,
             request.NormHours,
             request.SectionName,
             cancellationToken).ConfigureAwait(false);
@@ -364,7 +380,24 @@ public class RoutesController : Controller
         string PartName,
         string? PartCode,
         string? OperationName,
-        int OpNumber,
+        string OpNumber,
         decimal NormHours,
         string SectionName);
+
+    private static int ParseOpNumber(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Номер операции не заполнен.", nameof(value));
+        }
+
+        var trimmed = value.Trim();
+
+        if (!Regex.IsMatch(trimmed, RouteEditInputModel.OpNumberPattern))
+        {
+            throw new ArgumentException("Номер операции должен состоять из 1–10 цифр.", nameof(value));
+        }
+
+        return int.Parse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture);
+    }
 }

@@ -62,9 +62,10 @@
             return;
         }
 
-        const opNumber = Number(opNumberInput.value);
-        if (!opNumber || opNumber <= 0) {
-            alert("Номер операции должен быть больше нуля.");
+        const opNumberText = opNumberInput.value.trim();
+        const opNumberPattern = new RegExp(opNumberInput.dataset.pattern ?? "^\\d{1,10}$");
+        if (!opNumberPattern.test(opNumberText)) {
+            alert("Номер операции должен состоять из 1–10 цифр.");
             return;
         }
 
@@ -78,7 +79,7 @@
             partName,
             partCode: null,
             operationName,
-            opNumber,
+            opNumber: opNumberText,
             normHours,
             sectionName,
         };
