@@ -10,7 +10,6 @@ using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Controllers;
 
-[Authorize(Roles = "Admin")]
 [Route("admin/wip")]
 public class AdminWipController : Controller
 {
