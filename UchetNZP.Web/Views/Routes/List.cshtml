@@ -1,6 +1,6 @@
 @using System.Linq
 @model UchetNZP.Web.Models.RouteListViewModel
-@{ 
+@{
     ViewData["Title"] = "Маршруты деталей";
     var searchValue = Model.Filter.Search ?? string.Empty;
     var selectedSectionId = Model.Filter.SectionId;
@@ -10,11 +10,13 @@
         .ToList();
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
-    <div>
-        <h1 class="mb-1">Маршруты деталей</h1>
-        <p class="text-muted mb-0">Просматривайте, фильтруйте и редактируйте технологические маршруты.</p>
-    </div>
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Маршруты деталей</h1>
+    <p class="lead">Управляйте технологическими маршрутами: используйте фильтры, просматривайте операции и редактируйте данные.</p>
+</div>
+
+<div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
+    <div class="text-muted small">Всего маршрутов: @Model.Total</div>
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-primary" asp-action="Create">Добавить маршрут</a>
         <a class="btn btn-outline-primary" asp-action="Import">Импорт и редактирование</a>
@@ -32,13 +34,14 @@
 }
 
 <div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Фильтр маршрутов</div>
     <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-lg-5 col-xl-6">
+        <form method="get" class="row g-3 align-items-end" autocomplete="off">
+            <div class="col-12 col-md-6 col-xl-5">
                 <label class="form-label" for="routesSearchInput">Поиск</label>
                 <input id="routesSearchInput" class="form-control form-control-lg" type="text" name="Search" value="@searchValue" placeholder="Деталь, операция или участок" />
             </div>
-            <div class="col-lg-4 col-xl-3">
+            <div class="col-12 col-md-6 col-xl-4">
                 <label class="form-label" for="routesSectionSelect">Участок</label>
                 <select id="routesSectionSelect" class="form-select form-select-lg" name="SectionId">
                     <option value="">Все участки</option>
@@ -50,9 +53,9 @@
                     }
                 </select>
             </div>
-            <div class="col-lg-3 col-xl-3 d-flex gap-2">
+            <div class="col-12 col-xl-3 d-flex flex-wrap gap-3">
                 <button type="submit" class="btn btn-primary btn-lg flex-grow-1">Применить</button>
-                <a class="btn btn-outline-secondary btn-lg" asp-action="Index">Сбросить</a>
+                <a class="btn btn-outline-secondary btn-lg flex-grow-1" asp-action="Index">Сбросить</a>
             </div>
         </form>
     </div>
@@ -60,74 +63,75 @@
 
 @if (Model.Routes.Count == 0)
 {
-    <div class="alert alert-info fs-5" role="status">
-        Подходящих маршрутов не найдено. Добавьте новый маршрут или измените параметры поиска.
+    <div class="alert alert-light border shadow-sm">
+        <div class="fw-semibold mb-1">Подходящих маршрутов не найдено.</div>
+        <p class="mb-0">Добавьте новый маршрут или измените параметры поиска.</p>
     </div>
 }
 else
 {
     <div class="card shadow-sm">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <span class="fw-semibold">Всего маршрутов: @Model.Total</span>
+        <div class="card-header bg-light d-flex flex-column flex-md-row gap-2 justify-content-between align-items-md-center">
+            <div class="fw-semibold">Результаты поиска</div>
             @if (!string.IsNullOrWhiteSpace(searchValue) || selectedSectionId.HasValue)
             {
-                <span class="text-muted small">Показаны результаты с учётом выбранных фильтров.</span>
+                <span class="text-muted small">Показаны данные с учётом выбранных фильтров.</span>
             }
         </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped align-middle" aria-describedby="routesTableCaption">
-                    <caption id="routesTableCaption" class="visually-hidden">Текущие маршруты с возможностью редактирования</caption>
-                    <thead class="table-light">
-                        <tr>
-                            <th scope="col">Деталь</th>
-                            <th scope="col">Операция</th>
-                            <th scope="col" class="text-nowrap">Норматив, н/ч</th>
-                            <th scope="col">Участок</th>
-                            <th scope="col" class="text-end">Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var partRoutes in groupedRoutes)
-                        {
-                            if (partRoutes.Count == 0)
-                            {
-                                continue;
-                            }
-
-                            var first = partRoutes[0];
-                            <tr>
-                                <th scope="rowgroup" class="fw-semibold align-middle" rowspan="@partRoutes.Count">@first.PartDisplayName</th>
-                                <td>@first.OperationDisplay</td>
-                                <td>@first.NormHours.ToString("0.###")</td>
-                                <td>@first.SectionName</td>
-                                <td class="text-end text-nowrap">
-                                    <a class="btn btn-link text-decoration-none" asp-action="Edit" asp-route-id="@first.Id">Изменить</a>
-                                    <form asp-action="Delete" asp-route-id="@first.Id" method="post" class="d-inline">
-                                        @Html.AntiForgeryToken()
-                                        <button type="submit" class="btn btn-link text-danger text-decoration-none" onclick="return confirm('Удалить выбранный маршрут?');">Удалить</button>
-                                    </form>
-                                </td>
-                            </tr>
-
-                            foreach (var route in partRoutes.Skip(1))
-                            {
-                                <tr>
-                                    <td>@route.OperationDisplay</td>
-                                    <td>@route.NormHours.ToString("0.###")</td>
-                                    <td>@route.SectionName</td>
-                                    <td class="text-end text-nowrap">
-                                        <a class="btn btn-link text-decoration-none" asp-action="Edit" asp-route-id="@route.Id">Изменить</a>
-                                        <form asp-action="Delete" asp-route-id="@route.Id" method="post" class="d-inline">
-                                            @Html.AntiForgeryToken()
-                                            <button type="submit" class="btn btn-link text-danger text-decoration-none" onclick="return confirm('Удалить выбранный маршрут?');">Удалить</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            }
-                        }
-                    </tbody>
-                </table>
+            <div class="accordion" id="routesAccordion">
+                @for (var i = 0; i < groupedRoutes.Count; i++)
+                {
+                    var routes = groupedRoutes[i];
+                    var first = routes[0];
+                    var collapseId = $"routesGroup{i}";
+                    var headingId = $"routesHeading{i}";
+                    <div class="accordion-item mb-3 border-0 shadow-sm rounded-4">
+                        <h2 class="accordion-header" id="@headingId">
+                            <button class="accordion-button d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="@(i == 0 ? "true" : "false")" aria-controls="@collapseId">
+                                <span class="fs-5 fw-semibold">@first.PartDisplayName</span>
+                                <span class="badge bg-light text-dark">Операций: @routes.Count</span>
+                                @if (!string.IsNullOrWhiteSpace(first.SectionName))
+                                {
+                                    <span class="badge bg-light text-dark">Основной участок: @first.SectionName</span>
+                                }
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse @(i == 0 ? "show" : string.Empty)" aria-labelledby="@headingId" data-bs-parent="#routesAccordion">
+                            <div class="accordion-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped align-middle mb-0" aria-label="Маршрут детали @first.PartDisplayName">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th scope="col">Операция</th>
+                                                <th scope="col" class="text-nowrap">Норматив, н/ч</th>
+                                                <th scope="col">Участок</th>
+                                                <th scope="col" class="text-end">Действия</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var route in routes)
+                                            {
+                                                <tr>
+                                                    <td>@route.OperationDisplay</td>
+                                                    <td>@route.NormHours.ToString("0.###")</td>
+                                                    <td>@route.SectionName</td>
+                                                    <td class="text-end text-nowrap">
+                                                        <a class="btn btn-link text-decoration-none" asp-action="Edit" asp-route-id="@route.Id">Изменить</a>
+                                                        <form asp-action="Delete" asp-route-id="@route.Id" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-link text-danger text-decoration-none" onclick="return confirm('Удалить выбранный маршрут?');">Удалить</button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
         </div>
     </div>
