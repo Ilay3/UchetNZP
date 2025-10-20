@@ -17,6 +17,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<IWipService, WipService>();
 builder.Services.AddScoped<ILaunchService, LaunchService>();
+builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();

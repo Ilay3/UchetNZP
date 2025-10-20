@@ -26,6 +26,10 @@ public class AppDbContext : DbContext
 
     public DbSet<WipLaunchOperation> WipLaunchOperations => Set<WipLaunchOperation>();
 
+    public DbSet<WipTransfer> WipTransfers => Set<WipTransfer>();
+
+    public DbSet<WipTransferOperation> WipTransferOperations => Set<WipTransferOperation>();
+
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
     public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();
