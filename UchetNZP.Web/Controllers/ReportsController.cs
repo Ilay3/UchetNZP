@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -15,10 +16,12 @@ namespace UchetNZP.Web.Controllers;
 public class ReportsController : Controller
 {
     private readonly AppDbContext _dbContext;
+    private readonly IScrapReportExcelExporter _scrapReportExcelExporter;
 
-    public ReportsController(AppDbContext dbContext)
+    public ReportsController(AppDbContext dbContext, IScrapReportExcelExporter scrapReportExcelExporter)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _scrapReportExcelExporter = scrapReportExcelExporter ?? throw new ArgumentNullException(nameof(scrapReportExcelExporter));
     }
 
     [HttpGet("receipts")]
@@ -104,6 +107,24 @@ public class ReportsController : Controller
     [HttpGet("scrap")]
     public async Task<IActionResult> ScrapReport([FromQuery] ScrapReportQuery? query, CancellationToken cancellationToken)
     {
+        var (filter, items) = await LoadScrapReportAsync(query, cancellationToken).ConfigureAwait(false);
+        var model = new ScrapReportViewModel(filter, items, items.Sum(x => x.Quantity));
+        return View("~/Views/Reports/ScrapReport.cshtml", model);
+    }
+
+    [HttpGet("scrap/export")]
+    public async Task<IActionResult> ScrapReportExport([FromQuery] ScrapReportQuery? query, CancellationToken cancellationToken)
+    {
+        var (filter, items) = await LoadScrapReportAsync(query, cancellationToken).ConfigureAwait(false);
+        var content = _scrapReportExcelExporter.Export(filter, items);
+        var fileName = $"scrap-report-{filter.From:yyyyMMdd}-{filter.To:yyyyMMdd}.xlsx";
+        return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    private async Task<(ScrapReportFilterViewModel Filter, List<ScrapReportItemViewModel> Items)> LoadScrapReportAsync(
+        ScrapReportQuery? query,
+        CancellationToken cancellationToken)
+    {
         var now = DateTime.Now.Date;
         var defaultFrom = now.AddDays(-29);
         var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
@@ -183,12 +204,7 @@ public class ReportsController : Controller
             Employee = query?.Employee,
         };
 
-        var model = new ScrapReportViewModel(
-            filter,
-            items,
-            items.Sum(x => x.Quantity));
-
-        return View("~/Views/Reports/ScrapReport.cshtml", model);
+        return (filter, items);
     }
 
     [HttpGet("wip-summary")]

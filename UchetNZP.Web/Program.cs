@@ -21,6 +21,7 @@ builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddSingleton<IScrapReportExcelExporter, ScrapReportExcelExporter>();
 
 var app = builder.Build();
 
