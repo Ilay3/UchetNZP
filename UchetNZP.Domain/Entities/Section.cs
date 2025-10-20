@@ -19,4 +19,6 @@ public class Section
     public virtual ICollection<WipLaunch> WipLaunches { get; set; } = new List<WipLaunch>();
 
     public virtual ICollection<WipLaunchOperation> WipLaunchOperations { get; set; } = new List<WipLaunchOperation>();
+
+    public virtual ICollection<WipScrap> WipScraps { get; set; } = new List<WipScrap>();
 }

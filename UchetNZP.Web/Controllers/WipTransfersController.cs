@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Transfers;
+using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
 
@@ -153,7 +154,10 @@ public class WipTransfersController : Controller
                 x.ToOpNumber,
                 x.TransferDate,
                 x.Quantity,
-                x.Comment))
+                x.Comment,
+                x.Scrap is null
+                    ? null
+                    : new TransferScrapDto(x.Scrap.ScrapType, x.Scrap.Quantity, x.Scrap.Comment)))
             .ToList();
 
         var summary = await _transferService.AddTransfersBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
@@ -172,7 +176,10 @@ public class WipTransfersController : Controller
                     x.ToBalanceBefore,
                     x.ToBalanceAfter,
                     x.Quantity,
-                    x.TransferId))
+                    x.TransferId,
+                    x.Scrap is null
+                        ? null
+                        : new TransferScrapSummaryViewModel(x.Scrap.ScrapId, x.Scrap.ScrapType, x.Scrap.Quantity, x.Scrap.Comment)))
                 .ToList());
 
         return Ok(model);
@@ -185,6 +192,12 @@ public class WipTransfersController : Controller
         int FromOpNumber,
         int ToOpNumber,
         DateTime TransferDate,
+        decimal Quantity,
+        string? Comment,
+        TransferScrapSaveItem? Scrap);
+
+    public record TransferScrapSaveItem(
+        ScrapType ScrapType,
         decimal Quantity,
         string? Comment);
 }

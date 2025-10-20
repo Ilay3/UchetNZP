@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UchetNZP.Domain.Entities;
 
 namespace UchetNZP.Web.Models;
 
@@ -68,6 +69,12 @@ public record TransferBalancesViewModel(
     TransferOperationBalanceViewModel From,
     TransferOperationBalanceViewModel To);
 
+public record TransferScrapSummaryViewModel(
+    Guid ScrapId,
+    ScrapType ScrapType,
+    decimal Quantity,
+    string? Comment);
+
 public record TransferSummaryItemViewModel(
     Guid PartId,
     int FromOpNumber,
@@ -79,6 +86,7 @@ public record TransferSummaryItemViewModel(
     decimal ToBalanceBefore,
     decimal ToBalanceAfter,
     decimal Quantity,
-    Guid TransferId);
+    Guid TransferId,
+    TransferScrapSummaryViewModel? Scrap);
 
 public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);

@@ -11,5 +11,6 @@ public record TransferItemSummaryDto(
     decimal ToBalanceBefore,
     decimal ToBalanceAfter,
     decimal Quantity,
-    Guid TransferId
+    Guid TransferId,
+    TransferScrapSummaryDto? Scrap
 );
