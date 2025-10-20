@@ -63,6 +63,17 @@
     </div>
 </div>
 
+<div class="d-flex justify-content-end mb-4">
+    <a class="btn btn-outline-primary btn-lg px-4"
+       asp-action="ScrapReportExport"
+       asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
+       asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
+       asp-route-section='@Model.Filter.Section'
+       asp-route-part='@Model.Filter.Part'
+       asp-route-scrapType='@Model.Filter.ScrapType'
+       asp-route-employee='@Model.Filter.Employee'>Экспорт в Excel</a>
+</div>
+
 @if (Model.HasData)
 {
     <div class="card shadow-sm mb-4">

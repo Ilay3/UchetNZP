@@ -18,33 +18,57 @@
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1 gap-2">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="WipReceipts" asp-action="Index">Приход НЗП</a>
+                    <ul class="navbar-nav flex-grow-1 gap-3">
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="operationsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Операции
+                            </a>
+                            <ul class="dropdown-menu shadow" aria-labelledby="operationsMenu">
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="WipReceipts" asp-action="Index">Приход НЗП</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="WipLaunches" asp-action="Index">Запуск НЗП</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item d-flex align-items-center gap-2 fw-semibold text-primary" asp-area="" asp-controller="WipTransfers" asp-action="Index" title="Передача незавершённого производства">
+                                        <span>Передача НЗП</span>
+                                        <span class="badge rounded-pill text-bg-warning text-uppercase small">новое</span>
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="WipLaunches" asp-action="History">История запусков</a>
+                                </li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="WipLaunches" asp-action="Index">Запуск НЗП</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="reportsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Отчёты
+                            </a>
+                            <ul class="dropdown-menu shadow" aria-labelledby="reportsMenu">
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="ReceiptReport">Отчёт по приходу</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="ScrapReport">Отчёт по браку</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="WipSummary">Итоговый отчёт</a>
+                                </li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="WipTransfers" asp-action="Index">Передача НЗП</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="WipLaunches" asp-action="History">История запусков</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Reports" asp-action="ReceiptReport">Отчёт по приходу</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Reports" asp-action="ScrapReport">Отчёт по браку</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Reports" asp-action="WipSummary">Итоговый отчёт</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Routes" asp-action="Index">Маршруты деталей</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Routes" asp-action="Import">Маршруты (импорт)</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="adminMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                Администратор
+                            </a>
+                            <ul class="dropdown-menu shadow" aria-labelledby="adminMenu">
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="Routes" asp-action="Index">Маршруты деталей</a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-area="" asp-controller="Routes" asp-action="Import">Маршруты (импорт)</a>
+                                </li>
+                            </ul>
                         </li>
                     </ul>
                 </div>

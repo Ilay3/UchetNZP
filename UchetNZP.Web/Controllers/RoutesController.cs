@@ -16,12 +16,14 @@ public class RoutesController : Controller
     private readonly AppDbContext _dbContext;
     private readonly IRouteService _routeService;
     private readonly IImportService _importService;
+    private readonly IReportService _reportService;
 
-    public RoutesController(AppDbContext dbContext, IRouteService routeService, IImportService importService)
+    public RoutesController(AppDbContext dbContext, IRouteService routeService, IImportService importService, IReportService reportService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _routeService = routeService ?? throw new ArgumentNullException(nameof(routeService));
         _importService = importService ?? throw new ArgumentNullException(nameof(importService));
+        _reportService = reportService ?? throw new ArgumentNullException(nameof(reportService));
     }
 
     [HttpGet("")]
@@ -86,6 +88,25 @@ public class RoutesController : Controller
         var model = new RouteListViewModel(filter, routes);
 
         return View("~/Views/Routes/List.cshtml", model);
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export([FromQuery] RouteListQuery? query, CancellationToken cancellationToken)
+    {
+        query ??= new RouteListQuery();
+
+        var search = string.IsNullOrWhiteSpace(query.Search) ? null : query.Search;
+        Guid? sectionId = null;
+
+        if (query.SectionId.HasValue && query.SectionId.Value != Guid.Empty)
+        {
+            sectionId = query.SectionId.Value;
+        }
+
+        var file = await _reportService.ExportRoutesToExcelAsync(search, sectionId, cancellationToken).ConfigureAwait(false);
+        var fileName = $"Маршруты_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx";
+
+        return File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
     [HttpGet("create")]
