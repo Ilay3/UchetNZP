@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
@@ -141,6 +142,61 @@ public class LaunchService : ILaunchService
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
             return new LaunchBatchSummaryDto(results.Count, results);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task<LaunchDeleteResultDto> DeleteLaunchAsync(Guid launchId, CancellationToken cancellationToken = default)
+    {
+        if (launchId == Guid.Empty)
+        {
+            throw new ArgumentException("Идентификатор запуска не может быть пустым.", nameof(launchId));
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var launch = await _dbContext.WipLaunches
+                .Include(x => x.Operations)
+                .FirstOrDefaultAsync(x => x.Id == launchId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (launch is null)
+            {
+                throw new KeyNotFoundException($"Запуск {launchId} не найден.");
+            }
+
+            var balance = await _dbContext.WipBalances
+                .FirstOrDefaultAsync(
+                    x => x.PartId == launch.PartId &&
+                         x.SectionId == launch.SectionId &&
+                         x.OpNumber == launch.FromOpNumber,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (balance is null)
+            {
+                throw new InvalidOperationException($"Остаток НЗП по детали {launch.PartId} и операции {launch.FromOpNumber} отсутствует.");
+            }
+
+            balance.Quantity += launch.Quantity;
+
+            if (launch.Operations.Count > 0)
+            {
+                _dbContext.WipLaunchOperations.RemoveRange(launch.Operations);
+            }
+
+            _dbContext.WipLaunches.Remove(launch);
+
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            return new LaunchDeleteResultDto(launch.Id, launch.PartId, launch.SectionId, launch.FromOpNumber, balance.Quantity);
         }
         catch
         {

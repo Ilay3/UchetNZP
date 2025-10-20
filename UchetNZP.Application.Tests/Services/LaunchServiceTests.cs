@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -74,6 +75,125 @@ public class LaunchServiceTests
         Assert.Equal(4, launch.Operations.Count);
         Assert.Equal(12.4m, launch.Operations.Sum(x => x.Hours));
         Assert.All(launch.Operations, operation => Assert.Equal(40m, operation.Quantity));
+    }
+
+    [Fact]
+    public async Task DeleteLaunchAsync_RemovesLaunchAndRestoresBalance()
+    {
+        await using var dbContext = CreateContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var launchId = Guid.NewGuid();
+
+        dbContext.WipBalances.Add(new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OpNumber = 15,
+            Quantity = 10m,
+        });
+
+        var launch = new WipLaunch
+        {
+            Id = launchId,
+            UserId = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            FromOpNumber = 15,
+            LaunchDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            Quantity = 25m,
+            Comment = "test",
+            SumHoursToFinish = 7.5m,
+        };
+
+        dbContext.WipLaunches.Add(launch);
+        dbContext.WipLaunchOperations.AddRange(
+            new WipLaunchOperation
+            {
+                Id = Guid.NewGuid(),
+                WipLaunchId = launchId,
+                OperationId = Guid.NewGuid(),
+                SectionId = sectionId,
+                OpNumber = 20,
+                Quantity = 25m,
+                Hours = 5m,
+                NormHours = 0.2m,
+            },
+            new WipLaunchOperation
+            {
+                Id = Guid.NewGuid(),
+                WipLaunchId = launchId,
+                OperationId = Guid.NewGuid(),
+                SectionId = sectionId,
+                OpNumber = 25,
+                Quantity = 25m,
+                Hours = 2.5m,
+                NormHours = 0.1m,
+            });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new LaunchService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+
+        var result = await service.DeleteLaunchAsync(launchId);
+
+        Assert.Equal(launchId, result.LaunchId);
+        Assert.Equal(35m, result.Remaining);
+
+        Assert.False(await dbContext.WipLaunches.AnyAsync());
+        Assert.False(await dbContext.WipLaunchOperations.AnyAsync());
+
+        var balance = await dbContext.WipBalances.SingleAsync();
+        Assert.Equal(35m, balance.Quantity);
+    }
+
+    [Fact]
+    public async Task DeleteLaunchAsync_ThrowsForUnknownLaunch()
+    {
+        await using var dbContext = CreateContext();
+        var service = new LaunchService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.DeleteLaunchAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task DeleteLaunchAsync_ThrowsWhenBalanceMissing()
+    {
+        await using var dbContext = CreateContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var launchId = Guid.NewGuid();
+
+        dbContext.WipLaunches.Add(new WipLaunch
+        {
+            Id = launchId,
+            UserId = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            FromOpNumber = 10,
+            LaunchDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            Quantity = 5m,
+            SumHoursToFinish = 1m,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new LaunchService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteLaunchAsync(launchId));
+        Assert.Contains("Остаток НЗП", exception.Message);
+    }
+
+    [Fact]
+    public async Task DeleteLaunchAsync_ThrowsForEmptyId()
+    {
+        await using var dbContext = CreateContext();
+        var service = new LaunchService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.DeleteLaunchAsync(Guid.Empty));
     }
 
     private static PartRoute CreateRoute(Guid partId, Guid sectionId, Guid operationId, int opNumber, decimal norm)

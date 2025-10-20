@@ -180,3 +180,12 @@ public class LaunchHistoryQuery
 
     public DateTime? To { get; set; }
 }
+
+public record LaunchDeleteResponseModel(
+    Guid LaunchId,
+    Guid PartId,
+    Guid SectionId,
+    int FromOperation,
+    decimal Remaining,
+    string Message
+);
