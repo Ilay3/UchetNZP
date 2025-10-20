@@ -68,7 +68,6 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
         worksheet.Cell(rowIndex, 5).Value = "№ операции";
         worksheet.Cell(rowIndex, 6).Value = "Количество";
         worksheet.Cell(rowIndex, 7).Value = "Тип брака";
-        worksheet.Cell(rowIndex, 8).Value = "Ответственный";
         worksheet.Cell(rowIndex, 9).Value = "Комментарий";
         worksheet.Row(rowIndex).Style.Font.SetBold(true);
         rowIndex++;
@@ -93,7 +92,6 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
                 worksheet.Cell(rowIndex, 6).Value = item.Quantity;
                 worksheet.Cell(rowIndex, 6).Style.NumberFormat.Format = "0.###";
                 worksheet.Cell(rowIndex, 7).Value = item.ScrapType;
-                worksheet.Cell(rowIndex, 8).Value = item.Employee;
                 worksheet.Cell(rowIndex, 9).Value = item.Comment ?? string.Empty;
                 rowIndex++;
             }
