@@ -1,0 +1,120 @@
+@using System.Globalization
+@model AdminWipIndexViewModel
+@{
+    ViewData["Title"] = "Администрирование остатков НЗП";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Администрирование остатков НЗП</h1>
+    <p class="lead mb-0">Отфильтруйте список и скорректируйте количество по нужным операциям.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.StatusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Фильтры</div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-lg-4">
+                <label class="form-label" for="adminWipPartSelect">Деталь</label>
+                <select id="adminWipPartSelect" class="form-select" name="partId" asp-items="Model.Parts"></select>
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label" for="adminWipSectionSelect">Участок</label>
+                <select id="adminWipSectionSelect" class="form-select" name="sectionId" asp-items="Model.Sections"></select>
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label" for="adminWipOpInput">№ операции</label>
+                <input id="adminWipOpInput" class="form-control" type="number" name="opNumber" value="@(Model.SelectedOpNumber?.ToString(CultureInfo.InvariantCulture))" min="0" step="1" />
+            </div>
+            <div class="col-lg-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">Применить</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Сбросить</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+        <span>Остатки НЗП</span>
+        <span class="small text-muted">Всего записей: @Model.Balances.Count</span>
+    </div>
+    <div class="card-body">
+        @if (!Model.Balances.Any())
+        {
+            <div class="text-muted">По выбранным условиям записи не найдены.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle" aria-describedby="adminWipTableCaption">
+                    <caption id="adminWipTableCaption" class="visually-hidden">Текущие остатки НЗП по фильтру</caption>
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Деталь</th>
+                            <th scope="col">Участок</th>
+                            <th scope="col" class="text-center">Операция</th>
+                            <th scope="col" class="text-end">Количество</th>
+                            <th scope="col" class="text-nowrap">Корректировка</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.Balances)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@row.PartDisplay</div>
+                                </td>
+                                <td>
+                                    <div>@row.SectionDisplay</div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-secondary fs-6">@row.OpNumber</span>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-semibold">@row.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</span>
+                                </td>
+                                <td>
+                                    <form asp-action="Adjust" method="post" class="row g-2 align-items-center">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="BalanceId" value="@row.BalanceId" />
+                                        <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
+                                        <input type="hidden" name="FilterSectionId" value="@Model.SelectedSectionId" />
+                                        <input type="hidden" name="FilterOpNumber" value="@Model.SelectedOpNumber" />
+                                        <div class="col-sm-4">
+                                            <label class="visually-hidden" for="qty-@row.BalanceId">Новое количество</label>
+                                            <input id="qty-@row.BalanceId" class="form-control form-control-sm" type="number" name="NewQuantity" value="@row.Quantity.ToString(CultureInfo.InvariantCulture)" min="0" step="0.001" />
+                                        </div>
+                                        <div class="col-sm-5">
+                                            <label class="visually-hidden" for="comment-@row.BalanceId">Комментарий</label>
+                                            <input id="comment-@row.BalanceId" class="form-control form-control-sm" type="text" name="Comment" maxlength="512" placeholder="Комментарий" />
+                                        </div>
+                                        <div class="col-sm-3 d-flex gap-2">
+                                            <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+                                            <button type="reset" class="btn btn-outline-secondary btn-sm">Отмена</button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

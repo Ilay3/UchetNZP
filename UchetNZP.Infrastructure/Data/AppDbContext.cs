@@ -32,6 +32,8 @@ public class AppDbContext : DbContext
 
     public DbSet<WipScrap> WipScraps => Set<WipScrap>();
 
+    public DbSet<WipBalanceAdjustment> WipBalanceAdjustments => Set<WipBalanceAdjustment>();
+
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
     public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();
