@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Application.Services;
 
@@ -177,7 +178,7 @@ public class ReportService : IReportService
             {
                 worksheet.Cell(rowIndex, 1).Value = route.PartName;
                 worksheet.Cell(rowIndex, 2).Value = route.PartCode ?? string.Empty;
-                worksheet.Cell(rowIndex, 3).Value = route.OpNumber.ToString("D3");
+                worksheet.Cell(rowIndex, 3).Value = OperationNumber.Format(route.OpNumber);
                 worksheet.Cell(rowIndex, 4).Value = route.OperationName;
                 worksheet.Cell(rowIndex, 5).Value = route.SectionName;
                 worksheet.Cell(rowIndex, 6).Value = route.NormHours;

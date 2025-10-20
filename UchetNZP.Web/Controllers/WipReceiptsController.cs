@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Wip;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -89,7 +91,7 @@ public class WipReceiptsController : Controller
             .OrderBy(x => x.OpNumber)
             .Select(x => new PartOperationViewModel(
                 x.PartId,
-                x.OpNumber,
+                OperationNumber.Format(x.OpNumber),
                 x.OperationId,
                 x.Operation != null ? x.Operation.Name : string.Empty,
                 x.SectionId,
@@ -102,16 +104,26 @@ public class WipReceiptsController : Controller
     }
 
     [HttpGet("balance")]
-    public async Task<IActionResult> GetBalance([FromQuery] Guid partId, [FromQuery] Guid sectionId, [FromQuery] int opNumber, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetBalance([FromQuery] Guid partId, [FromQuery] Guid sectionId, [FromQuery] string? opNumber, CancellationToken cancellationToken)
     {
-        if (partId == Guid.Empty || sectionId == Guid.Empty || opNumber <= 0)
+        if (partId == Guid.Empty || sectionId == Guid.Empty || string.IsNullOrWhiteSpace(opNumber))
         {
             return BadRequest("Недостаточно данных для определения остатка.");
         }
 
+        int parsedOpNumber;
+        try
+        {
+            parsedOpNumber = OperationNumber.Parse(opNumber, nameof(opNumber));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
         var balance = await _dbContext.WipBalances
             .AsNoTracking()
-            .Where(x => x.PartId == partId && x.SectionId == sectionId && x.OpNumber == opNumber)
+            .Where(x => x.PartId == partId && x.SectionId == sectionId && x.OpNumber == parsedOpNumber)
             .Select(x => x.Quantity)
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -127,20 +139,36 @@ public class WipReceiptsController : Controller
             return BadRequest("Список приходов пуст.");
         }
 
-        var dtos = request.Items.Select(x => new ReceiptItemDto(
-            x.PartId,
-            x.OpNumber,
-            x.SectionId,
-            x.ReceiptDate,
-            x.Quantity,
-            x.Comment)).ToList();
+        List<ReceiptItemDto> dtos;
+        try
+        {
+            dtos = request.Items.Select(x => new ReceiptItemDto(
+                x.PartId,
+                OperationNumber.Parse(x.OpNumber, nameof(ReceiptSaveItem.OpNumber)),
+                x.SectionId,
+                x.ReceiptDate,
+                x.Quantity,
+                x.Comment)).ToList();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
 
         var summary = await _wipService.AddReceiptsBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
 
         var model = new ReceiptBatchSummaryViewModel(
             summary.Saved,
             summary.Items
-                .Select(x => new ReceiptSummaryItemViewModel(x.PartId, x.OpNumber, x.SectionId, x.Quantity, x.Was, x.Become, x.BalanceId, x.ReceiptId))
+                .Select(x => new ReceiptSummaryItemViewModel(
+                    x.PartId,
+                    OperationNumber.Format(x.OpNumber),
+                    x.SectionId,
+                    x.Quantity,
+                    x.Was,
+                    x.Become,
+                    x.BalanceId,
+                    x.ReceiptId))
                 .ToList());
 
         return Ok(model);
@@ -151,7 +179,7 @@ public class WipReceiptsController : Controller
     public record ReceiptSaveItem(
         Guid PartId,
         Guid SectionId,
-        int OpNumber,
+        string OpNumber,
         DateTime ReceiptDate,
         decimal Quantity,
         string? Comment);

@@ -7,6 +7,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Admin;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -23,7 +24,7 @@ public class AdminWipController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(Guid? partId, Guid? sectionId, int? opNumber)
+    public async Task<IActionResult> Index(Guid? partId, Guid? sectionId, string? opNumber)
     {
         var statusMessage = TempData["AdminWipMessage"] as string;
         var errorMessage = TempData["AdminWipError"] as string;
@@ -84,10 +85,16 @@ public class AdminWipController : Controller
     private async Task<AdminWipIndexViewModel> BuildIndexViewModelAsync(
         Guid? partId,
         Guid? sectionId,
-        int? opNumber,
+        string? opNumber,
         string? statusMessage,
         string? errorMessage)
     {
+        int? parsedOpNumber = null;
+        if (!string.IsNullOrWhiteSpace(opNumber) && OperationNumber.TryParse(opNumber, out var parsed))
+        {
+            parsedOpNumber = parsed;
+        }
+
         var partItems = await _dbContext.Parts
             .AsNoTracking()
             .OrderBy(x => x.Name)
@@ -142,9 +149,9 @@ public class AdminWipController : Controller
             balancesQuery = balancesQuery.Where(x => x.SectionId == sectionId.Value);
         }
 
-        if (opNumber.HasValue)
+        if (parsedOpNumber.HasValue)
         {
-            balancesQuery = balancesQuery.Where(x => x.OpNumber == opNumber.Value);
+            balancesQuery = balancesQuery.Where(x => x.OpNumber == parsedOpNumber.Value);
         }
 
         var balances = await balancesQuery
@@ -162,7 +169,7 @@ public class AdminWipController : Controller
                 SectionDisplay = string.IsNullOrWhiteSpace(x.Section!.Code)
                     ? x.Section.Name
                     : string.Format(CultureInfo.CurrentCulture, "{0} — {1}", x.Section.Code, x.Section.Name),
-                OpNumber = x.OpNumber,
+                OpNumber = OperationNumber.Format(x.OpNumber),
                 Quantity = x.Quantity,
             })
             .ToListAsync()
@@ -172,7 +179,9 @@ public class AdminWipController : Controller
         {
             SelectedPartId = partId,
             SelectedSectionId = sectionId,
-            SelectedOpNumber = opNumber,
+            SelectedOpNumber = parsedOpNumber.HasValue
+                ? OperationNumber.Format(parsedOpNumber.Value)
+                : OperationNumber.Normalize(opNumber),
             Parts = partItems,
             Sections = sectionItems,
             Balances = balances,

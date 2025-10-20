@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +9,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Launches;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -70,14 +70,14 @@ public class WipLaunchesController : Controller
                 x.Part != null ? x.Part.Name : string.Empty,
                 x.Part?.Code,
                 x.Section != null ? x.Section.Name : string.Empty,
-                x.FromOpNumber,
+                OperationNumber.Format(x.FromOpNumber),
                 x.Quantity,
                 x.SumHoursToFinish,
                 x.Comment,
                 x.Operations
                     .OrderBy(o => o.OpNumber)
                     .Select(o => new LaunchHistoryOperationViewModel(
-                        o.OpNumber,
+                        OperationNumber.Format(o.OpNumber),
                         o.Operation != null ? o.Operation.Name : string.Empty,
                         o.Section != null ? o.Section.Name : string.Empty,
                         o.NormHours,
@@ -165,7 +165,7 @@ public class WipLaunchesController : Controller
                               from balance in balances.DefaultIfEmpty()
                               orderby route.OpNumber
                               select new LaunchOperationLookupViewModel(
-                                  route.OpNumber,
+                                  OperationNumber.Format(route.OpNumber),
                                   operation != null ? operation.Name : string.Empty,
                                   route.NormHours,
                                   route.SectionId,
@@ -181,19 +181,26 @@ public class WipLaunchesController : Controller
     }
 
     [HttpGet("tail")]
-    public async Task<IActionResult> GetTail([FromQuery] Guid partId, [FromQuery] int opNumber, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTail([FromQuery] Guid partId, [FromQuery] string? opNumber, CancellationToken cancellationToken)
     {
-        if (partId == Guid.Empty || opNumber <= 0)
+        if (partId == Guid.Empty || string.IsNullOrWhiteSpace(opNumber))
         {
             return BadRequest("Недостаточно данных для расчёта хвоста маршрута.");
         }
 
-        var tail = await _routeService.GetTailToFinishAsync(partId, opNumber.ToString(CultureInfo.InvariantCulture), cancellationToken)
+        var normalizedOpNumber = OperationNumber.Normalize(opNumber);
+
+        if (!OperationNumber.TryParse(normalizedOpNumber, out _))
+        {
+            return BadRequest("Неверный номер операции.");
+        }
+
+        var tail = await _routeService.GetTailToFinishAsync(partId, normalizedOpNumber, cancellationToken)
             .ConfigureAwait(false);
 
         var operations = tail
             .Select(x => new LaunchTailOperationViewModel(
-                x.OpNumber,
+                OperationNumber.Format(x.OpNumber),
                 x.Operation != null ? x.Operation.Name : string.Empty,
                 x.NormHours,
                 x.SectionId,
@@ -213,16 +220,36 @@ public class WipLaunchesController : Controller
             return BadRequest("Список запусков пуст.");
         }
 
-        var dtos = request.Items
-            .Select(x => new LaunchItemDto(x.PartId, x.FromOpNumber, x.LaunchDate, x.Quantity, x.Comment))
-            .ToList();
+        List<LaunchItemDto> dtos;
+        try
+        {
+            dtos = request.Items
+                .Select(x => new LaunchItemDto(
+                    x.PartId,
+                    OperationNumber.Parse(x.FromOpNumber, nameof(LaunchSaveItem.FromOpNumber)),
+                    x.LaunchDate,
+                    x.Quantity,
+                    x.Comment))
+                .ToList();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
 
         var summary = await _launchService.AddLaunchesBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
 
         var model = new LaunchBatchSummaryViewModel(
             summary.Saved,
             summary.Items
-                .Select(x => new LaunchBatchItemViewModel(x.PartId, x.FromOpNumber, x.SectionId, x.Quantity, x.Remaining, x.SumHoursToFinish, x.LaunchId))
+                .Select(x => new LaunchBatchItemViewModel(
+                    x.PartId,
+                    OperationNumber.Format(x.FromOpNumber),
+                    x.SectionId,
+                    x.Quantity,
+                    x.Remaining,
+                    x.SumHoursToFinish,
+                    x.LaunchId))
                 .ToList());
 
         return Ok(model);
@@ -245,7 +272,13 @@ public class WipLaunchesController : Controller
         {
             var result = await _launchService.DeleteLaunchAsync(id, cancellationToken).ConfigureAwait(false);
             var message = $"Запуск успешно удалён. Текущий остаток: {result.Remaining:0.###}";
-            var response = new LaunchDeleteResponseModel(result.LaunchId, result.PartId, result.SectionId, result.FromOpNumber, result.Remaining, message);
+            var response = new LaunchDeleteResponseModel(
+                result.LaunchId,
+                result.PartId,
+                result.SectionId,
+                OperationNumber.Format(result.FromOpNumber),
+                result.Remaining,
+                message);
             return Ok(response);
         }
         catch (KeyNotFoundException ex)
@@ -288,7 +321,7 @@ public class WipLaunchesController : Controller
 
     public record LaunchSaveItem(
         Guid PartId,
-        int FromOpNumber,
+        string FromOpNumber,
         DateTime LaunchDate,
         decimal Quantity,
         string? Comment);

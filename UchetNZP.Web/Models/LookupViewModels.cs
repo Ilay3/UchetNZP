@@ -8,7 +8,7 @@ public record LookupItemViewModel(Guid Id, string Name, string? Code);
 
 public record PartOperationViewModel(
     Guid PartId,
-    int OpNumber,
+    string OpNumber,
     Guid OperationId,
     string OperationName,
     Guid SectionId,
@@ -17,7 +17,7 @@ public record PartOperationViewModel(
 
 public record ReceiptSummaryItemViewModel(
     Guid PartId,
-    int OpNumber,
+    string OpNumber,
     Guid SectionId,
     decimal Quantity,
     decimal Was,
@@ -28,7 +28,7 @@ public record ReceiptSummaryItemViewModel(
 public record ReceiptBatchSummaryViewModel(int Saved, IReadOnlyList<ReceiptSummaryItemViewModel> Items);
 
 public record LaunchOperationLookupViewModel(
-    int OpNumber,
+    string OpNumber,
     string OperationName,
     decimal NormHours,
     Guid SectionId,
@@ -36,7 +36,7 @@ public record LaunchOperationLookupViewModel(
     decimal Balance);
 
 public record LaunchTailOperationViewModel(
-    int OpNumber,
+    string OpNumber,
     string OperationName,
     decimal NormHours,
     Guid SectionId,
@@ -48,7 +48,7 @@ public record LaunchTailSummaryViewModel(
 
 public record LaunchBatchItemViewModel(
     Guid PartId,
-    int FromOpNumber,
+    string FromOpNumber,
     Guid SectionId,
     decimal Quantity,
     decimal Remaining,
@@ -58,12 +58,12 @@ public record LaunchBatchItemViewModel(
 public record LaunchBatchSummaryViewModel(int Saved, IReadOnlyList<LaunchBatchItemViewModel> Items);
 
 public record TransferOperationLookupViewModel(
-    int OpNumber,
+    string OpNumber,
     string OperationName,
     decimal NormHours,
     decimal Balance);
 
-public record TransferOperationBalanceViewModel(int OpNumber, Guid SectionId, decimal Balance);
+public record TransferOperationBalanceViewModel(string OpNumber, Guid SectionId, decimal Balance);
 
 public record TransferBalancesViewModel(
     TransferOperationBalanceViewModel From,
@@ -77,11 +77,11 @@ public record TransferScrapSummaryViewModel(
 
 public record TransferSummaryItemViewModel(
     Guid PartId,
-    int FromOpNumber,
+    string FromOpNumber,
     Guid FromSectionId,
     decimal FromBalanceBefore,
     decimal FromBalanceAfter,
-    int ToOpNumber,
+    string ToOpNumber,
     Guid ToSectionId,
     decimal ToBalanceBefore,
     decimal ToBalanceAfter,

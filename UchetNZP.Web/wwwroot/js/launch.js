@@ -116,7 +116,7 @@
     });
 
     function formatOperation(operation) {
-        const parts = [operation.opNumber.toString().padStart(3, "0")];
+        const parts = [operation.opNumber];
         if (operation.operationName) {
             parts.push(operation.operationName);
         }
@@ -207,7 +207,7 @@
         tailSummary.operations.forEach(operation => {
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td>${operation.opNumber.toString().padStart(3, "0")}</td>
+                <td>${operation.opNumber}</td>
                 <td>${operation.operationName ?? ""}</td>
                 <td>${operation.normHours.toFixed(3)}</td>`;
             tailTableBody.appendChild(row);
@@ -333,7 +333,7 @@
             row.innerHTML = `
                 <td>${item.date}</td>
                 <td>${item.partDisplay}</td>
-                <td>${item.fromOp.toString().padStart(3, "0")} / ${item.toOp.toString().padStart(3, "0")}</td>
+                <td>${item.fromOp} / ${item.toOp}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.hours.toFixed(3)}</td>
                 <td>${item.comment ?? ""}</td>
@@ -505,7 +505,7 @@
             const cartItem = cart.find(x => x.partId === item.partId && x.fromOp === item.fromOpNumber);
             row.innerHTML = `
                 <td>${cartItem ? cartItem.partDisplay : item.partId}</td>
-                <td>${item.fromOpNumber.toString().padStart(3, "0")}</td>
+                <td>${item.fromOpNumber}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.remaining.toFixed(3)}</td>
                 <td>${item.sumHoursToFinish.toFixed(3)}</td>`;

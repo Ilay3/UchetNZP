@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Globalization;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Models;
 
@@ -10,7 +10,7 @@ public record RouteListItemViewModel(
     Guid PartId,
     string PartName,
     string? PartCode,
-    int OpNumber,
+    string OpNumber,
     string OperationName,
     Guid SectionId,
     string SectionName,
@@ -21,8 +21,8 @@ public record RouteListItemViewModel(
         : $"{PartName} ({PartCode})";
 
     public string OperationDisplay => string.IsNullOrWhiteSpace(OperationName)
-        ? OpNumber.ToString("D3")
-        : $"{OpNumber:D3} — {OperationName}";
+        ? OpNumber
+        : $"{OpNumber} — {OperationName}";
 }
 
 public class RouteListFilterViewModel
@@ -62,10 +62,10 @@ public class RouteEditInputModel : IValidatableObject
     public string? OperationName { get; set; }
         = string.Empty;
 
-    public const string OpNumberPattern = @"^\d{1,10}$";
+    public const string OpNumberPattern = OperationNumber.AllowedPattern;
 
     [Required(ErrorMessage = "Укажите номер операции.")]
-    [RegularExpression(OpNumberPattern, ErrorMessage = "Номер операции должен состоять из 1–10 цифр.")]
+    [RegularExpression(OpNumberPattern, ErrorMessage = "Номер операции должен состоять из 1–10 цифр и может содержать дробную часть через «/».")]
     [Display(Name = "№ операции")]
     public string OpNumber { get; set; } = string.Empty;
 
@@ -96,6 +96,6 @@ public class RouteEditInputModel : IValidatableObject
             throw new ValidationException("Номер операции не заполнен.");
         }
 
-        return int.Parse(OpNumber, NumberStyles.None, CultureInfo.InvariantCulture);
+        return OperationNumber.Parse(OpNumber, nameof(OpNumber));
     }
 }
