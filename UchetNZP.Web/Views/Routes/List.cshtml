@@ -20,6 +20,7 @@
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-primary" asp-action="Create">Добавить маршрут</a>
         <a class="btn btn-outline-primary" asp-action="Import">Импорт и редактирование</a>
+        <a class="btn btn-outline-success" asp-action="Export" asp-route-Search="@(string.IsNullOrWhiteSpace(searchValue) ? null : searchValue)" asp-route-SectionId="@(selectedSectionId.HasValue ? selectedSectionId.Value : null)">Экспорт в Excel</a>
     </div>
 </div>
 
