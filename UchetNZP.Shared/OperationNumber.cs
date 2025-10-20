@@ -6,7 +6,7 @@ namespace UchetNZP.Shared;
 
 public static class OperationNumber
 {
-    public const string AllowedPattern = @"^\d{1,10}$";
+    public const string AllowedPattern = @"^\d{1,10}(?:/\d{1,5})?$";
 
     public static bool TryParse(string? value, out int result)
     {
@@ -23,14 +23,17 @@ public static class OperationNumber
             return false;
         }
 
-        return int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out result);
+        var slashIndex = trimmed.IndexOf('/', StringComparison.Ordinal);
+        var numericPart = slashIndex >= 0 ? trimmed[..slashIndex] : trimmed;
+
+        return int.TryParse(numericPart, NumberStyles.None, CultureInfo.InvariantCulture, out result);
     }
 
     public static int Parse(string? value, string parameterName)
     {
         if (!TryParse(value, out var result))
         {
-            throw new ArgumentException("Номер операции должен содержать от 1 до 10 цифр.", parameterName);
+            throw new ArgumentException("Номер операции должен содержать от 1 до 10 цифр и может включать дробную часть через «/».", parameterName);
         }
 
         return result;

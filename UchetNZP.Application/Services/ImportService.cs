@@ -7,6 +7,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Imports;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Application.Services;
 
@@ -192,7 +193,7 @@ public class ImportService : IImportService
                     continue;
                 }
 
-                if (!int.TryParse(opNumberText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var opNumber))
+                if (!OperationNumber.TryParse(opNumberText, out var opNumber))
                 {
                     const string reason = "Некорректный номер операции.";
                     items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
