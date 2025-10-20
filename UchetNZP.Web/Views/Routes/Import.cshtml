@@ -25,8 +25,8 @@
             </div>
             <div class="col-xl-1">
                 <label class="form-label" for="routeOpNumberInput">№</label>
-                <input id="routeOpNumberInput" class="form-control form-control-lg" type="number" min="1" step="1" />
-                <div class="form-text">Порядковый номер операции.</div>
+                <input id="routeOpNumberInput" class="form-control form-control-lg" type="text" inputmode="numeric" pattern="^\d{1,10}$" data-pattern="^\d{1,10}$" maxlength="10" />
+                <div class="form-text">Допустимы 1–10 цифр, например: 7, 015, 000123.</div>
             </div>
             <div class="col-xl-2">
                 <label class="form-label" for="routeNormInput">Норматив (н/ч)</label>
