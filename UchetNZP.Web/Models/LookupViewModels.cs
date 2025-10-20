@@ -55,3 +55,30 @@ public record LaunchBatchItemViewModel(
     Guid LaunchId);
 
 public record LaunchBatchSummaryViewModel(int Saved, IReadOnlyList<LaunchBatchItemViewModel> Items);
+
+public record TransferOperationLookupViewModel(
+    int OpNumber,
+    string OperationName,
+    decimal NormHours,
+    decimal Balance);
+
+public record TransferOperationBalanceViewModel(int OpNumber, Guid SectionId, decimal Balance);
+
+public record TransferBalancesViewModel(
+    TransferOperationBalanceViewModel From,
+    TransferOperationBalanceViewModel To);
+
+public record TransferSummaryItemViewModel(
+    Guid PartId,
+    int FromOpNumber,
+    Guid FromSectionId,
+    decimal FromBalanceBefore,
+    decimal FromBalanceAfter,
+    int ToOpNumber,
+    Guid ToSectionId,
+    decimal ToBalanceBefore,
+    decimal ToBalanceAfter,
+    decimal Quantity,
+    Guid TransferId);
+
+public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);
