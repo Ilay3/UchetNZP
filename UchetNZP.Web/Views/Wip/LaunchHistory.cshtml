@@ -74,6 +74,7 @@
                                         <th scope="col">Количество</th>
                                         <th scope="col">Часы</th>
                                         <th scope="col">Комментарий</th>
+                                        <th scope="col" class="text-end">Действия</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -107,6 +108,16 @@
                                             <td>@launch.Quantity.ToString("0.###")</td>
                                             <td>@launch.Hours.ToString("0.###")</td>
                                             <td>@(launch.HasComment ? launch.Comment : "—")</td>
+                                            <td class="text-end">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-outline-danger btn-sm"
+                                                    data-launch-delete
+                                                    data-launch-id="@launch.Id"
+                                                    data-confirm="Удалить запуск по детали '@launch.PartDisplayName' от @(launch.LaunchDate.ToString("dd.MM.yyyy"))?">
+                                                    Удалить
+                                                </button>
+                                            </td>
                                         </tr>
                                     }
                                 </tbody>
@@ -129,3 +140,81 @@ else
 <div class="d-flex justify-content-end mt-4">
     <a class="btn btn-link" asp-action="Index">← Вернуться к запуску НЗП</a>
 </div>
+
+@section Scripts
+{
+    <script>
+        (() => {
+            const accordion = document.getElementById('launchHistoryAccordion');
+            if (!accordion) {
+                return;
+            }
+
+            accordion.addEventListener('click', async (event) => {
+                const button = event.target instanceof HTMLElement
+                    ? event.target.closest('[data-launch-delete]')
+                    : null;
+
+                if (!(button instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const launchId = button.getAttribute('data-launch-id');
+                if (!launchId) {
+                    return;
+                }
+
+                const confirmationMessage = button.getAttribute('data-confirm')
+                    ?? 'Вы уверены, что хотите удалить запуск?';
+
+                if (!window.confirm(confirmationMessage)) {
+                    return;
+                }
+
+                button.disabled = true;
+                let shouldReload = false;
+
+                try {
+                    const response = await fetch(`/wip/launch/${launchId}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        shouldReload = true;
+                        const payload = await response.json();
+                        const message = typeof payload?.message === 'string'
+                            ? payload.message
+                            : 'Запуск успешно удалён.';
+                        window.alert(message);
+                    } else {
+                        const contentType = response.headers.get('Content-Type') ?? '';
+                        if (contentType.includes('application/json')) {
+                            const payload = await response.json();
+                            const message = typeof payload?.message === 'string'
+                                ? payload.message
+                                : 'Не удалось удалить запуск.';
+                            window.alert(message);
+                        } else {
+                            const text = await response.text();
+                            window.alert(text || 'Не удалось удалить запуск.');
+                        }
+                    }
+                } catch (error) {
+                    if (window.console && typeof window.console.error === 'function') {
+                        window.console.error(error);
+                    }
+                    window.alert('Произошла ошибка при удалении запуска.');
+                } finally {
+                    if (shouldReload) {
+                        window.setTimeout(() => window.location.reload(), 0);
+                    } else {
+                        button.disabled = false;
+                    }
+                }
+            });
+        })();
+    </script>
+}

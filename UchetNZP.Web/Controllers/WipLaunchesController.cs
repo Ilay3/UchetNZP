@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -225,6 +226,36 @@ public class WipLaunchesController : Controller
                 .ToList());
 
         return Ok(model);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор запуска.");
+        }
+
+        if (User?.Identity?.IsAuthenticated != true)
+        {
+            return Forbid();
+        }
+
+        try
+        {
+            var result = await _launchService.DeleteLaunchAsync(id, cancellationToken).ConfigureAwait(false);
+            var message = $"Запуск успешно удалён. Текущий остаток: {result.Remaining:0.###}";
+            var response = new LaunchDeleteResponseModel(result.LaunchId, result.PartId, result.SectionId, result.FromOpNumber, result.Remaining, message);
+            return Ok(response);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     [HttpGet("export")]

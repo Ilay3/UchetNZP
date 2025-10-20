@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\UchetNZP.Application\UchetNZP.Application.csproj" />
     <ProjectReference Include="..\UchetNZP.Domain\UchetNZP.Domain.csproj" />
+    <ProjectReference Include="..\UchetNZP.Web\UchetNZP.Web.csproj" />
   </ItemGroup>
 
 </Project>
