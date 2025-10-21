@@ -44,6 +44,14 @@ public class ReportServiceTests
                 OpNumber = 20,
                 NormHours = 0.75m,
             });
+        dbContext.WipBalances.Add(new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = partA.Id,
+            SectionId = sectionA.Id,
+            OpNumber = 10,
+            Quantity = 12.5m,
+        });
         await dbContext.SaveChangesAsync();
 
         var service = new ReportService(dbContext);
@@ -76,6 +84,7 @@ public class ReportServiceTests
         Assert.Equal(operationCut.Name, dataRow.Cell(4).GetString());
         Assert.Equal(sectionA.Name, dataRow.Cell(5).GetString());
         Assert.Equal(1.5m, dataRow.Cell(6).GetValue<decimal>());
+        Assert.Equal(12.5m, dataRow.Cell(7).GetValue<decimal>());
 
         var sectionFilterCell = worksheet
             .CellsUsed()
