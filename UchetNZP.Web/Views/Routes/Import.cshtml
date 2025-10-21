@@ -24,10 +24,10 @@
                 <datalist id="routeOperationOptions"></datalist>
                 <div class="form-text">Введите название операции или выберите из списка.</div>
             </div>
-            <div class="col-xl-1">
+            <div class="col-xl-3">
                 <label class="form-label" for="routeOpNumberInput">№</label>
                 <input id="routeOpNumberInput" class="form-control form-control-lg" type="text" inputmode="text" pattern="@OperationNumber.AllowedPattern" data-pattern="@OperationNumber.AllowedPattern" maxlength="16" />
-                <div class="form-text">Допустимы 1–10 цифр, можно указать дробную часть через «/», например: 7, 015, 010/1.</div>
+                <div class="form-text">Допустимы 1–10 цифр, можно указать дробную часть через «/»</div>
             </div>
             <div class="col-xl-2">
                 <label class="form-label" for="routeNormInput">Норматив (н/ч)</label>
@@ -58,7 +58,7 @@
             <div class="col-lg-6">
                 <label class="form-label" for="routeFileInput">Файл Excel</label>
                 <input id="routeFileInput" class="form-control form-control-lg" type="file" accept=".xlsx,.xls" />
-                <div class="form-text">Используйте шаблон с колонками: Наименование детали, Наименование операции, № операции, Утвержденный норматив (н/ч), Участок. После импорта будет показана сводка с именем файла, количеством успешных и пропущенных строк.</div>
+                <div class="form-text">Используйте шаблон с колонками: Наименование детали, Наименование операции, № операции, Утвержденный норматив (н/ч), Участок, Количество остатка (необязательно). После импорта будет показана сводка с именем файла, количеством успешных и пропущенных строк.</div>
             </div>
             <div class="col-lg-6 d-flex align-items-end">
                 <button type="button" class="btn btn-outline-primary btn-lg" id="routeImportButton">Импортировать файл</button>
