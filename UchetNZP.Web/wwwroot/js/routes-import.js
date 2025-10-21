@@ -30,17 +30,42 @@
 
     const opNumberInput = document.getElementById("routeOpNumberInput");
     const normInput = document.getElementById("routeNormInput");
+    const addOperationButton = document.getElementById("routeAddOperationButton");
     const saveButton = document.getElementById("routeSaveButton");
     const resetButton = document.getElementById("routeResetButton");
     const messageBox = document.getElementById("routeSaveMessage");
+    const operationsContainer = document.getElementById("routeOperationsContainer");
+    const operationsTable = operationsContainer ? operationsContainer.querySelector("table") : null;
+    const operationsTableBody = document.getElementById("routeOperationsTableBody");
+    const operationsEmptyState = document.getElementById("routeOperationsEmptyState");
 
     const fileInput = document.getElementById("routeFileInput");
     const importButton = document.getElementById("routeImportButton");
     const importSummaryContainer = document.getElementById("routeImportSummary");
     let lastDownloadedJobId = null;
+    const pendingOperations = [];
 
+    addOperationButton.addEventListener("click", () => addOperationToList());
     saveButton.addEventListener("click", () => saveRoute());
     resetButton.addEventListener("click", () => resetForm());
+    if (operationsTableBody) {
+        operationsTableBody.addEventListener("click", event => {
+            const target = event.target instanceof HTMLElement ? event.target.closest("[data-action='remove-operation']") : null;
+            if (!target) {
+                return;
+            }
+
+            const index = Number(target.dataset.index ?? "NaN");
+            if (Number.isNaN(index) || index < 0 || index >= pendingOperations.length) {
+                return;
+            }
+
+            pendingOperations.splice(index, 1);
+            renderOperations();
+        });
+    }
+
+    renderOperations();
     importButton.addEventListener("click", () => importRoutes());
 
     async function saveRoute() {
@@ -50,38 +75,27 @@
             return;
         }
 
-        const operationName = operationLookup.inputElement.value.trim();
-        if (!operationName) {
-            alert("Заполните наименование операции.");
+        ensureOperationsPrepared();
+
+        if (pendingOperations.length === 0) {
+            alert("Добавьте хотя бы одну операцию для сохранения.");
             return;
         }
 
-        const sectionName = sectionLookup.inputElement.value.trim();
-        if (!sectionName) {
-            alert("Укажите участок.");
-            return;
-        }
-
-        const opNumberText = opNumberInput.value.trim();
-        const opNumberPattern = new RegExp(opNumberInput.dataset.pattern ?? "^\\d{1,10}(?:/\\d{1,5})?$");
-        if (!opNumberPattern.test(opNumberText)) {
-            alert("Номер операции должен состоять из 1–10 цифр и может содержать дробную часть через «/».");
-            return;
-        }
-
-        const normHours = Number(normInput.value);
-        if (!normHours || normHours <= 0) {
-            alert("Норматив должен быть больше нуля.");
-            return;
-        }
+        const selectedPart = typeof partLookup.getSelected === "function" ? partLookup.getSelected() : null;
+        const partCode = selectedPart && typeof selectedPart.code === "string" && selectedPart.code.trim().length > 0
+            ? selectedPart.code
+            : null;
 
         const payload = {
             partName,
-            partCode: null,
-            operationName,
-            opNumber: opNumberText,
-            normHours,
-            sectionName,
+            partCode,
+            operations: pendingOperations.map(item => ({
+                operationName: item.operationName,
+                opNumber: item.opNumber,
+                normHours: item.normHours,
+                sectionName: item.sectionName,
+            })),
         };
 
         saveButton.disabled = true;
@@ -98,8 +112,11 @@
                 throw new Error("Не удалось сохранить маршрут.");
             }
 
-            namespace.showInlineMessage(messageBox, "Маршрут успешно сохранён.", "success");
-            resetForm();
+            const result = await response.json().catch(() => null);
+            const savedCount = result && typeof result.saved === "number" ? result.saved : pendingOperations.length;
+
+            namespace.showInlineMessage(messageBox, `Маршрут успешно сохранён. Операций: ${savedCount}.`, "success");
+            resetForm({ keepPart: true, preserveMessage: true });
         }
         catch (error) {
             console.error(error);
@@ -110,13 +127,152 @@
         }
     }
 
-    function resetForm() {
-        partLookup.setSelected(null);
+    function resetForm({ keepPart = false, preserveMessage = false } = {}) {
+        if (!keepPart) {
+            partLookup.setSelected(null);
+        }
+
+        clearOperationInputs();
+        pendingOperations.splice(0, pendingOperations.length);
+        renderOperations();
+        if (!preserveMessage) {
+            namespace.hideInlineMessage(messageBox);
+        }
+    }
+
+    function clearOperationInputs() {
         operationLookup.setSelected(null);
         opNumberInput.value = "";
         normInput.value = "";
         sectionLookup.setSelected(null);
-        namespace.hideInlineMessage(messageBox);
+    }
+
+    function renderOperations() {
+        if (!operationsTableBody || !operationsEmptyState || !operationsTable) {
+            return;
+        }
+
+        operationsTableBody.innerHTML = "";
+
+        if (pendingOperations.length === 0) {
+            operationsTable.classList.add("d-none");
+            operationsEmptyState.classList.remove("d-none");
+            return;
+        }
+
+        operationsTable.classList.remove("d-none");
+        operationsEmptyState.classList.add("d-none");
+
+        pendingOperations.forEach((item, index) => {
+            const row = document.createElement("tr");
+
+            const opNumberCell = document.createElement("td");
+            opNumberCell.textContent = item.opNumber;
+            row.appendChild(opNumberCell);
+
+            const operationNameCell = document.createElement("td");
+            operationNameCell.textContent = item.operationName;
+            row.appendChild(operationNameCell);
+
+            const normCell = document.createElement("td");
+            normCell.textContent = item.normHours.toFixed(3);
+            row.appendChild(normCell);
+
+            const sectionCell = document.createElement("td");
+            sectionCell.textContent = item.sectionName;
+            row.appendChild(sectionCell);
+
+            const actionsCell = document.createElement("td");
+            actionsCell.className = "text-end";
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "btn btn-sm btn-outline-danger";
+            removeButton.dataset.action = "remove-operation";
+            removeButton.dataset.index = String(index);
+            removeButton.textContent = "Удалить";
+            actionsCell.appendChild(removeButton);
+            row.appendChild(actionsCell);
+
+            operationsTableBody.appendChild(row);
+        });
+    }
+
+    function addOperationToList({ showAlerts = true } = {}) {
+        const operation = getOperationFromInputs(showAlerts);
+        if (!operation) {
+            return false;
+        }
+
+        pendingOperations.push(operation);
+        clearOperationInputs();
+        renderOperations();
+        return true;
+    }
+
+    function ensureOperationsPrepared() {
+        if (!hasAnyOperationInput()) {
+            return;
+        }
+
+        addOperationToList({ showAlerts: true });
+    }
+
+    function hasAnyOperationInput() {
+        return Boolean(
+            operationLookup.inputElement.value.trim() ||
+            opNumberInput.value.trim() ||
+            normInput.value.trim() ||
+            sectionLookup.inputElement.value.trim()
+        );
+    }
+
+    function getOperationFromInputs(showAlerts) {
+        const operationName = operationLookup.inputElement.value.trim();
+        if (!operationName) {
+            if (showAlerts) {
+                alert("Заполните наименование операции.");
+            }
+
+            return null;
+        }
+
+        const sectionName = sectionLookup.inputElement.value.trim();
+        if (!sectionName) {
+            if (showAlerts) {
+                alert("Укажите участок.");
+            }
+
+            return null;
+        }
+
+        const opNumberText = opNumberInput.value.trim();
+        const opNumberPattern = new RegExp(opNumberInput.dataset.pattern ?? "^\\d{1,10}(?:/\\d{1,5})?$");
+        if (!opNumberPattern.test(opNumberText)) {
+            if (showAlerts) {
+                alert("Номер операции должен состоять из 1–10 цифр и может содержать дробную часть через «/».");
+            }
+
+            return null;
+        }
+
+        const normValue = normInput.value.trim();
+        const normHours = Number(normValue);
+        if (!normValue || Number.isNaN(normHours) || normHours <= 0) {
+            if (showAlerts) {
+                alert("Норматив должен быть больше нуля.");
+            }
+
+            return null;
+        }
+
+        const roundedNorm = Math.round(normHours * 1000) / 1000;
+
+        return {
+            operationName,
+            opNumber: opNumberText,
+            normHours: roundedNorm,
+            sectionName,
+        };
     }
 
     async function importRoutes() {
@@ -197,7 +353,11 @@
     }
 
     namespace.bindHotkeys({
-        onEnter: () => saveRoute(),
+        onEnter: () => {
+            if (!addOperationToList({ showAlerts: false })) {
+                ensureOperationsPrepared();
+            }
+        },
         onSave: () => saveRoute(),
         onCancel: () => resetForm(),
     });
