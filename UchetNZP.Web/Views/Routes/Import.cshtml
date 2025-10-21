@@ -16,7 +16,12 @@
                 <label class="form-label" for="routePartNameInput">Деталь</label>
                 <input id="routePartNameInput" class="form-control form-control-lg" type="text" list="routePartOptions" placeholder="Наименование детали" autocomplete="off" />
                 <datalist id="routePartOptions"></datalist>
-                <div class="form-text">Введите новое имя или выберите существующее.</div>
+                <div class="form-text">Введите новое имя или выберите существующее. Деталь сохраняется для всех операций ниже.</div>
+            </div>
+            <div class="col-12">
+                <hr class="text-muted" />
+                <h2 class="h5">Операции детали</h2>
+                <p class="text-muted">Добавьте одну или несколько операций. После сохранения список очистится, а выбранная деталь останется, чтобы вы могли продолжить.</p>
             </div>
             <div class="col-xl-4">
                 <label class="form-label" for="routeOperationNameInput">Операция</label>
@@ -24,7 +29,7 @@
                 <datalist id="routeOperationOptions"></datalist>
                 <div class="form-text">Введите название операции или выберите из списка.</div>
             </div>
-            <div class="col-xl-3">
+            <div class="col-xl-2">
                 <label class="form-label" for="routeOpNumberInput">№</label>
                 <input id="routeOpNumberInput" class="form-control form-control-lg" type="text" inputmode="text" pattern="@OperationNumber.AllowedPattern" data-pattern="@OperationNumber.AllowedPattern" maxlength="16" />
                 <div class="form-text">Допустимы 1–10 цифр, можно указать дробную часть через «/»</div>
@@ -41,9 +46,27 @@
                 <div class="form-text">Укажите или выберите участок, на котором выполняется операция.</div>
             </div>
             <div class="col-12">
-                <div class="d-flex flex-column flex-md-row gap-3">
-                    <button type="button" class="btn btn-primary btn-lg" id="routeSaveButton">Сохранить маршрут (Ctrl+S)</button>
+                <div class="d-flex flex-column flex-lg-row gap-3">
+                    <button type="button" class="btn btn-outline-primary btn-lg" id="routeAddOperationButton">Добавить операцию в список (Enter)</button>
+                    <button type="button" class="btn btn-primary btn-lg" id="routeSaveButton">Сохранить все операции (Ctrl+S)</button>
                     <button type="button" class="btn btn-outline-secondary btn-lg" id="routeResetButton">Очистить форму (Esc)</button>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="table-responsive" id="routeOperationsContainer">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th scope="col">№</th>
+                                <th scope="col">Операция</th>
+                                <th scope="col">Норматив (н/ч)</th>
+                                <th scope="col">Участок</th>
+                                <th scope="col" class="text-end">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="routeOperationsTableBody"></tbody>
+                    </table>
+                    <div id="routeOperationsEmptyState" class="text-muted py-3 text-center">Список операций пока пуст. Добавьте первую операцию, чтобы сохранить маршрут.</div>
                 </div>
             </div>
         </form>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using Microsoft.AspNetCore.Http;
@@ -331,26 +332,61 @@ public class RoutesController : Controller
             return BadRequest("Данные маршрута не заполнены.");
         }
 
-        int opNumber;
-        try
+        if (string.IsNullOrWhiteSpace(request.PartName))
         {
-            opNumber = OperationNumber.Parse(request.OpNumber, nameof(request.OpNumber));
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(ex.Message);
+            return BadRequest("Наименование детали обязательно.");
         }
 
-        await _routeService.UpsertRouteAsync(
-            request.PartName,
-            request.PartCode,
-            request.OperationName,
-            opNumber,
-            request.NormHours,
-            request.SectionName,
-            cancellationToken).ConfigureAwait(false);
+        if (request.Operations is null || request.Operations.Count == 0)
+        {
+            return BadRequest("Добавьте хотя бы одну операцию.");
+        }
 
-        return Ok();
+        var operations = new List<(string? OperationName, int OpNumber, decimal NormHours, string SectionName)>();
+
+        foreach (var operation in request.Operations)
+        {
+            if (operation is null)
+            {
+                return BadRequest("Данные операции заполнены не полностью.");
+            }
+
+            if (operation.NormHours <= 0)
+            {
+                return BadRequest("Норматив должен быть больше нуля.");
+            }
+
+            if (string.IsNullOrWhiteSpace(operation.SectionName))
+            {
+                return BadRequest("Укажите участок для каждой операции.");
+            }
+
+            int opNumber;
+            try
+            {
+                opNumber = OperationNumber.Parse(operation.OpNumber, nameof(operation.OpNumber));
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+
+            operations.Add((operation.OperationName, opNumber, operation.NormHours, operation.SectionName));
+        }
+
+        foreach (var (operationName, opNumber, normHours, sectionName) in operations)
+        {
+            await _routeService.UpsertRouteAsync(
+                request.PartName,
+                request.PartCode,
+                operationName,
+                opNumber,
+                normHours,
+                sectionName,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return Ok(new { saved = operations.Count });
     }
 
     [HttpPost("import/upload")]
@@ -378,10 +414,11 @@ public class RoutesController : Controller
     public record RouteUpsertRequest(
         string PartName,
         string? PartCode,
+        IReadOnlyList<RouteUpsertOperation> Operations);
+
+    public record RouteUpsertOperation(
         string? OperationName,
         string OpNumber,
         decimal NormHours,
         string SectionName);
-
-    private static int ParseOpNumber(string? value) => OperationNumber.Parse(value, nameof(value));
 }
