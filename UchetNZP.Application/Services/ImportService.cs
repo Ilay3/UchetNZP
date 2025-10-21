@@ -133,6 +133,7 @@ public class ImportService : IImportService
         var colOpNumber = Require("№ операции");
         var colNorm = Require("Утвержденный норматив (н/ч)", "Технологический процесс");
         var colSection = Optional("Участок");
+        var colRemaining = Optional("Количество остатка");
 
         var rows = worksheet.RangeUsed()?.RowsUsed().Skip(1).ToList() ?? new List<IXLRangeRow>();
 
@@ -158,6 +159,7 @@ public class ImportService : IImportService
             var sectionCache = new Dictionary<string, Section>(StringComparer.OrdinalIgnoreCase);
             var operationCache = new Dictionary<string, Operation>(StringComparer.OrdinalIgnoreCase);
             var routeCache = new Dictionary<string, PartRoute>(StringComparer.OrdinalIgnoreCase);
+            var wipBalanceCache = new Dictionary<string, WipBalance>(StringComparer.OrdinalIgnoreCase);
 
             var results = new List<ImportItemResultDto>();
             var items = new List<ImportJobItem>();
@@ -182,6 +184,35 @@ public class ImportService : IImportService
                 var opNumberText = GetString(colOpNumber);
                 var normText = GetString(colNorm);
                 var sectionName = GetSectionName(row, colSection, operationName);
+                var remainingText = GetString(colRemaining);
+                decimal? remainingQuantity = null;
+
+                if (!string.IsNullOrWhiteSpace(remainingText))
+                {
+                    if (!TryParseDecimal(remainingText, out var parsedRemaining))
+                    {
+                        const string reason = "Некорректное количество остатка.";
+                        items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
+                        results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
+                        RegisterErrorRow(row, reason, rowNumber);
+                        skipped++;
+                        continue;
+                    }
+
+                    parsedRemaining = Math.Round(parsedRemaining, 3, MidpointRounding.AwayFromZero);
+
+                    if (parsedRemaining < 0)
+                    {
+                        const string reason = "Количество остатка не может быть отрицательным.";
+                        items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
+                        results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
+                        RegisterErrorRow(row, reason, rowNumber);
+                        skipped++;
+                        continue;
+                    }
+
+                    remainingQuantity = parsedRemaining;
+                }
 
                 if (string.IsNullOrWhiteSpace(partName) || string.IsNullOrWhiteSpace(operationName) || string.IsNullOrWhiteSpace(opNumberText) || string.IsNullOrWhiteSpace(normText) || string.IsNullOrWhiteSpace(sectionName))
                 {
@@ -244,6 +275,12 @@ public class ImportService : IImportService
                 route.OperationId = operation.Id;
                 route.SectionId = section.Id;
                 route.NormHours = normHours;
+
+                if (remainingQuantity.HasValue)
+                {
+                    await UpsertWipBalanceAsync(part.Id, section.Id, opNumber, remainingQuantity.Value, wipBalanceCache, cancellationToken)
+                        .ConfigureAwait(false);
+                }
 
                 items.Add(CreateJobItem(job.Id, rowNumber, "Succeeded", null));
                 results.Add(new ImportItemResultDto(rowNumber, "Succeeded", null));
@@ -421,6 +458,47 @@ public class ImportService : IImportService
 
         cache[key] = entity;
         return entity;
+    }
+
+    private async Task<WipBalance> UpsertWipBalanceAsync(
+        Guid partId,
+        Guid sectionId,
+        int opNumber,
+        decimal quantity,
+        Dictionary<string, WipBalance> cache,
+        CancellationToken cancellationToken)
+    {
+        var key = $"{partId:N}:{sectionId:N}:{opNumber}";
+
+        if (!cache.TryGetValue(key, out var balance))
+        {
+            balance = await _dbContext.WipBalances
+                .FirstOrDefaultAsync(x => x.PartId == partId && x.SectionId == sectionId && x.OpNumber == opNumber, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (balance is not null)
+            {
+                cache[key] = balance;
+            }
+        }
+
+        if (balance is null)
+        {
+            balance = new WipBalance
+            {
+                Id = Guid.NewGuid(),
+                PartId = partId,
+                SectionId = sectionId,
+                OpNumber = opNumber,
+            };
+
+            await _dbContext.WipBalances.AddAsync(balance, cancellationToken).ConfigureAwait(false);
+        }
+
+        balance.Quantity = quantity;
+        cache[key] = balance;
+
+        return balance;
     }
 
     private static bool TryParseDecimal(string value, out decimal result)
