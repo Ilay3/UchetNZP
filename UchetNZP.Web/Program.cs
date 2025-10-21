@@ -3,12 +3,15 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Services;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Web.Configuration;
 using UchetNZP.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 builder.Host.UseWindowsService();
+
+builder.Services.Configure<MaintenanceOptions>(builder.Configuration.GetSection("Maintenance"));
 
 builder.Services
     .AddAuthentication(options =>

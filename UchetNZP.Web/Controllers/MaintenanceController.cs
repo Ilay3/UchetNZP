@@ -1,9 +1,10 @@
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Web.Configuration;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -12,22 +13,29 @@ namespace UchetNZP.Web.Controllers;
 public class MaintenanceController : Controller
 {
     private readonly AppDbContext _dbContext;
-    private readonly IWebHostEnvironment _environment;
     private readonly ILogger<MaintenanceController> _logger;
+    private readonly MaintenanceOptions _options;
 
-    public MaintenanceController(AppDbContext dbContext, IWebHostEnvironment environment, ILogger<MaintenanceController> logger)
+    public MaintenanceController(
+        AppDbContext dbContext,
+        ILogger<MaintenanceController> logger,
+        IOptions<MaintenanceOptions> options)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
     }
 
     [HttpPost("clear-database")]
     public async Task<IActionResult> ClearDatabase(CancellationToken cancellationToken)
     {
-        if (!_environment.IsDevelopment())
+        if (!_options.AllowClearDatabaseEndpoint)
         {
-            return NotFound();
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                success = false,
+                message = "Команда очистки базы данных отключена настройками.",
+            });
         }
 
         try
