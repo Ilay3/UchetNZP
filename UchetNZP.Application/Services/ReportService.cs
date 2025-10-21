@@ -30,13 +30,26 @@ public class ReportService : IReportService
             normalizedSectionId = sectionId.Value;
         }
 
+        var balancesQuery = from balance in _dbContext.WipBalances.AsNoTracking()
+                            group balance by new { balance.PartId, balance.SectionId, balance.OpNumber }
+            into balanceGroup
+                            select new
+                            {
+                                balanceGroup.Key.PartId,
+                                balanceGroup.Key.SectionId,
+                                balanceGroup.Key.OpNumber,
+                                Quantity = balanceGroup.Sum(x => x.Quantity)
+                            };
+
         var routesQuery = from route in _dbContext.PartRoutes.AsNoTracking()
                           join part in _dbContext.Parts.AsNoTracking() on route.PartId equals part.Id
                           join operation in _dbContext.Operations.AsNoTracking() on route.OperationId equals operation.Id into operations
                           from operation in operations.DefaultIfEmpty()
                           join section in _dbContext.Sections.AsNoTracking() on route.SectionId equals section.Id into sections
                           from section in sections.DefaultIfEmpty()
-                          select new { route, part, operation, section };
+                          join balance in balancesQuery on new { route.PartId, route.SectionId, route.OpNumber } equals new { balance.PartId, balance.SectionId, balance.OpNumber } into balances
+                          from balance in balances.DefaultIfEmpty()
+                          select new { route, part, operation, section, balance };
 
         if (!string.IsNullOrEmpty(normalizedSearch))
         {
@@ -63,7 +76,8 @@ public class ReportService : IReportService
                 x.route.OpNumber,
                 x.operation != null ? x.operation.Name : string.Empty,
                 x.section != null ? x.section.Name : string.Empty,
-                x.route.NormHours))
+                x.route.NormHours,
+                x.balance != null ? (decimal?)x.balance.Quantity : null))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -164,6 +178,7 @@ public class ReportService : IReportService
         worksheet.Cell(rowIndex, 4).Value = "Операция";
         worksheet.Cell(rowIndex, 5).Value = "Участок";
         worksheet.Cell(rowIndex, 6).Value = "Норматив, н/ч";
+        worksheet.Cell(rowIndex, 7).Value = "Количество остатка";
         worksheet.Row(rowIndex).Style.Font.SetBold(true);
         rowIndex++;
 
@@ -183,6 +198,11 @@ public class ReportService : IReportService
                 worksheet.Cell(rowIndex, 5).Value = route.SectionName;
                 worksheet.Cell(rowIndex, 6).Value = route.NormHours;
                 worksheet.Cell(rowIndex, 6).Style.NumberFormat.Format = "0.###";
+                if (route.BalanceQuantity.HasValue)
+                {
+                    worksheet.Cell(rowIndex, 7).Value = route.BalanceQuantity.Value;
+                    worksheet.Cell(rowIndex, 7).Style.NumberFormat.Format = "0.###";
+                }
                 rowIndex++;
             }
         }
@@ -208,7 +228,8 @@ public class ReportService : IReportService
         int OpNumber,
         string OperationName,
         string SectionName,
-        decimal NormHours);
+        decimal NormHours,
+        decimal? BalanceQuantity);
 
     private async Task<List<WipLaunch>> GetLaunchesAsync(DateTime fromUtc, DateTime toUtcExclusive, CancellationToken cancellationToken)
     {
