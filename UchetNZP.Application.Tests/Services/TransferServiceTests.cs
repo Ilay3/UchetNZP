@@ -18,8 +18,8 @@ public class TransferServiceTests
         await using var dbContext = CreateContext();
 
         var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
-        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Участок 10" };
-        var toSection = new Section { Id = Guid.NewGuid(), Name = "Участок 20" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var toSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
         var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "010" };
         var toOperation = new Operation { Id = Guid.NewGuid(), Name = "020" };
 
@@ -84,8 +84,8 @@ public class TransferServiceTests
         await using var dbContext = CreateContext();
 
         var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
-        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Участок 10" };
-        var toSection = new Section { Id = Guid.NewGuid(), Name = "Участок 20" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var toSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
         var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "010" };
         var toOperation = new Operation { Id = Guid.NewGuid(), Name = "020" };
 

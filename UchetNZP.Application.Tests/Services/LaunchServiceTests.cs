@@ -22,7 +22,7 @@ public class LaunchServiceTests
         var sectionId = Guid.NewGuid();
 
         var part = new Part { Id = partId, Name = "Деталь" };
-        var section = new Section { Id = sectionId, Name = "Участок" };
+        var section = new Section { Id = sectionId, Name = "Вид работ" };
         var operations = new[]
         {
             new Operation { Id = Guid.NewGuid(), Name = "015" },

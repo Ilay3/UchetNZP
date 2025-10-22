@@ -38,7 +38,7 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
 
         if (!string.IsNullOrWhiteSpace(filter.Section))
         {
-            rowIndex = WriteFilterRow(worksheet, rowIndex, "Участок", filter.Section!);
+            rowIndex = WriteFilterRow(worksheet, rowIndex, "Вид работ", filter.Section!);
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Part))
@@ -62,7 +62,7 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
         }
 
         worksheet.Cell(rowIndex, 1).Value = "Дата";
-        worksheet.Cell(rowIndex, 2).Value = "Участок";
+        worksheet.Cell(rowIndex, 2).Value = "Вид работ";
         worksheet.Cell(rowIndex, 3).Value = "Деталь";
         worksheet.Cell(rowIndex, 4).Value = "Обозначение";
         worksheet.Cell(rowIndex, 5).Value = "№ операции";

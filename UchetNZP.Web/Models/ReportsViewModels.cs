@@ -98,3 +98,32 @@ public record ScrapReportViewModel(
 {
     public bool HasData => Items.Count > 0;
 }
+
+public class WipBatchReportFilterViewModel
+{
+    public DateTime From { get; init; }
+
+    public DateTime To { get; init; }
+
+    public string? Part { get; init; }
+
+    public string? Section { get; init; }
+
+    public string? OpNumber { get; init; }
+}
+
+public record WipBatchReportItemViewModel(
+    string PartName,
+    string? PartCode,
+    string SectionName,
+    string OpNumber,
+    decimal Quantity,
+    DateTime BatchDate);
+
+public record WipBatchReportViewModel(
+    WipBatchReportFilterViewModel Filter,
+    IReadOnlyList<WipBatchReportItemViewModel> Items,
+    decimal TotalQuantity)
+{
+    public bool HasData => Items.Count > 0;
+}

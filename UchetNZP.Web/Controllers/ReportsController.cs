@@ -79,7 +79,7 @@ public class ReportsController : Controller
         var items = receipts
             .Select(x => new ReceiptReportItemViewModel(
                 ConvertToLocal(x.ReceiptDate),
-                x.Section != null ? x.Section.Name : "Участок не задан",
+                x.Section != null ? x.Section.Name : "Вид работ не задан",
                 x.Part != null ? x.Part.Name : string.Empty,
                 x.Part?.Code,
                 OperationNumber.Format(x.OpNumber),
@@ -120,6 +120,111 @@ public class ReportsController : Controller
         var content = _scrapReportExcelExporter.Export(filter, items);
         var fileName = $"scrap-report-{filter.From:yyyyMMdd}-{filter.To:yyyyMMdd}.xlsx";
         return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    [HttpGet("wip-batches")]
+    public async Task<IActionResult> WipBatchReport([FromQuery] WipBatchReportQuery? query, CancellationToken cancellationToken)
+    {
+        var now = DateTime.Now.Date;
+        var defaultFrom = now.AddDays(-29);
+        var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
+
+        var fromUtc = ToUtcStartOfDay(fromDate);
+        var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
+
+        var filter = new WipBatchReportFilterViewModel
+        {
+            From = DateTime.SpecifyKind(fromDate, DateTimeKind.Unspecified),
+            To = DateTime.SpecifyKind(toDate, DateTimeKind.Unspecified),
+            Part = query?.Part,
+            Section = query?.Section,
+            OpNumber = query?.OpNumber,
+        };
+
+        int? parsedOpNumber = null;
+        if (!string.IsNullOrWhiteSpace(query?.OpNumber))
+        {
+            var trimmed = query.OpNumber.Trim();
+            if (OperationNumber.TryParse(trimmed, out var opNumber))
+            {
+                parsedOpNumber = opNumber;
+            }
+            else
+            {
+                var emptyModel = new WipBatchReportViewModel(filter, Array.Empty<WipBatchReportItemViewModel>(), 0m);
+                return View("~/Views/Reports/WipBatchReport.cshtml", emptyModel);
+            }
+        }
+
+        var receiptInfoQuery = _dbContext.WipReceipts
+            .AsNoTracking()
+            .GroupBy(x => new { x.PartId, x.SectionId, x.OpNumber })
+            .Select(g => new
+            {
+                g.Key.PartId,
+                g.Key.SectionId,
+                g.Key.OpNumber,
+                LastReceiptDate = g.Max(x => x.ReceiptDate)
+            })
+            .Where(x => x.LastReceiptDate >= fromUtc && x.LastReceiptDate < toUtcExclusive);
+
+        if (parsedOpNumber.HasValue)
+        {
+            receiptInfoQuery = receiptInfoQuery.Where(x => x.OpNumber == parsedOpNumber.Value);
+        }
+
+        var balancesQuery =
+            from balance in _dbContext.WipBalances.AsNoTracking()
+            join info in receiptInfoQuery
+                on new { balance.PartId, balance.SectionId, balance.OpNumber }
+                equals new { info.PartId, info.SectionId, info.OpNumber }
+            join part in _dbContext.Parts.AsNoTracking()
+                on balance.PartId equals part.Id
+            join section in _dbContext.Sections.AsNoTracking()
+                on balance.SectionId equals section.Id
+            select new
+            {
+                PartName = part.Name,
+                PartCode = part.Code,
+                SectionName = section.Name,
+                SectionCode = section.Code,
+                balance.OpNumber,
+                balance.Quantity,
+                info.LastReceiptDate,
+            };
+
+        if (!string.IsNullOrWhiteSpace(query?.Part))
+        {
+            var term = query.Part.Trim().ToLowerInvariant();
+            balancesQuery = balancesQuery.Where(x =>
+                x.PartName.ToLower().Contains(term) ||
+                (x.PartCode != null && x.PartCode.ToLower().Contains(term)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(query?.Section))
+        {
+            var term = query.Section.Trim().ToLowerInvariant();
+            balancesQuery = balancesQuery.Where(x =>
+                x.SectionName.ToLower().Contains(term) ||
+                (x.SectionCode != null && x.SectionCode.ToLower().Contains(term)));
+        }
+
+        var items = await balancesQuery
+            .OrderByDescending(x => x.LastReceiptDate)
+            .ThenBy(x => x.PartName)
+            .ThenBy(x => x.OpNumber)
+            .Select(x => new WipBatchReportItemViewModel(
+                x.PartName,
+                x.PartCode,
+                x.SectionName,
+                OperationNumber.Format(x.OpNumber),
+                x.Quantity,
+                ConvertToLocal(x.LastReceiptDate)))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var model = new WipBatchReportViewModel(filter, items, items.Sum(x => x.Quantity));
+        return View("~/Views/Reports/WipBatchReport.cshtml", model);
     }
 
     private async Task<(ScrapReportFilterViewModel Filter, List<ScrapReportItemViewModel> Items)> LoadScrapReportAsync(
@@ -185,7 +290,7 @@ public class ReportsController : Controller
         var items = scraps
             .Select(x => new ScrapReportItemViewModel(
                 ConvertToLocal(x.RecordedAt),
-                x.Section != null ? x.Section.Name : "Участок не задан",
+                x.Section != null ? x.Section.Name : "Вид работ не задан",
                 x.Part != null ? x.Part.Name : string.Empty,
                 x.Part?.Code,
                 OperationNumber.Format(x.OpNumber),
@@ -400,7 +505,7 @@ public class ReportsController : Controller
             {
                 PartName = partInfo?.Name ?? "Неизвестная деталь",
                 PartCode = partInfo?.Code,
-                SectionName = sectionInfo?.Name ?? "Участок не задан",
+                SectionName = sectionInfo?.Name ?? "Вид работ не задан",
                 OpNumber = opNumber,
             };
 
@@ -451,6 +556,13 @@ public class ReportsController : Controller
         string? Part,
         string? ScrapType,
         string? Employee);
+
+    public sealed record WipBatchReportQuery(
+        DateTime? From,
+        DateTime? To,
+        string? Section,
+        string? Part,
+        string? OpNumber);
 
     public sealed record WipSummaryQuery(
         DateTime? From,

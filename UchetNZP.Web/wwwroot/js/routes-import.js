@@ -280,7 +280,7 @@
         const sectionName = sectionLookup.inputElement.value.trim();
         if (!sectionName) {
             if (showAlerts) {
-                alert("Укажите участок.");
+                alert("Укажите вид работ.");
             }
 
             return null;

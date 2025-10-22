@@ -72,9 +72,9 @@ public class RouteEditInputModel : IValidatableObject
     [Display(Name = "Норматив (н/ч)")]
     public decimal NormHours { get; set; }
 
-    [Required(ErrorMessage = "Укажите участок.")]
-    [StringLength(256, ErrorMessage = "Наименование участка не должно превышать 256 символов.")]
-    [Display(Name = "Участок")]
+    [Required(ErrorMessage = "Укажите вид работ.")]
+    [StringLength(256, ErrorMessage = "Наименование вида работ не должно превышать 256 символов.")]
+    [Display(Name = "Вид работ")]
     public string SectionName { get; set; } = string.Empty;
 
     public string Title => Id.HasValue ? "Редактирование маршрута" : "Добавление маршрута";

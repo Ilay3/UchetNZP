@@ -40,10 +40,10 @@
                 <div class="form-text">Три знака после запятой, больше нуля.</div>
             </div>
             <div class="col-xl-4">
-                <label class="form-label" for="routeSectionNameInput">Участок</label>
-                <input id="routeSectionNameInput" class="form-control form-control-lg" type="text" list="routeSectionOptions" placeholder="Наименование участка" autocomplete="off" />
+                <label class="form-label" for="routeSectionNameInput">Вид работ</label>
+                <input id="routeSectionNameInput" class="form-control form-control-lg" type="text" list="routeSectionOptions" placeholder="Наименование вида работ" autocomplete="off" />
                 <datalist id="routeSectionOptions"></datalist>
-                <div class="form-text">Укажите или выберите участок, на котором выполняется операция.</div>
+                <div class="form-text">Укажите или выберите вид работ, на котором выполняется операция.</div>
             </div>
             <div class="col-12">
                 <div class="d-flex flex-column flex-lg-row gap-3">
@@ -60,7 +60,7 @@
                                 <th scope="col">№</th>
                                 <th scope="col">Операция</th>
                                 <th scope="col">Норматив (н/ч)</th>
-                                <th scope="col">Участок</th>
+                                <th scope="col">Вид работ</th>
                                 <th scope="col" class="text-end">Действия</th>
                             </tr>
                         </thead>
@@ -81,7 +81,7 @@
             <div class="col-lg-6">
                 <label class="form-label" for="routeFileInput">Файл Excel</label>
                 <input id="routeFileInput" class="form-control form-control-lg" type="file" accept=".xlsx,.xls" />
-                <div class="form-text">Используйте шаблон с колонками: Наименование детали, Наименование операции, № операции, Утвержденный норматив (н/ч), Участок, Количество остатка (необязательно). После импорта будет показана сводка с именем файла, количеством успешных и пропущенных строк.</div>
+                <div class="form-text">Используйте шаблон с колонками: Наименование детали, Наименование операции, № операции, Утвержденный норматив (н/ч), Вид работ, Количество остатка (необязательно). После импорта будет показана сводка с именем файла, количеством успешных и пропущенных строк.</div>
             </div>
             <div class="col-lg-6 d-flex align-items-end">
                 <button type="button" class="btn btn-outline-primary btn-lg" id="routeImportButton">Импортировать файл</button>
