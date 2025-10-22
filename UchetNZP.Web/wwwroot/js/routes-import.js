@@ -9,7 +9,8 @@
         datalist: document.getElementById("routePartOptions"),
         hiddenInput: document.createElement("input"),
         fetchUrl: "/routes/import/parts",
-        minLength: 2,
+        minLength: 1,
+        prefetch: true,
     });
 
     const operationLookup = namespace.initSearchableInput({
@@ -17,7 +18,8 @@
         datalist: document.getElementById("routeOperationOptions"),
         hiddenInput: document.createElement("input"),
         fetchUrl: "/routes/import/operations",
-        minLength: 2,
+        minLength: 1,
+        prefetch: true,
     });
 
     const sectionLookup = namespace.initSearchableInput({
@@ -25,7 +27,8 @@
         datalist: document.getElementById("routeSectionOptions"),
         hiddenInput: document.createElement("input"),
         fetchUrl: "/routes/import/sections",
-        minLength: 2,
+        minLength: 1,
+        prefetch: true,
     });
 
     const opNumberInput = document.getElementById("routeOpNumberInput");
@@ -38,6 +41,7 @@
     const operationsTable = operationsContainer ? operationsContainer.querySelector("table") : null;
     const operationsTableBody = document.getElementById("routeOperationsTableBody");
     const operationsEmptyState = document.getElementById("routeOperationsEmptyState");
+    const sectionHintCache = new Set();
 
     const fileInput = document.getElementById("routeFileInput");
     const importButton = document.getElementById("routeImportButton");
@@ -65,8 +69,45 @@
         });
     }
 
+    operationLookup.inputElement?.addEventListener("lookup:selected", event => {
+        const selected = event.detail;
+        applyOperationSectionHints(selected);
+    });
+
     renderOperations();
     importButton.addEventListener("click", () => importRoutes());
+
+    function applyOperationSectionHints(operation) {
+        const suggestions = extractSectionSuggestions(operation);
+        if (suggestions.length === 0) {
+            return;
+        }
+
+        const items = suggestions.map(name => ({ name }));
+        sectionLookup.addCustomItems(items);
+
+        const currentSection = sectionLookup.inputElement.value.trim();
+        if (!currentSection) {
+            sectionLookup.setSelected(items[0]);
+        }
+
+        const newHints = suggestions.filter(name => !sectionHintCache.has(name));
+        if (newHints.length > 0) {
+            newHints.forEach(name => sectionHintCache.add(name));
+            sectionLookup.refresh(newHints[0]);
+        }
+    }
+
+    function extractSectionSuggestions(operation) {
+        if (!operation) {
+            return [];
+        }
+
+        const raw = Array.isArray(operation.sections) ? operation.sections : [];
+        return raw
+            .map(item => typeof item === "string" ? item.trim() : "")
+            .filter(item => item.length > 0);
+    }
 
     async function saveRoute() {
         const partName = partLookup.inputElement.value.trim();

@@ -6,6 +6,12 @@ namespace UchetNZP.Web.Models;
 
 public record LookupItemViewModel(Guid Id, string Name, string? Code);
 
+public record OperationLookupItemViewModel(
+    Guid Id,
+    string Name,
+    string? Code,
+    IReadOnlyList<string> Sections);
+
 public record PartOperationViewModel(
     Guid PartId,
     string OpNumber,

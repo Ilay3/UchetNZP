@@ -291,12 +291,56 @@ public class RoutesController : Controller
                 (x.Code != null && x.Code.ToLower().Contains(term)));
         }
 
-        var items = await query
+        var operations = await query
             .OrderBy(x => x.Name)
             .Take(25)
-            .Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code))
+            .Select(x => new
+            {
+                x.Id,
+                x.Name,
+                x.Code,
+            })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        if (operations.Count == 0)
+        {
+            return Ok(Array.Empty<OperationLookupItemViewModel>());
+        }
+
+        var operationIds = operations.Select(x => x.Id).ToArray();
+
+        var sectionPairs = await _dbContext.PartRoutes
+            .AsNoTracking()
+            .Where(route => operationIds.Contains(route.OperationId))
+            .Join(
+                _dbContext.Sections.AsNoTracking(),
+                route => route.SectionId,
+                section => section.Id,
+                (route, section) => new { route.OperationId, section.Name })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var sectionsByOperation = sectionPairs
+            .GroupBy(x => x.OperationId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group
+                    .Select(x => x.Name)
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+                    .ToList());
+
+        var items = operations
+            .Select(operation => new OperationLookupItemViewModel(
+                operation.Id,
+                operation.Name,
+                operation.Code,
+                sectionsByOperation.TryGetValue(operation.Id, out var sections)
+                    ? sections
+                    : Array.Empty<string>()))
+            .ToList();
 
         return Ok(items);
     }

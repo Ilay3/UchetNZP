@@ -24,6 +24,7 @@
         fetchUrl,
         formatItem = defaultFormat,
         minLength = 0,
+        prefetch = false,
     }) {
         if (!input || !datalist || !hiddenInput || !fetchUrl) {
             throw new Error("searchable input requires input, datalist, hiddenInput and fetchUrl");
@@ -31,14 +32,59 @@
 
         let lastItems = [];
         let selectedItem = null;
+        const customItems = [];
+
+        function getAllItems() {
+            return [...customItems, ...lastItems];
+        }
+
+        function ensureCustomItem(item) {
+            if (!item) {
+                return false;
+            }
+
+            const value = formatItem(item);
+            if (!value) {
+                return false;
+            }
+
+            const exists = customItems.some(existing => formatItem(existing) === value);
+            if (!exists) {
+                customItems.push(item);
+                return true;
+            }
+
+            return false;
+        }
 
         function render(items) {
             datalist.innerHTML = "";
-            items.forEach(item => {
+            const seenValues = new Set();
+            const combined = [...customItems, ...items];
+            combined.forEach(item => {
+                const value = formatItem(item);
+                if (!value || seenValues.has(value)) {
+                    return;
+                }
+
+                seenValues.add(value);
                 const option = document.createElement("option");
-                option.value = formatItem(item);
+                option.value = value;
                 datalist.appendChild(option);
             });
+        }
+
+        function updateSelectionFromValue(value) {
+            const trimmed = value.trim();
+            const match = getAllItems().find(item => formatItem(item) === trimmed);
+            if (match) {
+                hiddenInput.value = match.id ?? "";
+                selectedItem = match;
+                return;
+            }
+
+            hiddenInput.value = "";
+            selectedItem = null;
         }
 
         async function request(term) {
@@ -55,6 +101,9 @@
 
                 lastItems = await response.json();
                 render(lastItems);
+                if (typeof term === "string" && term.trim().length > 0) {
+                    updateSelectionFromValue(term);
+                }
             }
             catch (error) {
                 console.error(error);
@@ -70,25 +119,36 @@
             if (value.length >= minLength) {
                 debouncedRequest(value);
             }
-            else {
-                datalist.innerHTML = "";
-                lastItems = [];
+            else if (prefetch && value.length === 0) {
+                request("");
             }
+            else {
+                lastItems = [];
+                render(lastItems);
+            }
+
+            updateSelectionFromValue(value);
         });
 
         input.addEventListener("change", () => {
             const value = input.value.trim();
-            const match = lastItems.find(item => formatItem(item) === value);
-            if (match) {
-                hiddenInput.value = match.id ?? "";
-                selectedItem = match;
-                input.dispatchEvent(new CustomEvent("lookup:selected", { detail: match }));
-            }
-            else {
-                hiddenInput.value = "";
-                selectedItem = null;
+            updateSelectionFromValue(value);
+            if (selectedItem) {
+                input.dispatchEvent(new CustomEvent("lookup:selected", { detail: selectedItem }));
             }
         });
+
+        if (prefetch) {
+            let hasPrefetched = false;
+            input.addEventListener("focus", () => {
+                if (hasPrefetched) {
+                    return;
+                }
+
+                hasPrefetched = true;
+                request("");
+            }, { once: true });
+        }
 
         return {
             inputElement: input,
@@ -106,15 +166,35 @@
                 selectedItem = item;
                 input.value = formatItem(item);
                 hiddenInput.value = item.id ?? "";
+                if (ensureCustomItem(item)) {
+                    render(lastItems);
+                }
             },
             clear: () => {
                 input.value = "";
                 hiddenInput.value = "";
                 selectedItem = null;
-                datalist.innerHTML = "";
                 lastItems = [];
+                customItems.length = 0;
+                render(lastItems);
             },
             refresh: (term) => request(term ?? input.value.trim()),
+            addCustomItems: (items) => {
+                if (!Array.isArray(items)) {
+                    return;
+                }
+
+                let hasChanges = false;
+                items.forEach(item => {
+                    if (ensureCustomItem(item)) {
+                        hasChanges = true;
+                    }
+                });
+
+                if (hasChanges) {
+                    render(lastItems);
+                }
+            },
         };
     };
 
