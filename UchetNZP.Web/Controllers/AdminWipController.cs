@@ -129,7 +129,7 @@ public class AdminWipController : Controller
         sectionItems.Insert(0, new SelectListItem
         {
             Value = string.Empty,
-            Text = "Все участки",
+            Text = "Все виды работ",
             Selected = !sectionId.HasValue,
         });
 

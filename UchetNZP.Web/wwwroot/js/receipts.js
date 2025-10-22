@@ -129,7 +129,7 @@
             radio.dataset.opNumber = String(operation.opNumber);
             radio.disabled = !belongsToSection;
             if (!belongsToSection) {
-                radio.setAttribute("title", "Операция относится к другому участку");
+                radio.setAttribute("title", "Операция относится к другому виду работ");
             }
 
             radio.addEventListener("change", () => {
@@ -330,7 +330,7 @@
         }
 
         if (!section || !section.id) {
-            alert("Выберите участок.");
+            alert("Выберите вид работ.");
             return;
         }
 
@@ -340,7 +340,7 @@
         }
 
         if (selectedOperation.sectionId !== section.id) {
-            alert("Выбранная операция относится к другому участку. Выберите корректный участок.");
+            alert("Выбранная операция относится к другому виду работ. Выберите корректный вид работ.");
             return;
         }
 

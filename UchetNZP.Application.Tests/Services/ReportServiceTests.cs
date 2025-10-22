@@ -88,7 +88,7 @@ public class ReportServiceTests
 
         var sectionFilterCell = worksheet
             .CellsUsed()
-            .FirstOrDefault(cell => cell.GetString() == "Участок");
+            .FirstOrDefault(cell => cell.GetString() == "Вид работ");
 
         Assert.NotNull(sectionFilterCell);
         var sectionValue = worksheet.Cell(sectionFilterCell!.Address.RowNumber, sectionFilterCell.Address.ColumnNumber + 1).GetString();

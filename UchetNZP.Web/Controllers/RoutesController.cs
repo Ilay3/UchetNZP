@@ -402,7 +402,7 @@ public class RoutesController : Controller
 
             if (string.IsNullOrWhiteSpace(operation.SectionName))
             {
-                return BadRequest("Укажите участок для каждой операции.");
+                return BadRequest("Укажите вид работ для каждой операции.");
             }
 
             int opNumber;

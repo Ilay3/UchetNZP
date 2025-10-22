@@ -40,12 +40,12 @@
         <form method="get" class="row g-3 align-items-end" autocomplete="off">
             <div class="col-12 col-md-6 col-xl-5">
                 <label class="form-label" for="routesSearchInput">Поиск</label>
-                <input id="routesSearchInput" class="form-control form-control-lg" type="text" name="Search" value="@searchValue" placeholder="Деталь, операция или участок" />
+                <input id="routesSearchInput" class="form-control form-control-lg" type="text" name="Search" value="@searchValue" placeholder="Деталь, операция или вид работ" />
             </div>
             <div class="col-12 col-md-6 col-xl-4">
-                <label class="form-label" for="routesSectionSelect">Участок</label>
+                <label class="form-label" for="routesSectionSelect">Вид работ</label>
                 <select id="routesSectionSelect" class="form-select form-select-lg" name="SectionId">
-                    <option value="">Все участки</option>
+                    <option value="">Все виды работ</option>
                     @foreach (var sectionItem in Model.Filter.Sections)
                     {
                         var selected = selectedSectionId.HasValue && selectedSectionId.Value == sectionItem.Id;
@@ -102,7 +102,7 @@ else
                                             <tr>
                                                 <th scope="col">Операция</th>
                                                 <th scope="col" class="text-nowrap">Норматив, н/ч</th>
-                                                <th scope="col">Участок</th>
+                                                <th scope="col">Вид работ</th>
                                                 <th scope="col" class="text-end">Действия</th>
                                             </tr>
                                         </thead>

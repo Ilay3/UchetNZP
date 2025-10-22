@@ -60,7 +60,7 @@ public class RouteService : IRouteService
 
         if (string.IsNullOrWhiteSpace(sectionName))
         {
-            throw new ArgumentException("Наименование участка обязательно.", nameof(sectionName));
+            throw new ArgumentException("Наименование вида работ обязательно.", nameof(sectionName));
         }
 
         if (opNumber <= 0)

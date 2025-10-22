@@ -5,7 +5,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Итоговый отчёт НЗП</h1>
-    <p class="lead mb-0">Сводные данные по приходу, расходу и текущим остаткам НЗП. Настройте фильтры и оцените нагрузку по участкам и операциям.</p>
+    <p class="lead mb-0">Сводные данные по приходу, расходу и текущим остаткам НЗП. Настройте фильтры и оцените нагрузку по видам работ и операциям.</p>
 </div>
 
 <div class="card shadow-sm mb-4">
@@ -24,8 +24,8 @@
                 <input id="summaryPartInput" class="form-control form-control-lg" type="text" name="part" value='@Model.Filter.Part' placeholder="Наименование или обозначение детали" />
             </div>
             <div class="col-md-3">
-                <label class="form-label" for="summarySectionInput">Участок</label>
-                <input id="summarySectionInput" class="form-control form-control-lg" type="text" name="section" value='@Model.Filter.Section' placeholder="Название или код участка" />
+                <label class="form-label" for="summarySectionInput">Вид работ</label>
+                <input id="summarySectionInput" class="form-control form-control-lg" type="text" name="section" value='@Model.Filter.Section' placeholder="Наименование или код вида работ" />
             </div>
             <div class="col-12 d-flex align-items-end">
                 <div class="d-flex flex-wrap gap-3 w-100">
@@ -55,7 +55,7 @@
                     <thead class="table-light">
                         <tr>
                             <th scope="col">Деталь</th>
-                            <th scope="col">Участок</th>
+                            <th scope="col">Вид работ</th>
                             <th scope="col">Операция</th>
                             <th scope="col">Приход</th>
                             <th scope="col">Расход</th>

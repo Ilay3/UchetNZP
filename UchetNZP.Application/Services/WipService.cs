@@ -60,7 +60,7 @@ public class WipService : IWipService
 
                 if (route.SectionId != item.SectionId)
                 {
-                    throw new InvalidOperationException($"Операция {item.OpNumber} для детали {item.PartId} относится к участку {route.SectionId}, а не к {item.SectionId}.");
+                    throw new InvalidOperationException($"Операция {item.OpNumber} для детали {item.PartId} относится к виду работ {route.SectionId}, а не к {item.SectionId}.");
                 }
 
                 var balance = await _dbContext.WipBalances

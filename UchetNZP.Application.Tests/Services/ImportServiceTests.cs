@@ -24,14 +24,14 @@ public class ImportServiceTests
         worksheet.Cell(1, 2).Value = "Наименование операции";
         worksheet.Cell(1, 3).Value = "№ операции";
         worksheet.Cell(1, 4).Value = "Утвержденный норматив (н/ч)";
-        worksheet.Cell(1, 5).Value = "Участок";
+        worksheet.Cell(1, 5).Value = "Вид работ";
         worksheet.Cell(1, 6).Value = "Количество остатка";
 
         worksheet.Cell(2, 1).Value = "Деталь 1";
         worksheet.Cell(2, 2).Value = "Операция 1";
         worksheet.Cell(2, 3).Value = "10";
         worksheet.Cell(2, 4).Value = 1.5;
-        worksheet.Cell(2, 5).Value = "Участок 1";
+        worksheet.Cell(2, 5).Value = "Вид работ 1";
         worksheet.Cell(2, 6).Value = 12.3456;
 
         using var stream = new MemoryStream();

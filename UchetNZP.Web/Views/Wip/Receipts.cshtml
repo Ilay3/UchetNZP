@@ -12,11 +12,11 @@
     <div class="card-body">
         <form id="receiptForm" class="row g-4" autocomplete="off">
             <div class="col-lg-4">
-                <label class="form-label" for="receiptSectionInput">Участок</label>
-                <input id="receiptSectionInput" class="form-control form-control-lg" type="text" list="receiptSectionOptions" placeholder="Начните вводить название участка" autocomplete="off" />
+                <label class="form-label" for="receiptSectionInput">Вид работ</label>
+                <input id="receiptSectionInput" class="form-control form-control-lg" type="text" list="receiptSectionOptions" placeholder="Начните вводить название вида работ" autocomplete="off" />
                 <datalist id="receiptSectionOptions"></datalist>
                 <input type="hidden" id="receiptSectionId" />
-                <div class="form-text">Введите минимум 2 символа для поиска участка.</div>
+                <div class="form-text">Введите минимум 2 символа для поиска вида работ.</div>
             </div>
             <div class="col-lg-4">
                 <label class="form-label" for="receiptPartInput">Деталь</label>
@@ -42,7 +42,7 @@
             </div>
             <div class="col-lg-4 d-flex align-items-end">
                 <div>
-                    <div class="fw-semibold text-uppercase small text-muted">Сейчас на участке</div>
+                    <div class="fw-semibold text-uppercase small text-muted">Текущий остаток по виду работ</div>
                     <div class="display-6" id="receiptBalanceLabel">0 шт</div>
                     <div class="form-text">Остаток обновляется при выборе операции.</div>
                 </div>
@@ -66,7 +66,7 @@
                         <th scope="col">№ операции</th>
                         <th scope="col">Наименование</th>
                         <th scope="col">Норматив, н/ч</th>
-                        <th scope="col">Участок</th>
+                        <th scope="col">Вид работ</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -101,7 +101,7 @@
                 <thead class="table-light">
                     <tr>
                         <th scope="col">Дата</th>
-                        <th scope="col">Участок</th>
+                        <th scope="col">Вид работ</th>
                         <th scope="col">Деталь</th>
                         <th scope="col">Операция</th>
                         <th scope="col">Было</th>

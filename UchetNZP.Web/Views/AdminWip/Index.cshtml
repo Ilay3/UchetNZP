@@ -35,7 +35,7 @@
                 <select id="adminWipPartSelect" class="form-select" name="partId" asp-items="Model.Parts"></select>
             </div>
             <div class="col-lg-4">
-                <label class="form-label" for="adminWipSectionSelect">Участок</label>
+                <label class="form-label" for="adminWipSectionSelect">Вид работ</label>
                 <select id="adminWipSectionSelect" class="form-select" name="sectionId" asp-items="Model.Sections"></select>
             </div>
             <div class="col-lg-2">
@@ -68,7 +68,7 @@
                     <thead class="table-light">
                         <tr>
                             <th scope="col">Деталь</th>
-                            <th scope="col">Участок</th>
+                            <th scope="col">Вид работ</th>
                             <th scope="col" class="text-center">Операция</th>
                             <th scope="col" class="text-end">Количество</th>
                             <th scope="col" class="text-nowrap">Корректировка</th>
@@ -99,7 +99,7 @@
                                         <input type="hidden" name="FilterOpNumber" value="@Model.SelectedOpNumber" />
                                         <div class="col-sm-4">
                                             <label class="visually-hidden" for="qty-@row.BalanceId">Новое количество</label>
-                                            <input id="qty-@row.BalanceId" class="form-control form-control-sm" type="number" name="NewQuantity" value="@row.Quantity.ToString(CultureInfo.InvariantCulture)" min="0" step="0.001" />
+                                            <input id="qty-@row.BalanceId" class="form-control form-control-sm" type="number" name="NewQuantity" value='@row.Quantity.ToString("0.###", CultureInfo.InvariantCulture)' min="0" step="1" />
                                         </div>
                                         <div class="col-sm-5">
                                             <label class="visually-hidden" for="comment-@row.BalanceId">Комментарий</label>

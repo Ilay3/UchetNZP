@@ -54,7 +54,7 @@
                         @if (dateGroup.SectionSummaries.Count > 0)
                         {
                             <div class="mb-3">
-                                <div class="fw-semibold mb-2">Часы по участкам</div>
+                                <div class="fw-semibold mb-2">Часы по видам работ</div>
                                 <div class="d-flex flex-wrap gap-2">
                                     @foreach (var summary in dateGroup.SectionSummaries)
                                     {
@@ -68,7 +68,7 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th scope="col">Деталь</th>
-                                        <th scope="col">Участок</th>
+                                        <th scope="col">Вид работ</th>
                                         <th scope="col">Операции</th>
                                         <th scope="col">Количество</th>
                                         <th scope="col">Часы</th>
@@ -94,7 +94,7 @@
                                                         <ul class="small mt-2 mb-0">
                                                             @foreach (var op in launch.Operations)
                                                             {
-                                                                <li><strong>@op.OpNumber</strong> — @(string.IsNullOrWhiteSpace(op.OperationName) ? "Без названия" : op.OperationName) (@(string.IsNullOrWhiteSpace(op.SectionName) ? "Участок не задан" : op.SectionName)) (норма: @op.NormHours.ToString("0.###"), часы: @op.Hours.ToString("0.###"))</li>
+                                                                <li><strong>@op.OpNumber</strong> — @(string.IsNullOrWhiteSpace(op.OperationName) ? "Без названия" : op.OperationName) (@(string.IsNullOrWhiteSpace(op.SectionName) ? "Вид работ не задан" : op.SectionName)) (норма: @op.NormHours.ToString("0.###"), часы: @op.Hours.ToString("0.###"))</li>
                                                             }
                                                         </ul>
                                                     </details>

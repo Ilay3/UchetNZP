@@ -132,7 +132,7 @@ public class ImportService : IImportService
         var colOperationName = Require("Наименование операции");
         var colOpNumber = Require("№ операции");
         var colNorm = Require("Утвержденный норматив (н/ч)", "Технологический процесс");
-        var colSection = Optional("Участок");
+        var colSection = Optional("Вид работ", "Участок");
         var colRemaining = Optional("Количество остатка");
 
         var rows = worksheet.RangeUsed()?.RowsUsed().Skip(1).ToList() ?? new List<IXLRangeRow>();

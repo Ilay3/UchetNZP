@@ -164,7 +164,7 @@ public class ReportService : IReportService
 
         if (!string.IsNullOrWhiteSpace(sectionDisplay))
         {
-            rowIndex = WriteFilterRow(worksheet, rowIndex, "Участок", sectionDisplay!);
+            rowIndex = WriteFilterRow(worksheet, rowIndex, "Вид работ", sectionDisplay!);
         }
 
         if (rowIndex > 3)
@@ -176,7 +176,7 @@ public class ReportService : IReportService
         worksheet.Cell(rowIndex, 2).Value = "Код детали";
         worksheet.Cell(rowIndex, 3).Value = "№ операции";
         worksheet.Cell(rowIndex, 4).Value = "Операция";
-        worksheet.Cell(rowIndex, 5).Value = "Участок";
+        worksheet.Cell(rowIndex, 5).Value = "Вид работ";
         worksheet.Cell(rowIndex, 6).Value = "Норматив, н/ч";
         worksheet.Cell(rowIndex, 7).Value = "Количество остатка";
         worksheet.Row(rowIndex).Style.Font.SetBold(true);
@@ -308,7 +308,7 @@ public class ReportService : IReportService
             if (sectionHoursTotals.Count > 0)
             {
                 rowIndex++;
-                worksheet.Cell(rowIndex, 1).Value = "Сумма времени по участкам";
+                worksheet.Cell(rowIndex, 1).Value = "Сумма времени по видам работ";
                 worksheet.Cell(rowIndex, 1).Style.Font.SetBold(true);
                 rowIndex++;
 
@@ -462,7 +462,7 @@ public class ReportService : IReportService
                 }
 
                 var sectionKey = string.IsNullOrWhiteSpace(operation.SectionName)
-                    ? "Участок не задан"
+                    ? "Вид работ не задан"
                     : operation.SectionName;
                 if (!sectionHoursTotals.TryGetValue(sectionKey, out var sectionTotal))
                 {
