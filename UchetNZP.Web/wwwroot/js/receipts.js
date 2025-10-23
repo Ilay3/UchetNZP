@@ -36,12 +36,21 @@
 
     dateInput.value = new Date().toISOString().slice(0, 10);
 
+    addButton.disabled = true;
+    saveButton.disabled = true;
+
     const baselineBalances = new Map();
     const pendingAdjustments = new Map();
     let operations = [];
     let selectedOperation = null;
     let cart = [];
     let editingIndex = null;
+    let isLoadingOperations = false;
+    let isLoadingBalance = false;
+    let operationsAbortController = null;
+    let operationsRequestId = 0;
+    let balanceRequestId = 0;
+    const balanceRequests = new Map();
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
 
@@ -52,11 +61,13 @@
         }
 
         loadOperations(part.id);
+        updateFormState();
     });
 
     sectionLookup.inputElement?.addEventListener("lookup:selected", () => {
         renderOperations();
         updateBalanceLabel();
+        updateFormState();
     });
 
     partLookup.inputElement?.addEventListener("input", () => {
@@ -64,39 +75,105 @@
         selectedOperation = null;
         renderOperations();
         updateBalanceLabel();
+        updateFormState();
     });
 
     sectionLookup.inputElement?.addEventListener("input", () => {
         renderOperations();
         updateBalanceLabel();
+        updateFormState();
     });
 
     function getBalanceKey(partId, sectionId, opNumber) {
         return `${partId}:${sectionId}:${opNumber}`;
     }
 
+    function canAddToCart() {
+        const part = partLookup.getSelected();
+        const section = sectionLookup.getSelected();
+
+        if (!part || !part.id || !section || !section.id) {
+            return false;
+        }
+
+        if (!selectedOperation || selectedOperation.sectionId !== section.id) {
+            return false;
+        }
+
+        if (isLoadingOperations || isLoadingBalance) {
+            return false;
+        }
+
+        const quantity = Number(quantityInput.value);
+        if (!quantity || quantity < 1) {
+            return false;
+        }
+
+        if (!dateInput.value) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function updateFormState() {
+        addButton.disabled = !canAddToCart();
+        saveButton.disabled = cart.length === 0;
+    }
+
     async function loadOperations(partId) {
+        const requestId = ++operationsRequestId;
+        if (operationsAbortController) {
+            operationsAbortController.abort();
+        }
+
+        operationsAbortController = new AbortController();
+        const signal = operationsAbortController.signal;
+
+        isLoadingOperations = true;
+        updateFormState();
         operationsTableBody.innerHTML = "<tr><td colspan=\"5\" class=\"text-center text-muted\">Загрузка операций...</td></tr>";
         try {
-            const response = await fetch(`/wip/receipts/operations?partId=${encodeURIComponent(partId)}`);
+            const response = await fetch(`/wip/receipts/operations?partId=${encodeURIComponent(partId)}`, { signal });
             if (!response.ok) {
                 throw new Error("Не удалось загрузить операции детали.");
             }
 
-            operations = await response.json();
+            const items = await response.json();
+            if (requestId !== operationsRequestId) {
+                return;
+            }
+
+            operations = Array.isArray(items) ? items : [];
             selectedOperation = null;
             renderOperations();
             updateBalanceLabel();
         }
         catch (error) {
+            if (signal.aborted) {
+                return;
+            }
+
             console.error(error);
+            if (requestId !== operationsRequestId) {
+                return;
+            }
+
             operationsTableBody.innerHTML = "<tr><td colspan=\"5\" class=\"text-danger text-center\">Ошибка загрузки операций. Попробуйте выбрать деталь ещё раз.</td></tr>";
+        }
+        finally {
+            if (requestId === operationsRequestId) {
+                isLoadingOperations = false;
+                operationsAbortController = null;
+                updateFormState();
+            }
         }
     }
 
     function renderOperations() {
         if (!operations.length) {
             operationsTableBody.innerHTML = "<tr><td colspan=\"5\" class=\"text-center text-muted\">Выберите деталь, чтобы увидеть операции.</td></tr>";
+            updateFormState();
             return;
         }
 
@@ -138,7 +215,8 @@
                 }
 
                 selectedOperation = operation;
-                updateBalanceLabel();
+                void updateBalanceLabel();
+                updateFormState();
             });
 
             if (selectedOperation && selectedOperation.opNumber === operation.opNumber) {
@@ -167,6 +245,8 @@
 
             operationsTableBody.appendChild(row);
         });
+
+        updateFormState();
     }
 
     async function ensureBalanceLoaded(partId, sectionId, opNumber) {
@@ -175,48 +255,93 @@
             return baselineBalances.get(key);
         }
 
-        try {
-            const response = await fetch(`/wip/receipts/balance?partId=${encodeURIComponent(partId)}&sectionId=${encodeURIComponent(sectionId)}&opNumber=${encodeURIComponent(opNumber)}`);
-            if (!response.ok) {
-                throw new Error("Не удалось получить остаток по операции.");
+        if (balanceRequests.has(key)) {
+            return balanceRequests.get(key);
+        }
+
+        const loadPromise = (async () => {
+            try {
+                const response = await fetch(`/wip/receipts/balance?partId=${encodeURIComponent(partId)}&sectionId=${encodeURIComponent(sectionId)}&opNumber=${encodeURIComponent(opNumber)}`);
+                if (!response.ok) {
+                    throw new Error("Не удалось получить остаток по операции.");
+                }
+
+                const quantity = await response.json();
+                const numeric = typeof quantity === "number" ? quantity : Number(quantity ?? 0);
+                baselineBalances.set(key, isNaN(numeric) ? 0 : numeric);
+            }
+            catch (error) {
+                console.error(error);
+                baselineBalances.set(key, 0);
+            }
+            finally {
+                balanceRequests.delete(key);
             }
 
-            const quantity = await response.json();
-            const numeric = typeof quantity === "number" ? quantity : Number(quantity ?? 0);
-            baselineBalances.set(key, isNaN(numeric) ? 0 : numeric);
-        }
-        catch (error) {
-            console.error(error);
-            baselineBalances.set(key, 0);
-        }
+            return baselineBalances.get(key);
+        })();
 
-        return baselineBalances.get(key);
+        balanceRequests.set(key, loadPromise);
+        return loadPromise;
     }
 
     async function updateBalanceLabel() {
+        const requestId = ++balanceRequestId;
         const part = partLookup.getSelected();
         const section = sectionLookup.getSelected();
 
         if (!part || !part.id || !section || !section.id || !selectedOperation) {
             balanceLabel.textContent = "0 шт";
+            isLoadingBalance = false;
+            updateFormState();
             return;
         }
 
         if (selectedOperation.sectionId !== section.id) {
             balanceLabel.textContent = "—";
+            isLoadingBalance = false;
+            updateFormState();
             return;
         }
 
+        isLoadingBalance = true;
+        updateFormState();
+
         const key = getBalanceKey(part.id, section.id, selectedOperation.opNumber);
-        const base = await ensureBalanceLoaded(part.id, section.id, selectedOperation.opNumber);
-        const pending = pendingAdjustments.get(key) ?? 0;
-        const total = (base ?? 0) + pending;
-        balanceLabel.textContent = `${total.toLocaleString("ru-RU")} шт`;
+        try {
+            const base = await ensureBalanceLoaded(part.id, section.id, selectedOperation.opNumber);
+            if (requestId !== balanceRequestId) {
+                return;
+            }
+
+            const partAfterAwait = partLookup.getSelected();
+            const sectionAfterAwait = sectionLookup.getSelected();
+            const operationAfterAwait = selectedOperation;
+            if (!partAfterAwait || !partAfterAwait.id || !sectionAfterAwait || !sectionAfterAwait.id || !operationAfterAwait) {
+                return;
+            }
+
+            const currentKey = getBalanceKey(partAfterAwait.id, sectionAfterAwait.id, operationAfterAwait.opNumber);
+            if (currentKey !== key) {
+                return;
+            }
+
+            const pending = pendingAdjustments.get(key) ?? 0;
+            const total = (base ?? 0) + pending;
+            balanceLabel.textContent = `${total.toLocaleString("ru-RU")} шт`;
+        }
+        finally {
+            if (requestId === balanceRequestId) {
+                isLoadingBalance = false;
+                updateFormState();
+            }
+        }
     }
 
     function renderCart() {
         if (!cart.length) {
             cartTableBody.innerHTML = "<tr><td colspan=\"9\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
+            updateFormState();
             return;
         }
 
@@ -240,6 +365,7 @@
 
             cartTableBody.appendChild(row);
         });
+        updateFormState();
     }
 
     cartTableBody.addEventListener("click", event => {
@@ -310,6 +436,10 @@
     resetButton.addEventListener("click", () => resetForm());
     saveButton.addEventListener("click", () => saveCart());
 
+    quantityInput.addEventListener("input", () => updateFormState());
+    dateInput.addEventListener("change", () => updateFormState());
+    dateInput.addEventListener("input", () => updateFormState());
+
     function resetForm() {
         editingIndex = null;
         quantityInput.value = "";
@@ -318,6 +448,7 @@
         selectedOperation = null;
         renderOperations();
         updateBalanceLabel();
+        updateFormState();
     }
 
     async function addToCart() {
@@ -483,6 +614,8 @@
             bootstrapModal.show();
         }
     }
+
+    updateFormState();
 
     namespace.bindHotkeys({
         onEnter: () => addToCart(),

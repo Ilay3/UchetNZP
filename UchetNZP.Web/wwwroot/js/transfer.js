@@ -43,6 +43,13 @@
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
 
+    fromOperationInput.disabled = true;
+    toOperationInput.disabled = true;
+    quantityInput.disabled = true;
+    commentInput.disabled = true;
+    addButton.disabled = true;
+    saveButton.disabled = true;
+
     const scrapTypeOptions = {
         technological: { value: 0, code: "Technological", label: "Технологический" },
         employee: { value: 1, code: "EmployeeFault", label: "По вине сотрудника" },
@@ -60,16 +67,22 @@
     let selectedFromOperation = null;
     let selectedToOperation = null;
     let balanceRequestId = 0;
+    let operationsAbortController = null;
+    let operationsRequestId = 0;
+    let balancesAbortController = null;
 
     const balanceCache = new Map();
     const pendingChanges = new Map();
     let cart = [];
+    let isLoadingOperations = false;
+    let isLoadingBalances = false;
 
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
         if (part && part.id) {
             void loadOperations(part.id);
         }
+        updateFormState();
     });
 
     partLookup.inputElement?.addEventListener("input", () => {
@@ -83,6 +96,7 @@
         updateFromOperationsDatalist();
         updateToOperationsDatalist();
         updateBalanceLabels();
+        updateFormState();
     });
 
     fromOperationInput.addEventListener("input", () => {
@@ -90,12 +104,14 @@
         fromOperationNumberInput.value = "";
         updateToOperationsDatalist();
         updateBalanceLabels();
+        updateFormState();
     });
 
     toOperationInput.addEventListener("input", () => {
         selectedToOperation = null;
         toOperationNumberInput.value = "";
         updateBalanceLabels();
+        updateFormState();
     });
 
     fromOperationInput.addEventListener("change", () => {
@@ -118,6 +134,7 @@
             updateToOperationsDatalist();
             updateBalanceLabels();
         }
+        updateFormState();
     });
 
     toOperationInput.addEventListener("change", () => {
@@ -127,6 +144,7 @@
             selectedToOperation = null;
             toOperationNumberInput.value = "";
             updateBalanceLabels();
+            updateFormState();
             return;
         }
 
@@ -136,17 +154,22 @@
             toOperationNumberInput.value = "";
             selectedToOperation = null;
             updateBalanceLabels();
+            updateFormState();
             return;
         }
 
         selectedToOperation = operation;
         toOperationNumberInput.value = operation.opNumber;
         void refreshBalances();
+        updateFormState();
     });
 
     addButton.addEventListener("click", () => void addToCart());
     resetButton.addEventListener("click", () => resetForm());
     saveButton.addEventListener("click", () => void saveCart());
+    quantityInput.addEventListener("input", () => updateFormState());
+    dateInput?.addEventListener("change", () => updateFormState());
+    dateInput?.addEventListener("input", () => updateFormState());
 
     cartTableBody.addEventListener("click", event => {
         const target = event.target;
@@ -318,7 +341,65 @@
         }
     }
 
+    function canAddToCart() {
+        const part = partLookup.getSelected();
+        if (!part || !part.id) {
+            return false;
+        }
+
+        if (!selectedFromOperation || !selectedToOperation) {
+            return false;
+        }
+
+        if (parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
+            return false;
+        }
+
+        if (isLoadingOperations || isLoadingBalances) {
+            return false;
+        }
+
+        const quantity = Number(quantityInput.value);
+        if (!quantity || quantity <= 0) {
+            return false;
+        }
+
+        if (!dateInput.value) {
+            return false;
+        }
+
+        const availableFrom = getAvailableBalance(part.id, selectedFromOperation.opNumber);
+        if (quantity > availableFrom + 1e-9) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function updateFormState() {
+        const partSelected = !!(partLookup.getSelected()?.id);
+        fromOperationInput.disabled = !partSelected || isLoadingOperations;
+        toOperationInput.disabled = !partSelected || isLoadingOperations || !selectedFromOperation;
+
+        const hasOperations = selectedFromOperation && selectedToOperation;
+        quantityInput.disabled = !hasOperations || isLoadingBalances;
+        commentInput.disabled = !hasOperations;
+
+        addButton.disabled = !canAddToCart();
+        saveButton.disabled = cart.length === 0;
+    }
+
     async function loadOperations(partId) {
+        const requestId = ++operationsRequestId;
+        if (operationsAbortController) {
+            operationsAbortController.abort();
+        }
+
+        operationsAbortController = new AbortController();
+        const signal = operationsAbortController.signal;
+
+        isLoadingOperations = true;
+        updateFormState();
         selectedFromOperation = null;
         selectedToOperation = null;
         fromOperationInput.value = "";
@@ -331,12 +412,16 @@
         updateBalanceLabels();
 
         try {
-            const response = await fetch(`/wip/transfer/operations?partId=${encodeURIComponent(partId)}`);
+            const response = await fetch(`/wip/transfer/operations?partId=${encodeURIComponent(partId)}`, { signal });
             if (!response.ok) {
                 throw new Error("Не удалось загрузить операции.");
             }
 
             const items = await response.json();
+            if (requestId !== operationsRequestId) {
+                return;
+            }
+
             operations = Array.isArray(items) ? items : [];
             operations.forEach(operation => {
                 const key = getBalanceKey(partId, operation.opNumber);
@@ -347,11 +432,26 @@
             updateBalanceLabels();
         }
         catch (error) {
+            if (signal.aborted) {
+                return;
+            }
+
             console.error(error);
+            if (requestId !== operationsRequestId) {
+                return;
+            }
+
             operations = [];
             updateFromOperationsDatalist();
             updateToOperationsDatalist();
             updateBalanceLabels();
+        }
+        finally {
+            if (requestId === operationsRequestId) {
+                isLoadingOperations = false;
+                operationsAbortController = null;
+                updateFormState();
+            }
         }
     }
 
@@ -380,13 +480,25 @@
         updateBalanceLabels();
 
         const part = partLookup.getSelected();
+        const requestId = ++balanceRequestId;
+        if (balancesAbortController) {
+            balancesAbortController.abort();
+            balancesAbortController = null;
+        }
+
         if (!part || !part.id || !selectedFromOperation || !selectedToOperation) {
+            isLoadingBalances = false;
+            updateFormState();
             return;
         }
 
-        const requestId = ++balanceRequestId;
+        balancesAbortController = new AbortController();
+        const signal = balancesAbortController.signal;
+
+        isLoadingBalances = true;
+        updateFormState();
         try {
-            const response = await fetch(`/wip/transfer/balances?partId=${encodeURIComponent(part.id)}&fromOpNumber=${encodeURIComponent(selectedFromOperation.opNumber)}&toOpNumber=${encodeURIComponent(selectedToOperation.opNumber)}`);
+            const response = await fetch(`/wip/transfer/balances?partId=${encodeURIComponent(part.id)}&fromOpNumber=${encodeURIComponent(selectedFromOperation.opNumber)}&toOpNumber=${encodeURIComponent(selectedToOperation.opNumber)}`, { signal });
             if (!response.ok) {
                 throw new Error("Не удалось загрузить остатки.");
             }
@@ -407,10 +519,19 @@
             }
         }
         catch (error) {
+            if (signal.aborted) {
+                return;
+            }
+
             console.error(error);
         }
         finally {
-            updateBalanceLabels();
+            if (requestId === balanceRequestId) {
+                isLoadingBalances = false;
+                balancesAbortController = null;
+                updateBalanceLabels();
+                updateFormState();
+            }
         }
     }
 
@@ -419,6 +540,7 @@
         if (!part || !part.id) {
             fromBalanceLabel.textContent = "0 шт";
             toBalanceLabel.textContent = "0 шт";
+            updateFormState();
             return;
         }
 
@@ -428,6 +550,7 @@
         const toAvailable = toNumber ? getAvailableBalance(part.id, toNumber) : 0;
         fromBalanceLabel.textContent = `${fromAvailable.toLocaleString("ru-RU")} шт`;
         toBalanceLabel.textContent = `${toAvailable.toLocaleString("ru-RU")} шт`;
+        updateFormState();
     }
 
     function resetForm() {
@@ -445,6 +568,7 @@
         toOperationNumberInput.value = "";
         updateToOperationsDatalist();
         updateBalanceLabels();
+        updateFormState();
     }
 
     async function addToCart() {
@@ -549,6 +673,7 @@
     function renderCart() {
         if (!cart.length) {
             cartTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td></tr>";
+            updateFormState();
             return;
         }
 
@@ -577,6 +702,7 @@
                 </td>`;
             cartTableBody.appendChild(row);
         });
+        updateFormState();
     }
 
     function formatBalanceChange(before, after) {
@@ -793,6 +919,7 @@
         }
 
         updateBalanceLabels();
+        updateFormState();
     }
 
     async function saveCart() {
@@ -935,6 +1062,8 @@
             bootstrapModal.show();
         }
     }
+
+    updateFormState();
 
     namespace.bindHotkeys({
         onEnter: () => void addToCart(),
