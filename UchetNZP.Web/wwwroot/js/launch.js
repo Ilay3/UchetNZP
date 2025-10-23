@@ -35,6 +35,12 @@
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
 
+    operationInput.disabled = true;
+    quantityInput.disabled = true;
+    commentInput.disabled = true;
+    addButton.disabled = true;
+    saveButton.disabled = true;
+
     const today = new Date().toISOString().slice(0, 10);
     dateInput.value = today;
     exportFromInput.value = today;
@@ -46,6 +52,13 @@
     const baselineRemainders = new Map();
     const pendingLaunches = new Map();
     let cart = [];
+    let isLoadingOperations = false;
+    let isLoadingTail = false;
+    let operationsAbortController = null;
+    let tailAbortController = null;
+    let operationsRequestId = 0;
+    let tailRequestId = 0;
+    const addButtonLabel = addButton ? addButton.textContent : "";
 
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
@@ -62,10 +75,17 @@
         updateRemainderLabel();
         renderTail();
         updateHours();
+        updateStepState();
     });
 
     operationInput.addEventListener("input", () => {
         operationNumberInput.value = "";
+        selectedOperation = null;
+        tailSummary = null;
+        renderTail();
+        updateRemainderLabel();
+        updateHours();
+        updateStepState();
     });
 
     operationInput.addEventListener("change", () => {
@@ -86,9 +106,16 @@
             renderTail();
             updateHours();
         }
+        updateStepState();
     });
 
-    quantityInput.addEventListener("input", () => updateHours());
+    quantityInput.addEventListener("input", () => {
+        updateHours();
+        updateStepState();
+    });
+
+    dateInput.addEventListener("change", () => updateStepState());
+    dateInput.addEventListener("input", () => updateStepState());
 
     addButton.addEventListener("click", () => addToCart());
     resetButton.addEventListener("click", () => resetForm());
@@ -130,7 +157,72 @@
         return `${partId}:${opNumber}`;
     }
 
+    function getAvailableQuantity(partId, opNumber, fallbackBalance) {
+        const key = getRemainderKey(partId, opNumber);
+        const base = baselineRemainders.get(key);
+        const pending = pendingLaunches.get(key) ?? 0;
+        const baseline = base ?? fallbackBalance ?? 0;
+        return baseline - pending;
+    }
+
+    function canAddToCart() {
+        const part = partLookup.getSelected();
+        if (!part || !part.id || !selectedOperation) {
+            return false;
+        }
+
+        if (isLoadingOperations || isLoadingTail || !tailSummary) {
+            return false;
+        }
+
+        const quantity = Number(quantityInput.value);
+        if (!quantity || quantity <= 0) {
+            return false;
+        }
+
+        if (!dateInput.value) {
+            return false;
+        }
+
+        const available = getAvailableQuantity(part.id, selectedOperation.opNumber, selectedOperation.balance ?? 0);
+        if (available < 0) {
+            return false;
+        }
+
+        return quantity <= available + 1e-9;
+    }
+
+    function updateStepState() {
+        const partSelected = !!(partLookup.getSelected()?.id);
+        operationInput.disabled = !partSelected || isLoadingOperations;
+
+        const hasOperation = !!selectedOperation;
+        quantityInput.disabled = !hasOperation || isLoadingTail;
+        commentInput.disabled = !hasOperation;
+
+        const loadingMessage = "Подождите…";
+        if (isLoadingTail) {
+            addButton.textContent = loadingMessage;
+        }
+        else if (addButtonLabel) {
+            addButton.textContent = addButtonLabel;
+        }
+
+        addButton.disabled = !canAddToCart();
+        saveButton.disabled = cart.length === 0;
+    }
+
     async function loadOperations(partId) {
+        const requestId = ++operationsRequestId;
+        if (operationsAbortController) {
+            operationsAbortController.abort();
+        }
+
+        operationsAbortController = new AbortController();
+        const signal = operationsAbortController.signal;
+
+        isLoadingOperations = true;
+        updateStepState();
         operationInput.value = "";
         operationNumberInput.value = "";
         operations = [];
@@ -138,13 +230,19 @@
         tailSummary = null;
         renderTail();
         updateHours();
+        updateRemainderLabel();
         try {
-            const response = await fetch(`/wip/launch/operations?partId=${encodeURIComponent(partId)}`);
+            const response = await fetch(`/wip/launch/operations?partId=${encodeURIComponent(partId)}`, { signal });
             if (!response.ok) {
                 throw new Error("Не удалось загрузить операции детали.");
             }
 
-            operations = await response.json();
+            const items = await response.json();
+            if (requestId !== operationsRequestId) {
+                return;
+            }
+
+            operations = Array.isArray(items) ? items : [];
             operations.forEach(operation => {
                 const key = getRemainderKey(partId, operation.opNumber);
                 baselineRemainders.set(key, operation.balance ?? 0);
@@ -154,11 +252,26 @@
             renderTail();
         }
         catch (error) {
+            if (signal.aborted) {
+                return;
+            }
+
             console.error(error);
+            if (requestId !== operationsRequestId) {
+                return;
+            }
+
             operations = [];
             updateOperationsDatalist();
             updateRemainderLabel();
             renderTail();
+        }
+        finally {
+            if (requestId === operationsRequestId) {
+                isLoadingOperations = false;
+                operationsAbortController = null;
+                updateStepState();
+            }
         }
     }
 
@@ -177,21 +290,49 @@
             return;
         }
 
+        const requestId = ++tailRequestId;
+        if (tailAbortController) {
+            tailAbortController.abort();
+        }
+
+        tailAbortController = new AbortController();
+        const signal = tailAbortController.signal;
+
+        isLoadingTail = true;
+        updateStepState();
         try {
-            const response = await fetch(`/wip/launch/tail?partId=${encodeURIComponent(part.id)}&opNumber=${encodeURIComponent(operation.opNumber)}`);
+            const response = await fetch(`/wip/launch/tail?partId=${encodeURIComponent(part.id)}&opNumber=${encodeURIComponent(operation.opNumber)}`, { signal });
             if (!response.ok) {
                 throw new Error("Не удалось рассчитать хвост маршрута.");
             }
 
-            tailSummary = await response.json();
+            const summary = await response.json();
+            if (requestId !== tailRequestId) {
+                return;
+            }
+
+            tailSummary = summary;
             renderTail();
             updateHours();
         }
         catch (error) {
+            if (signal.aborted) {
+                return;
+            }
+
             console.error(error);
-            tailSummary = null;
-            renderTail();
-            updateHours();
+            if (requestId === tailRequestId) {
+                tailSummary = null;
+                renderTail();
+                updateHours();
+            }
+        }
+        finally {
+            if (requestId === tailRequestId) {
+                isLoadingTail = false;
+                tailAbortController = null;
+                updateStepState();
+            }
         }
     }
 
@@ -228,14 +369,14 @@
         const part = partLookup.getSelected();
         if (!part || !part.id || !selectedOperation) {
             remainderLabel.textContent = "0 шт";
+            updateStepState();
             return;
         }
 
         const key = getRemainderKey(part.id, selectedOperation.opNumber);
-        const base = baselineRemainders.get(key);
-        const pending = pendingLaunches.get(key) ?? 0;
-        const available = (base ?? selectedOperation.balance ?? 0) - pending;
+        const available = getAvailableQuantity(part.id, selectedOperation.opNumber, selectedOperation.balance ?? 0);
         remainderLabel.textContent = `${available.toLocaleString("ru-RU")} шт`;
+        updateStepState();
     }
 
     function resetForm() {
@@ -250,6 +391,7 @@
         updateOperationsDatalist();
         updateRemainderLabel();
         updateHours();
+        updateStepState();
     }
 
     async function addToCart() {
@@ -279,9 +421,8 @@
         }
 
         const key = getRemainderKey(part.id, selectedOperation.opNumber);
-        const base = baselineRemainders.get(key) ?? selectedOperation.balance ?? 0;
         const pending = pendingLaunches.get(key) ?? 0;
-        const available = base - pending;
+        const available = getAvailableQuantity(part.id, selectedOperation.opNumber, selectedOperation.balance ?? 0);
         if (quantity > available) {
             alert(`Нельзя запустить больше, чем остаток (${available.toFixed(3)}).`);
             return;
@@ -324,6 +465,7 @@
     function renderCart() {
         if (!cart.length) {
             cartTableBody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center text-muted\">Добавьте операции запуска для сохранения.</td></tr>";
+            updateStepState();
             return;
         }
 
@@ -343,6 +485,7 @@
                 </td>`;
             cartTableBody.appendChild(row);
         });
+        updateStepState();
     }
 
     function removeCartItem(index) {
@@ -544,6 +687,8 @@
             alert("Не удалось выполнить экспорт. Попробуйте ещё раз.");
         }
     }
+
+    updateStepState();
 
     namespace.bindHotkeys({
         onEnter: () => addToCart(),

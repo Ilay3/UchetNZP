@@ -1,0 +1,357 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using UchetNZP.Domain.Entities;
+using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
+using UchetNZP.Web.Models;
+
+namespace UchetNZP.Web.Controllers;
+
+[Route("wip/history")]
+public class WipHistoryController : Controller
+{
+    private readonly AppDbContext _dbContext;
+
+    public WipHistoryController(AppDbContext dbContext)
+    {
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+    }
+
+    [HttpGet("")]
+    public async Task<IActionResult> Index([FromQuery] WipHistoryQuery? query, CancellationToken cancellationToken)
+    {
+        var now = DateTime.Now.Date;
+        var defaultFrom = now.AddDays(-13);
+        var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
+
+        var selectedTypes = ParseTypes(query?.Types);
+        if (selectedTypes.Count == 0)
+        {
+            selectedTypes = new HashSet<WipHistoryEntryType>
+            {
+                WipHistoryEntryType.Launch,
+                WipHistoryEntryType.Receipt,
+                WipHistoryEntryType.Transfer,
+            };
+        }
+
+        var entries = new List<WipHistoryEntryViewModel>();
+        var typeComparer = StringComparer.CurrentCultureIgnoreCase;
+
+        if (selectedTypes.Contains(WipHistoryEntryType.Launch))
+        {
+            var fromUtc = ToUtcStartOfDay(fromDate);
+            var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
+
+            var launches = await _dbContext.WipLaunches
+                .AsNoTracking()
+                .Where(x => x.LaunchDate >= fromUtc && x.LaunchDate < toUtcExclusive)
+                .Include(x => x.Part)
+                .Include(x => x.Section)
+                .Include(x => x.Operations)
+                    .ThenInclude(o => o.Operation)
+                .Include(x => x.Operations)
+                    .ThenInclude(o => o.Section)
+                .OrderBy(x => x.LaunchDate)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var launch in launches)
+            {
+                var orderedOperations = launch.Operations
+                    .OrderBy(op => op.OpNumber)
+                    .Select(op => new WipHistoryOperationDetailViewModel(
+                        OperationNumber.Format(op.OpNumber),
+                        op.Operation != null ? op.Operation.Name : string.Empty,
+                        op.Section != null ? op.Section.Name : string.Empty,
+                        op.NormHours,
+                        op.Hours,
+                        null))
+                    .ToList();
+
+                var lastOperationNumber = orderedOperations.Count > 0
+                    ? orderedOperations[^1].OpNumber
+                    : OperationNumber.Format(launch.FromOpNumber);
+
+                var entry = new WipHistoryEntryViewModel(
+                    launch.Id,
+                    WipHistoryEntryType.Launch,
+                    ToLocalDateTime(launch.LaunchDate),
+                    launch.Part != null ? launch.Part.Name : string.Empty,
+                    launch.Part?.Code,
+                    launch.Section != null ? launch.Section.Name : string.Empty,
+                    string.Empty,
+                    OperationNumber.Format(launch.FromOpNumber),
+                    lastOperationNumber,
+                    launch.Quantity,
+                    launch.SumHoursToFinish,
+                    launch.Comment,
+                    orderedOperations,
+                    null);
+
+                entries.Add(entry);
+            }
+        }
+
+        if (selectedTypes.Contains(WipHistoryEntryType.Receipt))
+        {
+            var toDateExclusive = toDate.AddDays(1);
+
+            var receipts = await _dbContext.WipReceipts
+                .AsNoTracking()
+                .Where(x => x.ReceiptDate >= fromDate && x.ReceiptDate < toDateExclusive)
+                .Include(x => x.Part)
+                .Include(x => x.Section)
+                .OrderBy(x => x.ReceiptDate)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var partIds = receipts.Select(x => x.PartId).Distinct().ToList();
+            var sectionIds = receipts.Select(x => x.SectionId).Distinct().ToList();
+            var opNumbers = receipts.Select(x => x.OpNumber).Distinct().ToList();
+
+            var routes = await _dbContext.PartRoutes
+                .AsNoTracking()
+                .Where(route =>
+                    partIds.Contains(route.PartId) &&
+                    sectionIds.Contains(route.SectionId) &&
+                    opNumbers.Contains(route.OpNumber))
+                .Include(route => route.Operation)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var routeLookup = routes.ToDictionary(
+                route => (route.PartId, route.SectionId, route.OpNumber),
+                route => route);
+
+            foreach (var receipt in receipts)
+            {
+                routeLookup.TryGetValue((receipt.PartId, receipt.SectionId, receipt.OpNumber), out var route);
+
+                var entry = new WipHistoryEntryViewModel(
+                    receipt.Id,
+                    WipHistoryEntryType.Receipt,
+                    DateTime.SpecifyKind(receipt.ReceiptDate, DateTimeKind.Unspecified),
+                    receipt.Part != null ? receipt.Part.Name : string.Empty,
+                    receipt.Part?.Code,
+                    receipt.Section != null ? receipt.Section.Name : string.Empty,
+                    string.Empty,
+                    OperationNumber.Format(receipt.OpNumber),
+                    OperationNumber.Format(receipt.OpNumber),
+                    receipt.Quantity,
+                    null,
+                    receipt.Comment,
+                    route != null
+                        ? new List<WipHistoryOperationDetailViewModel>
+                        {
+                            new WipHistoryOperationDetailViewModel(
+                                OperationNumber.Format(route.OpNumber),
+                                route.Operation != null ? route.Operation.Name : string.Empty,
+                                receipt.Section != null ? receipt.Section.Name : string.Empty,
+                                route.NormHours,
+                                null,
+                                null)
+                        }
+                        : Array.Empty<WipHistoryOperationDetailViewModel>(),
+                    null);
+
+                entries.Add(entry);
+            }
+        }
+
+        if (selectedTypes.Contains(WipHistoryEntryType.Transfer))
+        {
+            var toDateExclusive = toDate.AddDays(1);
+
+            var transfers = await _dbContext.WipTransfers
+                .AsNoTracking()
+                .Where(x => x.TransferDate >= fromDate && x.TransferDate < toDateExclusive)
+                .Include(x => x.Part)
+                .Include(x => x.Operations)
+                    .ThenInclude(o => o.Operation)
+                .Include(x => x.Operations)
+                    .ThenInclude(o => o.Section)
+                .Include(x => x.Scrap)
+                .OrderBy(x => x.TransferDate)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var transferSectionIds = transfers
+                .SelectMany(x => new[] { x.FromSectionId, x.ToSectionId })
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            var sectionLookup = transferSectionIds.Count == 0
+                ? new Dictionary<Guid, string>()
+                : await _dbContext.Sections
+                    .AsNoTracking()
+                    .Where(section => transferSectionIds.Contains(section.Id))
+                    .ToDictionaryAsync(section => section.Id, section => section.Name, cancellationToken)
+                    .ConfigureAwait(false);
+
+            foreach (var transfer in transfers)
+            {
+                var orderedOperations = transfer.Operations
+                    .OrderBy(op => op.OpNumber)
+                    .Select(op => new WipHistoryOperationDetailViewModel(
+                        OperationNumber.Format(op.OpNumber),
+                        op.Operation != null ? op.Operation.Name : string.Empty,
+                        op.Section != null ? op.Section.Name : string.Empty,
+                        null,
+                        null,
+                        op.QuantityChange))
+                    .ToList();
+
+                var scrap = transfer.Scrap is null
+                    ? null
+                    : new WipHistoryScrapViewModel(
+                        GetScrapDisplayName(transfer.Scrap.ScrapType),
+                        transfer.Scrap.Quantity,
+                        transfer.Scrap.Comment);
+
+                sectionLookup.TryGetValue(transfer.FromSectionId, out var fromSectionName);
+                sectionLookup.TryGetValue(transfer.ToSectionId, out var toSectionName);
+
+                var entry = new WipHistoryEntryViewModel(
+                    transfer.Id,
+                    WipHistoryEntryType.Transfer,
+                    DateTime.SpecifyKind(transfer.TransferDate, DateTimeKind.Unspecified),
+                    transfer.Part != null ? transfer.Part.Name : string.Empty,
+                    transfer.Part?.Code,
+                    fromSectionName ?? string.Empty,
+                    toSectionName ?? string.Empty,
+                    OperationNumber.Format(transfer.FromOpNumber),
+                    OperationNumber.Format(transfer.ToOpNumber),
+                    transfer.Quantity,
+                    null,
+                    transfer.Comment,
+                    orderedOperations,
+                    scrap);
+
+                entries.Add(entry);
+            }
+        }
+
+        var grouped = entries
+            .GroupBy(x => x.Date)
+            .OrderByDescending(g => g.Key)
+            .Select(g =>
+            {
+                var items = g
+                    .OrderBy(x => x.OccurredAt)
+                    .ThenBy(x => x.PartDisplayName, typeComparer)
+                    .ToList();
+
+                var summaries = items
+                    .GroupBy(x => x.Type)
+                    .Select(x => new WipHistoryTypeSummaryViewModel(
+                        x.Key,
+                        x.Count(),
+                        x.Sum(item => item.Quantity)))
+                    .OrderBy(x => x.Type)
+                    .ToList();
+
+                return new WipHistoryDateGroupViewModel(
+                    DateTime.SpecifyKind(g.Key, DateTimeKind.Unspecified),
+                    items,
+                    summaries);
+            })
+            .ToList();
+
+        var filter = new WipHistoryFilterViewModel
+        {
+            From = DateTime.SpecifyKind(fromDate, DateTimeKind.Unspecified),
+            To = DateTime.SpecifyKind(toDate, DateTimeKind.Unspecified),
+            Types = selectedTypes
+                .OrderBy(x => x)
+                .ToList(),
+        };
+
+        var model = new WipHistoryViewModel(filter, grouped);
+
+        return View("~/Views/Wip/History.cshtml", model);
+    }
+
+    private static HashSet<WipHistoryEntryType> ParseTypes(string[]? types)
+    {
+        var result = new HashSet<WipHistoryEntryType>();
+        if (types is null || types.Length == 0)
+        {
+            return result;
+        }
+
+        foreach (var value in types)
+        {
+            if (TryParseType(value, out var parsed))
+            {
+                result.Add(parsed);
+            }
+        }
+
+        return result;
+    }
+
+    private static bool TryParseType(string? value, out WipHistoryEntryType type)
+    {
+        switch (value?.Trim().ToLowerInvariant())
+        {
+            case "launch":
+            case "launches":
+                type = WipHistoryEntryType.Launch;
+                return true;
+            case "receipt":
+            case "receipts":
+                type = WipHistoryEntryType.Receipt;
+                return true;
+            case "transfer":
+            case "transfers":
+                type = WipHistoryEntryType.Transfer;
+                return true;
+            default:
+                type = default;
+                return false;
+        }
+    }
+
+    private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)
+    {
+        var normalizedFrom = from.Date;
+        var normalizedTo = to.Date;
+
+        if (normalizedFrom > normalizedTo)
+        {
+            (normalizedFrom, normalizedTo) = (normalizedTo, normalizedFrom);
+        }
+
+        return (normalizedFrom, normalizedTo);
+    }
+
+    private static DateTime ToUtcStartOfDay(DateTime date)
+    {
+        var local = DateTime.SpecifyKind(date.Date, DateTimeKind.Local);
+        return local.ToUniversalTime();
+    }
+
+    private static DateTime ToLocalDateTime(DateTime value)
+    {
+        var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        var local = utcValue.ToLocalTime();
+        return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+    }
+
+    private static string GetScrapDisplayName(ScrapType type)
+    {
+        return type switch
+        {
+            ScrapType.Technological => "Технологический брак",
+            ScrapType.EmployeeFault => "Брак по вине сотрудника",
+            _ => "Брак",
+        };
+    }
+}
