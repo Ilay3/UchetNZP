@@ -34,6 +34,17 @@
         };
     }
 
+    private static string GetTypeDisplayName(WipHistoryEntryType type)
+    {
+        return type switch
+        {
+            WipHistoryEntryType.Launch => "Запуски",
+            WipHistoryEntryType.Receipt => "Приходы",
+            WipHistoryEntryType.Transfer => "Передачи",
+            _ => "Операции",
+        };
+    }
+
     private static bool HasTimeComponent(DateTime value)
     {
         return value.TimeOfDay != TimeSpan.Zero;
@@ -65,13 +76,7 @@
                         var inputId = $"historyFilterType_{value}";
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" role="switch" id="@inputId" name="types" value="@value" @(Model.Filter.IsTypeSelected(type) ? "checked" : string.Empty) />
-                            <label class="form-check-label" for="@inputId">@type switch
-                            {
-                                WipHistoryEntryType.Launch => "Запуски",
-                                WipHistoryEntryType.Receipt => "Приходы",
-                                WipHistoryEntryType.Transfer => "Передачи",
-                                _ => "Операции"
-                            }</label>
+                            <label class="form-check-label" for="@inputId">@GetTypeDisplayName(type)</label>
                         </div>
                     }
                 </div>
