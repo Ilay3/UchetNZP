@@ -44,8 +44,8 @@
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
 
     const scrapTypeOptions = {
-        technological: { value: "Technological", label: "Технологический" },
-        employee: { value: "EmployeeFault", label: "По вине сотрудника" },
+        technological: { value: 0, code: "Technological", label: "Технологический" },
+        employee: { value: 1, code: "EmployeeFault", label: "По вине сотрудника" },
     };
 
     let scrapModalResolver = null;
@@ -529,7 +529,7 @@
                 item.scrapQuantity = leftover;
                 item.scrapComment = decision.comment ? decision.comment : null;
                 item.scrap = {
-                    type: item.scrapType,
+                    scrapType: item.scrapType,
                     quantity: item.scrapQuantity,
                     comment: item.scrapComment,
                 };
@@ -592,20 +592,37 @@
     }
 
     function getScrapLabel(type, fallbackLabel) {
-        if (!type && !fallbackLabel) {
+        const normalized = normalizeScrapTypeValue(type);
+        if (normalized !== null) {
+            const option = Object.values(scrapTypeOptions).find(entry => entry.value === normalized);
+            if (option) {
+                return option.label;
+            }
+        }
+
+        if (typeof type === "string" && type.trim().length > 0) {
+            const trimmed = type.trim();
+            const option = Object.values(scrapTypeOptions).find(entry => entry.code === trimmed);
+            if (option) {
+                return option.label;
+            }
+        }
+
+        if (fallbackLabel && fallbackLabel.length > 0) {
+            return fallbackLabel;
+        }
+
+        if (type === null || type === undefined) {
             return "";
         }
 
-        const option = Object.values(scrapTypeOptions).find(entry => entry.value === type);
-        if (option) {
-            return option.label;
-        }
-
-        return fallbackLabel ?? type ?? "";
+        return String(type);
     }
 
     function formatScrapCell(item) {
-        if (!item?.scrapType || !item?.scrapQuantity || item.scrapQuantity <= 0) {
+        const hasType = item && item.scrapType !== undefined && item.scrapType !== null;
+        const hasQuantity = item && Number(item.scrapQuantity) > 0;
+        if (!hasType || !hasQuantity) {
             return "<span class=\"text-muted\">Остаток остаётся на операции</span>";
         }
 
@@ -629,16 +646,52 @@
         }
 
         if (source.scrap) {
-            return source.scrap;
+            const scrap = source.scrap;
+            if (scrap && scrap.scrapType === undefined && scrap.type !== undefined) {
+                return { ...scrap, scrapType: scrap.type };
+            }
+
+            return scrap;
         }
 
         if (source.scrapQuantity || source.scrapType || source.scrapComment || source.scrapTypeLabel) {
             return {
                 quantity: source.scrapQuantity,
                 type: source.scrapType,
+                scrapType: source.scrapType,
                 comment: source.scrapComment,
                 typeLabel: source.scrapTypeLabel,
             };
+        }
+
+        return null;
+    }
+
+    function normalizeScrapTypeValue(raw) {
+        if (raw === null || raw === undefined) {
+            return null;
+        }
+
+        if (typeof raw === "number") {
+            return Number.isFinite(raw) ? raw : null;
+        }
+
+        if (typeof raw === "string") {
+            const trimmed = raw.trim();
+            if (!trimmed.length) {
+                return null;
+            }
+
+            const numeric = Number(trimmed);
+            if (Number.isFinite(numeric)) {
+                return numeric;
+            }
+
+            const byCode = Object.values(scrapTypeOptions)
+                .find(option => option.code === trimmed || option.label === trimmed);
+            if (byCode) {
+                return byCode.value;
+            }
         }
 
         return null;
@@ -655,22 +708,35 @@
         const quantity = Number.isFinite(parsedQuantity) ? parsedQuantity : 0;
         const commentRaw = raw.comment ?? raw.scrapComment ?? null;
         const comment = commentRaw !== null && commentRaw !== undefined ? String(commentRaw) : null;
-        const label = getScrapLabel(type, raw.typeLabel ?? raw.scrapTypeLabel ?? null);
-
-        if (!type || !(quantity > 0)) {
-            return {
-                scrapType: type,
-                scrapTypeLabel: label,
-                scrapQuantity: quantity,
-                scrapComment: comment,
-            };
-        }
+        const normalizedType = normalizeScrapTypeValue(type);
+        const label = getScrapLabel(normalizedType ?? type, raw.typeLabel ?? raw.scrapTypeLabel ?? null);
 
         return {
-            scrapType: type,
+            scrapType: normalizedType ?? type,
             scrapTypeLabel: label,
             scrapQuantity: quantity,
             scrapComment: comment,
+        };
+    }
+
+    function buildScrapPayload(item) {
+        if (!item) {
+            return null;
+        }
+
+        const typeSource = item.scrapType ?? item.scrap?.scrapType ?? item.scrap?.type ?? null;
+        const quantitySource = item.scrapQuantity ?? item.scrap?.quantity ?? 0;
+        const commentSource = item.scrapComment ?? item.scrap?.comment ?? null;
+        const normalizedType = normalizeScrapTypeValue(typeSource);
+        const parsedQuantity = Number(quantitySource);
+        if (normalizedType === null || !Number.isFinite(parsedQuantity) || !(parsedQuantity > 0)) {
+            return null;
+        }
+
+        return {
+            scrapType: normalizedType,
+            quantity: parsedQuantity,
+            comment: commentSource ?? null,
         };
     }
 
@@ -747,13 +813,7 @@
                 transferDate: item.date,
                 quantity: item.quantity,
                 comment: item.comment,
-                scrap: item.scrap ?? (item.scrapType && item.scrapQuantity > 0
-                    ? {
-                        type: item.scrapType,
-                        quantity: item.scrapQuantity,
-                        comment: item.scrapComment,
-                    }
-                    : null),
+                scrap: buildScrapPayload(item),
             })),
         };
 
