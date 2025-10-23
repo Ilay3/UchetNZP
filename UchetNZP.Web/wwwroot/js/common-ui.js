@@ -80,6 +80,9 @@
             if (match) {
                 hiddenInput.value = match.id ?? "";
                 selectedItem = match;
+                if (ensureCustomItem(match)) {
+                    render(lastItems);
+                }
                 return;
             }
 
@@ -113,9 +116,22 @@
         const debouncedRequest = debounce(request, 200);
 
         input.addEventListener("input", () => {
+            const value = input.value.trim();
+            const previousSelection = selectedItem;
+            const matchesPreviousSelection =
+                previousSelection && formatItem(previousSelection) === value;
+
+            if (matchesPreviousSelection) {
+                hiddenInput.value = previousSelection.id ?? "";
+                selectedItem = previousSelection;
+                if (ensureCustomItem(previousSelection)) {
+                    render(lastItems);
+                }
+                return;
+            }
+
             hiddenInput.value = "";
             selectedItem = null;
-            const value = input.value.trim();
             if (value.length >= minLength) {
                 debouncedRequest(value);
             }
