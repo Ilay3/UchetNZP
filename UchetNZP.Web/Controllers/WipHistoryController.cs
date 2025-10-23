@@ -100,11 +100,12 @@ public class WipHistoryController : Controller
 
         if (selectedTypes.Contains(WipHistoryEntryType.Receipt))
         {
-            var toDateExclusive = toDate.AddDays(1);
+            var fromUtc = ToUtcStartOfDay(fromDate);
+            var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
 
             var receipts = await _dbContext.WipReceipts
                 .AsNoTracking()
-                .Where(x => x.ReceiptDate >= fromDate && x.ReceiptDate < toDateExclusive)
+                .Where(x => x.ReceiptDate >= fromUtc && x.ReceiptDate < toUtcExclusive)
                 .Include(x => x.Part)
                 .Include(x => x.Section)
                 .OrderBy(x => x.ReceiptDate)
@@ -136,7 +137,7 @@ public class WipHistoryController : Controller
                 var entry = new WipHistoryEntryViewModel(
                     receipt.Id,
                     WipHistoryEntryType.Receipt,
-                    DateTime.SpecifyKind(receipt.ReceiptDate, DateTimeKind.Unspecified),
+                    ToLocalDateTime(receipt.ReceiptDate),
                     receipt.Part != null ? receipt.Part.Name : string.Empty,
                     receipt.Part?.Code,
                     receipt.Section != null ? receipt.Section.Name : string.Empty,
@@ -166,11 +167,12 @@ public class WipHistoryController : Controller
 
         if (selectedTypes.Contains(WipHistoryEntryType.Transfer))
         {
-            var toDateExclusive = toDate.AddDays(1);
+            var fromUtc = ToUtcStartOfDay(fromDate);
+            var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
 
             var transfers = await _dbContext.WipTransfers
                 .AsNoTracking()
-                .Where(x => x.TransferDate >= fromDate && x.TransferDate < toDateExclusive)
+                .Where(x => x.TransferDate >= fromUtc && x.TransferDate < toUtcExclusive)
                 .Include(x => x.Part)
                 .Include(x => x.Operations)
                     .ThenInclude(o => o.Operation)
@@ -221,7 +223,7 @@ public class WipHistoryController : Controller
                 var entry = new WipHistoryEntryViewModel(
                     transfer.Id,
                     WipHistoryEntryType.Transfer,
-                    DateTime.SpecifyKind(transfer.TransferDate, DateTimeKind.Unspecified),
+                    ToLocalDateTime(transfer.TransferDate),
                     transfer.Part != null ? transfer.Part.Name : string.Empty,
                     transfer.Part?.Code,
                     fromSectionName ?? string.Empty,
