@@ -102,6 +102,32 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-5" id="transferRecentContainer">
+    <div class="card-header bg-light fw-semibold">Последние передачи</div>
+    <div class="card-body">
+        <p class="text-muted mb-0" id="transferRecentEmpty">Сохранённых передач пока нет. После сохранения они появятся здесь, и каждую можно будет отменить.</p>
+        <div class="table-responsive d-none" id="transferRecentTableWrapper">
+            <table class="table table-hover align-middle" id="transferRecentTable" aria-describedby="transferRecentCaption">
+                <caption id="transferRecentCaption" class="visually-hidden">Список последних сохранённых передач НЗП</caption>
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Дата</th>
+                        <th scope="col">Деталь</th>
+                        <th scope="col">Операция до</th>
+                        <th scope="col">Операция после</th>
+                        <th scope="col">Количество</th>
+                        <th scope="col">Остаток до</th>
+                        <th scope="col">Остаток после</th>
+                        <th scope="col">Брак</th>
+                        <th scope="col" class="text-center">Действия</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="transferSummaryModal" tabindex="-1" aria-labelledby="transferSummaryTitle" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
