@@ -120,7 +120,7 @@
         if (operation) {
             selectedFromOperation = operation;
             fromOperationNumberInput.value = operation.opNumber;
-            if (selectedToOperation && parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(operation.opNumber)) {
+            if (selectedToOperation && !selectedToOperation.isWarehouse && parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(operation.opNumber)) {
                 selectedToOperation = null;
                 toOperationInput.value = "";
                 toOperationNumberInput.value = "";
@@ -148,7 +148,7 @@
             return;
         }
 
-        if (selectedFromOperation && parseOpNumber(operation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
+        if (selectedFromOperation && !operation.isWarehouse && parseOpNumber(operation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
             alert("Операция после должна быть позже операции до.");
             toOperationInput.value = "";
             toOperationNumberInput.value = "";
@@ -305,12 +305,20 @@
     }
 
     function formatOperation(operation) {
-        const parts = [operation.opNumber];
+        const opNumber = operation.opNumber;
+        const balanceValue = Number(operation.balance ?? 0);
+        if (operation.isWarehouse) {
+            const name = operation.operationName || "Склад";
+            return `${opNumber} | ${name} | остаток на складе: ${balanceValue.toFixed(3)}`;
+        }
+
+        const parts = [opNumber];
         if (operation.operationName) {
             parts.push(operation.operationName);
         }
-        parts.push(`${operation.normHours.toFixed(3)} н/ч`);
-        parts.push(`остаток: ${(operation.balance ?? 0).toFixed(3)}`);
+        const norm = Number(operation.normHours ?? 0);
+        parts.push(`${norm.toFixed(3)} н/ч`);
+        parts.push(`остаток: ${balanceValue.toFixed(3)}`);
         return parts.join(" | ");
     }
 
@@ -351,7 +359,7 @@
             return false;
         }
 
-        if (parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
+        if (!selectedToOperation.isWarehouse && parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
             return false;
         }
 
@@ -457,18 +465,20 @@
 
     function updateFromOperationsDatalist() {
         fromOperationOptions.innerHTML = "";
-        operations.forEach(operation => {
-            const option = document.createElement("option");
-            option.value = formatOperation(operation);
-            fromOperationOptions.appendChild(option);
-        });
+        operations
+            .filter(operation => !operation.isWarehouse)
+            .forEach(operation => {
+                const option = document.createElement("option");
+                option.value = formatOperation(operation);
+                fromOperationOptions.appendChild(option);
+            });
     }
 
     function updateToOperationsDatalist() {
         toOperationOptions.innerHTML = "";
         const fromNumber = selectedFromOperation?.opNumber ?? null;
         operations
-            .filter(operation => !fromNumber || parseOpNumber(operation.opNumber) > parseOpNumber(fromNumber))
+            .filter(operation => !fromNumber || operation.isWarehouse || parseOpNumber(operation.opNumber) > parseOpNumber(fromNumber))
             .forEach(operation => {
                 const option = document.createElement("option");
                 option.value = formatOperation(operation);

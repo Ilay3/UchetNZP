@@ -76,12 +76,26 @@ public class WipTransfersController : Controller
                                   OperationNumber.Format(route.OpNumber),
                                   operation != null ? operation.Name : string.Empty,
                                   route.NormHours,
-                                  balance != null ? balance.Quantity : 0m);
+                                  balance != null ? balance.Quantity : 0m,
+                                  false);
 
         var operations = await operationsQuery
             .Take(100)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        var warehouseBalance = await _dbContext.WarehouseItems
+            .AsNoTracking()
+            .Where(x => x.PartId == partId)
+            .SumAsync(x => x.Quantity, cancellationToken)
+            .ConfigureAwait(false);
+
+        operations.Add(new TransferOperationLookupViewModel(
+            OperationNumber.Format(WarehouseDefaults.OperationNumber),
+            WarehouseDefaults.OperationName,
+            0m,
+            warehouseBalance,
+            true));
 
         return Ok(operations);
     }
@@ -110,44 +124,69 @@ public class WipTransfersController : Controller
             return BadRequest(ex.Message);
         }
 
-        var routeSections = await _dbContext.PartRoutes
+        var fromRoute = await _dbContext.PartRoutes
             .AsNoTracking()
-            .Where(x => x.PartId == partId && (x.OpNumber == fromOp || x.OpNumber == toOp))
+            .Where(x => x.PartId == partId && x.OpNumber == fromOp)
             .Select(x => new { x.OpNumber, x.SectionId })
-            .ToListAsync(cancellationToken)
+            .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var fromRoute = routeSections.FirstOrDefault(x => x.OpNumber == fromOp);
-        var toRoute = routeSections.FirstOrDefault(x => x.OpNumber == toOp);
-
-        if (fromRoute is null || toRoute is null)
+        if (fromRoute is null)
         {
-            return BadRequest("Маршрут для одной из операций не найден.");
+            return BadRequest("Маршрут для операции до не найден.");
         }
 
-        var balances = await _dbContext.WipBalances
+        var fromBalance = await _dbContext.WipBalances
             .AsNoTracking()
-            .Where(x =>
-                x.PartId == partId &&
-                ((x.OpNumber == fromOp && x.SectionId == fromRoute.SectionId) ||
-                 (x.OpNumber == toOp && x.SectionId == toRoute.SectionId)))
-            .Select(x => new { x.OpNumber, x.SectionId, x.Quantity })
-            .ToListAsync(cancellationToken)
+            .Where(x => x.PartId == partId && x.OpNumber == fromOp && x.SectionId == fromRoute.SectionId)
+            .Select(x => x.Quantity)
+            .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        decimal fromBalance = balances
-            .Where(x => x.OpNumber == fromOp && x.SectionId == fromRoute.SectionId)
-            .Select(x => x.Quantity)
-            .FirstOrDefault();
+        TransferOperationBalanceViewModel toModel;
+        if (toOp == WarehouseDefaults.OperationNumber)
+        {
+            var warehouseBalance = await _dbContext.WarehouseItems
+                .AsNoTracking()
+                .Where(x => x.PartId == partId)
+                .SumAsync(x => x.Quantity, cancellationToken)
+                .ConfigureAwait(false);
 
-        decimal toBalance = balances
-            .Where(x => x.OpNumber == toOp && x.SectionId == toRoute.SectionId)
-            .Select(x => x.Quantity)
-            .FirstOrDefault();
+            toModel = new TransferOperationBalanceViewModel(
+                OperationNumber.Format(toOp),
+                WarehouseDefaults.SectionId,
+                warehouseBalance);
+        }
+        else
+        {
+            var toRoute = await _dbContext.PartRoutes
+                .AsNoTracking()
+                .Where(x => x.PartId == partId && x.OpNumber == toOp)
+                .Select(x => new { x.OpNumber, x.SectionId })
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (toRoute is null)
+            {
+                return BadRequest("Маршрут для операции после не найден.");
+            }
+
+            var toBalance = await _dbContext.WipBalances
+                .AsNoTracking()
+                .Where(x => x.PartId == partId && x.OpNumber == toOp && x.SectionId == toRoute.SectionId)
+                .Select(x => x.Quantity)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            toModel = new TransferOperationBalanceViewModel(
+                OperationNumber.Format(toOp),
+                toRoute.SectionId,
+                toBalance);
+        }
 
         var model = new TransferBalancesViewModel(
             new TransferOperationBalanceViewModel(OperationNumber.Format(fromOp), fromRoute.SectionId, fromBalance),
-            new TransferOperationBalanceViewModel(OperationNumber.Format(toOp), toRoute.SectionId, toBalance));
+            toModel);
 
         return Ok(model);
     }

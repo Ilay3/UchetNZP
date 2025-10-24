@@ -4,6 +4,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Transfers;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Application.Services;
 
@@ -67,17 +68,31 @@ public class TransferService : ITransferService
                     throw new InvalidOperationException($"Операция {item.FromOpNumber} для детали {item.PartId} отсутствует в маршруте.");
                 }
 
-                var toRoute = orderedRoute.FirstOrDefault(x => x.OpNumber == item.ToOpNumber);
-                if (toRoute is null)
+                var isWarehouseTransfer = item.ToOpNumber == WarehouseDefaults.OperationNumber;
+
+                PartRoute? toRoute = null;
+                if (!isWarehouseTransfer)
                 {
-                    throw new InvalidOperationException($"Операция {item.ToOpNumber} для детали {item.PartId} отсутствует в маршруте.");
+                    toRoute = orderedRoute.FirstOrDefault(x => x.OpNumber == item.ToOpNumber);
+                    if (toRoute is null)
+                    {
+                        throw new InvalidOperationException($"Операция {item.ToOpNumber} для детали {item.PartId} отсутствует в маршруте.");
+                    }
                 }
 
                 var fromIndex = orderedRoute.FindIndex(x => x.OpNumber == item.FromOpNumber);
-                var toIndex = orderedRoute.FindIndex(x => x.OpNumber == item.ToOpNumber);
-                if (fromIndex < 0 || toIndex < 0 || toIndex <= fromIndex)
+                if (fromIndex < 0)
                 {
-                    throw new InvalidOperationException($"Операция {item.ToOpNumber} должна следовать за {item.FromOpNumber} для детали {item.PartId}.");
+                    throw new InvalidOperationException($"Операция {item.FromOpNumber} для детали {item.PartId} отсутствует в маршруте.");
+                }
+
+                if (!isWarehouseTransfer)
+                {
+                    var toIndex = orderedRoute.FindIndex(x => x.OpNumber == item.ToOpNumber);
+                    if (toIndex < 0 || toIndex <= fromIndex)
+                    {
+                        throw new InvalidOperationException($"Операция {item.ToOpNumber} должна следовать за {item.FromOpNumber} для детали {item.PartId}.");
+                    }
                 }
 
                 var fromBalance = await _dbContext.WipBalances
@@ -96,30 +111,57 @@ public class TransferService : ITransferService
                     throw new InvalidOperationException($"Недостаточно остатка НЗП на операции {item.FromOpNumber} детали {item.PartId}. Доступно {fromBalance.Quantity}, требуется {item.Quantity}.");
                 }
 
-                var toBalance = await _dbContext.WipBalances
-                    .FirstOrDefaultAsync(
-                        x => x.PartId == item.PartId && x.OpNumber == item.ToOpNumber && x.SectionId == toRoute.SectionId,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-
                 decimal toBalanceBefore;
-                if (toBalance is null)
-                {
-                    toBalanceBefore = 0m;
-                    toBalance = new WipBalance
-                    {
-                        Id = Guid.NewGuid(),
-                        PartId = item.PartId,
-                        SectionId = toRoute.SectionId,
-                        OpNumber = item.ToOpNumber,
-                        Quantity = 0m,
-                    };
+                decimal toBalanceAfter;
+                Guid toSectionId;
+                Guid toOperationId;
+                Guid? toPartRouteId = null;
 
-                    await _dbContext.WipBalances.AddAsync(toBalance, cancellationToken).ConfigureAwait(false);
+                WipBalance? toBalance = null;
+                if (isWarehouseTransfer)
+                {
+                    var warehouseBefore = await _dbContext.WarehouseItems
+                        .Where(x => x.PartId == item.PartId)
+                        .SumAsync(x => x.Quantity, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    toBalanceBefore = warehouseBefore;
+                    toBalanceAfter = warehouseBefore + item.Quantity;
+                    toSectionId = WarehouseDefaults.SectionId;
+                    toOperationId = WarehouseDefaults.OperationId;
                 }
                 else
                 {
-                    toBalanceBefore = toBalance.Quantity;
+                    toBalance = await _dbContext.WipBalances
+                        .FirstOrDefaultAsync(
+                            x => x.PartId == item.PartId && x.OpNumber == item.ToOpNumber && x.SectionId == toRoute!.SectionId,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (toBalance is null)
+                    {
+                        toBalanceBefore = 0m;
+                        toBalance = new WipBalance
+                        {
+                            Id = Guid.NewGuid(),
+                            PartId = item.PartId,
+                            SectionId = toRoute!.SectionId,
+                            OpNumber = item.ToOpNumber,
+                            Quantity = 0m,
+                        };
+
+                        await _dbContext.WipBalances.AddAsync(toBalance, cancellationToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        toBalanceBefore = toBalance.Quantity;
+                    }
+
+                    toBalance.Quantity = toBalance.Quantity + item.Quantity;
+                    toBalanceAfter = toBalance.Quantity;
+                    toSectionId = toRoute!.SectionId;
+                    toOperationId = toRoute.OperationId;
+                    toPartRouteId = toRoute.Id;
                 }
 
                 var fromBalanceBefore = fromBalance.Quantity;
@@ -130,9 +172,8 @@ public class TransferService : ITransferService
                         $"Остаток НЗП для операции {item.FromOpNumber} детали {item.PartId} не может стать отрицательным.");
                 }
 
-                toBalance.Quantity = toBalance.Quantity + item.Quantity;
-
                 var transferDate = NormalizeToUtc(item.TransferDate);
+                var trimmedComment = string.IsNullOrWhiteSpace(item.Comment) ? null : item.Comment.Trim();
 
                 var transfer = new WipTransfer
                 {
@@ -141,12 +182,12 @@ public class TransferService : ITransferService
                     PartId = item.PartId,
                     FromSectionId = fromRoute.SectionId,
                     FromOpNumber = item.FromOpNumber,
-                    ToSectionId = toRoute.SectionId,
+                    ToSectionId = toSectionId,
                     ToOpNumber = item.ToOpNumber,
                     TransferDate = transferDate,
                     CreatedAt = now,
                     Quantity = item.Quantity,
-                    Comment = item.Comment,
+                    Comment = trimmedComment,
                 };
 
                 await _dbContext.WipTransfers.AddAsync(transfer, cancellationToken).ConfigureAwait(false);
@@ -166,14 +207,31 @@ public class TransferService : ITransferService
                 {
                     Id = Guid.NewGuid(),
                     WipTransferId = transfer.Id,
-                    OperationId = toRoute.OperationId,
-                    SectionId = toRoute.SectionId,
-                    OpNumber = toRoute.OpNumber,
-                    PartRouteId = toRoute.Id,
+                    OperationId = toOperationId,
+                    SectionId = toSectionId,
+                    OpNumber = item.ToOpNumber,
+                    PartRouteId = toPartRouteId,
                     QuantityChange = item.Quantity,
                 };
 
                 await _dbContext.WipTransferOperations.AddRangeAsync(new[] { fromOperation, toOperation }, cancellationToken).ConfigureAwait(false);
+
+                if (isWarehouseTransfer)
+                {
+                    var warehouseItem = new WarehouseItem
+                    {
+                        Id = Guid.NewGuid(),
+                        PartId = item.PartId,
+                        TransferId = transfer.Id,
+                        Quantity = item.Quantity,
+                        AddedAt = transferDate,
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        Comment = trimmedComment,
+                    };
+
+                    await _dbContext.WarehouseItems.AddAsync(warehouseItem, cancellationToken).ConfigureAwait(false);
+                }
 
                 TransferScrapSummaryDto? scrapSummary = null;
 
@@ -222,9 +280,9 @@ public class TransferService : ITransferService
                     fromBalanceBefore,
                     fromBalance.Quantity,
                     item.ToOpNumber,
-                    toRoute.SectionId,
+                    toSectionId,
                     toBalanceBefore,
-                    toBalance.Quantity,
+                    isWarehouseTransfer ? toBalanceAfter : toBalance!.Quantity,
                     item.Quantity,
                     transfer.Id,
                     scrapSummary));
