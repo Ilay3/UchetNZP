@@ -67,7 +67,8 @@ public record TransferOperationLookupViewModel(
     string OpNumber,
     string OperationName,
     decimal NormHours,
-    decimal Balance);
+    decimal Balance,
+    bool IsWarehouse);
 
 public record TransferOperationBalanceViewModel(string OpNumber, Guid SectionId, decimal Balance);
 

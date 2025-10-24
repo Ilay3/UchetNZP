@@ -19,4 +19,6 @@ public class Part
     public virtual ICollection<WipLaunch> WipLaunches { get; set; } = new List<WipLaunch>();
 
     public virtual ICollection<WipScrap> WipScraps { get; set; } = new List<WipScrap>();
+
+    public virtual ICollection<WarehouseItem> WarehouseItems { get; set; } = new List<WarehouseItem>();
 }

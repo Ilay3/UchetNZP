@@ -1,0 +1,130 @@
+@using System.Globalization
+@model WarehouseIndexViewModel
+@{
+    ViewData["Title"] = "Склад НЗП";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Склад НЗП</h1>
+    <p class="lead mb-0">Просматривайте остатки деталей на складе и при необходимости корректируйте запись.</p>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @Model.StatusMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+    </div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+    </div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Фильтр</div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-lg-6">
+                <label class="form-label" for="warehousePartSelect">Деталь</label>
+                <select id="warehousePartSelect" class="form-select" name="partId" asp-items="Model.Parts"></select>
+            </div>
+            <div class="col-lg-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1">Применить</button>
+                <a class="btn btn-outline-secondary" asp-action="Index">Сбросить</a>
+            </div>
+            <div class="col-lg-3 text-lg-end">
+                <span class="text-muted">Всего на складе: <span class="fw-semibold">@Model.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)</span> шт</span>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Записи склада</div>
+    <div class="card-body">
+        @if (!Model.Items.Any())
+        {
+            <div class="text-muted">Записей не найдено.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle" aria-describedby="warehouseTableCaption">
+                    <caption id="warehouseTableCaption" class="visually-hidden">Текущие записи склада НЗП</caption>
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Деталь</th>
+                            <th scope="col" class="text-end">Количество</th>
+                            <th scope="col">Дата добавления</th>
+                            <th scope="col">Комментарий</th>
+                            <th scope="col">Обновлено</th>
+                            <th scope="col" class="text-nowrap">Изменение</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.Items)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@row.PartDisplay</div>
+                                </td>
+                                <td class="text-end">
+                                    <span class="fw-semibold">@row.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</span>
+                                </td>
+                                <td>@row.AddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(row.Comment))
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                    else
+                                    {
+                                        @row.Comment
+                                    }
+                                </td>
+                                <td>
+                                    @if (row.UpdatedAt.HasValue)
+                                    {
+                                        @row.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    <form asp-action="Update" method="post" class="row g-2 align-items-center">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="Id" value="@row.Id" />
+                                        <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
+                                        <div class="col-sm-4">
+                                            <label class="visually-hidden" for="qty-@row.Id">Количество</label>
+                                            <input id="qty-@row.Id" class="form-control form-control-sm" type="number" name="Quantity" value='@row.Quantity.ToString("0.###", CultureInfo.InvariantCulture)' min="0" step="0.001" />
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="visually-hidden" for="date-@row.Id">Дата</label>
+                                            <input id="date-@row.Id" class="form-control form-control-sm" type="date" name="AddedAt" value="@row.AddedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label class="visually-hidden" for="comment-@row.Id">Комментарий</label>
+                                            <input id="comment-@row.Id" class="form-control form-control-sm" type="text" name="Comment" maxlength="512" value="@(row.Comment ?? string.Empty)" placeholder="Комментарий" />
+                                        </div>
+                                        <div class="col-12 d-flex gap-2">
+                                            <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+                                            <button type="reset" class="btn btn-outline-secondary btn-sm">Отмена</button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
