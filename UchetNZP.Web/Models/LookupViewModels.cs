@@ -33,6 +33,17 @@ public record ReceiptSummaryItemViewModel(
 
 public record ReceiptBatchSummaryViewModel(int Saved, IReadOnlyList<ReceiptSummaryItemViewModel> Items);
 
+public record ReceiptDeleteResultViewModel(
+    Guid ReceiptId,
+    Guid BalanceId,
+    Guid PartId,
+    Guid SectionId,
+    string OpNumber,
+    decimal ReceiptQuantity,
+    decimal PreviousQuantity,
+    decimal RestoredQuantity,
+    decimal Delta);
+
 public record LaunchOperationLookupViewModel(
     string OpNumber,
     string OperationName,

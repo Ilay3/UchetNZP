@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -122,6 +123,92 @@ public class WipService : IWipService
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    public async Task<ReceiptDeleteResultDto> DeleteReceiptAsync(Guid in_receiptId, CancellationToken cancellationToken = default)
+    {
+        if (in_receiptId == Guid.Empty)
+        {
+            throw new ArgumentException("Идентификатор прихода не задан.", nameof(in_receiptId));
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        ReceiptDeleteResultDto ret;
+
+        try
+        {
+            var receipt = await _dbContext.WipReceipts
+                .FirstOrDefaultAsync(x => x.Id == in_receiptId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (receipt is null)
+            {
+                throw new KeyNotFoundException($"Приход с идентификатором {in_receiptId} не найден.");
+            }
+
+            var balance = await _dbContext.WipBalances
+                .FirstOrDefaultAsync(
+                    x => x.PartId == receipt.PartId &&
+                        x.SectionId == receipt.SectionId &&
+                        x.OpNumber == receipt.OpNumber,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (balance is null)
+            {
+                throw new InvalidOperationException("Связанный остаток не найден.");
+            }
+
+            var previousQuantity = balance.Quantity;
+            var restoredQuantity = previousQuantity - receipt.Quantity;
+
+            if (restoredQuantity < 0)
+            {
+                throw new InvalidOperationException("Отмена прихода приведёт к отрицательному остатку.");
+            }
+
+            balance.Quantity = restoredQuantity;
+
+            var adjustment = new WipBalanceAdjustment
+            {
+                Id = Guid.NewGuid(),
+                WipBalanceId = balance.Id,
+                PartId = balance.PartId,
+                SectionId = balance.SectionId,
+                OpNumber = balance.OpNumber,
+                PreviousQuantity = previousQuantity,
+                NewQuantity = restoredQuantity,
+                Delta = restoredQuantity - previousQuantity,
+                Comment = $"Отмена прихода {receipt.Id}",
+                UserId = _currentUserService.UserId,
+                CreatedAt = DateTime.UtcNow,
+            };
+
+            _dbContext.WipBalanceAdjustments.Add(adjustment);
+            _dbContext.WipReceipts.Remove(receipt);
+
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            ret = new ReceiptDeleteResultDto(
+                receipt.Id,
+                balance.Id,
+                balance.PartId,
+                balance.SectionId,
+                balance.OpNumber,
+                receipt.Quantity,
+                previousQuantity,
+                restoredQuantity,
+                adjustment.Delta);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+
+        return ret;
     }
 
     private static DateTime NormalizeToUtc(DateTime value)
