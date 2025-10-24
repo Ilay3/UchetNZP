@@ -10,6 +10,7 @@
     const summaryIntro = document.getElementById("receiptSummaryIntro");
     const summaryModalElement = document.getElementById("receiptSummaryModal");
     const balanceLabel = document.getElementById("receiptBalanceLabel");
+    const historyTableBody = document.querySelector("#receiptHistoryTable tbody");
 
     const sectionLookup = namespace.initSearchableInput({
         input: document.getElementById("receiptSectionInput"),
@@ -44,6 +45,7 @@
     let operations = [];
     let selectedOperation = null;
     let cart = [];
+    let history = [];
     let editingIndex = null;
     let isLoadingOperations = false;
     let isLoadingBalance = false;
@@ -368,6 +370,33 @@
         updateFormState();
     }
 
+    function renderHistory() {
+        if (!historyTableBody) {
+            return;
+        }
+
+        if (!history.length) {
+            historyTableBody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center text-muted\">Сохранённые приходы появятся здесь.</td></tr>";
+            return;
+        }
+
+        historyTableBody.innerHTML = "";
+        history.forEach(item => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${item.date}</td>
+                <td>${item.sectionName}</td>
+                <td>${item.partDisplay}</td>
+                <td>${item.operationDisplay}</td>
+                <td>${item.quantity.toFixed(3)}</td>
+                <td>${item.become.toFixed(3)}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-link text-danger text-decoration-none" data-action="cancel" data-receipt-id="${item.receiptId}">Отменить</button>
+                </td>`;
+            historyTableBody.appendChild(row);
+        });
+    }
+
     cartTableBody.addEventListener("click", event => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) {
@@ -387,6 +416,28 @@
             void editCartItem(index);
         }
     });
+
+    if (historyTableBody) {
+        historyTableBody.addEventListener("click", event => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+
+            const button = target.closest("button[data-action=\"cancel\"]");
+            if (!(button instanceof HTMLButtonElement)) {
+                return;
+            }
+
+            const receiptId = button.dataset.receiptId;
+            if (!receiptId || button.disabled) {
+                return;
+            }
+
+            button.disabled = true;
+            void cancelSavedReceipt(receiptId, button);
+        });
+    }
 
     function removeCartItem(index) {
         const [removed] = cart.splice(index, 1);
@@ -531,6 +582,8 @@
             return;
         }
 
+        const cartSnapshot = cart.map(item => ({ ...item }));
+
         const payload = {
             items: cart.map(item => ({
                 partId: item.partId,
@@ -568,6 +621,7 @@
             cart = [];
             renderCart();
             updateBalanceAfterSave(summary);
+            updateHistoryAfterSave(cartSnapshot, summary);
             resetForm();
         }
         catch (error) {
@@ -590,6 +644,95 @@
         });
 
         updateBalanceLabel();
+    }
+
+    function updateHistoryAfterSave(cartSnapshot, summary) {
+        if (!historyTableBody || !summary || !Array.isArray(summary.items) || !summary.items.length) {
+            return;
+        }
+
+        const newEntries = [];
+
+        for (let index = summary.items.length - 1; index >= 0; index -= 1) {
+            const item = summary.items[index];
+            const snapshot = cartSnapshot[index] ?? null;
+            const partDisplay = snapshot ? snapshot.partDisplay : item.partId;
+            const sectionName = snapshot ? snapshot.sectionName : "";
+            const operationDisplay = snapshot ? snapshot.operationDisplay : item.opNumber;
+            const date = snapshot ? snapshot.date : new Date().toISOString().slice(0, 10);
+            const quantity = typeof item.quantity === "number" ? item.quantity : Number(item.quantity ?? 0);
+            const become = typeof item.become === "number" ? item.become : Number(item.become ?? 0);
+
+            newEntries.push({
+                receiptId: item.receiptId,
+                balanceId: item.balanceId,
+                partId: item.partId,
+                sectionId: item.sectionId,
+                opNumber: item.opNumber,
+                date,
+                sectionName,
+                partDisplay,
+                operationDisplay,
+                quantity: isNaN(quantity) ? 0 : quantity,
+                become: isNaN(become) ? 0 : become,
+            });
+        }
+
+        if (!newEntries.length) {
+            return;
+        }
+
+        history = [...newEntries, ...history].slice(0, 10);
+        renderHistory();
+    }
+
+    async function cancelSavedReceipt(receiptId, button) {
+        const index = history.findIndex(entry => entry.receiptId === receiptId);
+        if (index < 0) {
+            if (button) {
+                button.disabled = false;
+            }
+            return;
+        }
+
+        if (!window.confirm("Отменить выбранный приход?")) {
+            if (button) {
+                button.disabled = false;
+            }
+            return;
+        }
+
+        try {
+            const response = await fetch(`/wip/receipts/${encodeURIComponent(receiptId)}`, {
+                method: "DELETE",
+                headers: {
+                    "Accept": "application/json",
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error("Ошибка удаления прихода.");
+            }
+
+            const result = await response.json();
+            const key = getBalanceKey(result.partId, result.sectionId, result.opNumber);
+            const restored = typeof result.restoredQuantity === "number"
+                ? result.restoredQuantity
+                : Number(result.restoredQuantity ?? 0);
+            baselineBalances.set(key, isNaN(restored) ? 0 : restored);
+            pendingAdjustments.delete(key);
+
+            history.splice(index, 1);
+            renderHistory();
+            updateBalanceLabel();
+        }
+        catch (error) {
+            console.error(error);
+            alert("Не удалось отменить приход. Попробуйте повторить позже.");
+            if (button) {
+                button.disabled = false;
+            }
+        }
     }
 
     function showSummary(summary) {
@@ -616,6 +759,7 @@
     }
 
     updateFormState();
+    renderHistory();
 
     namespace.bindHotkeys({
         onEnter: () => addToCart(),

@@ -174,6 +174,41 @@ public class WipReceiptsController : Controller
         return Ok(model);
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор прихода.");
+        }
+
+        try
+        {
+            var result = await _wipService.DeleteReceiptAsync(id, cancellationToken).ConfigureAwait(false);
+
+            var viewModel = new ReceiptDeleteResultViewModel(
+                result.ReceiptId,
+                result.BalanceId,
+                result.PartId,
+                result.SectionId,
+                OperationNumber.Format(result.OpNumber),
+                result.ReceiptQuantity,
+                result.PreviousQuantity,
+                result.RestoredQuantity,
+                result.Delta);
+
+            return Ok(viewModel);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     public record ReceiptSaveRequest(IReadOnlyList<ReceiptSaveItem> Items);
 
     public record ReceiptSaveItem(
