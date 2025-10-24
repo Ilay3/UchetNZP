@@ -108,3 +108,30 @@ public record TransferSummaryItemViewModel(
     TransferScrapSummaryViewModel? Scrap);
 
 public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);
+
+public record TransferDeleteScrapViewModel(
+    Guid ScrapId,
+    ScrapType ScrapType,
+    decimal Quantity,
+    string? Comment);
+
+public record TransferDeleteWarehouseItemViewModel(
+    Guid WarehouseItemId,
+    decimal Quantity);
+
+public record TransferDeleteResultViewModel(
+    Guid TransferId,
+    Guid PartId,
+    string FromOpNumber,
+    Guid FromSectionId,
+    decimal FromBalanceBefore,
+    decimal FromBalanceAfter,
+    string ToOpNumber,
+    Guid ToSectionId,
+    decimal ToBalanceBefore,
+    decimal ToBalanceAfter,
+    decimal Quantity,
+    bool IsWarehouseTransfer,
+    IReadOnlyCollection<Guid> DeletedOperationIds,
+    TransferDeleteScrapViewModel? Scrap,
+    TransferDeleteWarehouseItemViewModel? WarehouseItem);

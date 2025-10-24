@@ -300,6 +300,168 @@ public class TransferService : ITransferService
         }
     }
 
+    public async Task<TransferDeleteResultDto> DeleteTransferAsync(Guid transferId, CancellationToken cancellationToken = default)
+    {
+        if (transferId == Guid.Empty)
+        {
+            throw new ArgumentException("Идентификатор передачи не может быть пустым.", nameof(transferId));
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var transfer = await _dbContext.WipTransfers
+                .Include(x => x.Operations)
+                .Include(x => x.Scrap)
+                .Include(x => x.WarehouseItem)
+                .FirstOrDefaultAsync(x => x.Id == transferId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (transfer is null)
+            {
+                throw new KeyNotFoundException($"Передача {transferId} не найдена.");
+            }
+
+            var operations = transfer.Operations.ToList();
+            if (operations.Count == 0)
+            {
+                throw new InvalidOperationException($"Для передачи {transferId} не найдены связанные операции.");
+            }
+
+            var fromOperation = operations.FirstOrDefault(x => x.QuantityChange < 0);
+            var toOperation = operations.FirstOrDefault(x => x.QuantityChange > 0);
+
+            if (fromOperation is null || toOperation is null)
+            {
+                throw new InvalidOperationException($"Передача {transferId} имеет некорректный набор операций.");
+            }
+
+            var fromBalance = await _dbContext.WipBalances
+                .FirstOrDefaultAsync(
+                    x => x.PartId == transfer.PartId &&
+                         x.SectionId == transfer.FromSectionId &&
+                         x.OpNumber == transfer.FromOpNumber,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (fromBalance is null)
+            {
+                throw new InvalidOperationException(
+                    $"Остаток НЗП для операции {transfer.FromOpNumber} детали {transfer.PartId} не найден.");
+            }
+
+            var fromBalanceBefore = fromBalance.Quantity;
+            var scrap = transfer.Scrap;
+            var scrapQuantity = scrap?.Quantity ?? 0m;
+            var fromBalanceAfter = fromBalanceBefore + transfer.Quantity + scrapQuantity;
+            fromBalance.Quantity = fromBalanceAfter;
+
+            TransferDeleteWarehouseItemDto? warehouseDto = null;
+            decimal toBalanceBefore;
+            decimal toBalanceAfter;
+            var isWarehouseTransfer = transfer.ToOpNumber == WarehouseDefaults.OperationNumber;
+
+            if (isWarehouseTransfer)
+            {
+                var warehouseItem = transfer.WarehouseItem;
+                if (warehouseItem is null)
+                {
+                    warehouseItem = await _dbContext.WarehouseItems
+                        .FirstOrDefaultAsync(x => x.TransferId == transfer.Id, cancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (warehouseItem is null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Для передачи {transferId} не найдена запись на складе.");
+                    }
+                }
+
+                toBalanceBefore = await _dbContext.WarehouseItems
+                    .Where(x => x.PartId == transfer.PartId)
+                    .SumAsync(x => x.Quantity, cancellationToken)
+                    .ConfigureAwait(false);
+
+                toBalanceAfter = toBalanceBefore - warehouseItem.Quantity;
+                if (toBalanceAfter < -0.000001m)
+                {
+                    throw new InvalidOperationException(
+                        "Отмена передачи приведёт к отрицательному остатку на складе.");
+                }
+
+                warehouseDto = new TransferDeleteWarehouseItemDto(warehouseItem.Id, warehouseItem.Quantity);
+                _dbContext.WarehouseItems.Remove(warehouseItem);
+            }
+            else
+            {
+                var toBalance = await _dbContext.WipBalances
+                    .FirstOrDefaultAsync(
+                        x => x.PartId == transfer.PartId &&
+                             x.SectionId == transfer.ToSectionId &&
+                             x.OpNumber == transfer.ToOpNumber,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (toBalance is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Остаток НЗП для операции {transfer.ToOpNumber} детали {transfer.PartId} не найден.");
+                }
+
+                toBalanceBefore = toBalance.Quantity;
+                toBalanceAfter = toBalanceBefore - transfer.Quantity;
+
+                if (toBalanceAfter < -0.000001m)
+                {
+                    throw new InvalidOperationException(
+                        "Отмена передачи приведёт к отрицательному остатку на операции после.");
+                }
+
+                toBalance.Quantity = toBalanceAfter;
+            }
+
+            TransferDeleteScrapDto? scrapDto = null;
+            if (scrap is not null)
+            {
+                scrapDto = new TransferDeleteScrapDto(scrap.Id, scrap.ScrapType, scrap.Quantity, scrap.Comment);
+                _dbContext.WipScraps.Remove(scrap);
+            }
+
+            if (operations.Count > 0)
+            {
+                _dbContext.WipTransferOperations.RemoveRange(operations);
+            }
+
+            _dbContext.WipTransfers.Remove(transfer);
+
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            return new TransferDeleteResultDto(
+                transfer.Id,
+                transfer.PartId,
+                transfer.FromOpNumber,
+                transfer.FromSectionId,
+                fromBalanceBefore,
+                fromBalanceAfter,
+                transfer.ToOpNumber,
+                transfer.ToSectionId,
+                toBalanceBefore,
+                toBalanceAfter,
+                transfer.Quantity,
+                isWarehouseTransfer,
+                operations.Select(x => x.Id).ToArray(),
+                scrapDto,
+                warehouseDto);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
     private static DateTime NormalizeToUtc(DateTime value)
     {
         return value.Kind switch

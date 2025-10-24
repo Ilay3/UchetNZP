@@ -39,6 +39,9 @@
     const scrapConfirmButton = document.getElementById("transferScrapConfirmButton");
     const scrapCommentInput = document.getElementById("transferScrapComment");
     const scrapTypeButtons = Array.from(scrapDetails?.querySelectorAll("[data-scrap-type]") ?? []);
+    const recentTableBody = document.querySelector("#transferRecentTable tbody");
+    const recentTableWrapper = document.getElementById("transferRecentTableWrapper");
+    const recentEmptyPlaceholder = document.getElementById("transferRecentEmpty");
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
@@ -54,6 +57,8 @@
         technological: { value: 0, code: "Technological", label: "Технологический" },
         employee: { value: 1, code: "EmployeeFault", label: "По вине сотрудника" },
     };
+
+    const RECENT_TRANSFER_LIMIT = 10;
 
     let scrapModalResolver = null;
     let scrapSelectedTypeKey = null;
@@ -74,6 +79,7 @@
     const balanceCache = new Map();
     const pendingChanges = new Map();
     let cart = [];
+    let recentTransfers = [];
     let isLoadingOperations = false;
     let isLoadingBalances = false;
 
@@ -188,6 +194,24 @@
         else if (target.dataset.action === "edit") {
             void editCartItem(index);
         }
+    });
+
+    recentTableBody?.addEventListener("click", event => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+
+        if (target.dataset.action !== "cancel") {
+            return;
+        }
+
+        const index = Number(target.dataset.index);
+        if (Number.isNaN(index) || index < 0 || index >= recentTransfers.length) {
+            return;
+        }
+
+        void cancelRecentTransfer(index);
     });
 
     scrapMarkButton?.addEventListener("click", () => {
@@ -322,8 +346,37 @@
         return parts.join(" | ");
     }
 
+    function normalizeOpNumberValue(value) {
+        if (value === null || value === undefined) {
+            return "";
+        }
+
+        if (typeof value === "number" && Number.isFinite(value)) {
+            const numeric = Math.trunc(value);
+            return numeric.toString().padStart(3, "0");
+        }
+
+        if (typeof value === "string") {
+            const trimmed = value.trim();
+            if (!trimmed.length) {
+                return "";
+            }
+
+            if (/^\d+$/.test(trimmed)) {
+                const parsed = Number(trimmed);
+                if (Number.isFinite(parsed)) {
+                    return Math.trunc(parsed).toString().padStart(3, "0");
+                }
+            }
+
+            return trimmed;
+        }
+
+        return String(value);
+    }
+
     function getBalanceKey(partId, opNumber) {
-        return `${partId}:${opNumber}`;
+        return `${partId}:${normalizeOpNumberValue(opNumber)}`;
     }
 
     function getAvailableBalance(partId, opNumber) {
@@ -776,6 +829,177 @@
             </div>`;
     }
 
+    function renderRecentTransfers() {
+        if (!recentTableBody || !recentTableWrapper || !recentEmptyPlaceholder) {
+            return;
+        }
+
+        if (!recentTransfers.length) {
+            recentTableBody.innerHTML = "";
+            recentTableWrapper.classList.add("d-none");
+            recentEmptyPlaceholder.classList.remove("d-none");
+            return;
+        }
+
+        recentTableWrapper.classList.remove("d-none");
+        recentEmptyPlaceholder.classList.add("d-none");
+        recentTableBody.innerHTML = "";
+
+        recentTransfers.forEach((item, index) => {
+            const row = document.createElement("tr");
+            const quantityText = Number(item.quantity).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+            const fromBalanceText = formatBalanceChange(item.fromBalanceBefore, item.fromBalanceAfter);
+            const toBalanceText = formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter);
+            const fromName = item.fromOperationName ? `<div class=\"small text-muted\">${escapeHtml(item.fromOperationName)}</div>` : "";
+            const toName = item.toOperationName ? `<div class=\"small text-muted\">${escapeHtml(item.toOperationName)}</div>` : "";
+
+            row.innerHTML = `
+                <td>${item.date ? escapeHtml(item.date) : ""}</td>
+                <td>${escapeHtml(item.partDisplay ?? item.partId ?? "")}</td>
+                <td>
+                    <div class="fw-semibold">${escapeHtml(item.fromOpNumber ?? "")}</div>
+                    ${fromName}
+                </td>
+                <td>
+                    <div class="fw-semibold">${escapeHtml(item.toOpNumber ?? "")}</div>
+                    ${toName}
+                </td>
+                <td>${quantityText}</td>
+                <td>${fromBalanceText}</td>
+                <td>${toBalanceText}</td>
+                <td>${formatScrapCell(item)}</td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-action="cancel" data-index="${index}" data-transfer-id="${item.transferId}">Отменить</button>
+                </td>`;
+
+            recentTableBody.appendChild(row);
+        });
+    }
+
+    function rememberRecentTransfers(summary, cartSnapshot) {
+        if (!summary || !Array.isArray(summary.items) || !Array.isArray(cartSnapshot)) {
+            return;
+        }
+
+        const additions = [];
+        summary.items.forEach((item, index) => {
+            if (!item || !item.transferId) {
+                return;
+            }
+
+            const cartItem = cartSnapshot[index] ?? null;
+            const partDisplay = cartItem?.partDisplay ?? cartItem?.partName ?? item.partId ?? "";
+            const scrapSource = extractScrapSource(item) ?? extractScrapSource(cartItem);
+            const scrapInfo = normalizeScrapInfo(scrapSource);
+
+            additions.push({
+                transferId: item.transferId,
+                partId: item.partId,
+                partDisplay,
+                date: cartItem?.date ?? null,
+                fromOpNumber: item.fromOpNumber,
+                fromOperationName: cartItem?.fromOperationName ?? null,
+                toOpNumber: item.toOpNumber,
+                toOperationName: cartItem?.toOperationName ?? null,
+                quantity: Number(item.quantity) || 0,
+                fromBalanceBefore: Number(item.fromBalanceBefore) || 0,
+                fromBalanceAfter: Number(item.fromBalanceAfter) || 0,
+                toBalanceBefore: Number(item.toBalanceBefore) || 0,
+                toBalanceAfter: Number(item.toBalanceAfter) || 0,
+                fromSectionId: item.fromSectionId,
+                toSectionId: item.toSectionId,
+                scrapType: scrapInfo?.scrapType ?? null,
+                scrapTypeLabel: scrapInfo?.scrapTypeLabel ?? null,
+                scrapQuantity: scrapInfo?.scrapQuantity ?? 0,
+                scrapComment: scrapInfo?.scrapComment ?? null,
+                scrap: scrapInfo,
+            });
+        });
+
+        if (!additions.length) {
+            return;
+        }
+
+        additions.reverse().forEach(entry => {
+            recentTransfers = recentTransfers.filter(existing => existing.transferId !== entry.transferId);
+            recentTransfers.unshift(entry);
+        });
+
+        if (recentTransfers.length > RECENT_TRANSFER_LIMIT) {
+            recentTransfers = recentTransfers.slice(0, RECENT_TRANSFER_LIMIT);
+        }
+
+        renderRecentTransfers();
+    }
+
+    async function cancelRecentTransfer(index) {
+        const item = recentTransfers[index];
+        if (!item) {
+            return;
+        }
+
+        if (!window.confirm("Отменить выбранную передачу?")) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/wip/transfer/${encodeURIComponent(item.transferId)}`, {
+                method: "DELETE",
+                headers: { "Accept": "application/json" },
+            });
+
+            if (!response.ok) {
+                let message = "Не удалось отменить передачу.";
+                try {
+                    const data = await response.json();
+                    if (typeof data === "string" && data.trim().length > 0) {
+                        message = data.trim();
+                    }
+                    else if (data && typeof data.message === "string" && data.message.trim().length > 0) {
+                        message = data.message.trim();
+                    }
+                }
+                catch {
+                    const text = await response.text();
+                    if (text && text.trim().length > 0) {
+                        message = text.trim();
+                    }
+                }
+
+                throw new Error(message);
+            }
+
+            const result = await response.json();
+            recentTransfers.splice(index, 1);
+            renderRecentTransfers();
+            applyDeleteResult(result);
+            alert("Передача отменена.");
+        }
+        catch (error) {
+            console.error(error);
+            alert(error instanceof Error ? error.message : "Не удалось отменить передачу.");
+        }
+    }
+
+    function applyDeleteResult(result) {
+        if (!result) {
+            return;
+        }
+
+        const partId = result.partId;
+        const fromKey = getBalanceKey(partId, result.fromOpNumber);
+        const toKey = getBalanceKey(partId, result.toOpNumber);
+
+        balanceCache.set(fromKey, Number(result.fromBalanceAfter) || 0);
+        balanceCache.set(toKey, Number(result.toBalanceAfter) || 0);
+
+        const part = partLookup.getSelected();
+        if (part && part.id === partId) {
+            updateOperationsDisplay(part.id);
+            updateBalanceLabels();
+        }
+    }
+
     function extractScrapSource(source) {
         if (!source) {
             return null;
@@ -955,6 +1179,7 @@
         };
 
         saveButton.disabled = true;
+        const cartSnapshot = cart.slice();
         try {
             const response = await fetch("/wip/transfer/save", {
                 method: "POST",
@@ -970,6 +1195,7 @@
             }
 
             const summary = await response.json();
+            rememberRecentTransfers(summary, cartSnapshot);
             showSummary(summary);
             updateBalancesAfterSave(summary);
             pendingChanges.clear();
@@ -1073,6 +1299,7 @@
         }
     }
 
+    renderRecentTransfers();
     updateFormState();
 
     namespace.bindHotkeys({

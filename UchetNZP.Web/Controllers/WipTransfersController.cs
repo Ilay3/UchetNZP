@@ -245,6 +245,61 @@ public class WipTransfersController : Controller
         return Ok(model);
     }
 
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Не указан идентификатор передачи.");
+        }
+
+        try
+        {
+            var result = await _transferService.DeleteTransferAsync(id, cancellationToken).ConfigureAwait(false);
+
+            var viewModel = new TransferDeleteResultViewModel(
+                result.TransferId,
+                result.PartId,
+                OperationNumber.Format(result.FromOpNumber),
+                result.FromSectionId,
+                result.FromBalanceBefore,
+                result.FromBalanceAfter,
+                OperationNumber.Format(result.ToOpNumber),
+                result.ToSectionId,
+                result.ToBalanceBefore,
+                result.ToBalanceAfter,
+                result.Quantity,
+                result.IsWarehouseTransfer,
+                result.DeletedOperationIds,
+                result.Scrap is null
+                    ? null
+                    : new TransferDeleteScrapViewModel(
+                        result.Scrap.ScrapId,
+                        result.Scrap.ScrapType,
+                        result.Scrap.Quantity,
+                        result.Scrap.Comment),
+                result.WarehouseItem is null
+                    ? null
+                    : new TransferDeleteWarehouseItemViewModel(
+                        result.WarehouseItem.WarehouseItemId,
+                        result.WarehouseItem.Quantity));
+
+            return Ok(viewModel);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     public record TransferSaveRequest(IReadOnlyList<TransferSaveItem> Items);
 
     public record TransferSaveItem(
