@@ -126,14 +126,12 @@ public class LaunchService : ILaunchService
                     await _dbContext.WipLaunchOperations.AddAsync(launchOperation, cancellationToken).ConfigureAwait(false);
                 }
 
-                balance.Quantity -= item.Quantity;
-
                 results.Add(new LaunchItemSummaryDto(
                     item.PartId,
                     item.FromOpNumber,
                     routeStart.SectionId,
                     item.Quantity,
-                    balance.Quantity,
+                    balance.Quantity - item.Quantity,
                     sumHours,
                     launch.Id));
             }
@@ -183,8 +181,6 @@ public class LaunchService : ILaunchService
             {
                 throw new InvalidOperationException($"Остаток НЗП по детали {launch.PartId} и операции {launch.FromOpNumber} отсутствует.");
             }
-
-            balance.Quantity += launch.Quantity;
 
             if (launch.Operations.Count > 0)
             {

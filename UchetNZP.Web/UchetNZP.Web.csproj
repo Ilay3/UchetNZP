@@ -23,6 +23,7 @@
     <ProjectReference Include="..\UchetNZP.Application\UchetNZP.Application.csproj" />
     <ProjectReference Include="..\UchetNZP.Domain\UchetNZP.Domain.csproj" />
     <ProjectReference Include="..\UchetNZP.Infrastructure\UchetNZP.Infrastructure.csproj" />
+    <ProjectReference Include="..\UchetNZP.Shared\UchetNZP.Shared.csproj" />
   </ItemGroup>
 
 </Project>

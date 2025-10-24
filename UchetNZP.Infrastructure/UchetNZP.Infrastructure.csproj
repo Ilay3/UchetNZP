@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\UchetNZP.Domain\UchetNZP.Domain.csproj" />
+    <ProjectReference Include="..\UchetNZP.Shared\UchetNZP.Shared.csproj" />
   </ItemGroup>
 
 </Project>

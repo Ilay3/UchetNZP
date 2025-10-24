@@ -6,6 +6,7 @@ using UchetNZP.Application.Contracts.Transfers;
 using UchetNZP.Application.Services;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
 using Xunit;
 
 namespace UchetNZP.Application.Tests.Services;
@@ -150,6 +151,73 @@ public class TransferServiceTests
         Assert.True(scrap.RecordedAt > DateTime.MinValue);
         Assert.NotNull(scrap.Transfer);
         Assert.Equal(item.TransferId, scrap.Transfer!.Id);
+    }
+
+    [Fact]
+    public async Task AddTransfersBatchAsync_ToWarehouse_StoresWarehouseEntry()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ" };
+        var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "010" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(fromSection, new Section { Id = WarehouseDefaults.SectionId, Name = WarehouseDefaults.SectionName });
+        dbContext.Operations.AddRange(fromOperation, new Operation { Id = WarehouseDefaults.OperationId, Name = WarehouseDefaults.OperationName });
+        dbContext.PartRoutes.Add(CreateRoute(part.Id, fromSection.Id, fromOperation.Id, 10));
+
+        var fromBalance = new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = fromSection.Id,
+            OpNumber = 10,
+            Quantity = 120m,
+        };
+
+        dbContext.WipBalances.Add(fromBalance);
+
+        var existingWarehouseItem = new WarehouseItem
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            Quantity = 5m,
+            AddedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+
+        dbContext.WarehouseItems.Add(existingWarehouseItem);
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+
+        var transferDate = new DateTime(2025, 2, 2, 0, 0, 0, DateTimeKind.Utc);
+        var summary = await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 40m, "Склад", null),
+        });
+
+        var item = Assert.Single(summary.Items);
+        Assert.Equal(WarehouseDefaults.SectionId, item.ToSectionId);
+        Assert.Equal(5m, item.ToBalanceBefore);
+        Assert.Equal(45m, item.ToBalanceAfter);
+
+        var updatedFromBalance = await dbContext.WipBalances.SingleAsync(x => x.Id == fromBalance.Id);
+        Assert.Equal(80m, updatedFromBalance.Quantity);
+
+        Assert.Equal(2, await dbContext.WarehouseItems.CountAsync());
+        var newEntry = await dbContext.WarehouseItems
+            .Where(x => x.TransferId == item.TransferId)
+            .SingleAsync();
+
+        Assert.Equal(40m, newEntry.Quantity);
+        Assert.Equal(transferDate, newEntry.AddedAt);
+        Assert.Equal(part.Id, newEntry.PartId);
+        Assert.Equal("Склад", newEntry.Comment);
+        Assert.Null(await dbContext.WipBalances.FirstOrDefaultAsync(x => x.OpNumber == WarehouseDefaults.OperationNumber));
     }
 
     private static PartRoute CreateRoute(Guid partId, Guid sectionId, Guid operationId, int opNumber)

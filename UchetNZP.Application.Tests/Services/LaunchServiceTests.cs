@@ -65,7 +65,7 @@ public class LaunchServiceTests
         Assert.Equal(60m, item.Remaining);
 
         var balance = await dbContext.WipBalances.FirstAsync(x => x.PartId == partId && x.OpNumber == 15);
-        Assert.Equal(60m, balance.Quantity);
+        Assert.Equal(100m, balance.Quantity);
 
         var launch = await dbContext.WipLaunches
             .Include(x => x.Operations)
@@ -140,13 +140,13 @@ public class LaunchServiceTests
         var result = await service.DeleteLaunchAsync(launchId);
 
         Assert.Equal(launchId, result.LaunchId);
-        Assert.Equal(35m, result.Remaining);
+        Assert.Equal(10m, result.Remaining);
 
         Assert.False(await dbContext.WipLaunches.AnyAsync());
         Assert.False(await dbContext.WipLaunchOperations.AnyAsync());
 
         var balance = await dbContext.WipBalances.SingleAsync();
-        Assert.Equal(35m, balance.Quantity);
+        Assert.Equal(10m, balance.Quantity);
     }
 
     [Fact]

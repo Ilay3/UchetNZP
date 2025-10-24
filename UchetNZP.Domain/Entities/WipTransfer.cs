@@ -31,4 +31,6 @@ public class WipTransfer
     public virtual ICollection<WipTransferOperation> Operations { get; set; } = new List<WipTransferOperation>();
 
     public virtual WipScrap? Scrap { get; set; }
+
+    public virtual WarehouseItem? WarehouseItem { get; set; }
 }
