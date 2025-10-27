@@ -70,8 +70,8 @@ public class WipHistoryController : Controller
             partIds = await _dbContext.Parts
                 .AsNoTracking()
                 .Where(part =>
-                    part.Name.ToLower().Contains(normalizedPart) ||
-                    (part.Code != null && part.Code.ToLower().Contains(normalizedPart)))
+                    part.Name.ToLower().IndexOf(normalizedPart) >= 0 ||
+                    (part.Code != null && part.Code.ToLower().IndexOf(normalizedPart) >= 0))
                 .Select(part => part.Id)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -84,8 +84,8 @@ public class WipHistoryController : Controller
             sectionIds = await _dbContext.Sections
                 .AsNoTracking()
                 .Where(section =>
-                    section.Name.ToLower().Contains(normalizedSection) ||
-                    (section.Code != null && section.Code.ToLower().Contains(normalizedSection)))
+                    section.Name.ToLower().IndexOf(normalizedSection) >= 0 ||
+                    (section.Code != null && section.Code.ToLower().IndexOf(normalizedSection) >= 0))
                 .Select(section => section.Id)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -109,7 +109,8 @@ public class WipHistoryController : Controller
                 .Include(x => x.Operations)
                     .ThenInclude(o => o.Operation)
                 .Include(x => x.Operations)
-                    .ThenInclude(o => o.Section);
+                    .ThenInclude(o => o.Section)
+                .AsQueryable();
 
             if (hasPartFilter)
             {
@@ -172,7 +173,8 @@ public class WipHistoryController : Controller
                 .AsNoTracking()
                 .Where(x => x.ReceiptDate >= fromUtc && x.ReceiptDate < toUtcExclusive)
                 .Include(x => x.Part)
-                .Include(x => x.Section);
+                .Include(x => x.Section)
+                .AsQueryable();
 
             if (hasPartFilter)
             {
@@ -189,15 +191,15 @@ public class WipHistoryController : Controller
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            var partIds = receipts.Select(x => x.PartId).Distinct().ToList();
-            var sectionIds = receipts.Select(x => x.SectionId).Distinct().ToList();
+            var receiptPartIds = receipts.Select(x => x.PartId).Distinct().ToList();
+            var receiptSectionIds = receipts.Select(x => x.SectionId).Distinct().ToList();
             var opNumbers = receipts.Select(x => x.OpNumber).Distinct().ToList();
 
             var routes = await _dbContext.PartRoutes
                 .AsNoTracking()
                 .Where(route =>
-                    partIds.Contains(route.PartId) &&
-                    sectionIds.Contains(route.SectionId) &&
+                    receiptPartIds.Contains(route.PartId) &&
+                    receiptSectionIds.Contains(route.SectionId) &&
                     opNumbers.Contains(route.OpNumber))
                 .Include(route => route.Operation)
                 .ToListAsync(cancellationToken)
@@ -255,7 +257,8 @@ public class WipHistoryController : Controller
                     .ThenInclude(o => o.Operation)
                 .Include(x => x.Operations)
                     .ThenInclude(o => o.Section)
-                .Include(x => x.Scrap);
+                .Include(x => x.Scrap)
+                .AsQueryable();
 
             if (hasPartFilter)
             {
