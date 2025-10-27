@@ -40,15 +40,68 @@ public class WipHistoryController : Controller
             };
         }
 
+        var partSearch = query?.Part;
+        if (string.IsNullOrWhiteSpace(partSearch))
+        {
+            partSearch = string.Empty;
+        }
+        else
+        {
+            partSearch = partSearch.Trim();
+        }
+
+        var sectionSearch = query?.Section;
+        if (string.IsNullOrWhiteSpace(sectionSearch))
+        {
+            sectionSearch = string.Empty;
+        }
+        else
+        {
+            sectionSearch = sectionSearch.Trim();
+        }
+
+        var hasPartFilter = partSearch.Length > 0;
+        var hasSectionFilter = sectionSearch.Length > 0;
+
+        var partIds = new List<Guid>();
+        if (hasPartFilter)
+        {
+            var normalizedPart = partSearch.ToLowerInvariant();
+            partIds = await _dbContext.Parts
+                .AsNoTracking()
+                .Where(part =>
+                    part.Name.ToLower().IndexOf(normalizedPart) >= 0 ||
+                    (part.Code != null && part.Code.ToLower().IndexOf(normalizedPart) >= 0))
+                .Select(part => part.Id)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var sectionIds = new List<Guid>();
+        if (hasSectionFilter)
+        {
+            var normalizedSection = sectionSearch.ToLowerInvariant();
+            sectionIds = await _dbContext.Sections
+                .AsNoTracking()
+                .Where(section =>
+                    section.Name.ToLower().IndexOf(normalizedSection) >= 0 ||
+                    (section.Code != null && section.Code.ToLower().IndexOf(normalizedSection) >= 0))
+                .Select(section => section.Id)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var canLoadData = (!hasPartFilter || partIds.Count > 0) && (!hasSectionFilter || sectionIds.Count > 0);
+
         var entries = new List<WipHistoryEntryViewModel>();
         var typeComparer = StringComparer.CurrentCultureIgnoreCase;
 
-        if (selectedTypes.Contains(WipHistoryEntryType.Launch))
+        if (selectedTypes.Contains(WipHistoryEntryType.Launch) && canLoadData)
         {
             var fromUtc = ToUtcStartOfDay(fromDate);
             var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
 
-            var launches = await _dbContext.WipLaunches
+            var launchesQuery = _dbContext.WipLaunches
                 .AsNoTracking()
                 .Where(x => x.LaunchDate >= fromUtc && x.LaunchDate < toUtcExclusive)
                 .Include(x => x.Part)
@@ -57,6 +110,19 @@ public class WipHistoryController : Controller
                     .ThenInclude(o => o.Operation)
                 .Include(x => x.Operations)
                     .ThenInclude(o => o.Section)
+                .AsQueryable();
+
+            if (hasPartFilter)
+            {
+                launchesQuery = launchesQuery.Where(x => partIds.Contains(x.PartId));
+            }
+
+            if (hasSectionFilter)
+            {
+                launchesQuery = launchesQuery.Where(x => sectionIds.Contains(x.SectionId));
+            }
+
+            var launches = await launchesQuery
                 .OrderBy(x => x.LaunchDate)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -98,29 +164,42 @@ public class WipHistoryController : Controller
             }
         }
 
-        if (selectedTypes.Contains(WipHistoryEntryType.Receipt))
+        if (selectedTypes.Contains(WipHistoryEntryType.Receipt) && canLoadData)
         {
             var fromUtc = ToUtcStartOfDay(fromDate);
             var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
 
-            var receipts = await _dbContext.WipReceipts
+            var receiptsQuery = _dbContext.WipReceipts
                 .AsNoTracking()
                 .Where(x => x.ReceiptDate >= fromUtc && x.ReceiptDate < toUtcExclusive)
                 .Include(x => x.Part)
                 .Include(x => x.Section)
+                .AsQueryable();
+
+            if (hasPartFilter)
+            {
+                receiptsQuery = receiptsQuery.Where(x => partIds.Contains(x.PartId));
+            }
+
+            if (hasSectionFilter)
+            {
+                receiptsQuery = receiptsQuery.Where(x => sectionIds.Contains(x.SectionId));
+            }
+
+            var receipts = await receiptsQuery
                 .OrderBy(x => x.ReceiptDate)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            var partIds = receipts.Select(x => x.PartId).Distinct().ToList();
-            var sectionIds = receipts.Select(x => x.SectionId).Distinct().ToList();
+            var receiptPartIds = receipts.Select(x => x.PartId).Distinct().ToList();
+            var receiptSectionIds = receipts.Select(x => x.SectionId).Distinct().ToList();
             var opNumbers = receipts.Select(x => x.OpNumber).Distinct().ToList();
 
             var routes = await _dbContext.PartRoutes
                 .AsNoTracking()
                 .Where(route =>
-                    partIds.Contains(route.PartId) &&
-                    sectionIds.Contains(route.SectionId) &&
+                    receiptPartIds.Contains(route.PartId) &&
+                    receiptSectionIds.Contains(route.SectionId) &&
                     opNumbers.Contains(route.OpNumber))
                 .Include(route => route.Operation)
                 .ToListAsync(cancellationToken)
@@ -165,12 +244,12 @@ public class WipHistoryController : Controller
             }
         }
 
-        if (selectedTypes.Contains(WipHistoryEntryType.Transfer))
+        if (selectedTypes.Contains(WipHistoryEntryType.Transfer) && canLoadData)
         {
             var fromUtc = ToUtcStartOfDay(fromDate);
             var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
 
-            var transfers = await _dbContext.WipTransfers
+            var transfersQuery = _dbContext.WipTransfers
                 .AsNoTracking()
                 .Where(x => x.TransferDate >= fromUtc && x.TransferDate < toUtcExclusive)
                 .Include(x => x.Part)
@@ -179,6 +258,19 @@ public class WipHistoryController : Controller
                 .Include(x => x.Operations)
                     .ThenInclude(o => o.Section)
                 .Include(x => x.Scrap)
+                .AsQueryable();
+
+            if (hasPartFilter)
+            {
+                transfersQuery = transfersQuery.Where(x => partIds.Contains(x.PartId));
+            }
+
+            if (hasSectionFilter)
+            {
+                transfersQuery = transfersQuery.Where(x => sectionIds.Contains(x.FromSectionId) || sectionIds.Contains(x.ToSectionId));
+            }
+
+            var transfers = await transfersQuery
                 .OrderBy(x => x.TransferDate)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -273,6 +365,8 @@ public class WipHistoryController : Controller
             Types = selectedTypes
                 .OrderBy(x => x)
                 .ToList(),
+            PartSearch = partSearch,
+            SectionSearch = sectionSearch,
         };
 
         var model = new WipHistoryViewModel(filter, grouped);

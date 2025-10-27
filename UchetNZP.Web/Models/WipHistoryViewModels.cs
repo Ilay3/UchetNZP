@@ -19,6 +19,10 @@ public class WipHistoryFilterViewModel
 
     public IReadOnlyCollection<WipHistoryEntryType> Types { get; init; } = Array.Empty<WipHistoryEntryType>();
 
+    public string PartSearch { get; init; } = string.Empty;
+
+    public string SectionSearch { get; init; } = string.Empty;
+
     public bool IsTypeSelected(WipHistoryEntryType type)
     {
         return Types.Contains(type);
@@ -261,4 +265,8 @@ public class WipHistoryQuery
     public DateTime? To { get; set; }
 
     public string[]? Types { get; set; }
+
+    public string? Part { get; set; }
+
+    public string? Section { get; set; }
 }

@@ -59,15 +59,26 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end" autocomplete="off">
-            <div class="col-sm-6 col-md-3">
+            <div class="col-sm-6 col-md-3 col-lg-2">
                 <label class="form-label" for="historyFilterFrom">Период с</label>
                 <input id="historyFilterFrom" class="form-control form-control-lg" type="date" name="from" value="@Model.Filter.From.ToString("yyyy-MM-dd")" />
             </div>
-            <div class="col-sm-6 col-md-3">
+            <div class="col-sm-6 col-md-3 col-lg-2">
                 <label class="form-label" for="historyFilterTo">по</label>
                 <input id="historyFilterTo" class="form-control form-control-lg" type="date" name="to" value="@Model.Filter.To.ToString("yyyy-MM-dd")" />
             </div>
-            <div class="col-12 col-md-6 col-lg-4">
+            <div class="col-sm-6 col-md-3 col-lg-3">
+                <label class="form-label" for="historyFilterPart">Деталь</label>
+                <input id="historyFilterPart" class="form-control form-control-lg" type="text" name="part" value="@Model.Filter.PartSearch" placeholder="Название или код" />
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-3">
+                <label class="form-label" for="historyFilterSection">Вид работ</label>
+                <input id="historyFilterSection" class="form-control form-control-lg" type="text" name="section" value="@Model.Filter.SectionSearch" placeholder="Участок или код" />
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <button type="submit" class="btn btn-primary btn-lg w-100">Показать</button>
+            </div>
+            <div class="col-12">
                 <div class="fw-semibold mb-2">Типы операций</div>
                 <div class="d-flex flex-wrap gap-3">
                     @foreach (var type in types)
@@ -81,9 +92,6 @@
                     }
                 </div>
                 <div class="form-text">Снимите галочки, чтобы исключить отдельные типы из списка.</div>
-            </div>
-            <div class="col-sm-6 col-md-3 col-lg-2">
-                <button type="submit" class="btn btn-primary btn-lg w-100">Показать</button>
             </div>
         </form>
     </div>
