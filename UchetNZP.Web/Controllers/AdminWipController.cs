@@ -101,7 +101,7 @@ public class AdminWipController : Controller
             .Select(x => new SelectListItem
             {
                 Value = x.Id.ToString(),
-                Text = string.IsNullOrWhiteSpace(x.Code) ? x.Name : string.Format(CultureInfo.CurrentCulture, "{0} — {1}", x.Code, x.Name),
+                Text = NameWithCodeFormatter.getNameWithCode(x.Name, x.Code),
                 Selected = partId.HasValue && x.Id == partId.Value,
             })
             .ToListAsync()
@@ -120,7 +120,7 @@ public class AdminWipController : Controller
             .Select(x => new SelectListItem
             {
                 Value = x.Id.ToString(),
-                Text = string.IsNullOrWhiteSpace(x.Code) ? x.Name : string.Format(CultureInfo.CurrentCulture, "{0} — {1}", x.Code, x.Name),
+                Text = NameWithCodeFormatter.getNameWithCode(x.Name, x.Code),
                 Selected = sectionId.HasValue && x.Id == sectionId.Value,
             })
             .ToListAsync()
@@ -163,12 +163,8 @@ public class AdminWipController : Controller
                 BalanceId = x.Id,
                 PartId = x.PartId,
                 SectionId = x.SectionId,
-                PartDisplay = string.IsNullOrWhiteSpace(x.Part!.Code)
-                    ? x.Part.Name
-                    : string.Format(CultureInfo.CurrentCulture, "{0} — {1}", x.Part.Code, x.Part.Name),
-                SectionDisplay = string.IsNullOrWhiteSpace(x.Section!.Code)
-                    ? x.Section.Name
-                    : string.Format(CultureInfo.CurrentCulture, "{0} — {1}", x.Section.Code, x.Section.Name),
+                PartDisplay = NameWithCodeFormatter.getNameWithCode(x.Part!.Name, x.Part.Code),
+                SectionDisplay = NameWithCodeFormatter.getNameWithCode(x.Section!.Name, x.Section.Code),
                 OpNumber = OperationNumber.Format(x.OpNumber),
                 Quantity = x.Quantity,
             })

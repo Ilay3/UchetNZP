@@ -1,13 +1,50 @@
 (function () {
     const globalNamespace = window.UchetNZP || (window.UchetNZP = {});
 
+    function toTrimmedString(value) {
+        if (typeof value === "string") {
+            return value.trim();
+        }
+
+        if (value === null || value === undefined) {
+            return "";
+        }
+
+        return String(value).trim();
+    }
+
+    function isCodePartOfName(name, code) {
+        if (!name || !code) {
+            return false;
+        }
+
+        return name.toLowerCase().includes(code.toLowerCase());
+    }
+
+    function formatNameWithCode(name, code) {
+        const normalizedName = toTrimmedString(name);
+        const normalizedCode = toTrimmedString(code);
+        let result = normalizedName;
+
+        if (!result && normalizedCode) {
+            result = normalizedCode;
+        }
+        else if (normalizedCode && !isCodePartOfName(result, normalizedCode)) {
+            result = `${result} (${normalizedCode})`;
+        }
+
+        return result;
+    }
+
     function defaultFormat(item) {
         if (!item) {
             return "";
         }
 
-        return item.code ? `${item.name} (${item.code})` : item.name;
+        return formatNameWithCode(item.name, item.code);
     }
+
+    globalNamespace.formatNameWithCode = formatNameWithCode;
 
     function debounce(fn, delay) {
         let timeoutId;

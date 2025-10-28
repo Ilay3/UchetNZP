@@ -4,6 +4,23 @@
         throw new Error("Не инициализировано пространство имён UchetNZP.");
     }
 
+    const formatNameWithCode = typeof namespace.formatNameWithCode === "function"
+        ? namespace.formatNameWithCode
+        : (name, code) => {
+            const normalizedName = typeof name === "string" ? name.trim() : "";
+            const normalizedCode = typeof code === "string" ? code.trim() : "";
+            let result = normalizedName;
+
+            if (!result && normalizedCode) {
+                result = normalizedCode;
+            }
+            else if (normalizedCode && !result.toLowerCase().includes(normalizedCode.toLowerCase())) {
+                result = `${result} (${normalizedCode})`;
+            }
+
+            return result;
+        };
+
     const operationsTableBody = document.querySelector("#receiptOperationsTable tbody");
     const cartTableBody = document.querySelector("#receiptCartTable tbody");
     const summaryTableBody = document.querySelector("#receiptSummaryTable tbody");
@@ -546,7 +563,7 @@
 
         pendingAdjustments.set(key, pending + quantity);
 
-        const partDisplay = part.code ? `${part.name} (${part.code})` : part.name;
+        const partDisplay = formatNameWithCode(part.name, part.code);
         const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
 
         const item = {
