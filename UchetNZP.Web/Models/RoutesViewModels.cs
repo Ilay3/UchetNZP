@@ -16,9 +16,7 @@ public record RouteListItemViewModel(
     string SectionName,
     decimal NormHours)
 {
-    public string PartDisplayName => string.IsNullOrWhiteSpace(PartCode)
-        ? PartName
-        : $"{PartName} ({PartCode})";
+    public string PartDisplayName => NameWithCodeFormatter.getNameWithCode(PartName, PartCode);
 
     public string OperationDisplay => string.IsNullOrWhiteSpace(OperationName)
         ? OpNumber

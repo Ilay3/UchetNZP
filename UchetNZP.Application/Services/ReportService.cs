@@ -88,7 +88,7 @@ public class ReportService : IReportService
             sectionDisplay = await _dbContext.Sections
                 .AsNoTracking()
                 .Where(x => x.Id == normalizedSectionId.Value)
-                .Select(x => string.IsNullOrWhiteSpace(x.Code) ? x.Name : $"{x.Name} ({x.Code})")
+                .Select(x => NameWithCodeFormatter.getNameWithCode(x.Name, x.Code))
                 .FirstOrDefaultAsync(cancellationToken)
                 .ConfigureAwait(false);
         }
