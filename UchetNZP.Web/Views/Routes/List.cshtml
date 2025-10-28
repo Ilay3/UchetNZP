@@ -1,4 +1,5 @@
 @using System.Linq
+@using UchetNZP.Shared
 @model UchetNZP.Web.Models.RouteListViewModel
 @{
     ViewData["Title"] = "Маршруты деталей";
@@ -49,7 +50,7 @@
                     @foreach (var sectionItem in Model.Filter.Sections)
                     {
                         var selected = selectedSectionId.HasValue && selectedSectionId.Value == sectionItem.Id;
-                        var label = string.IsNullOrWhiteSpace(sectionItem.Code) ? sectionItem.Name : $"{sectionItem.Name} ({sectionItem.Code})";
+                        var label = NameWithCodeFormatter.getNameWithCode(sectionItem.Name, sectionItem.Code);
                         <option value="@sectionItem.Id" selected="@(selected ? "selected" : null)">@label</option>
                     }
                 </select>

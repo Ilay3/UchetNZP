@@ -4,6 +4,23 @@
         throw new Error("Не инициализировано пространство имён UchetNZP.");
     }
 
+    const formatNameWithCode = typeof namespace.formatNameWithCode === "function"
+        ? namespace.formatNameWithCode
+        : (name, code) => {
+            const normalizedName = typeof name === "string" ? name.trim() : "";
+            const normalizedCode = typeof code === "string" ? code.trim() : "";
+            let result = normalizedName;
+
+            if (!result && normalizedCode) {
+                result = normalizedCode;
+            }
+            else if (normalizedCode && !result.toLowerCase().includes(normalizedCode.toLowerCase())) {
+                result = `${result} (${normalizedCode})`;
+            }
+
+            return result;
+        };
+
     const partLookup = namespace.initSearchableInput({
         input: document.getElementById("transferPartInput"),
         datalist: document.getElementById("transferPartOptions"),
@@ -680,7 +697,7 @@
             partId: part.id,
             partName: part.name,
             partCode: part.code ?? null,
-            partDisplay: part.code ? `${part.name} (${part.code})` : part.name,
+            partDisplay: formatNameWithCode(part.name, part.code),
             fromOpNumber: selectedFromOperation.opNumber,
             fromOperationName: selectedFromOperation.operationName,
             fromDisplay: formatOperation(selectedFromOperation),

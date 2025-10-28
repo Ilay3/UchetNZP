@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Models;
 
@@ -148,9 +149,7 @@ public class WipHistoryEntryViewModel
 
     public DateTime Date => OccurredAt.Date;
 
-    public string PartDisplayName => string.IsNullOrWhiteSpace(PartCode)
-        ? PartName
-        : $"{PartName} ({PartCode})";
+    public string PartDisplayName => NameWithCodeFormatter.getNameWithCode(PartName, PartCode);
 
     public string TypeDisplayName => Type switch
     {

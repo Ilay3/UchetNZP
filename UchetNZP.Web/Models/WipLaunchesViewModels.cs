@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Models;
 
@@ -81,9 +82,7 @@ public class LaunchHistoryItemViewModel
 
     public DateTime Date => LaunchDate.Date;
 
-    public string PartDisplayName => string.IsNullOrWhiteSpace(PartCode)
-        ? PartName
-        : $"{PartName} ({PartCode})";
+    public string PartDisplayName => NameWithCodeFormatter.getNameWithCode(PartName, PartCode);
 
     public string OperationRange
     {

@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Controllers;
@@ -99,9 +99,7 @@ public class WarehouseController : Controller
             .Select(x => new SelectListItem
             {
                 Value = x.Id.ToString(),
-                Text = string.IsNullOrWhiteSpace(x.Code)
-                    ? x.Name
-                    : string.Format(CultureInfo.CurrentCulture, "{0} — {1}", x.Code, x.Name),
+                Text = NameWithCodeFormatter.getNameWithCode(x.Name, x.Code),
                 Selected = partId.HasValue && x.Id == partId.Value,
             })
             .ToListAsync(cancellationToken)
@@ -131,9 +129,7 @@ public class WarehouseController : Controller
             {
                 Id = x.Id,
                 PartId = x.PartId,
-                PartDisplay = string.IsNullOrWhiteSpace(x.Part!.Code)
-                    ? x.Part.Name
-                    : string.Format(CultureInfo.CurrentCulture, "{0} — {1}", x.Part.Code, x.Part.Name),
+                PartDisplay = NameWithCodeFormatter.getNameWithCode(x.Part!.Name, x.Part.Code),
                 Quantity = x.Quantity,
                 AddedAt = x.AddedAt,
                 CreatedAt = x.CreatedAt,
