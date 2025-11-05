@@ -422,7 +422,7 @@ public class AdminController : Controller
             .ToList();
 
         var balances = balanceDtos
-            .Select(x => new AdminWipBalanceRowViewModel
+            .Select(x => new AdminCatalogWipBalanceRowViewModel
             {
                 Id = x.Id,
                 PartId = x.PartId,

@@ -13,7 +13,7 @@ public class AdminIndexViewModel
 
     public IReadOnlyCollection<AdminEntityRowViewModel> Sections { get; init; } = Array.Empty<AdminEntityRowViewModel>();
 
-    public IReadOnlyCollection<AdminWipBalanceRowViewModel> WipBalances { get; init; } = Array.Empty<AdminWipBalanceRowViewModel>();
+    public IReadOnlyCollection<AdminCatalogWipBalanceRowViewModel> WipBalances { get; init; } = Array.Empty<AdminCatalogWipBalanceRowViewModel>();
 
     public AdminPartInputModel PartInput { get; init; } = new();
 
@@ -41,7 +41,7 @@ public class AdminEntityRowViewModel
     public string? Code { get; init; }
 }
 
-public class AdminWipBalanceRowViewModel
+public class AdminCatalogWipBalanceRowViewModel
 {
     public Guid Id { get; init; }
 
