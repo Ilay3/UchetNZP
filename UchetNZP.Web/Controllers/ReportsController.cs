@@ -122,6 +122,97 @@ public class ReportsController : Controller
         return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
+    [HttpGet("transfer-period")]
+    public async Task<IActionResult> TransferPeriodReport([FromQuery] TransferPeriodReportQuery? in_query, CancellationToken in_cancellationToken)
+    {
+        var now = DateTime.Now.Date;
+        var defaultFrom = now.AddDays(-29);
+        var (fromDate, toDate) = NormalizePeriod(in_query?.From ?? defaultFrom, in_query?.To ?? now);
+
+        var fromUtc = ToUtcStartOfDay(fromDate);
+        var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
+
+        IQueryable<WipTransfer> transfersQuery = _dbContext.WipTransfers
+            .AsNoTracking()
+            .Where(x => x.TransferDate >= fromUtc && x.TransferDate < toUtcExclusive)
+            .Include(x => x.Part)
+            .Include(x => x.Operations)
+                .ThenInclude(x => x.Section);
+
+        if (!string.IsNullOrWhiteSpace(in_query?.Part))
+        {
+            var partTerm = in_query.Part.Trim().ToLowerInvariant();
+            transfersQuery = transfersQuery.Where(x =>
+                x.Part != null &&
+                (x.Part.Name.ToLower().Contains(partTerm) ||
+                 (x.Part.Code != null && x.Part.Code.ToLower().Contains(partTerm))));
+        }
+
+        if (!string.IsNullOrWhiteSpace(in_query?.Section))
+        {
+            var sectionTerm = in_query.Section.Trim().ToLowerInvariant();
+            transfersQuery = transfersQuery.Where(x =>
+                x.Operations.Any(operation =>
+                    operation.Section != null &&
+                    (operation.Section.Name.ToLower().Contains(sectionTerm) ||
+                     (operation.Section.Code != null && operation.Section.Code.ToLower().Contains(sectionTerm)))));
+        }
+
+        var transfers = await transfersQuery
+            .OrderBy(x => x.Part != null ? x.Part.Name : string.Empty)
+            .ThenBy(x => x.TransferDate)
+            .ThenBy(x => x.Id)
+            .ToListAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        var totalDays = (toDate - fromDate).Days;
+        var dates = Enumerable.Range(0, totalDays + 1)
+            .Select(offset => DateTime.SpecifyKind(fromDate.AddDays(offset), DateTimeKind.Unspecified))
+            .ToList();
+
+        var transferCells = transfers
+            .Select(x => new TransferPeriodCell(
+                x.PartId,
+                x.Part != null ? x.Part.Name : "Деталь не указана",
+                x.Part?.Code,
+                ConvertToLocal(x.TransferDate).Date,
+                BuildTransferCellText(x)))
+            .ToList();
+
+        var items = transferCells
+            .GroupBy(x => new { x.PartId, x.PartName, x.PartCode })
+            .OrderBy(group => group.Key.PartName)
+            .Select(group =>
+            {
+                var cells = new Dictionary<DateTime, IReadOnlyList<string>>();
+
+                foreach (var date in dates)
+                {
+                    var dayCells = group
+                        .Where(x => x.Date == date)
+                        .Select(x => x.Text)
+                        .ToList();
+
+                    cells[date] = dayCells.Count > 0 ? dayCells : Array.Empty<string>();
+                }
+
+                return new TransferPeriodReportItemViewModel(group.Key.PartName, group.Key.PartCode, cells);
+            })
+            .ToList();
+
+        var filter = new TransferPeriodReportFilterViewModel
+        {
+            From = DateTime.SpecifyKind(fromDate, DateTimeKind.Unspecified),
+            To = DateTime.SpecifyKind(toDate, DateTimeKind.Unspecified),
+            Part = in_query?.Part,
+            Section = in_query?.Section,
+        };
+
+        var model = new TransferPeriodReportViewModel(filter, dates, items);
+        IActionResult ret = View("~/Views/Reports/TransferPeriodReport.cshtml", model);
+        return ret;
+    }
+
     [HttpGet("wip-batches")]
     public async Task<IActionResult> WipBatchReport([FromQuery] WipBatchReportQuery? query, CancellationToken cancellationToken)
     {
@@ -541,6 +632,45 @@ public class ReportsController : Controller
         return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
     }
 
+    private static string BuildTransferCellText(WipTransfer in_transfer)
+    {
+        var fromQuantity = in_transfer.Operations
+            .Where(x => x.QuantityChange < 0m)
+            .Sum(x => Math.Abs(x.QuantityChange));
+
+        if (fromQuantity == 0m)
+        {
+            fromQuantity = Math.Abs(in_transfer.Quantity);
+        }
+
+        var toQuantity = in_transfer.Operations
+            .Where(x => x.QuantityChange > 0m)
+            .Sum(x => x.QuantityChange);
+
+        if (toQuantity == 0m)
+        {
+            toQuantity = Math.Abs(in_transfer.Quantity);
+        }
+
+        var fromText = fromQuantity.ToString("0.###");
+        var toText = toQuantity.ToString("0.###");
+
+        var ret = string.Format(
+            "{0} – {1} шт → {2} – {3} шт",
+            OperationNumber.Format(in_transfer.FromOpNumber),
+            fromText,
+            OperationNumber.Format(in_transfer.ToOpNumber),
+            toText);
+
+        return ret;
+    }
+
+    public sealed record TransferPeriodReportQuery(
+        DateTime? From,
+        DateTime? To,
+        string? Section,
+        string? Part);
+
     public sealed record ReceiptReportQuery(
         DateTime? From,
         DateTime? To,
@@ -592,6 +722,8 @@ public class ReportsController : Controller
 
         public decimal Balance { get; set; }
     }
+
+    private sealed record TransferPeriodCell(Guid PartId, string PartName, string? PartCode, DateTime Date, string Text);
 
     private static string GetScrapTypeDisplayName(ScrapType scrapType)
         => scrapType switch

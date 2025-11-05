@@ -127,3 +127,27 @@ public record WipBatchReportViewModel(
 {
     public bool HasData => Items.Count > 0;
 }
+
+public class TransferPeriodReportFilterViewModel
+{
+    public DateTime From { get; init; }
+
+    public DateTime To { get; init; }
+
+    public string? Part { get; init; }
+
+    public string? Section { get; init; }
+}
+
+public record TransferPeriodReportItemViewModel(
+    string PartName,
+    string? PartCode,
+    IReadOnlyDictionary<DateTime, IReadOnlyList<string>> Cells);
+
+public record TransferPeriodReportViewModel(
+    TransferPeriodReportFilterViewModel Filter,
+    IReadOnlyList<DateTime> Dates,
+    IReadOnlyList<TransferPeriodReportItemViewModel> Items)
+{
+    public bool HasData => Items.Count > 0;
+}
