@@ -19,11 +19,45 @@
 <section id="parts" class="mb-5">
     <h2 class="h4">Детали</h2>
 
+    <form method="get" class="row g-3 align-items-end mb-3">
+        <div class="col-md-6 col-lg-4">
+            <label for="partSearch" class="form-label">Поиск</label>
+            <input type="text" id="partSearch" name="partSearch" value="@Model.PartSearch" class="form-control" placeholder="Название или код" />
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <button type="submit" class="btn btn-outline-primary w-100">Найти</button>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <a class="btn btn-link w-100" href="@Url.Action("Index", new { operationSearch = Model.OperationSearch, sectionSearch = Model.SectionSearch, wipBalancePartFilter = Model.WipBalancePartFilter, wipBalanceSectionFilter = Model.WipBalanceSectionFilter, wipBalanceSearch = Model.WipBalanceSearch })">Сбросить</a>
+        </div>
+        @if (!string.IsNullOrEmpty(Model.OperationSearch))
+        {
+            <input type="hidden" name="operationSearch" value="@Model.OperationSearch" />
+        }
+        @if (!string.IsNullOrEmpty(Model.SectionSearch))
+        {
+            <input type="hidden" name="sectionSearch" value="@Model.SectionSearch" />
+        }
+        @if (Model.WipBalancePartFilter.HasValue)
+        {
+            <input type="hidden" name="wipBalancePartFilter" value="@Model.WipBalancePartFilter" />
+        }
+        @if (Model.WipBalanceSectionFilter.HasValue)
+        {
+            <input type="hidden" name="wipBalanceSectionFilter" value="@Model.WipBalanceSectionFilter" />
+        }
+        @if (!string.IsNullOrEmpty(Model.WipBalanceSearch))
+        {
+            <input type="hidden" name="wipBalanceSearch" value="@Model.WipBalanceSearch" />
+        }
+    </form>
+
     <div class="card mb-3">
         <div class="card-body">
             <h3 class="h5">Добавить деталь</h3>
             <form asp-action="CreatePart" method="post" class="row g-3">
                 @Html.AntiForgeryToken()
+                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                 <div class="col-md-5">
                     <label asp-for="PartInput.Name" class="form-label"></label>
@@ -65,11 +99,13 @@
                     <td class="text-end">
                         <form id="@formId" asp-action="UpdatePart" method="post" class="d-inline">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="Id" value="@part.Id" />
                             <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения детали?');">Сохранить</button>
                         </form>
                         <form asp-action="DeletePart" method="post" class="d-inline" onsubmit="return confirm('Удалить деталь? Это действие нельзя отменить.');">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="id" value="@part.Id" />
                             <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
                         </form>
@@ -84,11 +120,45 @@
 <section id="operations" class="mb-5">
     <h2 class="h4">Операции</h2>
 
+    <form method="get" class="row g-3 align-items-end mb-3">
+        <div class="col-md-6 col-lg-4">
+            <label for="operationSearch" class="form-label">Поиск</label>
+            <input type="text" id="operationSearch" name="operationSearch" value="@Model.OperationSearch" class="form-control" placeholder="Название или код" />
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <button type="submit" class="btn btn-outline-primary w-100">Найти</button>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <a class="btn btn-link w-100" href="@Url.Action("Index", new { partSearch = Model.PartSearch, sectionSearch = Model.SectionSearch, wipBalancePartFilter = Model.WipBalancePartFilter, wipBalanceSectionFilter = Model.WipBalanceSectionFilter, wipBalanceSearch = Model.WipBalanceSearch })">Сбросить</a>
+        </div>
+        @if (!string.IsNullOrEmpty(Model.PartSearch))
+        {
+            <input type="hidden" name="partSearch" value="@Model.PartSearch" />
+        }
+        @if (!string.IsNullOrEmpty(Model.SectionSearch))
+        {
+            <input type="hidden" name="sectionSearch" value="@Model.SectionSearch" />
+        }
+        @if (Model.WipBalancePartFilter.HasValue)
+        {
+            <input type="hidden" name="wipBalancePartFilter" value="@Model.WipBalancePartFilter" />
+        }
+        @if (Model.WipBalanceSectionFilter.HasValue)
+        {
+            <input type="hidden" name="wipBalanceSectionFilter" value="@Model.WipBalanceSectionFilter" />
+        }
+        @if (!string.IsNullOrEmpty(Model.WipBalanceSearch))
+        {
+            <input type="hidden" name="wipBalanceSearch" value="@Model.WipBalanceSearch" />
+        }
+    </form>
+
     <div class="card mb-3">
         <div class="card-body">
             <h3 class="h5">Добавить операцию</h3>
             <form asp-action="CreateOperation" method="post" class="row g-3">
                 @Html.AntiForgeryToken()
+                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                 <div class="col-md-5">
                     <label asp-for="OperationInput.Name" class="form-label"></label>
@@ -130,11 +200,13 @@
                     <td class="text-end">
                         <form id="@formId" asp-action="UpdateOperation" method="post" class="d-inline">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="Id" value="@operation.Id" />
                             <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения операции?');">Сохранить</button>
                         </form>
                         <form asp-action="DeleteOperation" method="post" class="d-inline" onsubmit="return confirm('Удалить операцию? Это действие нельзя отменить.');">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="id" value="@operation.Id" />
                             <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
                         </form>
@@ -149,11 +221,45 @@
 <section id="sections" class="mb-5">
     <h2 class="h4">Участки</h2>
 
+    <form method="get" class="row g-3 align-items-end mb-3">
+        <div class="col-md-6 col-lg-4">
+            <label for="sectionSearch" class="form-label">Поиск</label>
+            <input type="text" id="sectionSearch" name="sectionSearch" value="@Model.SectionSearch" class="form-control" placeholder="Название или код" />
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <button type="submit" class="btn btn-outline-primary w-100">Найти</button>
+        </div>
+        <div class="col-md-3 col-lg-2">
+            <a class="btn btn-link w-100" href="@Url.Action("Index", new { partSearch = Model.PartSearch, operationSearch = Model.OperationSearch, wipBalancePartFilter = Model.WipBalancePartFilter, wipBalanceSectionFilter = Model.WipBalanceSectionFilter, wipBalanceSearch = Model.WipBalanceSearch })">Сбросить</a>
+        </div>
+        @if (!string.IsNullOrEmpty(Model.PartSearch))
+        {
+            <input type="hidden" name="partSearch" value="@Model.PartSearch" />
+        }
+        @if (!string.IsNullOrEmpty(Model.OperationSearch))
+        {
+            <input type="hidden" name="operationSearch" value="@Model.OperationSearch" />
+        }
+        @if (Model.WipBalancePartFilter.HasValue)
+        {
+            <input type="hidden" name="wipBalancePartFilter" value="@Model.WipBalancePartFilter" />
+        }
+        @if (Model.WipBalanceSectionFilter.HasValue)
+        {
+            <input type="hidden" name="wipBalanceSectionFilter" value="@Model.WipBalanceSectionFilter" />
+        }
+        @if (!string.IsNullOrEmpty(Model.WipBalanceSearch))
+        {
+            <input type="hidden" name="wipBalanceSearch" value="@Model.WipBalanceSearch" />
+        }
+    </form>
+
     <div class="card mb-3">
         <div class="card-body">
             <h3 class="h5">Добавить участок</h3>
             <form asp-action="CreateSection" method="post" class="row g-3">
                 @Html.AntiForgeryToken()
+                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                 <div class="col-md-5">
                     <label asp-for="SectionInput.Name" class="form-label"></label>
@@ -195,11 +301,13 @@
                     <td class="text-end">
                         <form id="@formId" asp-action="UpdateSection" method="post" class="d-inline">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="Id" value="@section.Id" />
                             <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения участка?');">Сохранить</button>
                         </form>
                         <form asp-action="DeleteSection" method="post" class="d-inline" onsubmit="return confirm('Удалить участок? Это действие нельзя отменить.');">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="id" value="@section.Id" />
                             <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
                         </form>
@@ -214,11 +322,59 @@
 <section id="balances" class="mb-5">
     <h2 class="h4">Остатки</h2>
 
+    <form method="get" class="row g-3 align-items-end mb-3">
+        <div class="col-md-4 col-lg-3">
+            <label for="wipBalancePartFilter" class="form-label">Деталь</label>
+            <select id="wipBalancePartFilter" name="wipBalancePartFilter" class="form-select">
+                <option value="">Все детали</option>
+                @foreach (var option in Model.PartOptions)
+                {
+                    var selected = Model.WipBalancePartFilter.HasValue && option.Value == Model.WipBalancePartFilter.Value.ToString() ? "selected" : null;
+                    <option value="@option.Value" selected="@selected">@option.Text</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <label for="wipBalanceSectionFilter" class="form-label">Участок</label>
+            <select id="wipBalanceSectionFilter" name="wipBalanceSectionFilter" class="form-select">
+                <option value="">Все участки</option>
+                @foreach (var option in Model.SectionOptions)
+                {
+                    var selected = Model.WipBalanceSectionFilter.HasValue && option.Value == Model.WipBalanceSectionFilter.Value.ToString() ? "selected" : null;
+                    <option value="@option.Value" selected="@selected">@option.Text</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4 col-lg-3">
+            <label for="wipBalanceSearch" class="form-label">Поиск</label>
+            <input type="text" id="wipBalanceSearch" name="wipBalanceSearch" value="@Model.WipBalanceSearch" class="form-control" placeholder="Деталь, участок или операция" />
+        </div>
+        <div class="col-md-2 col-lg-1">
+            <button type="submit" class="btn btn-outline-primary w-100">Фильтр</button>
+        </div>
+        <div class="col-md-2 col-lg-1">
+            <a class="btn btn-link w-100" href="@Url.Action("Index", new { partSearch = Model.PartSearch, operationSearch = Model.OperationSearch, sectionSearch = Model.SectionSearch })">Сбросить</a>
+        </div>
+        @if (!string.IsNullOrEmpty(Model.PartSearch))
+        {
+            <input type="hidden" name="partSearch" value="@Model.PartSearch" />
+        }
+        @if (!string.IsNullOrEmpty(Model.OperationSearch))
+        {
+            <input type="hidden" name="operationSearch" value="@Model.OperationSearch" />
+        }
+        @if (!string.IsNullOrEmpty(Model.SectionSearch))
+        {
+            <input type="hidden" name="sectionSearch" value="@Model.SectionSearch" />
+        }
+    </form>
+
     <div class="card mb-3">
         <div class="card-body">
             <h3 class="h5">Добавить остаток</h3>
             <form asp-action="CreateWipBalance" method="post" class="row g-3">
                 @Html.AntiForgeryToken()
+                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                 <div class="col-md-4">
                     <label asp-for="WipBalanceInput.PartId" class="form-label"></label>
@@ -294,11 +450,13 @@
                     <td class="text-end">
                         <form id="@formId" asp-action="UpdateWipBalance" method="post" class="d-inline">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="Id" value="@balance.Id" />
                             <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения остатка?');">Сохранить</button>
                         </form>
                         <form asp-action="DeleteWipBalance" method="post" class="d-inline" onsubmit="return confirm('Удалить остаток? Это действие нельзя отменить.');">
                             @Html.AntiForgeryToken()
+                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
                             <input type="hidden" name="id" value="@balance.Id" />
                             <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
                         </form>

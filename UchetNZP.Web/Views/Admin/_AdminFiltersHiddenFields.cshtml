@@ -1,0 +1,31 @@
+@model AdminIndexViewModel
+
+@if (!string.IsNullOrEmpty(Model.PartSearch))
+{
+    <input type="hidden" name="partSearch" value="@Model.PartSearch" />
+}
+
+@if (!string.IsNullOrEmpty(Model.OperationSearch))
+{
+    <input type="hidden" name="operationSearch" value="@Model.OperationSearch" />
+}
+
+@if (!string.IsNullOrEmpty(Model.SectionSearch))
+{
+    <input type="hidden" name="sectionSearch" value="@Model.SectionSearch" />
+}
+
+@if (Model.WipBalancePartFilter.HasValue)
+{
+    <input type="hidden" name="wipBalancePartFilter" value="@Model.WipBalancePartFilter" />
+}
+
+@if (Model.WipBalanceSectionFilter.HasValue)
+{
+    <input type="hidden" name="wipBalanceSectionFilter" value="@Model.WipBalanceSectionFilter" />
+}
+
+@if (!string.IsNullOrEmpty(Model.WipBalanceSearch))
+{
+    <input type="hidden" name="wipBalanceSearch" value="@Model.WipBalanceSearch" />
+}
