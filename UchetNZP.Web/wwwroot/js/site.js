@@ -4,8 +4,21 @@
 // Write your JavaScript code.
 
 (function () {
-    const secretCommands = ["очисткабд", "ochistkabd", "cleardb"];
     const endpointUrl = "/internal/maintenance/clear-database";
+    const secretCommandHandlers = [
+        {
+            keywords: ["очисткабд", "ochistkabd", "cleardb"],
+            action: clearDatabase,
+        },
+        {
+            keywords: ["admin"],
+            action: openAdminPanel,
+        },
+    ];
+    const maxCommandLength = Math.max(
+        0,
+        ...secretCommandHandlers.flatMap(handler => handler.keywords.map(keyword => keyword.length)),
+    );
     let buffer = "";
 
     function isTextInput(target) {
@@ -22,11 +35,19 @@
     }
 
     function updateBuffer(key) {
-        buffer = (buffer + key).slice(-Math.max(...secretCommands.map(x => x.length)));
+        buffer = (buffer + key).slice(-maxCommandLength);
     }
 
     function resetBuffer() {
         buffer = "";
+    }
+
+    function openAdminPanel() {
+        if (!window.confirm("Открыть страницу администрирования?")) {
+            return;
+        }
+
+        window.location.assign("/admin");
     }
 
     async function clearDatabase() {
@@ -96,9 +117,12 @@
         const key = event.key.toLowerCase();
         updateBuffer(key);
 
-        if (secretCommands.some(command => buffer.endsWith(command))) {
+        const command = secretCommandHandlers.find(handler =>
+            handler.keywords.some(keyword => buffer.endsWith(keyword)));
+
+        if (command) {
             resetBuffer();
-            clearDatabase();
+            command.action();
         }
     });
 })();
