@@ -37,6 +37,7 @@ builder.Services.AddScoped<IAdminWipService, AdminWipService>();
 builder.Services.AddScoped<IAdminCatalogService, AdminCatalogService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IScrapReportExcelExporter, ScrapReportExcelExporter>();
+builder.Services.AddSingleton<ITransferPeriodReportExcelExporter, TransferPeriodReportExcelExporter>();
 
 var app = builder.Build();
 

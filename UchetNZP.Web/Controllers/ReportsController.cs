@@ -18,11 +18,16 @@ public class ReportsController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly IScrapReportExcelExporter _scrapReportExcelExporter;
+    private readonly ITransferPeriodReportExcelExporter _transferPeriodReportExcelExporter;
 
-    public ReportsController(AppDbContext dbContext, IScrapReportExcelExporter scrapReportExcelExporter)
+    public ReportsController(
+        AppDbContext dbContext,
+        IScrapReportExcelExporter scrapReportExcelExporter,
+        ITransferPeriodReportExcelExporter transferPeriodReportExcelExporter)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _scrapReportExcelExporter = scrapReportExcelExporter ?? throw new ArgumentNullException(nameof(scrapReportExcelExporter));
+        _transferPeriodReportExcelExporter = transferPeriodReportExcelExporter ?? throw new ArgumentNullException(nameof(transferPeriodReportExcelExporter));
     }
 
     [HttpGet("receipts")]
@@ -125,9 +130,31 @@ public class ReportsController : Controller
     [HttpGet("transfer-period")]
     public async Task<IActionResult> TransferPeriodReport([FromQuery] TransferPeriodReportQuery? in_query, CancellationToken in_cancellationToken)
     {
+        var model = await LoadTransferPeriodReportAsync(in_query, in_cancellationToken).ConfigureAwait(false);
+        IActionResult ret = View("~/Views/Reports/TransferPeriodReport.cshtml", model);
+        return ret;
+    }
+
+    [HttpGet("transfer-period/export")]
+    public async Task<IActionResult> TransferPeriodReportExport([FromQuery] TransferPeriodReportQuery? in_query, CancellationToken in_cancellationToken)
+    {
+        var model = await LoadTransferPeriodReportAsync(in_query, in_cancellationToken).ConfigureAwait(false);
+        var content = _transferPeriodReportExcelExporter.Export(model.Filter, model.Dates, model.Items);
+        var fileName = string.Format(
+            "transfer-period-report-{0:yyyyMMdd}-{1:yyyyMMdd}.xlsx",
+            model.Filter.From,
+            model.Filter.To);
+        IActionResult ret = File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        return ret;
+    }
+
+    private async Task<TransferPeriodReportViewModel> LoadTransferPeriodReportAsync(TransferPeriodReportQuery? in_query, CancellationToken in_cancellationToken)
+    {
         var now = DateTime.Now.Date;
         var defaultFrom = now.AddDays(-29);
-        var (fromDate, toDate) = NormalizePeriod(in_query?.From ?? defaultFrom, in_query?.To ?? now);
+        var period = NormalizePeriod(in_query?.From ?? defaultFrom, in_query?.To ?? now);
+        var fromDate = period.From;
+        var toDate = period.To;
 
         var fromUtc = ToUtcStartOfDay(fromDate);
         var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
@@ -208,8 +235,7 @@ public class ReportsController : Controller
             Section = in_query?.Section,
         };
 
-        var model = new TransferPeriodReportViewModel(filter, dates, items);
-        IActionResult ret = View("~/Views/Reports/TransferPeriodReport.cshtml", model);
+        var ret = new TransferPeriodReportViewModel(filter, dates, items);
         return ret;
     }
 

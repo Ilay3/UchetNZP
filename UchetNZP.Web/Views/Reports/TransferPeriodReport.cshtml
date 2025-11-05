@@ -40,9 +40,14 @@
 @if (Model.HasData)
 {
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
-            <span>Деталей в отчёте: @Model.Items.Count</span>
-            <span>Дней в периоде: @Model.Dates.Count</span>
+        <div class="card-header bg-light fw-semibold">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div class="d-flex flex-wrap gap-4">
+                    <span>Деталей в отчёте: @Model.Items.Count</span>
+                    <span>Дней в периоде: @Model.Dates.Count</span>
+                </div>
+                <a class="btn btn-success" asp-controller="Reports" asp-action="TransferPeriodReportExport" asp-route-from="@Model.Filter.From.ToString("yyyy-MM-dd")" asp-route-to="@Model.Filter.To.ToString("yyyy-MM-dd")" asp-route-part="@Model.Filter.Part" asp-route-section="@Model.Filter.Section">Экспорт в Excel</a>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
