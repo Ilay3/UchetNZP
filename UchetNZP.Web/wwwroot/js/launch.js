@@ -620,9 +620,10 @@
             return;
         }
 
-        summary.items.forEach(item => {
-            const key = getRemainderKey(item.partId, item.fromOpNumber);
-            baselineRemainders.set(key, item.remaining);
+        summary.items.forEach(summaryItem => {
+            const key = getRemainderKey(summaryItem.partId, summaryItem.fromOpNumber);
+            const actualRemaining = Number(summaryItem.remaining ?? 0);
+            baselineRemainders.set(key, actualRemaining);
         });
 
         updateOperationsDisplay();
@@ -660,15 +661,16 @@
         summaryTableBody.innerHTML = "";
         summaryIntro.textContent = `Сохранено записей: ${summary.saved}.`;
 
-        summary.items.forEach(item => {
+        summary.items.forEach(summaryItem => {
             const row = document.createElement("tr");
-            const cartItem = cart.find(x => x.partId === item.partId && x.fromOp === item.fromOpNumber);
+            const cartItem = cart.find(x => x.partId === summaryItem.partId && x.fromOp === summaryItem.fromOpNumber);
+            const actualRemaining = Number(summaryItem.remaining ?? 0);
             row.innerHTML = `
-                <td>${cartItem ? cartItem.partDisplay : item.partId}</td>
-                <td>${item.fromOpNumber}</td>
-                <td>${item.quantity.toFixed(3)}</td>
-                <td>${item.remaining.toFixed(3)}</td>
-                <td>${item.sumHoursToFinish.toFixed(3)}</td>`;
+                <td>${cartItem ? cartItem.partDisplay : summaryItem.partId}</td>
+                <td>${summaryItem.fromOpNumber}</td>
+                <td>${summaryItem.quantity.toFixed(3)}</td>
+                <td>${actualRemaining.toFixed(3)}</td>
+                <td>${summaryItem.sumHoursToFinish.toFixed(3)}</td>`;
             summaryTableBody.appendChild(row);
         });
 

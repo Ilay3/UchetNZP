@@ -62,7 +62,7 @@ public class LaunchServiceTests
         Assert.Equal(1, summary.Saved);
         var item = Assert.Single(summary.Items);
         Assert.Equal(12.4m, item.SumHoursToFinish);
-        Assert.Equal(60m, item.Remaining);
+        Assert.Equal(100m, item.Remaining);
 
         var balance = await dbContext.WipBalances.FirstAsync(x => x.PartId == partId && x.OpNumber == 15);
         Assert.Equal(100m, balance.Quantity);

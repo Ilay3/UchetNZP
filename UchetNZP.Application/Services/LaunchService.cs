@@ -39,7 +39,7 @@ public class LaunchService : ILaunchService
 
         try
         {
-            var results = new List<LaunchItemSummaryDto>(materialized.Count);
+            var pendingSummaries = new List<(Guid PartId, int FromOpNumber, Guid SectionId, decimal Quantity, decimal SumHoursToFinish, Guid LaunchId, WipBalance Balance)>(materialized.Count);
 
             foreach (var item in materialized)
             {
@@ -126,17 +126,32 @@ public class LaunchService : ILaunchService
                     await _dbContext.WipLaunchOperations.AddAsync(launchOperation, cancellationToken).ConfigureAwait(false);
                 }
 
-                results.Add(new LaunchItemSummaryDto(
+                pendingSummaries.Add((
                     item.PartId,
                     item.FromOpNumber,
                     routeStart.SectionId,
                     item.Quantity,
-                    balance.Quantity - item.Quantity,
                     sumHours,
-                    launch.Id));
+                    launch.Id,
+                    balance));
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var pendingSummary in pendingSummaries)
+            {
+                await _dbContext.Entry(pendingSummary.Balance).ReloadAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            var results = pendingSummaries
+                .Select(pendingSummary => new LaunchItemSummaryDto(
+                    pendingSummary.PartId,
+                    pendingSummary.FromOpNumber,
+                    pendingSummary.SectionId,
+                    pendingSummary.Quantity,
+                    pendingSummary.Balance.Quantity,
+                    pendingSummary.SumHoursToFinish,
+                    pendingSummary.LaunchId))
+                .ToList();
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
             return new LaunchBatchSummaryDto(results.Count, results);
