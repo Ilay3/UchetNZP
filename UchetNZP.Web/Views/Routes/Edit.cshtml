@@ -1,8 +1,18 @@
 @model UchetNZP.Web.Models.RouteEditInputModel
+@using System.Globalization
 @using UchetNZP.Shared
 @{
     ViewData["Title"] = Model.Title;
     var formAction = Model.Id.HasValue ? "Edit" : "Create";
+    var normHoursValue = ViewData.ModelState.TryGetValue(nameof(Model.NormHours), out var normEntry)
+        && normEntry.RawValue is { } rawValue
+        ? rawValue switch
+        {
+            string rawString => rawString,
+            string[] rawArray when rawArray.Length > 0 => rawArray[0],
+            _ => Model.NormHours.ToString("0.###", CultureInfo.InvariantCulture),
+        }
+        : Model.NormHours.ToString("0.###", CultureInfo.InvariantCulture);
 }
 
 <div class="page-header mb-4">
@@ -30,7 +40,7 @@
             </div>
             <div class="col-lg-3">
                 <label asp-for="NormHours" class="form-label"></label>
-                <input asp-for="NormHours" class="form-control form-control-lg" min="0.001" step="0.001" />
+                <input asp-for="NormHours" class="form-control form-control-lg" type="number" min="0.001" step="0.001" inputmode="decimal" value="@normHoursValue" />
                 <span asp-validation-for="NormHours" class="text-danger"></span>
             </div>
             <div class="col-lg-6">
