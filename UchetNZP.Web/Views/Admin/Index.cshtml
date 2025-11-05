@@ -288,27 +288,27 @@
                 </tr>
             </thead>
             <tbody>
-            @foreach (var section in Model.Sections)
+            @foreach (var sections in Model.Sections)
             {
-                var formId = $"update-section-{section.Id}";
+                var formId = $"update-section-{sections.Id}";
                 <tr>
                     <td>
-                        <input form="@formId" type="text" name="Name" value="@section.Name" class="form-control form-control-sm" required />
+                        <input form="@formId" type="text" name="Name" value="@sections.Name" class="form-control form-control-sm" required />
                     </td>
                     <td>
-                        <input form="@formId" type="text" name="Code" value="@section.Code" class="form-control form-control-sm" />
+                        <input form="@formId" type="text" name="Code" value="@sections.Code" class="form-control form-control-sm" />
                     </td>
                     <td class="text-end">
                         <form id="@formId" asp-action="UpdateSection" method="post" class="d-inline">
                             @Html.AntiForgeryToken()
                             @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="Id" value="@section.Id" />
+                            <input type="hidden" name="Id" value="@sections.Id" />
                             <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения участка?');">Сохранить</button>
                         </form>
                         <form asp-action="DeleteSection" method="post" class="d-inline" onsubmit="return confirm('Удалить участок? Это действие нельзя отменить.');">
                             @Html.AntiForgeryToken()
                             @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="id" value="@section.Id" />
+                            <input type="hidden" name="id" value="@sections.Id" />
                             <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
                         </form>
                     </td>
