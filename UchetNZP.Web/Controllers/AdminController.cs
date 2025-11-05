@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.AspNetCore.Routing;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Admin;
 using UchetNZP.Web.Models;
@@ -27,13 +30,29 @@ public class AdminController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(
+        string? partSearch,
+        string? operationSearch,
+        string? sectionSearch,
+        Guid? wipBalancePartFilter,
+        Guid? wipBalanceSectionFilter,
+        string? wipBalanceSearch,
+        CancellationToken cancellationToken)
     {
         var statusMessage = ReadTempData(StatusTempDataKey);
         var errorMessage = ReadTempData(ErrorTempDataKey);
 
+        var filters = NormalizeFilters(new AdminCatalogFilters(
+            partSearch,
+            operationSearch,
+            sectionSearch,
+            wipBalancePartFilter,
+            wipBalanceSectionFilter,
+            wipBalanceSearch));
+
         var viewModel = await BuildIndexViewModelAsync(
             cancellationToken,
+            filters,
             statusMessage: statusMessage,
             errorMessage: errorMessage).ConfigureAwait(false);
 
@@ -46,8 +65,10 @@ public class AdminController : Controller
     {
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 partInput: input,
                 errorMessage: "Исправьте ошибки формы создания детали.").ConfigureAwait(false);
 
@@ -58,12 +79,15 @@ public class AdminController : Controller
         {
             await _catalogService.CreatePartAsync(new AdminPartEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
             TempData[StatusTempDataKey] = "Деталь успешно создана.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 partInput: input,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
@@ -77,8 +101,10 @@ public class AdminController : Controller
     {
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: "Исправьте данные для редактирования детали.").ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -88,12 +114,15 @@ public class AdminController : Controller
         {
             await _catalogService.UpdatePartAsync(input.Id, new AdminPartEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
             TempData[StatusTempDataKey] = "Изменения детали сохранены.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -114,7 +143,8 @@ public class AdminController : Controller
             TempData[ErrorTempDataKey] = ex.Message;
         }
 
-        return RedirectToAction(nameof(Index));
+        var filters = ReadFilters();
+        return RedirectToAction(nameof(Index), BuildRouteValues(filters));
     }
 
     [HttpPost("operations/create")]
@@ -123,8 +153,10 @@ public class AdminController : Controller
     {
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 operationInput: input,
                 errorMessage: "Исправьте ошибки формы создания операции.").ConfigureAwait(false);
 
@@ -135,12 +167,15 @@ public class AdminController : Controller
         {
             await _catalogService.CreateOperationAsync(new AdminOperationEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
             TempData[StatusTempDataKey] = "Операция успешно создана.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 operationInput: input,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
@@ -154,8 +189,10 @@ public class AdminController : Controller
     {
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: "Исправьте данные для редактирования операции.").ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -165,12 +202,15 @@ public class AdminController : Controller
         {
             await _catalogService.UpdateOperationAsync(input.Id, new AdminOperationEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
             TempData[StatusTempDataKey] = "Изменения операции сохранены.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -191,7 +231,8 @@ public class AdminController : Controller
             TempData[ErrorTempDataKey] = ex.Message;
         }
 
-        return RedirectToAction(nameof(Index));
+        var filters = ReadFilters();
+        return RedirectToAction(nameof(Index), BuildRouteValues(filters));
     }
 
     [HttpPost("sections/create")]
@@ -200,8 +241,10 @@ public class AdminController : Controller
     {
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 sectionInput: input,
                 errorMessage: "Исправьте ошибки формы создания участка.").ConfigureAwait(false);
 
@@ -212,12 +255,15 @@ public class AdminController : Controller
         {
             await _catalogService.CreateSectionAsync(new AdminSectionEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
             TempData[StatusTempDataKey] = "Участок успешно создан.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 sectionInput: input,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
@@ -231,8 +277,10 @@ public class AdminController : Controller
     {
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: "Исправьте данные для редактирования участка.").ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -242,12 +290,15 @@ public class AdminController : Controller
         {
             await _catalogService.UpdateSectionAsync(input.Id, new AdminSectionEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
             TempData[StatusTempDataKey] = "Изменения участка сохранены.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -268,7 +319,8 @@ public class AdminController : Controller
             TempData[ErrorTempDataKey] = ex.Message;
         }
 
-        return RedirectToAction(nameof(Index));
+        var filters = ReadFilters();
+        return RedirectToAction(nameof(Index), BuildRouteValues(filters));
     }
 
     [HttpPost("balances/create")]
@@ -287,8 +339,10 @@ public class AdminController : Controller
 
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 wipBalanceInput: input,
                 errorMessage: "Исправьте ошибки формы создания остатка.").ConfigureAwait(false);
 
@@ -302,12 +356,15 @@ public class AdminController : Controller
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Остаток успешно создан.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 wipBalanceInput: input,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
@@ -336,8 +393,10 @@ public class AdminController : Controller
 
         if (!ModelState.IsValid)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: "Исправьте данные для редактирования остатка.").ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -351,12 +410,15 @@ public class AdminController : Controller
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Изменения остатка сохранены.";
-            return RedirectToAction(nameof(Index));
+            var filters = ReadFilters();
+            return RedirectToAction(nameof(Index), BuildRouteValues(filters));
         }
         catch (Exception ex)
         {
+            var filters = ReadFilters();
             var viewModel = await BuildIndexViewModelAsync(
                 cancellationToken,
+                filters,
                 errorMessage: ex.Message).ConfigureAwait(false);
 
             return View("Index", viewModel);
@@ -377,11 +439,13 @@ public class AdminController : Controller
             TempData[ErrorTempDataKey] = ex.Message;
         }
 
-        return RedirectToAction(nameof(Index));
+        var filters = ReadFilters();
+        return RedirectToAction(nameof(Index), BuildRouteValues(filters));
     }
 
     private async Task<AdminIndexViewModel> BuildIndexViewModelAsync(
         CancellationToken cancellationToken,
+        AdminCatalogFilters? filters = null,
         AdminPartInputModel? partInput = null,
         AdminOperationInputModel? operationInput = null,
         AdminSectionInputModel? sectionInput = null,
@@ -389,12 +453,14 @@ public class AdminController : Controller
         string? statusMessage = null,
         string? errorMessage = null)
     {
+        var normalizedFilters = NormalizeFilters(filters ?? new AdminCatalogFilters());
+
         var partDtos = await _catalogService.GetPartsAsync(cancellationToken).ConfigureAwait(false);
         var operationDtos = await _catalogService.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
         var sectionDtos = await _catalogService.GetSectionsAsync(cancellationToken).ConfigureAwait(false);
         var balanceDtos = await _catalogService.GetWipBalancesAsync(cancellationToken).ConfigureAwait(false);
 
-        var parts = partDtos
+        var partRows = partDtos
             .Select(x => new AdminEntityRowViewModel
             {
                 Id = x.Id,
@@ -403,7 +469,9 @@ public class AdminController : Controller
             })
             .ToList();
 
-        var operations = operationDtos
+        var parts = FilterEntities(partRows, normalizedFilters.PartSearch);
+
+        var operationRows = operationDtos
             .Select(x => new AdminEntityRowViewModel
             {
                 Id = x.Id,
@@ -412,7 +480,9 @@ public class AdminController : Controller
             })
             .ToList();
 
-        var sections = sectionDtos
+        var operations = FilterEntities(operationRows, normalizedFilters.OperationSearch);
+
+        var sectionRows = sectionDtos
             .Select(x => new AdminEntityRowViewModel
             {
                 Id = x.Id,
@@ -420,6 +490,8 @@ public class AdminController : Controller
                 Code = x.Code,
             })
             .ToList();
+
+        var sections = FilterEntities(sectionRows, normalizedFilters.SectionSearch);
 
         var balances = balanceDtos
             .Select(x => new AdminCatalogWipBalanceRowViewModel
@@ -434,7 +506,35 @@ public class AdminController : Controller
             })
             .ToList();
 
-        var partOptions = parts
+        if (normalizedFilters.WipBalancePartFilter.HasValue)
+        {
+            var partId = normalizedFilters.WipBalancePartFilter.Value;
+            balances = balances
+                .Where(x => x.PartId == partId)
+                .ToList();
+        }
+
+        if (normalizedFilters.WipBalanceSectionFilter.HasValue)
+        {
+            var sectionId = normalizedFilters.WipBalanceSectionFilter.Value;
+            balances = balances
+                .Where(x => x.SectionId == sectionId)
+                .ToList();
+        }
+
+        if (!string.IsNullOrEmpty(normalizedFilters.WipBalanceSearch))
+        {
+            var search = normalizedFilters.WipBalanceSearch;
+            balances = balances
+                .Where(x =>
+                    ContainsText(x.PartName, search)
+                    || ContainsText(x.SectionName, search)
+                    || x.OpNumber.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                    || x.Quantity.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase))
+                .ToList();
+        }
+
+        var partOptions = partRows
             .Select(x => new SelectListItem
             {
                 Value = x.Id.ToString(),
@@ -442,7 +542,7 @@ public class AdminController : Controller
             })
             .ToList();
 
-        var sectionOptions = sections
+        var sectionOptions = sectionRows
             .Select(x => new SelectListItem
             {
                 Value = x.Id.ToString(),
@@ -462,6 +562,12 @@ public class AdminController : Controller
             OperationInput = operationInput ?? new AdminOperationInputModel(),
             SectionInput = sectionInput ?? new AdminSectionInputModel(),
             WipBalanceInput = wipBalanceInput ?? new AdminWipBalanceInputModel(),
+            PartSearch = normalizedFilters.PartSearch,
+            OperationSearch = normalizedFilters.OperationSearch,
+            SectionSearch = normalizedFilters.SectionSearch,
+            WipBalancePartFilter = normalizedFilters.WipBalancePartFilter,
+            WipBalanceSectionFilter = normalizedFilters.WipBalanceSectionFilter,
+            WipBalanceSearch = normalizedFilters.WipBalanceSearch,
             StatusMessage = NormalizeMessage(statusMessage),
             ErrorMessage = NormalizeMessage(errorMessage),
         };
@@ -496,4 +602,172 @@ public class AdminController : Controller
 
         return string.Format(CultureInfo.CurrentCulture, "{0} ({1})", name, code);
     }
+
+    private AdminCatalogFilters ReadFilters()
+    {
+        var filters = new AdminCatalogFilters();
+
+        var query = Request?.Query;
+        if (query is not null)
+        {
+            filters = filters with
+            {
+                PartSearch = GetQueryValue(query, "partSearch"),
+                OperationSearch = GetQueryValue(query, "operationSearch"),
+                SectionSearch = GetQueryValue(query, "sectionSearch"),
+                WipBalancePartFilter = GetGuidFromText(GetQueryValue(query, "wipBalancePartFilter")),
+                WipBalanceSectionFilter = GetGuidFromText(GetQueryValue(query, "wipBalanceSectionFilter")),
+                WipBalanceSearch = GetQueryValue(query, "wipBalanceSearch"),
+            };
+        }
+
+        if (Request?.HasFormContentType == true)
+        {
+            var form = Request?.Form;
+            if (form is not null)
+            {
+                filters = filters with
+                {
+                    PartSearch = GetFormValue(form, "partSearch") ?? filters.PartSearch,
+                    OperationSearch = GetFormValue(form, "operationSearch") ?? filters.OperationSearch,
+                    SectionSearch = GetFormValue(form, "sectionSearch") ?? filters.SectionSearch,
+                    WipBalancePartFilter = GetGuidFromText(GetFormValue(form, "wipBalancePartFilter")) ?? filters.WipBalancePartFilter,
+                    WipBalanceSectionFilter = GetGuidFromText(GetFormValue(form, "wipBalanceSectionFilter")) ?? filters.WipBalanceSectionFilter,
+                    WipBalanceSearch = GetFormValue(form, "wipBalanceSearch") ?? filters.WipBalanceSearch,
+                };
+            }
+        }
+
+        var ret = NormalizeFilters(filters);
+        return ret;
+    }
+
+    private static string? GetQueryValue(IQueryCollection collection, string key)
+    {
+        string? ret = null;
+        if (collection.TryGetValue(key, out var values))
+        {
+            var candidate = values.ToString();
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                ret = candidate;
+            }
+        }
+
+        return ret;
+    }
+
+    private static string? GetFormValue(IFormCollection collection, string key)
+    {
+        string? ret = null;
+        if (collection.TryGetValue(key, out var values))
+        {
+            var candidate = values.ToString();
+            if (!string.IsNullOrWhiteSpace(candidate))
+            {
+                ret = candidate;
+            }
+        }
+
+        return ret;
+    }
+
+    private static Guid? GetGuidFromText(string? text)
+    {
+        Guid? ret = null;
+        if (!string.IsNullOrWhiteSpace(text) && Guid.TryParse(text, out var parsed))
+        {
+            ret = parsed;
+        }
+
+        return ret;
+    }
+
+    private static AdminCatalogFilters NormalizeFilters(AdminCatalogFilters filters)
+    {
+        var ret = filters with
+        {
+            PartSearch = NormalizeSearchValue(filters.PartSearch),
+            OperationSearch = NormalizeSearchValue(filters.OperationSearch),
+            SectionSearch = NormalizeSearchValue(filters.SectionSearch),
+            WipBalanceSearch = NormalizeSearchValue(filters.WipBalanceSearch),
+        };
+
+        return ret;
+    }
+
+    private static string? NormalizeSearchValue(string? value)
+    {
+        string? ret = null;
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            ret = value.Trim();
+        }
+
+        return ret;
+    }
+
+    private static List<AdminEntityRowViewModel> FilterEntities(
+        List<AdminEntityRowViewModel> source,
+        string? search)
+    {
+        if (string.IsNullOrEmpty(search))
+        {
+            return source;
+        }
+
+        var ret = source
+            .Where(x => ContainsText(x.Name, search) || (!string.IsNullOrEmpty(x.Code) && ContainsText(x.Code!, search)))
+            .ToList();
+
+        return ret;
+    }
+
+    private static bool ContainsText(string value, string search)
+        => value.Contains(search, StringComparison.CurrentCultureIgnoreCase);
+
+    private static RouteValueDictionary BuildRouteValues(AdminCatalogFilters filters)
+    {
+        var ret = new RouteValueDictionary();
+
+        if (!string.IsNullOrEmpty(filters.PartSearch))
+        {
+            ret["partSearch"] = filters.PartSearch!;
+        }
+
+        if (!string.IsNullOrEmpty(filters.OperationSearch))
+        {
+            ret["operationSearch"] = filters.OperationSearch!;
+        }
+
+        if (!string.IsNullOrEmpty(filters.SectionSearch))
+        {
+            ret["sectionSearch"] = filters.SectionSearch!;
+        }
+
+        if (filters.WipBalancePartFilter.HasValue)
+        {
+            ret["wipBalancePartFilter"] = filters.WipBalancePartFilter.Value;
+        }
+
+        if (filters.WipBalanceSectionFilter.HasValue)
+        {
+            ret["wipBalanceSectionFilter"] = filters.WipBalanceSectionFilter.Value;
+        }
+
+        if (!string.IsNullOrEmpty(filters.WipBalanceSearch))
+        {
+            ret["wipBalanceSearch"] = filters.WipBalanceSearch!;
+        }
+
+        return ret;
+    }
+
+    private sealed record AdminCatalogFilters(
+        string? PartSearch = null,
+        string? OperationSearch = null,
+        string? SectionSearch = null,
+        Guid? WipBalancePartFilter = null,
+        Guid? WipBalanceSectionFilter = null,
+        string? WipBalanceSearch = null);
 }

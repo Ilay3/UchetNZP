@@ -27,6 +27,18 @@ public class AdminIndexViewModel
 
     public IReadOnlyCollection<SelectListItem> SectionOptions { get; init; } = Array.Empty<SelectListItem>();
 
+    public string? PartSearch { get; init; }
+
+    public string? OperationSearch { get; init; }
+
+    public string? SectionSearch { get; init; }
+
+    public Guid? WipBalancePartFilter { get; init; }
+
+    public Guid? WipBalanceSectionFilter { get; init; }
+
+    public string? WipBalanceSearch { get; init; }
+
     public string? StatusMessage { get; init; }
 
     public string? ErrorMessage { get; init; }
