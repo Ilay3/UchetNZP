@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -19,14 +20,14 @@ public class WipService : IWipService
         _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
     }
 
-    public async Task<ReceiptBatchSummaryDto> AddReceiptsBatchAsync(IEnumerable<ReceiptItemDto> items, CancellationToken cancellationToken = default)
+    public async Task<ReceiptBatchSummaryDto> AddReceiptsBatchAsync(IEnumerable<ReceiptItemDto> in_items, CancellationToken cancellationToken = default)
     {
-        if (items is null)
+        if (in_items is null)
         {
-            throw new ArgumentNullException(nameof(items));
+            throw new ArgumentNullException(nameof(in_items));
         }
 
-        var materialized = items.ToList();
+        var materialized = in_items.ToList();
         if (materialized.Count == 0)
         {
             return new ReceiptBatchSummaryDto(0, Array.Empty<ReceiptItemSummaryDto>());
@@ -37,6 +38,7 @@ public class WipService : IWipService
         try
         {
             var results = new List<ReceiptItemSummaryDto>(materialized.Count);
+            var reservedLabelIds = new HashSet<Guid>();
 
             foreach (var item in materialized)
             {
@@ -87,6 +89,10 @@ public class WipService : IWipService
                 var was = balance.Quantity;
                 balance.Quantity = was + item.Quantity;
 
+                var label = await ResolveLabelAsync(item, reservedLabelIds, cancellationToken).ConfigureAwait(false);
+                label.IsAssigned = true;
+                reservedLabelIds.Add(label.Id);
+
                 var receipt = new WipReceipt
                 {
                     Id = Guid.NewGuid(),
@@ -98,6 +104,7 @@ public class WipService : IWipService
                     CreatedAt = now,
                     Quantity = item.Quantity,
                     Comment = item.Comment,
+                    WipLabelId = label.Id,
                 };
 
                 await _dbContext.WipReceipts.AddAsync(receipt, cancellationToken).ConfigureAwait(false);
@@ -110,7 +117,10 @@ public class WipService : IWipService
                     was,
                     balance.Quantity,
                     balance.Id,
-                    receipt.Id));
+                    receipt.Id,
+                    label.Id,
+                    label.Number,
+                    label.IsAssigned));
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -123,6 +133,74 @@ public class WipService : IWipService
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private async Task<WipLabel> ResolveLabelAsync(ReceiptItemDto in_item, ISet<Guid> in_reservedLabelIds, CancellationToken cancellationToken)
+    {
+        if (in_item is null)
+        {
+            throw new ArgumentNullException(nameof(in_item));
+        }
+
+        if (in_reservedLabelIds is null)
+        {
+            throw new ArgumentNullException(nameof(in_reservedLabelIds));
+        }
+
+        WipLabel? ret = null;
+
+        if (in_item.WipLabelId.HasValue)
+        {
+            ret = await _dbContext.WipLabels
+                .FirstOrDefaultAsync(x => x.Id == in_item.WipLabelId.Value, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (ret is null)
+            {
+                throw new InvalidOperationException($"Ярлык с идентификатором {in_item.WipLabelId.Value} не найден.");
+            }
+        }
+        else
+        {
+            ret = await _dbContext.WipLabels
+                .Where(x => !x.IsAssigned && x.PartId == in_item.PartId && x.Quantity == in_item.Quantity)
+                .Where(x => !in_reservedLabelIds.Contains(x.Id))
+                .OrderBy(x => x.Number)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (ret is null)
+            {
+                throw new InvalidOperationException($"Свободный ярлык для детали {in_item.PartId} с количеством {in_item.Quantity} не найден.");
+            }
+        }
+
+        if (in_reservedLabelIds.Contains(ret.Id))
+        {
+            throw new InvalidOperationException($"Ярлык {ret.Number} уже зарезервирован в текущей операции сохранения.");
+        }
+
+        if (ret.PartId != in_item.PartId)
+        {
+            throw new InvalidOperationException($"Ярлык {ret.Number} относится к другой детали и не может быть использован для прихода детали {in_item.PartId}.");
+        }
+
+        if (ret.Quantity != in_item.Quantity)
+        {
+            throw new InvalidOperationException($"Количество ярлыка {ret.Number} ({ret.Quantity}) не совпадает с количеством прихода ({in_item.Quantity}).");
+        }
+
+        if (ret.IsAssigned && !in_item.IsAssigned)
+        {
+            throw new InvalidOperationException($"Ярлык {ret.Number} уже назначен и не может быть использован повторно.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(in_item.LabelNumber) && !string.Equals(in_item.LabelNumber, ret.Number, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"Переданный номер ярлыка {in_item.LabelNumber} не совпадает с фактическим номером {ret.Number}.");
+        }
+
+        return ret;
     }
 
     public async Task<ReceiptDeleteResultDto> DeleteReceiptAsync(Guid in_receiptId, CancellationToken cancellationToken = default)
