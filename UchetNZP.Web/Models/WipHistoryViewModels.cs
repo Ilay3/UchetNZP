@@ -100,6 +100,7 @@ public class WipHistoryEntryViewModel
         decimal quantity,
         decimal? hours,
         string? comment,
+        string? labelNumber,
         IReadOnlyList<WipHistoryOperationDetailViewModel> operations,
         WipHistoryScrapViewModel? scrap)
     {
@@ -115,6 +116,7 @@ public class WipHistoryEntryViewModel
         Quantity = quantity;
         Hours = hours;
         Comment = comment;
+        LabelNumber = labelNumber;
         Operations = operations ?? Array.Empty<WipHistoryOperationDetailViewModel>();
         Scrap = scrap;
     }
@@ -142,6 +144,8 @@ public class WipHistoryEntryViewModel
     public decimal? Hours { get; }
 
     public string? Comment { get; }
+
+    public string? LabelNumber { get; }
 
     public IReadOnlyList<WipHistoryOperationDetailViewModel> Operations { get; }
 
@@ -187,6 +191,8 @@ public class WipHistoryEntryViewModel
     public bool HasOperations => Operations.Count > 0;
 
     public bool HasScrap => Scrap is not null;
+
+    public bool HasLabel => !string.IsNullOrWhiteSpace(LabelNumber);
 
     public bool HasTargetSection => !string.IsNullOrWhiteSpace(TargetSectionName);
 }

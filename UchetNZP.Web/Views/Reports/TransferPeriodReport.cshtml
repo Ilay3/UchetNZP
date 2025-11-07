@@ -1,3 +1,4 @@
+@using System.Text.Encodings.Web
 @model UchetNZP.Web.Models.TransferPeriodReportViewModel
 @{
     ViewData["Title"] = "Отчёт по передаче НЗП за период";
@@ -81,7 +82,10 @@
                                             <ul class="list-unstyled mb-0">
                                                 @foreach (var cell in cellValues)
                                                 {
-                                                    <li>@cell</li>
+                                                    var encoded = string.IsNullOrWhiteSpace(cell)
+                                                        ? string.Empty
+                                                        : HtmlEncoder.Default.Encode(cell).Replace("\n", "<br />");
+                                                    <li>@Html.Raw(encoded)</li>
                                                 }
                                             </ul>
                                         }

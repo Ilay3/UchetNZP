@@ -157,6 +157,7 @@ public class WipHistoryController : Controller
                     launch.Quantity,
                     launch.SumHoursToFinish,
                     launch.Comment,
+                    null,
                     orderedOperations,
                     null);
 
@@ -174,6 +175,7 @@ public class WipHistoryController : Controller
                 .Where(x => x.ReceiptDate >= fromUtc && x.ReceiptDate < toUtcExclusive)
                 .Include(x => x.Part)
                 .Include(x => x.Section)
+                .Include(x => x.WipLabel)
                 .AsQueryable();
 
             if (hasPartFilter)
@@ -226,6 +228,9 @@ public class WipHistoryController : Controller
                     receipt.Quantity,
                     null,
                     receipt.Comment,
+                    receipt.WipLabel != null && !string.IsNullOrWhiteSpace(receipt.WipLabel.Number)
+                        ? receipt.WipLabel.Number
+                        : null,
                     route != null
                         ? new List<WipHistoryOperationDetailViewModel>
                         {
@@ -325,6 +330,7 @@ public class WipHistoryController : Controller
                     transfer.Quantity,
                     null,
                     transfer.Comment,
+                    null,
                     orderedOperations,
                     scrap);
 
