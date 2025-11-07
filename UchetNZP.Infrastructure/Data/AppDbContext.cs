@@ -40,6 +40,8 @@ public class AppDbContext : DbContext
 
     public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();
 
+    public DbSet<WipLabel> WipLabels => Set<WipLabel>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

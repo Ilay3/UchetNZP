@@ -21,4 +21,6 @@ public class Part
     public virtual ICollection<WipScrap> WipScraps { get; set; } = new List<WipScrap>();
 
     public virtual ICollection<WarehouseItem> WarehouseItems { get; set; } = new List<WarehouseItem>();
+
+    public virtual ICollection<WipLabel> WipLabels { get; set; } = new List<WipLabel>();
 }
