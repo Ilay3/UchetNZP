@@ -65,7 +65,7 @@ public class TransferPeriodReportExcelExporter : ITransferPeriodReportExcelExpor
 
         var headerColumnIndex = 1;
         worksheet.Cell(rowIndex, headerColumnIndex++).Value = "Деталь";
-        worksheet.Cell(rowIndex, headerColumnIndex++).Value = "Обозначение";
+        
 
         foreach (var date in in_dates)
         {
@@ -91,7 +91,7 @@ public class TransferPeriodReportExcelExporter : ITransferPeriodReportExcelExpor
             {
                 var columnIndex = 1;
                 worksheet.Cell(rowIndex, columnIndex++).Value = item.PartName;
-                worksheet.Cell(rowIndex, columnIndex++).Value = item.PartCode ?? string.Empty;
+                
 
                 foreach (var date in in_dates)
                 {
