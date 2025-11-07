@@ -26,6 +26,15 @@
                 <div class="form-text">Ищите по наименованию или обозначению.</div>
             </div>
             <div class="col-lg-4">
+                <label class="form-label" for="receiptLabelSelect">Ярлык детали</label>
+                <input id="receiptLabelSearchInput" class="form-control form-control-lg mb-2" type="search" placeholder="Поиск по номеру ярлыка" autocomplete="off" disabled />
+                <select id="receiptLabelSelect" class="form-select form-select-lg" aria-describedby="receiptLabelHelp" disabled>
+                    <option value="">Автоматический выбор</option>
+                </select>
+                <input type="hidden" id="receiptLabelId" />
+                <div class="form-text" id="receiptLabelHelp">Выберите свободный ярлык или оставьте поле пустым для автоматического подбора. Количество ярлыка должно совпадать с количеством прихода.</div>
+            </div>
+            <div class="col-lg-4">
                 <label class="form-label" for="receiptDateInput">Дата</label>
                 <input id="receiptDateInput" class="form-control form-control-lg" type="date" />
                 <div class="form-text">Дата прихода устанавливается автоматически на сегодня и может быть изменена.</div>

@@ -48,6 +48,9 @@
     const dateInput = document.getElementById("receiptDateInput");
     const quantityInput = document.getElementById("receiptQuantityInput");
     const commentInput = document.getElementById("receiptCommentInput");
+    const labelSearchInput = document.getElementById("receiptLabelSearchInput");
+    const labelSelect = document.getElementById("receiptLabelSelect");
+    const labelHiddenInput = document.getElementById("receiptLabelId");
     const addButton = document.getElementById("receiptAddButton");
     const saveButton = document.getElementById("receiptSaveButton");
     const resetButton = document.getElementById("receiptResetButton");
@@ -70,6 +73,14 @@
     let operationsRequestId = 0;
     let balanceRequestId = 0;
     const balanceRequests = new Map();
+    let labels = [];
+    let filteredLabels = [];
+    let selectedLabel = null;
+    let isLoadingLabels = false;
+    let labelsAbortController = null;
+    let labelsRequestId = 0;
+    let loadedLabelsPartId = null;
+    let isUpdatingLabels = false;
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
 
@@ -79,6 +90,7 @@
             return;
         }
 
+        void loadLabels(part.id);
         loadOperations(part.id);
         updateFormState();
     });
@@ -94,6 +106,7 @@
         selectedOperation = null;
         renderOperations();
         updateBalanceLabel();
+        resetLabels();
         updateFormState();
     });
 
@@ -101,6 +114,30 @@
         renderOperations();
         updateBalanceLabel();
         updateFormState();
+    });
+
+    labelSearchInput?.addEventListener("input", () => {
+        filterLabels(labelSearchInput.value);
+    });
+
+    labelSelect?.addEventListener("change", () => {
+        if (!labelSelect) {
+            return;
+        }
+
+        const labelId = labelSelect.value;
+        if (!labelId) {
+            setSelectedLabel(null);
+            return;
+        }
+
+        const label = labels.find(item => item.id === labelId) || filteredLabels.find(item => item.id === labelId) || null;
+        if (!label) {
+            setSelectedLabel(null);
+            return;
+        }
+
+        setSelectedLabel(label);
     });
 
     function getBalanceKey(partId, sectionId, opNumber) {
@@ -132,12 +169,20 @@
             return false;
         }
 
+        if (selectedLabel) {
+            const labelQuantity = Number(selectedLabel.quantity);
+            if (!Number.isFinite(labelQuantity) || Math.abs(labelQuantity - quantity) > 0.000001) {
+                return false;
+            }
+        }
+
         return true;
     }
 
     function updateFormState() {
         addButton.disabled = !canAddToCart();
         saveButton.disabled = cart.length === 0;
+        updateLabelControlsState();
     }
 
     async function loadOperations(partId) {
@@ -357,6 +402,270 @@
         }
     }
 
+    function normalizeLabel(raw) {
+        if (!raw) {
+            return null;
+        }
+
+        const id = typeof raw.id === "string" ? raw.id : raw.id ? String(raw.id) : "";
+        const number = typeof raw.number === "string" ? raw.number.trim() : "";
+        const quantityValue = typeof raw.quantity === "number" ? raw.quantity : Number(raw.quantity ?? 0);
+        const quantity = Number.isFinite(quantityValue) ? quantityValue : 0;
+        const isAssignedFlag = Boolean(raw.isAssigned);
+
+        if (!id || !number) {
+            return null;
+        }
+
+        return {
+            id,
+            number,
+            quantity,
+            isAssigned: isAssignedFlag,
+        };
+    }
+
+    function renderLabelOptions() {
+        if (!labelSelect) {
+            return;
+        }
+
+        labelSelect.innerHTML = "";
+
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Автоматический выбор";
+        labelSelect.appendChild(placeholder);
+
+        if (!filteredLabels.length) {
+            labelSelect.value = "";
+            return;
+        }
+
+        const sorted = [...filteredLabels].sort((left, right) => left.number.localeCompare(right.number, "ru", { numeric: true }));
+        sorted.forEach(label => {
+            const option = document.createElement("option");
+            option.value = label.id;
+            option.textContent = `${label.number} • ${label.quantity.toLocaleString("ru-RU")} шт`;
+            labelSelect.appendChild(option);
+        });
+
+        if (selectedLabel && sorted.some(label => label.id === selectedLabel.id)) {
+            labelSelect.value = selectedLabel.id;
+        }
+        else {
+            labelSelect.value = "";
+        }
+    }
+
+    function updateLabelControlsState() {
+        const part = partLookup.getSelected();
+        const hasPart = Boolean(part && part.id);
+        const shouldEnable = hasPart && !isLoadingLabels;
+
+        if (labelSearchInput) {
+            labelSearchInput.disabled = !shouldEnable;
+        }
+
+        if (labelSelect) {
+            labelSelect.disabled = !shouldEnable;
+        }
+    }
+
+    function filterLabels(term) {
+        const normalizedTerm = typeof term === "string" ? term.trim().toLowerCase() : "";
+
+        if (!normalizedTerm) {
+            filteredLabels = [...labels];
+        }
+        else {
+            filteredLabels = labels.filter(label => label.number.toLowerCase().includes(normalizedTerm));
+        }
+
+        if (!isUpdatingLabels && selectedLabel && !filteredLabels.some(label => label.id === selectedLabel.id)) {
+            selectedLabel = null;
+            if (labelHiddenInput) {
+                labelHiddenInput.value = "";
+            }
+        }
+
+        renderLabelOptions();
+        updateLabelControlsState();
+        updateFormState();
+    }
+
+    function ensureLabelInList(label) {
+        const normalized = normalizeLabel(label);
+        if (!normalized) {
+            return null;
+        }
+
+        const index = labels.findIndex(item => item.id === normalized.id);
+        if (index >= 0) {
+            labels[index] = normalized;
+        }
+        else {
+            labels.push(normalized);
+        }
+
+        return normalized;
+    }
+
+    function setSelectedLabel(label) {
+        if (!labelHiddenInput) {
+            return;
+        }
+
+        if (!label) {
+            selectedLabel = null;
+            labelHiddenInput.value = "";
+            if (labelSelect) {
+                labelSelect.value = "";
+            }
+            updateFormState();
+            return;
+        }
+
+        const normalized = ensureLabelInList(label);
+        if (!normalized) {
+            selectedLabel = null;
+            labelHiddenInput.value = "";
+            if (labelSelect) {
+                labelSelect.value = "";
+            }
+            updateFormState();
+            return;
+        }
+
+        selectedLabel = normalized;
+        labelHiddenInput.value = normalized.id;
+
+        const searchTerm = labelSearchInput ? labelSearchInput.value : "";
+        isUpdatingLabels = true;
+        filterLabels(searchTerm);
+        isUpdatingLabels = false;
+
+        if (labelSelect) {
+            labelSelect.value = normalized.id;
+        }
+
+        updateFormState();
+    }
+
+    function resetLabels() {
+        labels = [];
+        filteredLabels = [];
+        loadedLabelsPartId = null;
+        setSelectedLabel(null);
+
+        if (labelSearchInput) {
+            labelSearchInput.value = "";
+        }
+
+        renderLabelOptions();
+        updateLabelControlsState();
+    }
+
+    function removeLabelFromList(labelId) {
+        if (!labelId) {
+            return;
+        }
+
+        labels = labels.filter(item => item.id !== labelId);
+        filteredLabels = filteredLabels.filter(item => item.id !== labelId);
+        if (selectedLabel && selectedLabel.id === labelId) {
+            setSelectedLabel(null);
+            renderLabelOptions();
+            updateLabelControlsState();
+        }
+        else {
+            renderLabelOptions();
+            updateLabelControlsState();
+        }
+    }
+
+    async function loadLabels(partId, options = {}) {
+        if (!partId) {
+            resetLabels();
+            return;
+        }
+
+        const requestId = ++labelsRequestId;
+
+        if (labelsAbortController) {
+            labelsAbortController.abort();
+        }
+
+        labelsAbortController = new AbortController();
+        const signal = labelsAbortController.signal;
+
+        isLoadingLabels = true;
+        updateLabelControlsState();
+
+        try {
+            const url = new URL("/wip/labels/list", window.location.origin);
+            url.searchParams.set("partId", partId);
+            const response = await fetch(url.toString(), { signal, headers: { "Accept": "application/json" } });
+            if (!response.ok) {
+                throw new Error("Не удалось загрузить ярлыки детали.");
+            }
+
+            const items = await response.json();
+            if (requestId !== labelsRequestId) {
+                return;
+            }
+
+            loadedLabelsPartId = partId;
+            labels = Array.isArray(items)
+                ? items
+                    .map(normalizeLabel)
+                    .filter(item => item && !item.isAssigned)
+                : [];
+
+            const ensured = options.ensureLabel ? ensureLabelInList(options.ensureLabel) : null;
+            if (ensured && labelSearchInput) {
+                labelSearchInput.value = ensured.number;
+            }
+            else if (!ensured && labelSearchInput) {
+                labelSearchInput.value = "";
+            }
+
+            const searchTerm = labelSearchInput ? labelSearchInput.value : "";
+            isUpdatingLabels = true;
+            filterLabels(searchTerm);
+            isUpdatingLabels = false;
+
+            setSelectedLabel(ensured);
+        }
+        catch (error) {
+            if (signal.aborted) {
+                return;
+            }
+
+            console.error(error);
+            if (options.ensureLabel) {
+                const ensured = ensureLabelInList(options.ensureLabel);
+                if (ensured) {
+                    if (labelSearchInput) {
+                        labelSearchInput.value = ensured.number;
+                    }
+
+                    setSelectedLabel(ensured);
+                }
+            }
+            else {
+                resetLabels();
+            }
+        }
+        finally {
+            if (requestId === labelsRequestId) {
+                isLoadingLabels = false;
+                labelsAbortController = null;
+                updateLabelControlsState();
+            }
+        }
+    }
+
     function renderCart() {
         if (!cart.length) {
             cartTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
@@ -467,6 +776,21 @@
             if (pendingAdjustments.get(key) <= 0) {
                 pendingAdjustments.delete(key);
             }
+
+            if (removed.wipLabelId && loadedLabelsPartId && loadedLabelsPartId === removed.partId) {
+                const restored = ensureLabelInList({
+                    id: removed.wipLabelId,
+                    number: removed.labelNumber,
+                    quantity: removed.quantity,
+                    isAssigned: removed.isAssigned,
+                });
+                if (restored) {
+                    const searchTerm = labelSearchInput ? labelSearchInput.value : "";
+                    isUpdatingLabels = true;
+                    filterLabels(searchTerm);
+                    isUpdatingLabels = false;
+                }
+            }
         }
 
         editingIndex = null;
@@ -489,12 +813,22 @@
             pendingAdjustments.delete(key);
         }
 
+        const labelOption = item.wipLabelId
+            ? {
+                id: item.wipLabelId,
+                number: item.labelNumber,
+                quantity: item.quantity,
+                isAssigned: item.isAssigned,
+            }
+            : null;
+
         partLookup.setSelected({ id: item.partId, name: item.partName, code: item.partCode });
         sectionLookup.setSelected({ id: item.sectionId, name: item.sectionName, code: null });
         quantityInput.value = item.quantity;
         commentInput.value = item.comment ?? "";
         dateInput.value = item.date;
 
+        await loadLabels(item.partId, { ensureLabel: labelOption });
         await loadOperations(item.partId);
         selectedOperation = operations.find(op => op.opNumber === item.opNumber) ?? null;
         renderOperations();
@@ -516,6 +850,7 @@
         commentInput.value = "";
         dateInput.value = new Date().toISOString().slice(0, 10);
         selectedOperation = null;
+        setSelectedLabel(null);
         renderOperations();
         updateBalanceLabel();
         updateFormState();
@@ -567,6 +902,9 @@
 
         const partDisplay = formatNameWithCode(part.name, part.code);
         const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
+        const labelId = selectedLabel ? selectedLabel.id : null;
+        const labelNumber = selectedLabel ? selectedLabel.number : null;
+        const labelIsAssigned = selectedLabel ? Boolean(selectedLabel.isAssigned) : false;
 
         const item = {
             partId: part.id,
@@ -583,12 +921,16 @@
             comment: commentInput.value || null,
             was,
             become,
-            wipLabelId: null,
-            labelNumber: null,
-            isAssigned: false,
+            wipLabelId: labelId,
+            labelNumber,
+            isAssigned: labelIsAssigned,
         };
 
         cart.push(item);
+        if (labelId) {
+            removeLabelFromList(labelId);
+            setSelectedLabel(null);
+        }
         editingIndex = null;
         renderCart();
         resetForm();
@@ -614,6 +956,9 @@
                 receiptDate: item.date,
                 quantity: item.quantity,
                 comment: item.comment,
+                wipLabelId: item.wipLabelId,
+                labelNumber: item.labelNumber,
+                isAssigned: item.isAssigned,
             })),
         };
 

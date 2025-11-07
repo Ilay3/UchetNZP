@@ -149,9 +149,9 @@ public class WipReceiptsController : Controller
                 x.ReceiptDate,
                 x.Quantity,
                 x.Comment,
-                null,
-                null,
-                false)).ToList();
+                x.WipLabelId,
+                x.LabelNumber,
+                x.IsAssigned)).ToList();
         }
         catch (ArgumentException ex)
         {
@@ -231,5 +231,8 @@ public class WipReceiptsController : Controller
         string OpNumber,
         DateTime ReceiptDate,
         decimal Quantity,
-        string? Comment);
+        string? Comment,
+        Guid? WipLabelId,
+        string? LabelNumber,
+        bool IsAssigned = false);
 }
