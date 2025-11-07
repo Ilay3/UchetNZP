@@ -57,6 +57,7 @@
                             <th scope="col">Деталь</th>
                             <th scope="col">Вид работ</th>
                             <th scope="col">Операция</th>
+                            <th scope="col">Ярлыки</th>
                             <th scope="col">Приход</th>
                             <th scope="col">Расход</th>
                             <th scope="col">Остаток</th>
@@ -75,6 +76,7 @@
                                 </td>
                                 <td>@item.SectionName</td>
                                 <td>@item.OpNumber</td>
+                                <td>@(string.IsNullOrWhiteSpace(item.LabelNumbers) ? "—" : item.LabelNumbers)</td>
                                 <td>@item.Receipt.ToString("0.###")</td>
                                 <td>@item.Launch.ToString("0.###")</td>
                                 <td>@item.Balance.ToString("0.###")</td>

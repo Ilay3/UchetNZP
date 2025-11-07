@@ -59,6 +59,7 @@
                             <th scope="col">Деталь</th>
                             <th scope="col">Вид работ</th>
                             <th scope="col">Операция</th>
+                            <th scope="col">Ярлыки</th>
                             <th scope="col">Остаток</th>
                             <th scope="col">Дата партии</th>
                         </tr>
@@ -76,6 +77,7 @@
                                 </td>
                                 <td>@item.SectionName</td>
                                 <td>@item.OpNumber</td>
+                                <td>@(string.IsNullOrWhiteSpace(item.LabelNumbers) ? "—" : item.LabelNumbers)</td>
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@item.BatchDate.ToString("dd.MM.yyyy")</td>
                             </tr>

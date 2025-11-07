@@ -165,6 +165,10 @@
                                     {
                                         <span class="badge bg-light text-dark border">В: @entry.TargetSectionName</span>
                                     }
+                                    @if (entry.HasLabel)
+                                    {
+                                        <span class="badge bg-light text-dark border">Ярлык: @entry.LabelNumber</span>
+                                    }
                                 </div>
                                 @if (entry.HasComment)
                                 {

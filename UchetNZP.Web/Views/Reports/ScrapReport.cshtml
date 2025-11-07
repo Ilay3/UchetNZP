@@ -85,6 +85,7 @@
                             <th scope="col">Дата</th>
                             <th scope="col">Вид работ</th>
                             <th scope="col">Деталь</th>
+                            <th scope="col">Ярлык</th>
                             <th scope="col">Операция</th>
                             <th scope="col">Количество</th>
                             <th scope="col">Тип брака</th>
@@ -104,6 +105,7 @@
                                         <div class="text-muted small">@item.PartCode</div>
                                     }
                                 </td>
+                                <td>@(string.IsNullOrWhiteSpace(item.LabelNumber) ? "—" : item.LabelNumber)</td>
                                 <td>@item.OpNumber</td>
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@item.ScrapType</td>

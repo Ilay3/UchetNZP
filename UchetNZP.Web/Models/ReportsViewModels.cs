@@ -54,7 +54,8 @@ public record WipSummaryItemViewModel(
     string OpNumber,
     decimal Receipt,
     decimal Launch,
-    decimal Balance);
+    decimal Balance,
+    string? LabelNumbers);
 
 public record WipSummaryViewModel(
     WipSummaryFilterViewModel Filter,
@@ -90,7 +91,8 @@ public record ScrapReportItemViewModel(
     decimal Quantity,
     string ScrapType,
     string Employee,
-    string? Comment);
+    string? Comment,
+    string? LabelNumber);
 
 public record ScrapReportViewModel(
     ScrapReportFilterViewModel Filter,
@@ -119,7 +121,8 @@ public record WipBatchReportItemViewModel(
     string SectionName,
     string OpNumber,
     decimal Quantity,
-    DateTime BatchDate);
+    DateTime BatchDate,
+    string? LabelNumbers);
 
 public record WipBatchReportViewModel(
     WipBatchReportFilterViewModel Filter,
