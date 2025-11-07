@@ -8,5 +8,8 @@ public record ReceiptItemSummaryDto(
     decimal Was,
     decimal Become,
     Guid BalanceId,
-    Guid ReceiptId
+    Guid ReceiptId,
+    Guid? WipLabelId,
+    string? LabelNumber,
+    bool IsAssigned
 );

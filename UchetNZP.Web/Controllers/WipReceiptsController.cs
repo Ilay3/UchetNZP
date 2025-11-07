@@ -148,14 +148,25 @@ public class WipReceiptsController : Controller
                 x.SectionId,
                 x.ReceiptDate,
                 x.Quantity,
-                x.Comment)).ToList();
+                x.Comment,
+                null,
+                null,
+                false)).ToList();
         }
         catch (ArgumentException ex)
         {
             return BadRequest(ex.Message);
         }
 
-        var summary = await _wipService.AddReceiptsBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
+        ReceiptBatchSummaryDto summary;
+        try
+        {
+            summary = await _wipService.AddReceiptsBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
 
         var model = new ReceiptBatchSummaryViewModel(
             summary.Saved,
@@ -168,7 +179,10 @@ public class WipReceiptsController : Controller
                     x.Was,
                     x.Become,
                     x.BalanceId,
-                    x.ReceiptId))
+                    x.ReceiptId,
+                    x.WipLabelId,
+                    x.LabelNumber,
+                    x.IsAssigned))
                 .ToList());
 
         return Ok(model);

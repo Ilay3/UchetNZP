@@ -5,7 +5,7 @@ namespace UchetNZP.Application.Abstractions;
 
 public interface IWipService
 {
-    Task<ReceiptBatchSummaryDto> AddReceiptsBatchAsync(IEnumerable<ReceiptItemDto> items, CancellationToken cancellationToken = default);
+    Task<ReceiptBatchSummaryDto> AddReceiptsBatchAsync(IEnumerable<ReceiptItemDto> in_items, CancellationToken cancellationToken = default);
 
     Task<ReceiptDeleteResultDto> DeleteReceiptAsync(Guid in_receiptId, CancellationToken cancellationToken = default);
 }

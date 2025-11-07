@@ -359,7 +359,7 @@
 
     function renderCart() {
         if (!cart.length) {
-            cartTableBody.innerHTML = "<tr><td colspan=\"9\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
+            cartTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
             updateFormState();
             return;
         }
@@ -373,6 +373,7 @@
                 <td>${item.sectionName}</td>
                 <td>${item.partDisplay}</td>
                 <td>${item.operationDisplay}</td>
+                <td>${item.isAssigned && item.labelNumber ? item.labelNumber : ""}</td>
                 <td>${item.was.toFixed(3)}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>
@@ -393,7 +394,7 @@
         }
 
         if (!history.length) {
-            historyTableBody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center text-muted\">Сохранённые приходы появятся здесь.</td></tr>";
+            historyTableBody.innerHTML = "<tr><td colspan=\"8\" class=\"text-center text-muted\">Сохранённые приходы появятся здесь.</td></tr>";
             return;
         }
 
@@ -405,6 +406,7 @@
                 <td>${item.sectionName}</td>
                 <td>${item.partDisplay}</td>
                 <td>${item.operationDisplay}</td>
+                <td>${item.isAssigned && item.labelNumber ? item.labelNumber : ""}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>
                 <td class="text-center">
@@ -581,6 +583,9 @@
             comment: commentInput.value || null,
             was,
             become,
+            wipLabelId: null,
+            labelNumber: null,
+            isAssigned: false,
         };
 
         cart.push(item);
@@ -624,7 +629,9 @@
             });
 
             if (!response.ok) {
-                throw new Error("Не удалось сохранить приходы.");
+                const errorText = await response.text();
+                const normalized = typeof errorText === "string" && errorText.trim().length ? errorText.trim() : null;
+                throw new Error(normalized ?? "Не удалось сохранить приходы.");
             }
 
             const summary = await response.json();
@@ -643,7 +650,12 @@
         }
         catch (error) {
             console.error(error);
-            alert("Во время сохранения произошла ошибка. Попробуйте ещё раз.");
+            if (error instanceof Error && error.message) {
+                alert(error.message);
+            }
+            else {
+                alert("Во время сохранения произошла ошибка. Попробуйте ещё раз.");
+            }
         }
         finally {
             saveButton.disabled = false;
@@ -692,6 +704,9 @@
                 operationDisplay,
                 quantity: isNaN(quantity) ? 0 : quantity,
                 become: isNaN(become) ? 0 : become,
+                wipLabelId: item.wipLabelId ?? null,
+                labelNumber: typeof item.labelNumber === "string" ? item.labelNumber : null,
+                isAssigned: Boolean(item.isAssigned),
             });
         }
 
@@ -759,10 +774,14 @@
         summary.items.forEach(item => {
             const row = document.createElement("tr");
             const matchingCartItem = cart.find(x => x.partId === item.partId && x.sectionId === item.sectionId && x.opNumber === item.opNumber && x.quantity === item.quantity);
+            const labelDisplay = item.isAssigned && typeof item.labelNumber === "string" && item.labelNumber
+                ? item.labelNumber
+                : (matchingCartItem && matchingCartItem.isAssigned && matchingCartItem.labelNumber ? matchingCartItem.labelNumber : "");
 
             row.innerHTML = `
                 <td>${matchingCartItem ? matchingCartItem.partDisplay : item.partId}</td>
                 <td>${matchingCartItem ? matchingCartItem.operationDisplay : item.opNumber}</td>
+                <td>${labelDisplay}</td>
                 <td>${item.was.toFixed(3)}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>`;
