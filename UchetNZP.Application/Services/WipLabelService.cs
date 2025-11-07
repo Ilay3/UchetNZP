@@ -222,7 +222,7 @@ public class WipLabelService : IWipLabelService
 
     private static DateTime NormalizeDate(DateTime in_date)
     {
-        var ret = DateTime.SpecifyKind(in_date.Date, DateTimeKind.Unspecified);
+        var ret = DateTime.SpecifyKind(in_date.Date, DateTimeKind.Utc);
         return ret;
     }
 }
