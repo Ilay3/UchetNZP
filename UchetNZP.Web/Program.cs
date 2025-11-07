@@ -35,6 +35,7 @@ builder.Services.AddScoped<IImportService, ImportService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IAdminWipService, AdminWipService>();
 builder.Services.AddScoped<IAdminCatalogService, AdminCatalogService>();
+builder.Services.AddScoped<IWipLabelService, WipLabelService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IScrapReportExcelExporter, ScrapReportExcelExporter>();
 builder.Services.AddSingleton<ITransferPeriodReportExcelExporter, TransferPeriodReportExcelExporter>();
