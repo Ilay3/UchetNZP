@@ -29,7 +29,10 @@ public record ReceiptSummaryItemViewModel(
     decimal Was,
     decimal Become,
     Guid BalanceId,
-    Guid ReceiptId);
+    Guid ReceiptId,
+    Guid? WipLabelId,
+    string? LabelNumber,
+    bool IsAssigned);
 
 public record ReceiptBatchSummaryViewModel(int Saved, IReadOnlyList<ReceiptSummaryItemViewModel> Items);
 

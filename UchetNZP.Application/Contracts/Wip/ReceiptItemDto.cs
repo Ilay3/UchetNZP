@@ -6,5 +6,8 @@ public record ReceiptItemDto(
     Guid SectionId,
     DateTime ReceiptDate,
     decimal Quantity,
-    string? Comment
+    string? Comment,
+    Guid? WipLabelId,
+    string? LabelNumber,
+    bool IsAssigned
 );
