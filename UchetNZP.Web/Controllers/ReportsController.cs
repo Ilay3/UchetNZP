@@ -75,6 +75,7 @@ public class ReportsController : Controller
         var receipts = await receiptsQuery
             .Include(x => x.Part)
             .Include(x => x.Section)
+            .Include(x => x.WipLabel)
             .OrderByDescending(x => x.ReceiptDate)
             .ThenBy(x => x.Part != null ? x.Part.Name : string.Empty)
             .ThenBy(x => x.OpNumber)
@@ -89,7 +90,8 @@ public class ReportsController : Controller
                 x.Part?.Code,
                 OperationNumber.Format(x.OpNumber),
                 x.Quantity,
-                string.IsNullOrWhiteSpace(x.Comment) ? null : x.Comment))
+                string.IsNullOrWhiteSpace(x.Comment) ? null : x.Comment,
+                x.WipLabel != null && !string.IsNullOrWhiteSpace(x.WipLabel.Number) ? x.WipLabel.Number : null))
             .ToList();
 
         var filter = new ReceiptReportFilterViewModel

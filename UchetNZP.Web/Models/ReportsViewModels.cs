@@ -25,7 +25,8 @@ public record ReceiptReportItemViewModel(
     string? PartCode,
     string OpNumber,
     decimal Quantity,
-    string? Comment);
+    string? Comment,
+    string? LabelNumber);
 
 public record ReceiptReportViewModel(
     ReceiptReportFilterViewModel Filter,
