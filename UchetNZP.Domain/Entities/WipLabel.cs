@@ -23,4 +23,6 @@ public class WipLabel
     public virtual WipReceipt? WipReceipt { get; set; }
 
     public virtual ICollection<WipTransfer> Transfers { get; set; } = new List<WipTransfer>();
+
+    public virtual ICollection<WarehouseLabelItem> WarehouseLabelItems { get; set; } = new List<WarehouseLabelItem>();
 }

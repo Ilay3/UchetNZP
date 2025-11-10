@@ -228,7 +228,7 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime>("AddedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<decimal>("Delta")
@@ -279,7 +279,7 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime>("AddedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("FromOpNumber")
@@ -371,7 +371,7 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime>("AddedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("OpNumber")
@@ -575,6 +575,37 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.HasIndex("WipTransferId");
 
                     b.ToTable("WipTransferOperations");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseLabelItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WarehouseItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WipLabelId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WarehouseItemId");
+
+                    b.HasIndex("WipLabelId");
+
+                    b.ToTable("WarehouseLabelItems");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
@@ -796,6 +827,7 @@ namespace UchetNZP.Infrastructure.Data.Migrations
 
                     b.Navigation("WipReceipt");
                     b.Navigation("Transfers");
+                    b.Navigation("WarehouseLabelItems");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipScrap", b =>
@@ -890,6 +922,27 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Navigation("Part");
 
                     b.Navigation("Transfer");
+
+                    b.Navigation("WarehouseLabelItems");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseLabelItem", b =>
+                {
+                    b.HasOne("UchetNZP.Domain.Entities.WarehouseItem", "WarehouseItem")
+                        .WithMany("WarehouseLabelItems")
+                        .HasForeignKey("WarehouseItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "WipLabel")
+                        .WithMany("WarehouseLabelItems")
+                        .HasForeignKey("WipLabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WarehouseItem");
+
+                    b.Navigation("WipLabel");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.ImportJob", b =>

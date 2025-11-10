@@ -33,5 +33,10 @@ public class WarehouseItemConfiguration : IEntityTypeConfiguration<WarehouseItem
             .WithOne(x => x.WarehouseItem)
             .HasForeignKey<WarehouseItem>(x => x.TransferId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasMany(x => x.WarehouseLabelItems)
+            .WithOne(x => x.WarehouseItem)
+            .HasForeignKey(x => x.WarehouseItemId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

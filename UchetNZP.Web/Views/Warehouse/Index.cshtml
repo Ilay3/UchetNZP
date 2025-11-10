@@ -63,6 +63,7 @@
                             <th scope="col">Дата добавления</th>
                             <th scope="col">Комментарий</th>
                             <th scope="col">Обновлено</th>
+                            <th scope="col" class="text-nowrap">Ярлыки</th>
                             <th scope="col" class="text-nowrap">Изменение</th>
                         </tr>
                     </thead>
@@ -98,6 +99,12 @@
                                     }
                                 </td>
                                 <td>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm js-warehouse-labels-toggle" data-target="#labels-@row.Id" aria-expanded="false" aria-controls="labels-@row.Id">
+                                        Ярлыки
+                                        <span class="badge bg-secondary ms-1">@row.LabelRows.Count</span>
+                                    </button>
+                                </td>
+                                <td>
                                     <form asp-action="Update" method="post" class="row g-2 align-items-center">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="Id" value="@row.Id" />
@@ -121,6 +128,64 @@
                                     </form>
                                 </td>
                             </tr>
+                            <tr id="labels-@row.Id" class="warehouse-labels-row d-none">
+                                <td colspan="7">
+                                    <div class="border rounded p-3 bg-light">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0">Ярлыки детали</h6>
+                                            <small class="text-muted">Всего: @row.LabelRows.Count</small>
+                                        </div>
+                                        @if (row.LabelRows.Count == 0)
+                                        {
+                                            <div class="text-muted">Для этой записи склада нет привязанных ярлыков.</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="table-responsive">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th scope="col">Номер</th>
+                                                            <th scope="col" class="text-end">Количество</th>
+                                                            <th scope="col">Дата добавления</th>
+                                                            <th scope="col">Обновлено</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var label in row.LabelRows)
+                                                        {
+                                                            <tr>
+                                                                <td class="fw-semibold">
+                                                                    @if (string.IsNullOrWhiteSpace(label.LabelNumber))
+                                                                    {
+                                                                        <span class="text-muted">—</span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        @label.LabelNumber
+                                                                    }
+                                                                </td>
+                                                                <td class="text-end">@label.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
+                                                                <td>@label.AddedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)</td>
+                                                                <td>
+                                                                    @if (label.UpdatedAt.HasValue)
+                                                                    {
+                                                                        @label.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span class="text-muted">—</span>
+                                                                    }
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
                         }
                     </tbody>
                 </table>
@@ -128,3 +193,8 @@
         }
     </div>
 </div>
+
+@section Scripts
+{
+    <script src="~/js/warehouse-labels.js" asp-append-version="true"></script>
+}
