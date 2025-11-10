@@ -1721,6 +1721,17 @@
         renderCart();
 
         partLookup.setSelected({ id: item.partId, name: item.partName, code: item.partCode });
+        if (item.labelId) {
+            selectedLabelOption = {
+                id: item.labelId,
+                number: item.labelNumber ?? item.labelId,
+                quantity: Number(item.labelQuantityTotal ?? item.labelQuantityBefore ?? 0),
+                remainingQuantity: Number(item.labelQuantityBefore ?? 0),
+            };
+        }
+        else {
+            selectedLabelOption = null;
+        }
         commentInput.value = item.comment ?? "";
         quantityInput.value = item.quantity;
         if (dateInput) {
@@ -1733,7 +1744,8 @@
             selectedFromOperation = fromOperation;
             fromOperationInput.value = formatOperation(fromOperation);
             fromOperationNumberInput.value = fromOperation.opNumber;
-            void loadLabels(item.partId, fromOperation.opNumber);
+            await loadLabels(item.partId, fromOperation.opNumber);
+            restoreLabelOptionFromCartItem(item);
         }
 
         updateToOperationsDatalist();
