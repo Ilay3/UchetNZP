@@ -52,6 +52,7 @@
                     <div class="fw-semibold text-uppercase small text-muted">На операции до</div>
                     <div class="display-6" id="transferFromBalanceLabel">0 шт</div>
                     <div class="form-text">Остаток учитывает выбранные записи в корзине.</div>
+                    <div class="small text-muted mt-2">Ярлыки: <span id="transferFromLabels">—</span></div>
                 </div>
             </div>
             <div class="col-md-6 col-lg-4">
@@ -59,6 +60,7 @@
                     <div class="fw-semibold text-uppercase small text-muted">На операции после</div>
                     <div class="display-6" id="transferToBalanceLabel">0 шт</div>
                     <div class="form-text">Остаток увеличивается с учётом готовых к передаче позиций.</div>
+                    <div class="small text-muted mt-2">Ярлыки: <span id="transferToLabels">—</span></div>
                 </div>
             </div>
         </form>
@@ -84,6 +86,7 @@
                         <th scope="col">Деталь</th>
                         <th scope="col">Операция до</th>
                         <th scope="col">Операция после</th>
+                        <th scope="col">Ярлыки</th>
                         <th scope="col">Количество</th>
                         <th scope="col">Остаток до (было → станет)</th>
                         <th scope="col">Остаток после (было → станет)</th>
@@ -94,7 +97,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="10" class="text-center text-muted">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td>
+                        <td colspan="11" class="text-center text-muted">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td>
                     </tr>
                 </tbody>
             </table>
@@ -115,6 +118,7 @@
                         <th scope="col">Деталь</th>
                         <th scope="col">Операция до</th>
                         <th scope="col">Операция после</th>
+                        <th scope="col">Ярлыки</th>
                         <th scope="col">Количество</th>
                         <th scope="col">Остаток до</th>
                         <th scope="col">Остаток после</th>
@@ -144,6 +148,7 @@
                                 <th scope="col">Деталь</th>
                                 <th scope="col">Операция до</th>
                                 <th scope="col">Операция после</th>
+                                <th scope="col">Ярлыки</th>
                                 <th scope="col">Количество</th>
                                 <th scope="col">Брак</th>
                                 <th scope="col">ID передачи</th>

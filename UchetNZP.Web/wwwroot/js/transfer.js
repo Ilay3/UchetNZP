@@ -40,6 +40,8 @@
     const commentInput = document.getElementById("transferCommentInput");
     const fromBalanceLabel = document.getElementById("transferFromBalanceLabel");
     const toBalanceLabel = document.getElementById("transferToBalanceLabel");
+    const fromLabelsElement = document.getElementById("transferFromLabels");
+    const toLabelsElement = document.getElementById("transferToLabels");
     const addButton = document.getElementById("transferAddButton");
     const resetButton = document.getElementById("transferResetButton");
     const saveButton = document.getElementById("transferSaveButton");
@@ -94,6 +96,7 @@
     let balancesAbortController = null;
 
     const balanceCache = new Map();
+    const balanceLabels = new Map();
     const pendingChanges = new Map();
     let cart = [];
     let recentTransfers = [];
@@ -591,11 +594,13 @@
             if (data?.from) {
                 const key = getBalanceKey(part.id, data.from.opNumber);
                 balanceCache.set(key, Number(data.from.balance) || 0);
+                balanceLabels.set(key, normalizeLabelArray(data.from.labels));
             }
 
             if (data?.to) {
                 const key = getBalanceKey(part.id, data.to.opNumber);
                 balanceCache.set(key, Number(data.to.balance) || 0);
+                balanceLabels.set(key, normalizeLabelArray(data.to.labels));
             }
         }
         catch (error) {
@@ -620,6 +625,8 @@
         if (!part || !part.id) {
             fromBalanceLabel.textContent = "0 шт";
             toBalanceLabel.textContent = "0 шт";
+            updateLabelElement(fromLabelsElement, []);
+            updateLabelElement(toLabelsElement, []);
             updateFormState();
             return;
         }
@@ -630,6 +637,10 @@
         const toAvailable = toNumber ? getAvailableBalance(part.id, toNumber) : 0;
         fromBalanceLabel.textContent = `${fromAvailable.toLocaleString("ru-RU")} шт`;
         toBalanceLabel.textContent = `${toAvailable.toLocaleString("ru-RU")} шт`;
+        const fromLabels = fromNumber ? balanceLabels.get(getBalanceKey(part.id, fromNumber)) : null;
+        const toLabels = toNumber ? balanceLabels.get(getBalanceKey(part.id, toNumber)) : null;
+        updateLabelElement(fromLabelsElement, fromLabels);
+        updateLabelElement(toLabelsElement, toLabels);
         updateFormState();
     }
 
@@ -692,6 +703,8 @@
         }
 
         const toAvailable = getAvailableBalance(part.id, selectedToOperation.opNumber);
+        const fromLabelKey = getBalanceKey(part.id, selectedFromOperation.opNumber);
+        const fromLabels = balanceLabels.get(fromLabelKey);
 
         const item = {
             partId: part.id,
@@ -716,6 +729,7 @@
             scrapQuantity: 0,
             scrapComment: null,
             scrap: null,
+            labelNumbers: normalizeLabelArray(fromLabels),
         };
 
         const leftover = item.fromBalanceAfter;
@@ -752,7 +766,7 @@
 
     function renderCart() {
         if (!cart.length) {
-            cartTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td></tr>";
+            cartTableBody.innerHTML = "<tr><td colspan=\"11\" class=\"text-center text-muted\">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td></tr>";
             updateFormState();
             return;
         }
@@ -771,6 +785,7 @@
                     <div class="fw-semibold">${item.toOpNumber}</div>
                     <div class="small text-muted">${item.toOperationName ?? ""}</div>
                 </td>
+                <td>${formatLabelList(item.labelNumbers)}</td>
                 <td>${item.quantity.toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
                 <td>${formatBalanceChange(item.fromBalanceBefore, item.fromBalanceAfter)}</td>
                 <td>${formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter)}</td>
@@ -795,6 +810,55 @@
         const element = document.createElement("div");
         element.textContent = value;
         return element.innerHTML;
+    }
+
+    function normalizeLabelArray(source) {
+        if (!Array.isArray(source)) {
+            return [];
+        }
+
+        const seen = new Set();
+        const ret = [];
+        source.forEach(label => {
+            if (label === null || label === undefined) {
+                return;
+            }
+
+            const normalized = String(label).trim();
+            if (!normalized.length) {
+                return;
+            }
+
+            const key = normalized.toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                ret.push(normalized);
+            }
+        });
+
+        return ret;
+    }
+
+    function renderLabelSummary(labels) {
+        const normalized = normalizeLabelArray(labels);
+        return normalized.length ? normalized.join(", ") : "—";
+    }
+
+    function formatLabelList(labels) {
+        const normalized = normalizeLabelArray(labels);
+        if (!normalized.length) {
+            return "<span class=\"text-muted\">—</span>";
+        }
+
+        return normalized.map(entry => escapeHtml(entry)).join(", ");
+    }
+
+    function updateLabelElement(element, labels) {
+        if (!element) {
+            return;
+        }
+
+        element.textContent = renderLabelSummary(labels);
     }
 
     function getScrapLabel(type, fallbackLabel) {
@@ -881,6 +945,7 @@
                     <div class="fw-semibold">${escapeHtml(item.toOpNumber ?? "")}</div>
                     ${toName}
                 </td>
+                <td>${formatLabelList(item.labelNumbers)}</td>
                 <td>${quantityText}</td>
                 <td>${fromBalanceText}</td>
                 <td>${toBalanceText}</td>
@@ -918,6 +983,7 @@
                 fromOperationName: cartItem?.fromOperationName ?? null,
                 toOpNumber: item.toOpNumber,
                 toOperationName: cartItem?.toOperationName ?? null,
+                labelNumbers: normalizeLabelArray(item.labelNumbers ?? cartItem?.labelNumbers),
                 quantity: Number(item.quantity) || 0,
                 fromBalanceBefore: Number(item.fromBalanceBefore) || 0,
                 fromBalanceAfter: Number(item.fromBalanceAfter) || 0,
@@ -1009,6 +1075,8 @@
 
         balanceCache.set(fromKey, Number(result.fromBalanceAfter) || 0);
         balanceCache.set(toKey, Number(result.toBalanceAfter) || 0);
+        balanceLabels.delete(fromKey);
+        balanceLabels.delete(toKey);
 
         const part = partLookup.getSelected();
         if (part && part.id === partId) {
@@ -1239,6 +1307,9 @@
             const toKey = getBalanceKey(item.partId, item.toOpNumber);
             balanceCache.set(fromKey, Number(item.fromBalanceAfter) || 0);
             balanceCache.set(toKey, Number(item.toBalanceAfter) || 0);
+            const labels = normalizeLabelArray(item.labelNumbers);
+            balanceLabels.set(fromKey, labels);
+            balanceLabels.set(toKey, labels);
         });
 
         const part = partLookup.getSelected();
@@ -1301,10 +1372,12 @@
             const scrapSource = extractScrapSource(item) ?? extractScrapSource(cartItem);
             const scrapInfo = normalizeScrapInfo(scrapSource);
             const scrapCell = formatScrapCell(scrapInfo ?? {});
+            const labelsHtml = formatLabelList(item.labelNumbers ?? cartItem?.labelNumbers);
             row.innerHTML = `
                 <td>${partDisplay}</td>
                 <td>${fromText}</td>
                 <td>${toText}</td>
+                <td>${labelsHtml}</td>
                 <td>${Number(item.quantity).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
                 <td>${scrapCell}</td>
                 <td>${item.transferId}</td>`;

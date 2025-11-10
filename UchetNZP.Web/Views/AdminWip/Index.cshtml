@@ -70,6 +70,7 @@
                             <th scope="col">Деталь</th>
                             <th scope="col">Вид работ</th>
                             <th scope="col" class="text-center">Операция</th>
+                            <th scope="col">Ярлыки</th>
                             <th scope="col" class="text-end">Количество</th>
                             <th scope="col" class="text-nowrap">Корректировка</th>
                         </tr>
@@ -86,6 +87,16 @@
                                 </td>
                                 <td class="text-center">
                                     <span class="badge bg-secondary fs-6">@row.OpNumber</span>
+                                </td>
+                                <td>
+                                    @if (row.LabelNumbers.Count > 0)
+                                    {
+                                        <span>@string.Join(", ", row.LabelNumbers)</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
                                 </td>
                                 <td class="text-end">
                                     <span class="fw-semibold">@row.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</span>
