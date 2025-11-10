@@ -74,17 +74,44 @@ public class WipTransfersController : Controller
                                   equals new { balance.PartId, balance.SectionId, balance.OpNumber } into balances
                               from balance in balances.DefaultIfEmpty()
                               orderby route.OpNumber
-                              select new TransferOperationLookupViewModel(
-                                  OperationNumber.Format(route.OpNumber),
-                                  operation != null ? operation.Name : string.Empty,
+                              select new
+                              {
+                                  route.OpNumber,
+                                  route.SectionId,
+                                  OperationName = operation != null ? operation.Name : string.Empty,
                                   route.NormHours,
-                                  balance != null ? balance.Quantity : 0m,
-                                  false);
+                                  Balance = balance != null ? balance.Quantity : 0m,
+                              };
 
-        var operations = await operationsQuery
+        var operationItems = await operationsQuery
             .Take(100)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        var labelKeys = operationItems
+            .Select(x => (partId, x.SectionId, x.OpNumber))
+            .Distinct()
+            .ToList();
+
+        var labelLookup = await LoadLabelBalancesAsync(labelKeys, cancellationToken).ConfigureAwait(false);
+
+        var operations = operationItems
+            .Select(item =>
+            {
+                var key = (partId, item.SectionId, item.OpNumber);
+                var labels = labelLookup.TryGetValue(key, out var list)
+                    ? list
+                    : Array.Empty<TransferOperationLabelBalanceViewModel>();
+
+                return new TransferOperationLookupViewModel(
+                    OperationNumber.Format(item.OpNumber),
+                    item.OperationName,
+                    item.NormHours,
+                    item.Balance,
+                    false,
+                    labels);
+            })
+            .ToList();
 
         var warehouseBalance = await _dbContext.WarehouseItems
             .AsNoTracking()
@@ -97,7 +124,8 @@ public class WipTransfersController : Controller
             WarehouseDefaults.OperationName,
             0m,
             warehouseBalance,
-            true));
+            true,
+            Array.Empty<TransferOperationLabelBalanceViewModel>()));
 
         return Ok(operations);
     }
@@ -195,27 +223,32 @@ public class WipTransfersController : Controller
             labelKeys.Add((partId, toSectionId, toOp));
         }
 
-        var labelLookup = await LoadLabelNumbersAsync(labelKeys, cancellationToken).ConfigureAwait(false);
+        var labelLookup = await LoadLabelBalancesAsync(labelKeys, cancellationToken).ConfigureAwait(false);
 
-        var fromLabels = labelLookup.TryGetValue((partId, fromRoute.SectionId, fromOp), out var fromList)
+        var fromLabelBalances = labelLookup.TryGetValue((partId, fromRoute.SectionId, fromOp), out var fromList)
             ? fromList
-            : Array.Empty<string>();
+            : Array.Empty<TransferOperationLabelBalanceViewModel>();
 
-        var toLabels = isWarehouseTransfer
-            ? Array.Empty<string>()
-            : (labelLookup.TryGetValue((partId, toSectionId, toOp), out var toList) ? toList : Array.Empty<string>());
+        var toLabelBalances = isWarehouseTransfer
+            ? Array.Empty<TransferOperationLabelBalanceViewModel>()
+            : (labelLookup.TryGetValue((partId, toSectionId, toOp), out var toList) ? toList : Array.Empty<TransferOperationLabelBalanceViewModel>());
+
+        var fromLabels = ExtractLabelNumbers(fromLabelBalances);
+        var toLabels = ExtractLabelNumbers(toLabelBalances);
 
         var fromModel = new TransferOperationBalanceViewModel(
             OperationNumber.Format(fromOp),
             fromRoute.SectionId,
             fromBalance,
-            fromLabels);
+            fromLabels,
+            fromLabelBalances);
 
         var toModel = new TransferOperationBalanceViewModel(
             OperationNumber.Format(toOp),
             toSectionId,
             toBalanceValue,
-            toLabels);
+            toLabels,
+            toLabelBalances);
 
         var model = new TransferBalancesViewModel(fromModel, toModel);
 
@@ -436,7 +469,7 @@ public class WipTransfersController : Controller
         decimal Quantity,
         string? Comment);
 
-    private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), IReadOnlyList<string>>> LoadLabelNumbersAsync(
+    private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), IReadOnlyList<TransferOperationLabelBalanceViewModel>>> LoadLabelBalancesAsync(
         IReadOnlyCollection<(Guid PartId, Guid SectionId, int OpNumber)> in_keys,
         CancellationToken in_cancellationToken)
     {
@@ -445,10 +478,10 @@ public class WipTransfersController : Controller
             throw new ArgumentNullException(nameof(in_keys));
         }
 
-        var buffer = new Dictionary<(Guid, Guid, int), List<string>>();
+        var ret = new Dictionary<(Guid, Guid, int), IReadOnlyList<TransferOperationLabelBalanceViewModel>>();
         if (in_keys.Count == 0)
         {
-            return new Dictionary<(Guid, Guid, int), IReadOnlyList<string>>();
+            return ret;
         }
 
         var partIds = in_keys.Select(x => x.PartId).Distinct().ToList();
@@ -464,49 +497,88 @@ public class WipTransfersController : Controller
                 x.PartId,
                 SectionId = x.WipReceipt!.SectionId,
                 OpNumber = x.WipReceipt.OpNumber,
+                x.Id,
                 x.Number,
+                x.RemainingQuantity,
             })
             .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
 
+        var buffer = new Dictionary<(Guid, Guid, int), List<TransferOperationLabelBalanceViewModel>>();
         foreach (var label in labels)
         {
             var key = (label.PartId, label.SectionId, label.OpNumber);
             if (!buffer.TryGetValue(key, out var list))
             {
-                list = new List<string>();
+                list = new List<TransferOperationLabelBalanceViewModel>();
                 buffer[key] = list;
             }
 
-            if (!string.IsNullOrWhiteSpace(label.Number))
-            {
-                list.Add(label.Number.Trim());
-            }
+            var number = string.IsNullOrWhiteSpace(label.Number) ? string.Empty : label.Number.Trim();
+            list.Add(new TransferOperationLabelBalanceViewModel(label.Id, number, label.RemainingQuantity));
         }
 
         foreach (var pair in buffer.ToList())
         {
             var sorted = pair.Value
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .Select(x => x.Trim())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x.Number, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(x => x.Id)
                 .ToList();
 
             buffer[pair.Key] = sorted;
         }
 
-        var ret = buffer.ToDictionary(
-            pair => pair.Key,
-            pair => (IReadOnlyList<string>)pair.Value);
+        foreach (var pair in buffer)
+        {
+            ret[pair.Key] = pair.Value;
+        }
 
         foreach (var key in in_keys)
         {
             if (!ret.ContainsKey(key))
             {
-                ret[key] = Array.Empty<string>();
+                ret[key] = Array.Empty<TransferOperationLabelBalanceViewModel>();
             }
         }
+
+        return ret;
+    }
+
+    private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), IReadOnlyList<string>>> LoadLabelNumbersAsync(
+        IReadOnlyCollection<(Guid PartId, Guid SectionId, int OpNumber)> in_keys,
+        CancellationToken in_cancellationToken)
+    {
+        var balances = await LoadLabelBalancesAsync(in_keys, in_cancellationToken).ConfigureAwait(false);
+
+        var ret = new Dictionary<(Guid, Guid, int), IReadOnlyList<string>>();
+        foreach (var key in in_keys)
+        {
+            if (!balances.TryGetValue(key, out var list) || list.Count == 0)
+            {
+                ret[key] = Array.Empty<string>();
+                continue;
+            }
+
+            ret[key] = ExtractLabelNumbers(list);
+        }
+
+        return ret;
+    }
+
+    private static IReadOnlyList<string> ExtractLabelNumbers(IReadOnlyList<TransferOperationLabelBalanceViewModel> in_labels)
+    {
+        if (in_labels is null || in_labels.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var ret = in_labels
+            .Select(x => x.Number)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         return ret;
     }

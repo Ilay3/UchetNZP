@@ -100,6 +100,9 @@
     const balanceCache = new Map();
     const balanceLabels = new Map();
     const pendingChanges = new Map();
+    const labelBalanceCache = new Map();
+    const labelPendingChanges = new Map();
+    let currentOperationsPartId = null;
     let cart = [];
     let recentTransfers = [];
     let isLoadingOperations = false;
@@ -127,6 +130,7 @@
         toOperationInput.value = "";
         toOperationNumberInput.value = "";
         operations = [];
+        currentOperationsPartId = null;
         resetLabels();
         updateFromOperationsDatalist();
         updateToOperationsDatalist();
@@ -377,8 +381,8 @@
 
     function formatOperation(operation) {
         const opNumber = operation.opNumber;
-        const balanceValue = Number(operation.balance ?? 0);
         if (operation.isWarehouse) {
+            const balanceValue = Number(operation.balance ?? 0);
             const name = operation.operationName || "Склад";
             return `${opNumber} | ${name} | остаток на складе: ${balanceValue.toFixed(3)}`;
         }
@@ -389,7 +393,17 @@
         }
         const norm = Number(operation.normHours ?? 0);
         parts.push(`${norm.toFixed(3)} н/ч`);
-        parts.push(`остаток: ${balanceValue.toFixed(3)}`);
+        const labels = Array.isArray(operation.labelBalances) ? operation.labelBalances : [];
+        const labelTexts = labels
+            .map(formatLabelBalanceLabel)
+            .filter(text => text.length > 0);
+        if (labelTexts.length) {
+            parts.push(`ярлыки: ${labelTexts.join(", ")}`);
+        }
+        else {
+            const balanceValue = Number(operation.balance ?? 0);
+            parts.push(`остаток: ${balanceValue.toFixed(3)}`);
+        }
         return parts.join(" | ");
     }
 
@@ -426,9 +440,22 @@
         return `${partId}:${normalizeOpNumberValue(opNumber)}`;
     }
 
-    function getAvailableBalance(partId, opNumber) {
+    function getLabelBalanceKey(partId, opNumber, labelId) {
+        return `${partId}:${normalizeOpNumberValue(opNumber)}:${labelId}`;
+    }
+
+    function getAvailableBalance(partId, opNumber, labelId = null) {
         if (!partId || !opNumber) {
             return 0;
+        }
+
+        if (labelId) {
+            const labelKey = getLabelBalanceKey(partId, opNumber, labelId);
+            if (labelBalanceCache.has(labelKey)) {
+                const baseLabel = labelBalanceCache.get(labelKey) ?? 0;
+                const pendingLabel = labelPendingChanges.get(labelKey) ?? 0;
+                return baseLabel + pendingLabel;
+            }
         }
 
         const key = getBalanceKey(partId, opNumber);
@@ -447,6 +474,68 @@
         else {
             pendingChanges.set(key, next);
         }
+    }
+
+    function applyLabelPendingChange(partId, opNumber, labelId, delta) {
+        if (!partId || !opNumber || !labelId) {
+            return;
+        }
+
+        const numericDelta = Number(delta);
+        if (!Number.isFinite(numericDelta) || Math.abs(numericDelta) < 1e-9) {
+            return;
+        }
+
+        const key = getLabelBalanceKey(partId, opNumber, labelId);
+        const current = labelPendingChanges.get(key) ?? 0;
+        const next = current + numericDelta;
+        if (Math.abs(next) < 1e-9) {
+            labelPendingChanges.delete(key);
+        }
+        else {
+            labelPendingChanges.set(key, next);
+        }
+    }
+
+    function restoreLabelOptionFromCartItem(item) {
+        if (!item || !item.labelId) {
+            return;
+        }
+
+        const part = partLookup.getSelected();
+        if (!part || !part.id || part.id !== item.partId) {
+            return;
+        }
+
+        if (!selectedFromOperation || selectedFromOperation.opNumber !== item.fromOpNumber) {
+            return;
+        }
+
+        const restoredRemaining = Number(item.labelQuantityBefore ?? 0);
+        const restoredTotal = Number(item.labelQuantityTotal ?? item.labelQuantityBefore ?? 0);
+        const number = item.labelNumber ?? item.labelId;
+        const existingIndex = labelOptions.findIndex(option => option.id === item.labelId);
+        if (existingIndex >= 0) {
+            labelOptions[existingIndex] = {
+                ...labelOptions[existingIndex],
+                remainingQuantity: restoredRemaining,
+                quantity: restoredTotal,
+                number,
+            };
+            selectedLabelOption = labelOptions[existingIndex];
+        }
+        else {
+            const option = {
+                id: item.labelId,
+                number,
+                quantity: restoredTotal,
+                remainingQuantity: restoredRemaining,
+            };
+            labelOptions.push(option);
+            selectedLabelOption = option;
+        }
+
+        updateLabelSelect();
     }
 
     function canAddToCart() {
@@ -476,7 +565,12 @@
             return false;
         }
 
-        const availableFrom = getAvailableBalance(part.id, selectedFromOperation.opNumber);
+        if (labelOptions.length > 0 && !selectedLabelOption) {
+            return false;
+        }
+
+        const labelId = selectedLabelOption?.id ?? null;
+        const availableFrom = getAvailableBalance(part.id, selectedFromOperation.opNumber, labelId);
         if (quantity > availableFrom + 1e-9) {
             return false;
         }
@@ -518,6 +612,7 @@
         toOperationInput.value = "";
         toOperationNumberInput.value = "";
         operations = [];
+        currentOperationsPartId = null;
         resetLabels();
         updateFromOperationsDatalist();
         updateToOperationsDatalist();
@@ -534,13 +629,16 @@
                 return;
             }
 
-            operations = Array.isArray(items) ? items : [];
+            operations = Array.isArray(items)
+                ? items.map(raw => normalizeOperation(raw))
+                : [];
             operations.forEach(operation => {
                 const key = getBalanceKey(partId, operation.opNumber);
-                balanceCache.set(key, operation.balance ?? 0);
+                balanceCache.set(key, Number(operation.balance ?? 0));
+                operation.labelBalances = registerLabelBalances(partId, operation.opNumber, operation.labelBalances ?? []);
             });
-            updateFromOperationsDatalist();
-            updateToOperationsDatalist();
+            currentOperationsPartId = partId;
+            updateOperationsDisplay(partId);
             updateBalanceLabels();
         }
         catch (error) {
@@ -554,6 +652,7 @@
             }
 
             operations = [];
+            currentOperationsPartId = null;
             updateFromOperationsDatalist();
             updateToOperationsDatalist();
             updateBalanceLabels();
@@ -565,6 +664,82 @@
                 updateFormState();
             }
         }
+    }
+
+    function normalizeOperation(raw) {
+        if (!raw || typeof raw !== "object") {
+            return {
+                opNumber: "",
+                operationName: "",
+                normHours: 0,
+                balance: 0,
+                isWarehouse: false,
+                labelBalances: [],
+            };
+        }
+
+        const opNumber = normalizeOpNumberValue(raw.opNumber ?? raw.OpNumber ?? "");
+        const operationName = typeof raw.operationName === "string"
+            ? raw.operationName
+            : (typeof raw.OperationName === "string" ? raw.OperationName : "");
+        const normHours = Number(raw.normHours ?? raw.NormHours ?? 0);
+        const balance = Number(raw.balance ?? raw.Balance ?? 0);
+        const isWarehouse = Boolean(raw.isWarehouse ?? raw.IsWarehouse);
+        const labels = raw.labelBalances ?? raw.LabelBalances ?? raw.labels ?? raw.Labels ?? [];
+
+        return {
+            opNumber,
+            operationName,
+            normHours,
+            balance,
+            isWarehouse,
+            labelBalances: labels,
+        };
+    }
+
+    function normalizeLabelBalanceItems(source) {
+        if (!Array.isArray(source)) {
+            return [];
+        }
+
+        return source
+            .map(item => {
+                if (!item || typeof item !== "object") {
+                    return null;
+                }
+
+                const rawId = item.id ?? item.Id ?? item.ID ?? item.labelId ?? item.LabelId ?? item.wipLabelId ?? item.WipLabelId;
+                if (!rawId) {
+                    return null;
+                }
+
+                const id = String(rawId);
+                let numberValue = "";
+                if (typeof item.number === "string" && item.number.trim().length > 0) {
+                    numberValue = item.number.trim();
+                }
+                else if (typeof item.Number === "string" && item.Number.trim().length > 0) {
+                    numberValue = item.Number.trim();
+                }
+
+                const remaining = Number(item.remainingQuantity ?? item.RemainingQuantity ?? item.remaining ?? 0);
+
+                return {
+                    id,
+                    number: numberValue,
+                    remainingQuantity: Number.isFinite(remaining) ? remaining : 0,
+                };
+            })
+            .filter(item => item !== null);
+    }
+
+    function registerLabelBalances(partId, opNumber, labels) {
+        const normalized = normalizeLabelBalanceItems(labels);
+        normalized.forEach(label => {
+            const key = getLabelBalanceKey(partId, opNumber, label.id);
+            labelBalanceCache.set(key, Number(label.remainingQuantity ?? 0));
+        });
+        return normalized;
     }
 
     async function loadLabels(partId, opNumber) {
@@ -610,12 +785,12 @@
             selectedLabelOption = labelOptions.find(option => selectedLabelOption && option.id === selectedLabelOption.id) ?? null;
             updateLabelSelect();
 
-            const numbers = labelOptions
-                .map(option => option.number)
-                .filter(value => typeof value === "string" && value.trim().length > 0)
-                .map(value => value.trim());
-
-            balanceLabels.set(getBalanceKey(partId, opNumber), numbers);
+            const normalizedLabels = registerLabelBalances(partId, opNumber, labelOptions);
+            const summaries = normalizedLabels
+                .map(formatLabelBalanceLabel)
+                .filter(text => text.length > 0);
+            balanceLabels.set(getBalanceKey(partId, opNumber), summaries);
+            updateOperationsDisplay(partId);
             updateBalanceLabels();
         }
         catch (error) {
@@ -701,13 +876,31 @@
             if (data?.from) {
                 const key = getBalanceKey(part.id, data.from.opNumber);
                 balanceCache.set(key, Number(data.from.balance) || 0);
-                balanceLabels.set(key, normalizeLabelArray(data.from.labels));
+                const labelBalances = registerLabelBalances(part.id, data.from.opNumber, data.from.labelBalances ?? []);
+                const summaries = labelBalances
+                    .map(formatLabelBalanceLabel)
+                    .filter(text => text.length > 0);
+                if (summaries.length) {
+                    balanceLabels.set(key, summaries);
+                }
+                else {
+                    balanceLabels.set(key, normalizeLabelArray(data.from.labels));
+                }
             }
 
             if (data?.to) {
                 const key = getBalanceKey(part.id, data.to.opNumber);
                 balanceCache.set(key, Number(data.to.balance) || 0);
-                balanceLabels.set(key, normalizeLabelArray(data.to.labels));
+                const labelBalances = registerLabelBalances(part.id, data.to.opNumber, data.to.labelBalances ?? []);
+                const summaries = labelBalances
+                    .map(formatLabelBalanceLabel)
+                    .filter(text => text.length > 0);
+                if (summaries.length) {
+                    balanceLabels.set(key, summaries);
+                }
+                else {
+                    balanceLabels.set(key, normalizeLabelArray(data.to.labels));
+                }
             }
         }
         catch (error) {
@@ -721,6 +914,7 @@
             if (requestId === balanceRequestId) {
                 isLoadingBalances = false;
                 balancesAbortController = null;
+                updateOperationsDisplay(part.id);
                 updateBalanceLabels();
                 updateFormState();
             }
@@ -741,7 +935,8 @@
 
         const fromNumber = selectedFromOperation?.opNumber;
         const toNumber = selectedToOperation?.opNumber;
-        const fromAvailable = fromNumber ? getAvailableBalance(part.id, fromNumber) : 0;
+        const labelId = selectedLabelOption?.id ?? null;
+        const fromAvailable = fromNumber ? getAvailableBalance(part.id, fromNumber, labelId) : 0;
         const toAvailable = toNumber ? getAvailableBalance(part.id, toNumber) : 0;
         fromBalanceLabel.textContent = `${fromAvailable.toLocaleString("ru-RU")} шт`;
         toBalanceLabel.textContent = `${toAvailable.toLocaleString("ru-RU")} шт`;
@@ -876,7 +1071,13 @@
             return;
         }
 
-        const fromAvailable = getAvailableBalance(part.id, selectedFromOperation.opNumber);
+        const label = selectedLabelOption;
+        if (labelOptions.length > 0 && !label) {
+            alert("Выберите ярлык для списания.");
+            return;
+        }
+
+        const fromAvailable = getAvailableBalance(part.id, selectedFromOperation.opNumber, label?.id ?? null);
         if (quantity > fromAvailable) {
             alert(`Нельзя передать больше, чем остаток (${fromAvailable.toFixed(3)}).`);
             return;
@@ -885,8 +1086,8 @@
         const toAvailable = getAvailableBalance(part.id, selectedToOperation.opNumber);
         const fromLabelKey = getBalanceKey(part.id, selectedFromOperation.opNumber);
         const fromLabels = balanceLabels.get(fromLabelKey);
-        const label = selectedLabelOption;
         const labelQuantityBeforeValue = label ? Number(label.remainingQuantity ?? label.remainingquantity ?? 0) : null;
+        const labelQuantityTotalValue = label ? Number(label.quantity ?? 0) : null;
         let labelQuantityAfterValue = labelQuantityBeforeValue;
 
         const item = {
@@ -917,6 +1118,7 @@
             labelNumber: label ? (label.number ?? null) : null,
             labelQuantityBefore: labelQuantityBeforeValue,
             labelQuantityAfter: labelQuantityBeforeValue,
+            labelQuantityTotal: labelQuantityTotalValue,
         };
 
         const leftover = item.fromBalanceAfter;
@@ -961,6 +1163,9 @@
 
         applyPendingChange(part.id, selectedFromOperation.opNumber, fromDelta);
         applyPendingChange(part.id, selectedToOperation.opNumber, quantity);
+        if (label && labelQuantityBeforeValue !== null) {
+            applyLabelPendingChange(part.id, selectedFromOperation.opNumber, label.id, -labelConsumption);
+        }
         cart.push(item);
 
         if (label && labelQuantityBeforeValue !== null) {
@@ -981,19 +1186,9 @@
             }
 
             updateLabelSelect();
-
-            if (labelOptions.length) {
-                const updatedNumbers = labelOptions
-                    .map(option => option.number)
-                    .filter(value => typeof value === "string" && value.trim().length > 0)
-                    .map(value => value.trim());
-                balanceLabels.set(fromLabelKey, updatedNumbers);
-            }
-            else {
-                balanceLabels.delete(fromLabelKey);
-            }
         }
 
+        updateOperationsDisplay(part.id);
         renderCart();
         resetForm();
         updateBalanceLabels();
@@ -1086,6 +1281,23 @@
         }
 
         return normalized.map(entry => escapeHtml(entry)).join(", ");
+    }
+
+    function formatLabelBalanceLabel(label) {
+        if (!label) {
+            return "";
+        }
+
+        const remaining = Number(label.remainingQuantity ?? 0);
+        if (!(remaining > 0)) {
+            return "";
+        }
+
+        const number = typeof label.number === "string" && label.number.trim().length > 0
+            ? label.number.trim()
+            : String(label.id ?? "");
+        const remainingText = remaining.toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        return `${number} — остаток ${remainingText} шт`;
     }
 
     function formatLabelOption(option) {
@@ -1476,6 +1688,12 @@
             if (removed.scrapQuantity && removed.scrapQuantity > 0) {
                 applyPendingChange(removed.partId, removed.fromOpNumber, removed.scrapQuantity);
             }
+            if (removed.labelId) {
+                const labelDelta = Number(removed.quantity ?? 0) + Number(removed.scrapQuantity ?? 0);
+                applyLabelPendingChange(removed.partId, removed.fromOpNumber, removed.labelId, labelDelta);
+                restoreLabelOptionFromCartItem(removed);
+            }
+            updateOperationsDisplay(removed.partId);
         }
 
         renderCart();
@@ -1493,6 +1711,12 @@
         if (item.scrapQuantity && item.scrapQuantity > 0) {
             applyPendingChange(item.partId, item.fromOpNumber, item.scrapQuantity);
         }
+        if (item.labelId) {
+            const labelDelta = Number(item.quantity ?? 0) + Number(item.scrapQuantity ?? 0);
+            applyLabelPendingChange(item.partId, item.fromOpNumber, item.labelId, labelDelta);
+        }
+
+        updateOperationsDisplay(item.partId);
 
         renderCart();
 
@@ -1509,6 +1733,7 @@
             selectedFromOperation = fromOperation;
             fromOperationInput.value = formatOperation(fromOperation);
             fromOperationNumberInput.value = fromOperation.opNumber;
+            void loadLabels(item.partId, fromOperation.opNumber);
         }
 
         updateToOperationsDatalist();
@@ -1568,6 +1793,7 @@
             showSummary(summary);
             updateBalancesAfterSave(summary);
             pendingChanges.clear();
+            labelPendingChanges.clear();
             cart = [];
             renderCart();
             resetForm();
@@ -1591,8 +1817,30 @@
             const toKey = getBalanceKey(item.partId, item.toOpNumber);
             balanceCache.set(fromKey, Number(item.fromBalanceAfter) || 0);
             balanceCache.set(toKey, Number(item.toBalanceAfter) || 0);
-            const labels = normalizeLabelArray(item.labelNumbers);
-            balanceLabels.set(fromKey, labels);
+            const labelSummaries = [];
+
+            const rawLabelId = item.wipLabelId ?? item.labelId ?? null;
+            if (rawLabelId) {
+                const labelId = String(rawLabelId);
+                const remaining = Number(item.labelQuantityAfter ?? item.labelQuantityBefore ?? 0);
+                const number = item.labelNumber ?? (Array.isArray(item.labelNumbers) && item.labelNumbers.length ? item.labelNumbers[0] : null);
+                const labelKey = getLabelBalanceKey(item.partId, item.fromOpNumber, labelId);
+                labelBalanceCache.set(labelKey, remaining);
+                labelPendingChanges.delete(labelKey);
+                const labelText = formatLabelBalanceLabel({ id: labelId, number, remainingQuantity: remaining });
+                if (labelText) {
+                    labelSummaries.push(labelText);
+                }
+            }
+
+            if (!labelSummaries.length) {
+                const normalized = normalizeLabelArray(item.labelNumbers);
+                if (normalized.length) {
+                    labelSummaries.push(...normalized);
+                }
+            }
+
+            balanceLabels.set(fromKey, labelSummaries);
             balanceLabels.delete(toKey);
         });
 
@@ -1615,14 +1863,37 @@
             return;
         }
 
+        const actualPartId = currentOperationsPartId ?? partId;
+        if (!actualPartId || (partId && actualPartId !== partId)) {
+            return;
+        }
+
         operations = operations.map(operation => {
-            const key = getBalanceKey(partId, operation.opNumber);
-            const balance = balanceCache.get(key);
-            if (balance === undefined) {
-                return operation;
+            const opNumber = operation.opNumber;
+            const updatedBalance = getAvailableBalance(actualPartId, opNumber);
+            let labelBalances = Array.isArray(operation.labelBalances) ? operation.labelBalances : [];
+            if (labelBalances.length) {
+                labelBalances = labelBalances
+                    .map(label => {
+                        const available = getAvailableBalance(actualPartId, opNumber, label.id);
+                        return { ...label, remainingQuantity: available };
+                    })
+                    .filter(label => Number(label.remainingQuantity ?? 0) > 1e-9);
+
+                const labelTexts = labelBalances
+                    .map(formatLabelBalanceLabel)
+                    .filter(text => text.length > 0);
+                balanceLabels.set(getBalanceKey(actualPartId, opNumber), labelTexts);
+            }
+            else {
+                balanceLabels.set(getBalanceKey(actualPartId, opNumber), []);
             }
 
-            return { ...operation, balance };
+            return {
+                ...operation,
+                balance: updatedBalance,
+                labelBalances,
+            };
         });
 
         updateFromOperationsDatalist();
