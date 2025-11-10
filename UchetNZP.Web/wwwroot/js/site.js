@@ -14,6 +14,10 @@
             keywords: ["admin"],
             action: openAdminPanel,
         },
+        {
+            keywords: ["edit"],
+            action: openAdminRemnants,
+        },
     ];
     const maxCommandLength = Math.max(
         0,
@@ -42,12 +46,20 @@
         buffer = "";
     }
 
-    function openAdminPanel() {
-        if (!window.confirm("Открыть страницу администрирования?")) {
+    function confirmAndRedirect(in_message, in_url) {
+        if (!window.confirm(in_message)) {
             return;
         }
 
-        window.location.assign("/admin");
+        window.location.assign(in_url);
+    }
+
+    function openAdminPanel() {
+        confirmAndRedirect("Открыть страницу администрирования?", "/admin");
+    }
+
+    function openAdminRemnants() {
+        confirmAndRedirect("Открыть страницу администрирования остатков?", "/admin/wip");
     }
 
     async function clearDatabase() {
