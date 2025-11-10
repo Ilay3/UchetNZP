@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace UchetNZP.Domain.Entities;
 
 public class WipLabel
@@ -10,6 +12,8 @@ public class WipLabel
 
     public decimal Quantity { get; set; }
 
+    public decimal RemainingQuantity { get; set; }
+
     public string Number { get; set; } = string.Empty;
 
     public bool IsAssigned { get; set; }
@@ -17,4 +21,6 @@ public class WipLabel
     public virtual Part? Part { get; set; }
 
     public virtual WipReceipt? WipReceipt { get; set; }
+
+    public virtual ICollection<WipTransfer> Transfers { get; set; } = new List<WipTransfer>();
 }

@@ -10,7 +10,6 @@ using UchetNZP.Application.Contracts.Transfers;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
-using UchetNZP.Web.Services;
 using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
@@ -20,16 +19,13 @@ public class WipTransfersController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly ITransferService _transferService;
-    private readonly IWipLabelLookupService _labelLookupService;
 
     public WipTransfersController(
         AppDbContext dbContext,
-        ITransferService transferService,
-        IWipLabelLookupService labelLookupService)
+        ITransferService transferService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _transferService = transferService ?? throw new ArgumentNullException(nameof(transferService));
-        _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
     [HttpGet("")]
@@ -189,32 +185,25 @@ public class WipTransfersController : Controller
             toBalanceValue = toBalance;
         }
 
-        var labelKeys = new List<LabelLookupKey>
+        var labelKeys = new List<(Guid PartId, Guid SectionId, int OpNumber)>
         {
-            new LabelLookupKey(partId, fromRoute.SectionId, fromOp),
+            (partId, fromRoute.SectionId, fromOp),
         };
 
         if (!isWarehouseTransfer)
         {
-            labelKeys.Add(new LabelLookupKey(partId, toSectionId, toOp));
+            labelKeys.Add((partId, toSectionId, toOp));
         }
 
-        var labelLookup = await _labelLookupService
-            .LoadAsync(labelKeys, cancellationToken, null, DateTime.UtcNow.AddDays(1))
-            .ConfigureAwait(false);
+        var labelLookup = await LoadLabelNumbersAsync(labelKeys, cancellationToken).ConfigureAwait(false);
 
-        var nowUtc = DateTime.UtcNow;
-        var fromLabels = _labelLookupService.FindLabelsUpToDate(
-            labelLookup,
-            new LabelLookupKey(partId, fromRoute.SectionId, fromOp),
-            nowUtc);
+        var fromLabels = labelLookup.TryGetValue((partId, fromRoute.SectionId, fromOp), out var fromList)
+            ? fromList
+            : Array.Empty<string>();
 
         var toLabels = isWarehouseTransfer
             ? Array.Empty<string>()
-            : _labelLookupService.FindLabelsUpToDate(
-                labelLookup,
-                new LabelLookupKey(partId, toSectionId, toOp),
-                nowUtc);
+            : (labelLookup.TryGetValue((partId, toSectionId, toOp), out var toList) ? toList : Array.Empty<string>());
 
         var fromModel = new TransferOperationBalanceViewModel(
             OperationNumber.Format(fromOp),
@@ -231,6 +220,57 @@ public class WipTransfersController : Controller
         var model = new TransferBalancesViewModel(fromModel, toModel);
 
         return Ok(model);
+    }
+
+    [HttpGet("labels")]
+    public async Task<IActionResult> GetLabels([FromQuery] Guid partId, [FromQuery] string? opNumber, CancellationToken cancellationToken)
+    {
+        if (partId == Guid.Empty)
+        {
+            return BadRequest("Не выбрана деталь.");
+        }
+
+        if (string.IsNullOrWhiteSpace(opNumber))
+        {
+            return BadRequest("Не указан номер операции.");
+        }
+
+        int parsedOpNumber;
+        try
+        {
+            parsedOpNumber = OperationNumber.Parse(opNumber, nameof(opNumber));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
+        var route = await _dbContext.PartRoutes
+            .AsNoTracking()
+            .Where(x => x.PartId == partId && x.OpNumber == parsedOpNumber)
+            .Select(x => new { x.SectionId })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (route is null)
+        {
+            return BadRequest("Маршрут для указанной операции не найден.");
+        }
+
+        var labels = await _dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => x.PartId == partId && x.RemainingQuantity > 0m)
+            .Where(x => x.WipReceipt != null && x.WipReceipt.SectionId == route.SectionId && x.WipReceipt.OpNumber == parsedOpNumber)
+            .OrderBy(x => x.Number)
+            .Select(x => new TransferLabelOptionViewModel(
+                x.Id,
+                x.Number,
+                x.Quantity,
+                x.RemainingQuantity))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(labels);
     }
 
     [HttpPost("save")]
@@ -252,6 +292,7 @@ public class WipTransfersController : Controller
                     x.TransferDate,
                     x.Quantity,
                     x.Comment,
+                    x.WipLabelId,
                     x.Scrap is null
                         ? null
                         : new TransferScrapDto(x.Scrap.ScrapType, x.Scrap.Quantity, x.Scrap.Comment)))
@@ -271,46 +312,18 @@ public class WipTransfersController : Controller
         }
         else
         {
-            var transferIds = summary.Items
-                .Select(x => x.TransferId)
-                .Where(id => id != Guid.Empty)
+            var labelKeys = summary.Items
+                .Select(x => (x.PartId, x.FromSectionId, x.FromOpNumber))
                 .Distinct()
                 .ToList();
 
-            var transferDateMap = transferIds.Count == 0
-                ? new Dictionary<Guid, DateTime>()
-                : await _dbContext.WipTransfers
-                    .AsNoTracking()
-                    .Where(x => transferIds.Contains(x.Id))
-                    .ToDictionaryAsync(x => x.Id, x => x.TransferDate, cancellationToken)
-                    .ConfigureAwait(false);
-
-            var labelKeys = summary.Items
-                .Select(x => new LabelLookupKey(x.PartId, x.FromSectionId, x.FromOpNumber))
-                .ToList();
-
-            DateTime? maxTransferDateUtc = transferDateMap.Count == 0
-                ? null
-                : transferDateMap.Values
-                    .Select(EnsureUtc)
-                    .DefaultIfEmpty(DateTime.UtcNow)
-                    .Max()
-                    .AddDays(1);
-
-            var labelLookup = await _labelLookupService
-                .LoadAsync(labelKeys, cancellationToken, null, maxTransferDateUtc)
-                .ConfigureAwait(false);
+            var labelLookup = await LoadLabelNumbersAsync(labelKeys, cancellationToken).ConfigureAwait(false);
 
             summaryItems = summary.Items
                 .Select(item =>
                 {
-                    var hasDate = transferDateMap.TryGetValue(item.TransferId, out var transferDate);
-                    var effectiveDate = hasDate ? transferDate : DateTime.UtcNow;
-
-                    var labels = _labelLookupService.FindLabelsUpToDate(
-                        labelLookup,
-                        new LabelLookupKey(item.PartId, item.FromSectionId, item.FromOpNumber),
-                        effectiveDate);
+                    var key = (item.PartId, item.FromSectionId, item.FromOpNumber);
+                    var labels = labelLookup.TryGetValue(key, out var list) ? list : Array.Empty<string>();
 
                     var scrapSummary = item.Scrap is null
                         ? null
@@ -333,7 +346,11 @@ public class WipTransfersController : Controller
                         item.Quantity,
                         item.TransferId,
                         scrapSummary,
-                        labels);
+                        labels,
+                        item.WipLabelId,
+                        item.LabelNumber,
+                        item.LabelQuantityBefore,
+                        item.LabelQuantityAfter);
                 })
                 .ToList();
         }
@@ -380,7 +397,11 @@ public class WipTransfersController : Controller
                     ? null
                     : new TransferDeleteWarehouseItemViewModel(
                         result.WarehouseItem.WarehouseItemId,
-                        result.WarehouseItem.Quantity));
+                        result.WarehouseItem.Quantity),
+                result.WipLabelId,
+                result.LabelNumber,
+                result.LabelQuantityBefore,
+                result.LabelQuantityAfter);
 
             return Ok(viewModel);
         }
@@ -407,6 +428,7 @@ public class WipTransfersController : Controller
         DateTime TransferDate,
         decimal Quantity,
         string? Comment,
+        Guid? WipLabelId,
         TransferScrapSaveItem? Scrap);
 
     public record TransferScrapSaveItem(
@@ -414,13 +436,79 @@ public class WipTransfersController : Controller
         decimal Quantity,
         string? Comment);
 
-    private static DateTime EnsureUtc(DateTime in_value)
+    private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), IReadOnlyList<string>>> LoadLabelNumbersAsync(
+        IReadOnlyCollection<(Guid PartId, Guid SectionId, int OpNumber)> in_keys,
+        CancellationToken in_cancellationToken)
     {
-        return in_value.Kind switch
+        if (in_keys is null)
         {
-            DateTimeKind.Utc => in_value,
-            DateTimeKind.Local => in_value.ToUniversalTime(),
-            _ => DateTime.SpecifyKind(in_value, DateTimeKind.Utc),
-        };
+            throw new ArgumentNullException(nameof(in_keys));
+        }
+
+        var buffer = new Dictionary<(Guid, Guid, int), List<string>>();
+        if (in_keys.Count == 0)
+        {
+            return new Dictionary<(Guid, Guid, int), IReadOnlyList<string>>();
+        }
+
+        var partIds = in_keys.Select(x => x.PartId).Distinct().ToList();
+        var sectionIds = in_keys.Select(x => x.SectionId).Distinct().ToList();
+        var opNumbers = in_keys.Select(x => x.OpNumber).Distinct().ToList();
+
+        var labels = await _dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => partIds.Contains(x.PartId) && x.RemainingQuantity > 0m)
+            .Where(x => x.WipReceipt != null && sectionIds.Contains(x.WipReceipt.SectionId) && opNumbers.Contains(x.WipReceipt.OpNumber))
+            .Select(x => new
+            {
+                x.PartId,
+                SectionId = x.WipReceipt!.SectionId,
+                OpNumber = x.WipReceipt.OpNumber,
+                x.Number,
+            })
+            .ToListAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var label in labels)
+        {
+            var key = (label.PartId, label.SectionId, label.OpNumber);
+            if (!buffer.TryGetValue(key, out var list))
+            {
+                list = new List<string>();
+                buffer[key] = list;
+            }
+
+            if (!string.IsNullOrWhiteSpace(label.Number))
+            {
+                list.Add(label.Number.Trim());
+            }
+        }
+
+        foreach (var pair in buffer.ToList())
+        {
+            var sorted = pair.Value
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            buffer[pair.Key] = sorted;
+        }
+
+        var ret = buffer.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<string>)pair.Value);
+
+        foreach (var key in in_keys)
+        {
+            if (!ret.ContainsKey(key))
+            {
+                ret[key] = Array.Empty<string>();
+            }
+        }
+
+        return ret;
     }
+
 }

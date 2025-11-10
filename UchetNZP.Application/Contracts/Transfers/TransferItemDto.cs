@@ -7,5 +7,6 @@ public record TransferItemDto(
     DateTime TransferDate,
     decimal Quantity,
     string? Comment,
+    Guid? WipLabelId,
     TransferScrapDto? Scrap
 );

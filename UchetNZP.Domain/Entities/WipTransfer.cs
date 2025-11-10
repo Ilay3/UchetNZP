@@ -26,6 +26,8 @@ public class WipTransfer
 
     public string? Comment { get; set; }
 
+    public Guid? WipLabelId { get; set; }
+
     public virtual Part? Part { get; set; }
 
     public virtual ICollection<WipTransferOperation> Operations { get; set; } = new List<WipTransferOperation>();
@@ -33,4 +35,6 @@ public class WipTransfer
     public virtual WipScrap? Scrap { get; set; }
 
     public virtual WarehouseItem? WarehouseItem { get; set; }
+
+    public virtual WipLabel? WipLabel { get; set; }
 }

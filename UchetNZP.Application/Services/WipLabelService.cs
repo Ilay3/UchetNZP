@@ -150,6 +150,7 @@ public class WipLabelService : IWipLabelService
                     PartId = in_partId,
                     LabelDate = normalizedDate,
                     Quantity = in_quantity,
+                    RemainingQuantity = in_quantity,
                     Number = number,
                     IsAssigned = false,
                 };

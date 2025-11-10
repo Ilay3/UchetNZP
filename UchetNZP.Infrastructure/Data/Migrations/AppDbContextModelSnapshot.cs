@@ -432,6 +432,10 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
 
+                    b.Property<decimal>("RemainingQuantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Number")
@@ -512,6 +516,9 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("numeric");
 
+                    b.Property<Guid?>("WipLabelId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("ToOpNumber")
                         .HasColumnType("integer");
 
@@ -527,6 +534,8 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PartId");
+
+                    b.HasIndex("WipLabelId");
 
                     b.ToTable("WipTransfers");
                 });
@@ -778,9 +787,15 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasMany("UchetNZP.Domain.Entities.WipTransfer", "Transfers")
+                        .WithOne("WipLabel")
+                        .HasForeignKey("WipLabelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Part");
 
                     b.Navigation("WipReceipt");
+                    b.Navigation("Transfers");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipScrap", b =>
@@ -817,7 +832,13 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "WipLabel")
+                        .WithMany("Transfers")
+                        .HasForeignKey("WipLabelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Part");
+                    b.Navigation("WipLabel");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipTransferOperation", b =>
