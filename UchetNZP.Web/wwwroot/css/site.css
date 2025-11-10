@@ -73,3 +73,9 @@ table {
   font-size: 2rem;
   font-weight: 600;
 }
+
+@media (min-width: 1200px) {
+  #transferLabelSelect {
+    min-width: 28rem;
+  }
+}
