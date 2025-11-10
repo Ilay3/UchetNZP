@@ -154,11 +154,78 @@ public class WarehouseController : Controller
 
         var totalQuantity = items.Sum(x => x.Quantity);
 
+        var partGroups = items
+            .GroupBy(x => x.PartId)
+            .Select(group =>
+            {
+                var orderedItems = group
+                    .OrderByDescending(item => item.AddedAt)
+                    .ThenBy(item => item.CreatedAt)
+                    .ToArray();
+
+                var labelGroups = group
+                    .SelectMany(item => item.LabelRows)
+                    .GroupBy(label => label.LabelId)
+                    .Select(labelGroup =>
+                    {
+                        var labelItems = labelGroup.ToList();
+                        var firstLabel = labelItems
+                            .OrderBy(x => x.AddedAt)
+                            .First();
+
+                        var updates = labelItems
+                            .Where(x => x.UpdatedAt.HasValue)
+                            .Select(x => x.UpdatedAt!.Value)
+                            .ToList();
+
+                        DateTime? lastUpdated = null;
+
+                        if (updates.Count > 0)
+                        {
+                            lastUpdated = updates.Max();
+                        }
+
+                        return new WarehouseLabelGroupViewModel
+                        {
+                            LabelId = labelGroup.Key,
+                            LabelNumber = firstLabel.LabelNumber,
+                            TotalQuantity = labelItems.Sum(x => x.Quantity),
+                            FirstAddedAt = labelItems.Min(x => x.AddedAt),
+                            LastUpdatedAt = lastUpdated,
+                        };
+                    })
+                    .OrderByDescending(label => label.FirstAddedAt)
+                    .ThenBy(label => label.LabelNumber, StringComparer.CurrentCultureIgnoreCase)
+                    .ToArray();
+
+                var latestAddedAt = orderedItems.Length > 0
+                    ? orderedItems.First().AddedAt
+                    : DateTime.MinValue;
+
+                return new
+                {
+                    LatestAddedAt = latestAddedAt,
+                    Group = new WarehousePartGroupViewModel
+                    {
+                        PartId = group.Key,
+                        PartDisplay = orderedItems.Length > 0 ? orderedItems.First().PartDisplay : string.Empty,
+                        TotalQuantity = group.Sum(item => item.Quantity),
+                        LabelGroups = labelGroups,
+                        Items = orderedItems,
+                    },
+                };
+            })
+            .OrderByDescending(x => x.LatestAddedAt)
+            .ThenBy(x => x.Group.PartDisplay, StringComparer.CurrentCultureIgnoreCase)
+            .Select(x => x.Group)
+            .ToArray();
+
         return new WarehouseIndexViewModel
         {
             SelectedPartId = partId,
             Parts = parts,
             Items = items,
+            PartGroups = partGroups,
             TotalQuantity = totalQuantity,
             StatusMessage = statusMessage,
             ErrorMessage = errorMessage,

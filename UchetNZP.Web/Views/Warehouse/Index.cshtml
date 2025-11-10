@@ -47,154 +47,164 @@
 <div class="card shadow-sm">
     <div class="card-header bg-light fw-semibold">Записи склада</div>
     <div class="card-body">
-        @if (!Model.Items.Any())
+        @if (Model.PartGroups.Count == 0)
         {
             <div class="text-muted">Записей не найдено.</div>
         }
         else
         {
-            <div class="table-responsive">
-                <table class="table table-striped align-middle" aria-describedby="warehouseTableCaption">
-                    <caption id="warehouseTableCaption" class="visually-hidden">Текущие записи склада НЗП</caption>
-                    <thead class="table-light">
-                        <tr>
-                            <th scope="col">Деталь</th>
-                            <th scope="col" class="text-end">Количество</th>
-                            <th scope="col">Дата добавления</th>
-                            <th scope="col">Комментарий</th>
-                            <th scope="col">Обновлено</th>
-                            <th scope="col" class="text-nowrap">Ярлыки</th>
-                            <th scope="col" class="text-nowrap">Изменение</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var row in Model.Items)
-                        {
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold">@row.PartDisplay</div>
-                                </td>
-                                <td class="text-end">
-                                    <span class="fw-semibold">@row.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</span>
-                                </td>
-                                <td>@row.AddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</td>
-                                <td>
-                                    @if (string.IsNullOrWhiteSpace(row.Comment))
+            var accordionId = "warehouseAccordion";
+            var accordionIndex = 0;
+
+            <div class="accordion" id="@accordionId">
+                @foreach (var partGroup in Model.PartGroups)
+                {
+                    var collapseId = $"warehouse-collapse-{accordionIndex}";
+                    var headingId = $"warehouse-heading-{accordionIndex}";
+                    var labelCount = partGroup.LabelGroups.Count;
+                    var itemCount = partGroup.Items.Count;
+                    accordionIndex++;
+
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="@headingId">
+                            <button class="accordion-button collapsed d-flex flex-column flex-lg-row align-items-lg-center gap-2" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">
+                                <span class="flex-grow-1 text-start">
+                                    <span class="fw-semibold">@partGroup.PartDisplay</span>
+                                    <span class="d-block small text-muted">Ярлыков: @labelCount • Записей: @itemCount</span>
+                                </span>
+                                <span class="badge bg-primary text-uppercase">
+                                    Всего: @partGroup.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)
+                                </span>
+                            </button>
+                        </h2>
+                        <div id="@collapseId" class="accordion-collapse collapse" aria-labelledby="@headingId" data-bs-parent="#@accordionId">
+                            <div class="accordion-body">
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                        <h6 class="mb-0">Ярлыки детали</h6>
+                                        <small class="text-muted">Всего: @labelCount</small>
+                                    </div>
+                                    @if (labelCount == 0)
                                     {
-                                        <span class="text-muted">—</span>
+                                        <div class="text-muted">Для этой детали нет привязанных ярлыков.</div>
                                     }
                                     else
                                     {
-                                        @row.Comment
-                                    }
-                                </td>
-                                <td>
-                                    @if (row.UpdatedAt.HasValue)
-                                    {
-                                        @row.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
-                                    }
-                                    else
-                                    {
-                                        <span class="text-muted">—</span>
-                                    }
-                                </td>
-                                <td>
-                                    <button type="button" class="btn btn-outline-secondary btn-sm js-warehouse-labels-toggle" data-target="#labels-@row.Id" aria-expanded="false" aria-controls="labels-@row.Id">
-                                        Ярлыки
-                                        <span class="badge bg-secondary ms-1">@row.LabelRows.Count</span>
-                                    </button>
-                                </td>
-                                <td>
-                                    <form asp-action="Update" method="post" class="row g-2 align-items-center">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="Id" value="@row.Id" />
-                                        <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
-                                        <div class="col-sm-4">
-                                            <label class="visually-hidden" for="qty-@row.Id">Количество</label>
-                                            <input id="qty-@row.Id" class="form-control form-control-sm" type="number" name="Quantity" value='@row.Quantity.ToString("0.###", CultureInfo.InvariantCulture)' min="0" step="0.001" />
-                                        </div>
-                                        <div class="col-sm-4">
-                                            <label class="visually-hidden" for="date-@row.Id">Дата</label>
-                                            <input id="date-@row.Id" class="form-control form-control-sm" type="date" name="AddedAt" value="@row.AddedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
-                                        </div>
-                                        <div class="col-sm-4">
-                                            <label class="visually-hidden" for="comment-@row.Id">Комментарий</label>
-                                            <input id="comment-@row.Id" class="form-control form-control-sm" type="text" name="Comment" maxlength="512" value="@(row.Comment ?? string.Empty)" placeholder="Комментарий" />
-                                        </div>
-                                        <div class="col-12 d-flex gap-2">
-                                            <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
-                                            <button type="reset" class="btn btn-outline-secondary btn-sm">Отмена</button>
-                                        </div>
-                                    </form>
-                                </td>
-                            </tr>
-                            <tr id="labels-@row.Id" class="warehouse-labels-row d-none">
-                                <td colspan="7">
-                                    <div class="border rounded p-3 bg-light">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h6 class="mb-0">Ярлыки детали</h6>
-                                            <small class="text-muted">Всего: @row.LabelRows.Count</small>
-                                        </div>
-                                        @if (row.LabelRows.Count == 0)
-                                        {
-                                            <div class="text-muted">Для этой записи склада нет привязанных ярлыков.</div>
-                                        }
-                                        else
-                                        {
-                                            <div class="table-responsive">
-                                                <table class="table table-sm align-middle mb-0">
-                                                    <thead>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead>
+                                                    <tr>
+                                                        <th scope="col">Номер</th>
+                                                        <th scope="col" class="text-end">Количество</th>
+                                                        <th scope="col">Дата добавления</th>
+                                                        <th scope="col">Обновлено</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var label in partGroup.LabelGroups)
+                                                    {
                                                         <tr>
-                                                            <th scope="col">Номер</th>
-                                                            <th scope="col" class="text-end">Количество</th>
-                                                            <th scope="col">Дата добавления</th>
-                                                            <th scope="col">Обновлено</th>
+                                                            <td class="fw-semibold">
+                                                                @if (string.IsNullOrWhiteSpace(label.LabelNumber))
+                                                                {
+                                                                    <span class="text-muted">—</span>
+                                                                }
+                                                                else
+                                                                {
+                                                                    @label.LabelNumber
+                                                                }
+                                                            </td>
+                                                            <td class="text-end">@label.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
+                                                            <td>@label.FirstAddedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)</td>
+                                                            <td>
+                                                                @if (label.LastUpdatedAt.HasValue)
+                                                                {
+                                                                    @label.LastUpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
+                                                                }
+                                                                else
+                                                                {
+                                                                    <span class="text-muted">—</span>
+                                                                }
+                                                            </td>
                                                         </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        @foreach (var label in row.LabelRows)
-                                                        {
-                                                            <tr>
-                                                                <td class="fw-semibold">
-                                                                    @if (string.IsNullOrWhiteSpace(label.LabelNumber))
-                                                                    {
-                                                                        <span class="text-muted">—</span>
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        @label.LabelNumber
-                                                                    }
-                                                                </td>
-                                                                <td class="text-end">@label.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
-                                                                <td>@label.AddedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)</td>
-                                                                <td>
-                                                                    @if (label.UpdatedAt.HasValue)
-                                                                    {
-                                                                        @label.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        <span class="text-muted">—</span>
-                                                                    }
-                                                                </td>
-                                                            </tr>
-                                                        }
-                                                    </tbody>
-                                                </table>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                                    <h6 class="mb-0">Записи склада</h6>
+                                    <small class="text-muted">Всего: @itemCount</small>
+                                </div>
+
+                                @if (itemCount == 0)
+                                {
+                                    <div class="text-muted">Для этой детали нет записей на складе.</div>
+                                }
+                                else
+                                {
+                                    <div class="row g-3">
+                                        @foreach (var row in partGroup.Items)
+                                        {
+                                            <div class="col-12">
+                                                <div class="border rounded p-3 bg-white h-100">
+                                                    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+                                                        <div>
+                                                            <div class="fw-semibold">Запись от @row.AddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</div>
+                                                            <div class="text-muted small">
+                                                                Создано: @row.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
+                                                                @if (row.UpdatedAt.HasValue)
+                                                                {
+                                                                    <text> • Обновлено: @row.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)</text>
+                                                                }
+                                                            </div>
+                                                            @if (string.IsNullOrWhiteSpace(row.Comment))
+                                                            {
+                                                                <div class="text-muted small fst-italic mt-1">Комментарий не указан.</div>
+                                                            }
+                                                            else
+                                                            {
+                                                                <div class="small mt-1">Комментарий: @row.Comment</div>
+                                                            }
+                                                        </div>
+                                                        <div class="text-lg-end">
+                                                            <div class="fs-3 fw-semibold">@row.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</div>
+                                                            <div class="text-muted small">Количество, шт</div>
+                                                        </div>
+                                                    </div>
+                                                    <form asp-action="Update" method="post" class="row g-2 g-lg-3 align-items-end">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="Id" value="@row.Id" />
+                                                        <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
+                                                        <div class="col-12 col-md-4 col-lg-3">
+                                                            <label class="form-label" for="qty-@row.Id">Количество</label>
+                                                            <input id="qty-@row.Id" class="form-control" type="number" name="Quantity" value='@row.Quantity.ToString("0.###", CultureInfo.InvariantCulture)' min="0" step="0.001" />
+                                                        </div>
+                                                        <div class="col-12 col-md-4 col-lg-3">
+                                                            <label class="form-label" for="date-@row.Id">Дата</label>
+                                                            <input id="date-@row.Id" class="form-control" type="date" name="AddedAt" value="@row.AddedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                                                        </div>
+                                                        <div class="col-12 col-md-4 col-lg-4">
+                                                            <label class="form-label" for="comment-@row.Id">Комментарий</label>
+                                                            <input id="comment-@row.Id" class="form-control" type="text" name="Comment" maxlength="512" value="@(row.Comment ?? string.Empty)" placeholder="Комментарий" />
+                                                        </div>
+                                                        <div class="col-12 col-lg-2 d-flex gap-2 justify-content-end">
+                                                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                                                            <button type="reset" class="btn btn-outline-secondary">Отмена</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
                                             </div>
                                         }
                                     </div>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
         }
     </div>
 </div>
-
-@section Scripts
-{
-    <script src="~/js/warehouse-labels.js" asp-append-version="true"></script>
-}
