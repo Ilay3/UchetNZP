@@ -90,6 +90,12 @@ public record TransferOperationBalanceViewModel(
     decimal Balance,
     IReadOnlyList<string> Labels);
 
+public record TransferLabelOptionViewModel(
+    Guid Id,
+    string Number,
+    decimal Quantity,
+    decimal RemainingQuantity);
+
 public record TransferBalancesViewModel(
     TransferOperationBalanceViewModel From,
     TransferOperationBalanceViewModel To);
@@ -113,7 +119,11 @@ public record TransferSummaryItemViewModel(
     decimal Quantity,
     Guid TransferId,
     TransferScrapSummaryViewModel? Scrap,
-    IReadOnlyList<string> LabelNumbers);
+    IReadOnlyList<string> LabelNumbers,
+    Guid? WipLabelId,
+    string? LabelNumber,
+    decimal? LabelQuantityBefore,
+    decimal? LabelQuantityAfter);
 
 public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);
 
@@ -142,4 +152,8 @@ public record TransferDeleteResultViewModel(
     bool IsWarehouseTransfer,
     IReadOnlyCollection<Guid> DeletedOperationIds,
     TransferDeleteScrapViewModel? Scrap,
-    TransferDeleteWarehouseItemViewModel? WarehouseItem);
+    TransferDeleteWarehouseItemViewModel? WarehouseItem,
+    Guid? WipLabelId,
+    string? LabelNumber,
+    decimal? LabelQuantityBefore,
+    decimal? LabelQuantityAfter);

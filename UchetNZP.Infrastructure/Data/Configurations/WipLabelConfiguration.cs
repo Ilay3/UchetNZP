@@ -18,6 +18,9 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.Property(x => x.Quantity)
             .HasPrecision(12, 3);
 
+        builder.Property(x => x.RemainingQuantity)
+            .HasPrecision(12, 3);
+
         builder.Property(x => x.Number)
             .HasMaxLength(5)
             .IsRequired();
@@ -33,6 +36,11 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.HasOne(x => x.WipReceipt)
             .WithOne(x => x.WipLabel)
             .HasForeignKey<WipReceipt>(x => x.WipLabelId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasMany(x => x.Transfers)
+            .WithOne(x => x.WipLabel)
+            .HasForeignKey(x => x.WipLabelId)
             .OnDelete(DeleteBehavior.SetNull);
     }
 }

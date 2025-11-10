@@ -175,6 +175,11 @@ public class TransferService : ITransferService
                 var transferDate = NormalizeToUtc(item.TransferDate);
                 var trimmedComment = string.IsNullOrWhiteSpace(item.Comment) ? null : item.Comment.Trim();
 
+                Guid? transferLabelId = null;
+                string? transferLabelNumber = null;
+                decimal? labelQuantityBefore = null;
+                decimal? labelQuantityAfter = null;
+
                 var transfer = new WipTransfer
                 {
                     Id = Guid.NewGuid(),
@@ -234,6 +239,7 @@ public class TransferService : ITransferService
                 }
 
                 TransferScrapSummaryDto? scrapSummary = null;
+                var scrapQuantity = 0m;
 
                 if (item.Scrap is not null)
                 {
@@ -247,6 +253,8 @@ public class TransferService : ITransferService
                         throw new InvalidOperationException(
                             $"Количество брака ({item.Scrap.Quantity}) не совпадает с остатком ({remainingAfterTransfer}) для операции {item.FromOpNumber} детали {item.PartId}.");
                     }
+
+                    scrapQuantity = item.Scrap.Quantity;
 
                     fromBalance.Quantity = 0m;
 
@@ -273,6 +281,22 @@ public class TransferService : ITransferService
                     fromBalance.Quantity = remainingAfterTransfer;
                 }
 
+                var labelUsage = await ResolveTransferLabelAsync(
+                        item,
+                        fromRoute,
+                        scrapQuantity,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (labelUsage is not null)
+                {
+                    transferLabelId = labelUsage.Label.Id;
+                    transferLabelNumber = labelUsage.Label.Number;
+                    labelQuantityBefore = labelUsage.RemainingBefore;
+                    labelQuantityAfter = labelUsage.RemainingAfter;
+                    transfer.WipLabelId = transferLabelId;
+                }
+
                 results.Add(new TransferItemSummaryDto(
                     item.PartId,
                     item.FromOpNumber,
@@ -285,7 +309,11 @@ public class TransferService : ITransferService
                     isWarehouseTransfer ? toBalanceAfter : toBalance!.Quantity,
                     item.Quantity,
                     transfer.Id,
-                    scrapSummary));
+                    scrapSummary,
+                    transferLabelId,
+                    transferLabelNumber,
+                    labelQuantityBefore,
+                    labelQuantityAfter));
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -298,6 +326,92 @@ public class TransferService : ITransferService
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private async Task<TransferLabelUsage?> ResolveTransferLabelAsync(
+        TransferItemDto item,
+        PartRoute fromRoute,
+        decimal scrapQuantity,
+        CancellationToken cancellationToken)
+    {
+        if (item is null)
+        {
+            throw new ArgumentNullException(nameof(item));
+        }
+
+        if (fromRoute is null)
+        {
+            throw new ArgumentNullException(nameof(fromRoute));
+        }
+
+        var requiredQuantity = item.Quantity + scrapQuantity;
+        if (requiredQuantity <= 0m)
+        {
+            return null;
+        }
+
+        WipLabel? label;
+
+        if (item.WipLabelId.HasValue)
+        {
+            label = await _dbContext.WipLabels
+                .Include(x => x.WipReceipt)
+                .FirstOrDefaultAsync(x => x.Id == item.WipLabelId.Value, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (label is null)
+            {
+                throw new InvalidOperationException($"Ярлык с идентификатором {item.WipLabelId.Value} не найден.");
+            }
+        }
+        else
+        {
+            var candidates = await _dbContext.WipLabels
+                .Include(x => x.WipReceipt)
+                .Where(x =>
+                    x.PartId == item.PartId &&
+                    x.WipReceipt != null &&
+                    x.WipReceipt.SectionId == fromRoute.SectionId &&
+                    x.WipReceipt.OpNumber == item.FromOpNumber &&
+                    x.RemainingQuantity > 0m)
+                .OrderBy(x => x.Number)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            label = candidates.FirstOrDefault(x => x.RemainingQuantity >= requiredQuantity);
+
+            if (label is null)
+            {
+                throw new InvalidOperationException("Свободный ярлык для выбранной операции не найден или имеет недостаточный остаток.");
+            }
+        }
+
+        if (label.PartId != item.PartId)
+        {
+            throw new InvalidOperationException($"Ярлык {label.Number} относится к другой детали и не может быть использован для передачи детали {item.PartId}.");
+        }
+
+        if (label.WipReceipt is null)
+        {
+            throw new InvalidOperationException($"Ярлык {label.Number} не связан с приходом и не может быть использован.");
+        }
+
+        if (label.WipReceipt.SectionId != fromRoute.SectionId || label.WipReceipt.OpNumber != item.FromOpNumber)
+        {
+            throw new InvalidOperationException($"Ярлык {label.Number} относится к другой операции и не может быть использован для операции {item.FromOpNumber}.");
+        }
+
+        var remainingBefore = label.RemainingQuantity;
+        if (remainingBefore + 0.000001m < requiredQuantity)
+        {
+            throw new InvalidOperationException($"Остаток ярлыка {label.Number} ({remainingBefore}) меньше требуемого количества ({requiredQuantity}).");
+        }
+
+        var remainingAfter = remainingBefore - requiredQuantity;
+        label.RemainingQuantity = remainingAfter;
+
+        var ret = new TransferLabelUsage(label, remainingBefore, remainingAfter);
+        return ret;
     }
 
     public async Task<TransferDeleteResultDto> DeleteTransferAsync(Guid transferId, CancellationToken cancellationToken = default)
@@ -315,6 +429,7 @@ public class TransferService : ITransferService
                 .Include(x => x.Operations)
                 .Include(x => x.Scrap)
                 .Include(x => x.WarehouseItem)
+                .Include(x => x.WipLabel)
                 .FirstOrDefaultAsync(x => x.Id == transferId, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -356,6 +471,11 @@ public class TransferService : ITransferService
             var scrapQuantity = scrap?.Quantity ?? 0m;
             var fromBalanceAfter = fromBalanceBefore + transfer.Quantity + scrapQuantity;
             fromBalance.Quantity = fromBalanceAfter;
+
+            Guid? transferLabelId = transfer.WipLabelId;
+            string? transferLabelNumber = transfer.WipLabel?.Number;
+            decimal? labelQuantityBefore = null;
+            decimal? labelQuantityAfter = null;
 
             TransferDeleteWarehouseItemDto? warehouseDto = null;
             decimal toBalanceBefore;
@@ -428,6 +548,30 @@ public class TransferService : ITransferService
                 _dbContext.WipScraps.Remove(scrap);
             }
 
+            if (transferLabelId.HasValue)
+            {
+                var label = transfer.WipLabel ?? await _dbContext.WipLabels
+                    .FirstOrDefaultAsync(x => x.Id == transferLabelId.Value, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (label is null)
+                {
+                    throw new InvalidOperationException($"Для передачи {transferId} не найден связанный ярлык {transferLabelId.Value}.");
+                }
+
+                labelQuantityBefore = label.RemainingQuantity;
+                var restoreQuantity = transfer.Quantity + scrapQuantity;
+                var updatedQuantity = label.RemainingQuantity + restoreQuantity;
+                if (updatedQuantity > label.Quantity)
+                {
+                    updatedQuantity = label.Quantity;
+                }
+
+                label.RemainingQuantity = updatedQuantity;
+                labelQuantityAfter = updatedQuantity;
+                transferLabelNumber = label.Number;
+            }
+
             if (operations.Count > 0)
             {
                 _dbContext.WipTransferOperations.RemoveRange(operations);
@@ -453,7 +597,11 @@ public class TransferService : ITransferService
                 isWarehouseTransfer,
                 operations.Select(x => x.Id).ToArray(),
                 scrapDto,
-                warehouseDto);
+                warehouseDto,
+                transferLabelId,
+                transferLabelNumber,
+                labelQuantityBefore,
+                labelQuantityAfter);
         }
         catch
         {
@@ -471,4 +619,6 @@ public class TransferService : ITransferService
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
     }
+
+    private sealed record TransferLabelUsage(WipLabel Label, decimal RemainingBefore, decimal RemainingAfter);
 }

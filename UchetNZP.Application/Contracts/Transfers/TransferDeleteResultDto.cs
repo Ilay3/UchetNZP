@@ -17,7 +17,11 @@ public record TransferDeleteResultDto(
     bool IsWarehouseTransfer,
     IReadOnlyCollection<Guid> DeletedOperationIds,
     TransferDeleteScrapDto? Scrap,
-    TransferDeleteWarehouseItemDto? WarehouseItem
+    TransferDeleteWarehouseItemDto? WarehouseItem,
+    Guid? WipLabelId,
+    string? LabelNumber,
+    decimal? LabelQuantityBefore,
+    decimal? LabelQuantityAfter
 );
 
 public record TransferDeleteScrapDto(

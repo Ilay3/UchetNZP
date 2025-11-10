@@ -32,6 +32,13 @@
                 <input type="hidden" id="transferToOperationNumber" />
                 <div class="form-text">Выберите операцию, на которую передаётся НЗП.</div>
             </div>
+            <div class="col-12 col-lg-6 col-xl-4">
+                <label class="form-label" for="transferLabelSelect">Ярлык</label>
+                <select id="transferLabelSelect" class="form-select form-select-lg">
+                    <option value="">— Свободные ярлыки будут загружены —</option>
+                </select>
+                <div class="form-text" id="transferLabelHint">Выберите операцию до, чтобы увидеть свободные ярлыки.</div>
+            </div>
             <div class="col-sm-6 col-lg-4">
                 <label class="form-label" for="transferDateInput">Дата передачи</label>
                 <input id="transferDateInput" class="form-control form-control-lg" type="date" />
