@@ -77,18 +77,25 @@ public record LaunchBatchItemViewModel(
 
 public record LaunchBatchSummaryViewModel(int Saved, IReadOnlyList<LaunchBatchItemViewModel> Items);
 
+public record TransferOperationLabelBalanceViewModel(
+    Guid Id,
+    string Number,
+    decimal RemainingQuantity);
+
 public record TransferOperationLookupViewModel(
     string OpNumber,
     string OperationName,
     decimal NormHours,
     decimal Balance,
-    bool IsWarehouse);
+    bool IsWarehouse,
+    IReadOnlyList<TransferOperationLabelBalanceViewModel> LabelBalances);
 
 public record TransferOperationBalanceViewModel(
     string OpNumber,
     Guid SectionId,
     decimal Balance,
-    IReadOnlyList<string> Labels);
+    IReadOnlyList<string> Labels,
+    IReadOnlyList<TransferOperationLabelBalanceViewModel> LabelBalances);
 
 public record TransferLabelOptionViewModel(
     Guid Id,
