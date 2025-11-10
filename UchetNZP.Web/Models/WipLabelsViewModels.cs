@@ -67,3 +67,19 @@ public class WipLabelBatchInputModel : WipLabelCreateInputModel
 {
     public int Count { get; set; }
 }
+
+public class WipLabelManualCreateInputModel : WipLabelCreateInputModel
+{
+    public string Number { get; set; } = string.Empty;
+}
+
+public class WipLabelUpdateInputModel
+{
+    public Guid Id { get; set; }
+
+    public DateTime LabelDate { get; set; }
+
+    public decimal Quantity { get; set; }
+
+    public string Number { get; set; } = string.Empty;
+}

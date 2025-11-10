@@ -144,6 +144,112 @@ public class WipLabelsController : Controller
         return ret;
     }
 
+    [HttpPost("manual")]
+    public async Task<IActionResult> CreateLabelManual([FromBody] WipLabelManualCreateInputModel? in_request, CancellationToken in_cancellationToken)
+    {
+        IActionResult ret;
+
+        if (in_request is null)
+        {
+            ret = BadRequest("Запрос не может быть пустым.");
+        }
+        else if (in_request.PartId == Guid.Empty)
+        {
+            ret = BadRequest("Не выбрана деталь.");
+        }
+        else if (in_request.Quantity <= 0)
+        {
+            ret = BadRequest("Количество должно быть больше нуля.");
+        }
+        else if (string.IsNullOrWhiteSpace(in_request.Number))
+        {
+            ret = BadRequest("Номер ярлыка не может быть пустым.");
+        }
+        else
+        {
+            try
+            {
+                var dto = new WipLabelManualCreateDto(in_request.PartId, in_request.LabelDate, in_request.Quantity, in_request.Number);
+                var created = await m_wipLabelService
+                    .CreateLabelWithNumberAsync(dto, in_cancellationToken)
+                    .ConfigureAwait(false);
+
+                var item = MapToViewModel(created);
+                ret = Ok(item);
+            }
+            catch (InvalidOperationException ex)
+            {
+                ret = BadRequest(ex.Message);
+            }
+        }
+
+        return ret;
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> UpdateLabel(Guid id, [FromBody] WipLabelUpdateInputModel? in_request, CancellationToken in_cancellationToken)
+    {
+        IActionResult ret;
+
+        if (in_request is null)
+        {
+            ret = BadRequest("Запрос не может быть пустым.");
+        }
+        else if (id == Guid.Empty || in_request.Id == Guid.Empty || id != in_request.Id)
+        {
+            ret = BadRequest("Некорректный идентификатор ярлыка.");
+        }
+        else if (in_request.Quantity <= 0)
+        {
+            ret = BadRequest("Количество должно быть больше нуля.");
+        }
+        else if (string.IsNullOrWhiteSpace(in_request.Number))
+        {
+            ret = BadRequest("Номер ярлыка не может быть пустым.");
+        }
+        else
+        {
+            try
+            {
+                var dto = new WipLabelUpdateDto(in_request.Id, in_request.LabelDate, in_request.Quantity, in_request.Number);
+                var updated = await m_wipLabelService
+                    .UpdateLabelAsync(dto, in_cancellationToken)
+                    .ConfigureAwait(false);
+
+                var item = MapToViewModel(updated);
+                ret = Ok(item);
+            }
+            catch (InvalidOperationException ex)
+            {
+                ret = BadRequest(ex.Message);
+            }
+        }
+
+        return ret;
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteLabel(Guid id, CancellationToken in_cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор ярлыка.");
+        }
+
+        try
+        {
+            await m_wipLabelService
+                .DeleteLabelAsync(id, in_cancellationToken)
+                .ConfigureAwait(false);
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     private static WipLabelListItemViewModel MapToViewModel(WipLabelDto in_label)
     {
         if (in_label is null)

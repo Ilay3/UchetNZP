@@ -114,6 +114,168 @@ public class WipLabelService : IWipLabelService
         return ret;
     }
 
+    public async Task<WipLabelDto> CreateLabelWithNumberAsync(WipLabelManualCreateDto in_request, CancellationToken in_cancellationToken = default)
+    {
+        if (in_request is null)
+        {
+            throw new ArgumentNullException(nameof(in_request));
+        }
+
+        var normalizedNumber = NormalizeNumber(in_request.Number);
+        var normalizedDate = NormalizeDate(in_request.LabelDate);
+
+        if (in_request.PartId == Guid.Empty)
+        {
+            throw new InvalidOperationException("Не выбрана деталь для создания ярлыка.");
+        }
+
+        if (in_request.Quantity <= 0)
+        {
+            throw new InvalidOperationException("Количество должно быть больше нуля.");
+        }
+
+        await using var transaction = await m_dbContext.Database
+            .BeginTransactionAsync(IsolationLevel.Serializable, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            var exists = await m_dbContext.WipLabels
+                .AsNoTracking()
+                .AnyAsync(x => x.Number == normalizedNumber, in_cancellationToken)
+                .ConfigureAwait(false);
+
+            if (exists)
+            {
+                throw new InvalidOperationException($"Ярлык с номером {normalizedNumber} уже существует.");
+            }
+
+            var part = await GetPartAsync(in_request.PartId, in_cancellationToken).ConfigureAwait(false);
+
+            var entity = new WipLabel
+            {
+                Id = Guid.NewGuid(),
+                PartId = in_request.PartId,
+                LabelDate = normalizedDate,
+                Quantity = in_request.Quantity,
+                RemainingQuantity = in_request.Quantity,
+                Number = normalizedNumber,
+                IsAssigned = false,
+            };
+
+            await m_dbContext.WipLabels.AddAsync(entity, in_cancellationToken).ConfigureAwait(false);
+            await m_dbContext.SaveChangesAsync(in_cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(in_cancellationToken).ConfigureAwait(false);
+
+            var ret = new WipLabelDto(
+                entity.Id,
+                entity.PartId,
+                part.Name,
+                part.Code,
+                entity.Number,
+                entity.LabelDate,
+                entity.Quantity,
+                entity.IsAssigned);
+
+            return ret;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(in_cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task<WipLabelDto> UpdateLabelAsync(WipLabelUpdateDto in_request, CancellationToken in_cancellationToken = default)
+    {
+        if (in_request is null)
+        {
+            throw new ArgumentNullException(nameof(in_request));
+        }
+
+        if (in_request.Id == Guid.Empty)
+        {
+            throw new InvalidOperationException("Не указан идентификатор ярлыка.");
+        }
+
+        if (in_request.Quantity <= 0)
+        {
+            throw new InvalidOperationException("Количество должно быть больше нуля.");
+        }
+
+        var normalizedNumber = NormalizeNumber(in_request.Number);
+        var normalizedDate = NormalizeDate(in_request.LabelDate);
+
+        var label = await m_dbContext.WipLabels
+            .Include(x => x.Part)
+            .FirstOrDefaultAsync(x => x.Id == in_request.Id, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (label == null)
+        {
+            throw new InvalidOperationException("Ярлык не найден.");
+        }
+
+        await EnsureLabelCanBeModifiedAsync(label.Id, in_cancellationToken).ConfigureAwait(false);
+
+        if (!string.Equals(label.Number, normalizedNumber, StringComparison.Ordinal))
+        {
+            var exists = await m_dbContext.WipLabels
+                .AsNoTracking()
+                .AnyAsync(x => x.Number == normalizedNumber && x.Id != label.Id, in_cancellationToken)
+                .ConfigureAwait(false);
+
+            if (exists)
+            {
+                throw new InvalidOperationException($"Ярлык с номером {normalizedNumber} уже существует.");
+            }
+        }
+
+        label.Number = normalizedNumber;
+        label.LabelDate = normalizedDate;
+        label.Quantity = in_request.Quantity;
+        label.RemainingQuantity = in_request.Quantity;
+
+        await m_dbContext.SaveChangesAsync(in_cancellationToken).ConfigureAwait(false);
+
+        var partName = label.Part != null ? label.Part.Name : string.Empty;
+        var partCode = label.Part != null ? label.Part.Code : null;
+
+        var ret = new WipLabelDto(
+            label.Id,
+            label.PartId,
+            partName,
+            partCode,
+            label.Number,
+            label.LabelDate,
+            label.Quantity,
+            label.IsAssigned);
+
+        return ret;
+    }
+
+    public async Task DeleteLabelAsync(Guid in_id, CancellationToken in_cancellationToken = default)
+    {
+        if (in_id == Guid.Empty)
+        {
+            throw new InvalidOperationException("Не указан идентификатор ярлыка.");
+        }
+
+        var label = await m_dbContext.WipLabels
+            .FirstOrDefaultAsync(x => x.Id == in_id, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (label == null)
+        {
+            throw new InvalidOperationException("Ярлык не найден.");
+        }
+
+        await EnsureLabelCanBeModifiedAsync(label.Id, in_cancellationToken).ConfigureAwait(false);
+
+        m_dbContext.WipLabels.Remove(label);
+        await m_dbContext.SaveChangesAsync(in_cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task<List<WipLabelDto>> CreateLabelsAsync(Guid in_partId, DateTime in_labelDate, decimal in_quantity, int in_count, CancellationToken in_cancellationToken)
     {
         if (in_partId == Guid.Empty)
@@ -225,5 +387,86 @@ public class WipLabelService : IWipLabelService
     {
         var ret = DateTime.SpecifyKind(in_date.Date, DateTimeKind.Utc);
         return ret;
+    }
+
+    private static string NormalizeNumber(string in_number)
+    {
+        if (string.IsNullOrWhiteSpace(in_number))
+        {
+            throw new InvalidOperationException("Номер ярлыка не может быть пустым.");
+        }
+
+        var trimmed = in_number.Trim();
+
+        if (trimmed.Length > 5)
+        {
+            throw new InvalidOperationException("Номер ярлыка не может содержать более 5 символов.");
+        }
+
+        if (!trimmed.All(char.IsDigit))
+        {
+            throw new InvalidOperationException("Номер ярлыка должен содержать только цифры.");
+        }
+
+        if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+        {
+            throw new InvalidOperationException("Номер ярлыка должен быть положительным числом.");
+        }
+
+        var ret = number.ToString("D5", CultureInfo.InvariantCulture);
+        return ret;
+    }
+
+    private async Task EnsureLabelCanBeModifiedAsync(Guid in_labelId, CancellationToken in_cancellationToken)
+    {
+        var label = await m_dbContext.WipLabels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == in_labelId, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (label == null)
+        {
+            throw new InvalidOperationException("Ярлык не найден.");
+        }
+
+        if (label.IsAssigned)
+        {
+            throw new InvalidOperationException("Ярлык уже назначен и не может быть изменён или удалён.");
+        }
+
+        if (label.RemainingQuantity != label.Quantity)
+        {
+            throw new InvalidOperationException("Нельзя изменить или удалить ярлык, по которому уже списан остаток.");
+        }
+
+        var hasReceipt = await m_dbContext.WipReceipts
+            .AsNoTracking()
+            .AnyAsync(x => x.WipLabelId == in_labelId, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (hasReceipt)
+        {
+            throw new InvalidOperationException("Нельзя изменить или удалить ярлык, связанный с приёмкой.");
+        }
+
+        var hasTransfers = await m_dbContext.WipTransfers
+            .AsNoTracking()
+            .AnyAsync(x => x.WipLabelId == in_labelId, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (hasTransfers)
+        {
+            throw new InvalidOperationException("Нельзя изменить или удалить ярлык, использованный в перемещениях.");
+        }
+
+        var hasWarehouseItems = await m_dbContext.WarehouseLabelItems
+            .AsNoTracking()
+            .AnyAsync(x => x.WipLabelId == in_labelId, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (hasWarehouseItems)
+        {
+            throw new InvalidOperationException("Нельзя изменить или удалить ярлык, находящийся на складе.");
+        }
     }
 }

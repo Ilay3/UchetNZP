@@ -12,10 +12,23 @@
             <div class="card-body">
                 <div id="labelsFormMessage" class="alert d-none" role="alert"></div>
                 <div class="mb-3">
+                    <div class="btn-group w-100" role="group" aria-label="Способ создания ярлыка">
+                        <input type="radio" class="btn-check" name="labelMode" id="labelModeAuto" value="auto" checked>
+                        <label class="btn btn-outline-primary" for="labelModeAuto">Автоматический номер</label>
+                        <input type="radio" class="btn-check" name="labelMode" id="labelModeManual" value="manual">
+                        <label class="btn btn-outline-primary" for="labelModeManual">Ручной ввод номера</label>
+                    </div>
+                </div>
+                <div class="mb-3">
                     <label class="form-label" for="labelPartInput">Деталь</label>
                     <input id="labelPartInput" class="form-control" list="labelPartOptions" autocomplete="off" placeholder="Начните вводить название детали" />
                     <input id="labelPartId" type="hidden" />
                     <datalist id="labelPartOptions"></datalist>
+                </div>
+                <div class="mb-3 d-none" id="labelManualNumberRow">
+                    <label class="form-label" for="labelNumberInput">Номер ярлыка</label>
+                    <input id="labelNumberInput" type="text" class="form-control" maxlength="5" placeholder="Например, 00012" autocomplete="off" />
+                    <div class="form-text">Доступны только цифры, номер будет дополнен нулями слева до пяти знаков.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="labelDateInput">Дата</label>
@@ -28,9 +41,9 @@
                         <span class="input-group-text">шт</span>
                     </div>
                 </div>
-                <div class="mb-4">
+                <div class="mb-4" id="labelCountRow">
                     <label class="form-label" for="labelCountInput">Количество ярлыков</label>
-                    <input id="labelCountInput" type="number" class="form-control" min="1" value="1" />
+                    <input id="labelCountInput" type="number" class="form-control" min="1" step="1" value="1" />
                 </div>
                 <button id="labelAddButton" type="button" class="btn btn-primary w-100">Создать ярлыки</button>
             </div>
@@ -66,15 +79,51 @@
                                 <th scope="col">Количество</th>
                                 <th scope="col">Деталь</th>
                                 <th scope="col">Статус</th>
+                                <th scope="col" class="text-end">Действия</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr class="text-center text-muted">
-                                <td colspan="5">Нет данных для отображения</td>
+                                <td colspan="6">Нет данных для отображения</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="labelEditModal" tabindex="-1" aria-labelledby="labelEditModalTitle" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="labelEditModalTitle">Редактирование ярлыка</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2 text-muted small" id="labelEditPartName"></div>
+                <div id="labelEditMessage" class="alert d-none" role="alert"></div>
+                <div class="mb-3">
+                    <label class="form-label" for="editLabelNumberInput">Номер</label>
+                    <input id="editLabelNumberInput" type="text" class="form-control" maxlength="5" autocomplete="off" />
+                    <div class="form-text">Доступны только цифры, номер автоматически дополняется до пяти символов.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="editLabelDateInput">Дата</label>
+                    <input id="editLabelDateInput" type="date" class="form-control" />
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="editLabelQuantityInput">Количество</label>
+                    <div class="input-group">
+                        <input id="editLabelQuantityInput" type="number" class="form-control" step="0.001" min="0.001" />
+                        <span class="input-group-text">шт</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button id="labelEditSaveButton" type="button" class="btn btn-primary">Сохранить</button>
             </div>
         </div>
     </div>

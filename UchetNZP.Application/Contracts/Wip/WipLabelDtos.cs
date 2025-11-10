@@ -94,3 +94,41 @@ public class WipLabelBatchCreateDto
 
     public int Count { get; }
 }
+
+public class WipLabelManualCreateDto
+{
+    public WipLabelManualCreateDto(Guid in_partId, DateTime in_labelDate, decimal in_quantity, string in_number)
+    {
+        PartId = in_partId;
+        LabelDate = DateTime.SpecifyKind(in_labelDate, DateTimeKind.Unspecified);
+        Quantity = in_quantity;
+        Number = in_number ?? string.Empty;
+    }
+
+    public Guid PartId { get; }
+
+    public DateTime LabelDate { get; }
+
+    public decimal Quantity { get; }
+
+    public string Number { get; }
+}
+
+public class WipLabelUpdateDto
+{
+    public WipLabelUpdateDto(Guid in_id, DateTime in_labelDate, decimal in_quantity, string in_number)
+    {
+        Id = in_id;
+        LabelDate = DateTime.SpecifyKind(in_labelDate, DateTimeKind.Unspecified);
+        Quantity = in_quantity;
+        Number = in_number ?? string.Empty;
+    }
+
+    public Guid Id { get; }
+
+    public DateTime LabelDate { get; }
+
+    public decimal Quantity { get; }
+
+    public string Number { get; }
+}
