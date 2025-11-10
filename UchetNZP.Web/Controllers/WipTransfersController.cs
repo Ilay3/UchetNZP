@@ -10,6 +10,7 @@ using UchetNZP.Application.Contracts.Transfers;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
 using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
@@ -19,11 +20,16 @@ public class WipTransfersController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly ITransferService _transferService;
+    private readonly IWipLabelLookupService _labelLookupService;
 
-    public WipTransfersController(AppDbContext dbContext, ITransferService transferService)
+    public WipTransfersController(
+        AppDbContext dbContext,
+        ITransferService transferService,
+        IWipLabelLookupService labelLookupService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _transferService = transferService ?? throw new ArgumentNullException(nameof(transferService));
+        _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
     [HttpGet("")]
@@ -143,8 +149,11 @@ public class WipTransfersController : Controller
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        TransferOperationBalanceViewModel toModel;
-        if (toOp == WarehouseDefaults.OperationNumber)
+        var isWarehouseTransfer = toOp == WarehouseDefaults.OperationNumber;
+        Guid toSectionId;
+        decimal toBalanceValue;
+
+        if (isWarehouseTransfer)
         {
             var warehouseBalance = await _dbContext.WarehouseItems
                 .AsNoTracking()
@@ -152,10 +161,8 @@ public class WipTransfersController : Controller
                 .SumAsync(x => x.Quantity, cancellationToken)
                 .ConfigureAwait(false);
 
-            toModel = new TransferOperationBalanceViewModel(
-                OperationNumber.Format(toOp),
-                WarehouseDefaults.SectionId,
-                warehouseBalance);
+            toSectionId = WarehouseDefaults.SectionId;
+            toBalanceValue = warehouseBalance;
         }
         else
         {
@@ -178,15 +185,50 @@ public class WipTransfersController : Controller
                 .FirstOrDefaultAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            toModel = new TransferOperationBalanceViewModel(
-                OperationNumber.Format(toOp),
-                toRoute.SectionId,
-                toBalance);
+            toSectionId = toRoute.SectionId;
+            toBalanceValue = toBalance;
         }
 
-        var model = new TransferBalancesViewModel(
-            new TransferOperationBalanceViewModel(OperationNumber.Format(fromOp), fromRoute.SectionId, fromBalance),
-            toModel);
+        var labelKeys = new List<LabelLookupKey>
+        {
+            new LabelLookupKey(partId, fromRoute.SectionId, fromOp),
+        };
+
+        if (!isWarehouseTransfer)
+        {
+            labelKeys.Add(new LabelLookupKey(partId, toSectionId, toOp));
+        }
+
+        var labelLookup = await _labelLookupService
+            .LoadAsync(labelKeys, cancellationToken, null, DateTime.UtcNow.AddDays(1))
+            .ConfigureAwait(false);
+
+        var nowUtc = DateTime.UtcNow;
+        var fromLabels = _labelLookupService.FindLabelsUpToDate(
+            labelLookup,
+            new LabelLookupKey(partId, fromRoute.SectionId, fromOp),
+            nowUtc);
+
+        var toLabels = isWarehouseTransfer
+            ? Array.Empty<string>()
+            : _labelLookupService.FindLabelsUpToDate(
+                labelLookup,
+                new LabelLookupKey(partId, toSectionId, toOp),
+                nowUtc);
+
+        var fromModel = new TransferOperationBalanceViewModel(
+            OperationNumber.Format(fromOp),
+            fromRoute.SectionId,
+            fromBalance,
+            fromLabels);
+
+        var toModel = new TransferOperationBalanceViewModel(
+            OperationNumber.Format(toOp),
+            toSectionId,
+            toBalanceValue,
+            toLabels);
+
+        var model = new TransferBalancesViewModel(fromModel, toModel);
 
         return Ok(model);
     }
@@ -222,25 +264,81 @@ public class WipTransfersController : Controller
 
         var summary = await _transferService.AddTransfersBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
 
-        var model = new TransferBatchSummaryViewModel(
-            summary.Saved,
-            summary.Items
-                .Select(x => new TransferSummaryItemViewModel(
-                    x.PartId,
-                    OperationNumber.Format(x.FromOpNumber),
-                    x.FromSectionId,
-                    x.FromBalanceBefore,
-                    x.FromBalanceAfter,
-                    OperationNumber.Format(x.ToOpNumber),
-                    x.ToSectionId,
-                    x.ToBalanceBefore,
-                    x.ToBalanceAfter,
-                    x.Quantity,
-                    x.TransferId,
-                    x.Scrap is null
+        List<TransferSummaryItemViewModel> summaryItems;
+        if (summary.Items.Count == 0)
+        {
+            summaryItems = new List<TransferSummaryItemViewModel>();
+        }
+        else
+        {
+            var transferIds = summary.Items
+                .Select(x => x.TransferId)
+                .Where(id => id != Guid.Empty)
+                .Distinct()
+                .ToList();
+
+            var transferDateMap = transferIds.Count == 0
+                ? new Dictionary<Guid, DateTime>()
+                : await _dbContext.WipTransfers
+                    .AsNoTracking()
+                    .Where(x => transferIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id, x => x.TransferDate, cancellationToken)
+                    .ConfigureAwait(false);
+
+            var labelKeys = summary.Items
+                .Select(x => new LabelLookupKey(x.PartId, x.FromSectionId, x.FromOpNumber))
+                .ToList();
+
+            DateTime? maxTransferDateUtc = transferDateMap.Count == 0
+                ? null
+                : transferDateMap.Values
+                    .Select(EnsureUtc)
+                    .DefaultIfEmpty(DateTime.UtcNow)
+                    .Max()
+                    .AddDays(1);
+
+            var labelLookup = await _labelLookupService
+                .LoadAsync(labelKeys, cancellationToken, null, maxTransferDateUtc)
+                .ConfigureAwait(false);
+
+            summaryItems = summary.Items
+                .Select(item =>
+                {
+                    var hasDate = transferDateMap.TryGetValue(item.TransferId, out var transferDate);
+                    var effectiveDate = hasDate ? transferDate : DateTime.UtcNow;
+
+                    var labels = _labelLookupService.FindLabelsUpToDate(
+                        labelLookup,
+                        new LabelLookupKey(item.PartId, item.FromSectionId, item.FromOpNumber),
+                        effectiveDate);
+
+                    var scrapSummary = item.Scrap is null
                         ? null
-                        : new TransferScrapSummaryViewModel(x.Scrap.ScrapId, x.Scrap.ScrapType, x.Scrap.Quantity, x.Scrap.Comment)))
-                .ToList());
+                        : new TransferScrapSummaryViewModel(
+                            item.Scrap.ScrapId,
+                            item.Scrap.ScrapType,
+                            item.Scrap.Quantity,
+                            item.Scrap.Comment);
+
+                    return new TransferSummaryItemViewModel(
+                        item.PartId,
+                        OperationNumber.Format(item.FromOpNumber),
+                        item.FromSectionId,
+                        item.FromBalanceBefore,
+                        item.FromBalanceAfter,
+                        OperationNumber.Format(item.ToOpNumber),
+                        item.ToSectionId,
+                        item.ToBalanceBefore,
+                        item.ToBalanceAfter,
+                        item.Quantity,
+                        item.TransferId,
+                        scrapSummary,
+                        labels);
+                })
+                .ToList();
+        }
+
+        var model = new TransferBatchSummaryViewModel(summary.Saved, summaryItems);
 
         return Ok(model);
     }
@@ -315,4 +413,14 @@ public class WipTransfersController : Controller
         ScrapType ScrapType,
         decimal Quantity,
         string? Comment);
+
+    private static DateTime EnsureUtc(DateTime in_value)
+    {
+        return in_value.Kind switch
+        {
+            DateTimeKind.Utc => in_value,
+            DateTimeKind.Local => in_value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(in_value, DateTimeKind.Utc),
+        };
+    }
 }

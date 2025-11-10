@@ -84,7 +84,11 @@ public record TransferOperationLookupViewModel(
     decimal Balance,
     bool IsWarehouse);
 
-public record TransferOperationBalanceViewModel(string OpNumber, Guid SectionId, decimal Balance);
+public record TransferOperationBalanceViewModel(
+    string OpNumber,
+    Guid SectionId,
+    decimal Balance,
+    IReadOnlyList<string> Labels);
 
 public record TransferBalancesViewModel(
     TransferOperationBalanceViewModel From,
@@ -108,7 +112,8 @@ public record TransferSummaryItemViewModel(
     decimal ToBalanceAfter,
     decimal Quantity,
     Guid TransferId,
-    TransferScrapSummaryViewModel? Scrap);
+    TransferScrapSummaryViewModel? Scrap,
+    IReadOnlyList<string> LabelNumbers);
 
 public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);
 

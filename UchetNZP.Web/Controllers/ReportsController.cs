@@ -19,15 +19,18 @@ public class ReportsController : Controller
     private readonly AppDbContext _dbContext;
     private readonly IScrapReportExcelExporter _scrapReportExcelExporter;
     private readonly ITransferPeriodReportExcelExporter _transferPeriodReportExcelExporter;
+    private readonly IWipLabelLookupService _labelLookupService;
 
     public ReportsController(
         AppDbContext dbContext,
         IScrapReportExcelExporter scrapReportExcelExporter,
-        ITransferPeriodReportExcelExporter transferPeriodReportExcelExporter)
+        ITransferPeriodReportExcelExporter transferPeriodReportExcelExporter,
+        IWipLabelLookupService labelLookupService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _scrapReportExcelExporter = scrapReportExcelExporter ?? throw new ArgumentNullException(nameof(scrapReportExcelExporter));
         _transferPeriodReportExcelExporter = transferPeriodReportExcelExporter ?? throw new ArgumentNullException(nameof(transferPeriodReportExcelExporter));
+        _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
     [HttpGet("receipts")]
@@ -202,7 +205,7 @@ public class ReportsController : Controller
             ? EnsureUtc(transfers.Max(x => x.TransferDate)).AddDays(1)
             : (DateTime?)null;
 
-        var transferLabelLookup = await LoadLabelLookupAsync(
+        var transferLabelLookup = await _labelLookupService.LoadAsync(
                 transferLabelKeys,
                 in_cancellationToken,
                 null,
@@ -217,11 +220,9 @@ public class ReportsController : Controller
         var transferCells = transfers
             .Select(x =>
             {
-                var labelNumber = FindLatestLabelNumber(
+                var labelNumbers = _labelLookupService.FindLabelsUpToDate(
                     transferLabelLookup,
-                    x.PartId,
-                    x.FromSectionId,
-                    x.FromOpNumber,
+                    new LabelLookupKey(x.PartId, x.FromSectionId, x.FromOpNumber),
                     x.TransferDate);
 
                 return new TransferPeriodCell(
@@ -229,7 +230,7 @@ public class ReportsController : Controller
                     x.Part != null ? x.Part.Name : "Деталь не указана",
                     x.Part?.Code,
                     ConvertToLocal(x.TransferDate).Date,
-                    BuildTransferCellText(x, labelNumber));
+                    BuildTransferCellText(x, labelNumbers));
             })
             .ToList();
 
@@ -381,7 +382,7 @@ public class ReportsController : Controller
             ? EnsureUtc(rawBatchItems.Max(x => x.LastReceiptDate)).AddDays(1)
             : (DateTime?)null;
 
-        var batchLabelLookup = await LoadLabelLookupAsync(
+        var batchLabelLookup = await _labelLookupService.LoadAsync(
                 batchLabelKeys,
                 cancellationToken,
                 null,
@@ -391,11 +392,9 @@ public class ReportsController : Controller
         var items = rawBatchItems
             .Select(x =>
             {
-                var labels = FindLabelNumbersAtDate(
+                var labels = _labelLookupService.FindLabelsOnDate(
                     batchLabelLookup,
-                    x.PartId,
-                    x.SectionId,
-                    x.OpNumber,
+                    new LabelLookupKey(x.PartId, x.SectionId, x.OpNumber),
                     x.LastReceiptDate);
                 var labelText = labels.Count > 0 ? string.Join(", ", labels) : null;
 
@@ -474,7 +473,7 @@ public class ReportsController : Controller
             ? EnsureUtc(scraps.Max(x => x.RecordedAt)).AddDays(1)
             : (DateTime?)null;
 
-        var scrapLabelLookup = await LoadLabelLookupAsync(
+        var scrapLabelLookup = await _labelLookupService.LoadAsync(
                 scrapLabelKeys,
                 cancellationToken,
                 null,
@@ -500,7 +499,10 @@ public class ReportsController : Controller
                 GetScrapTypeDisplayName(x.ScrapType),
                 FormatEmployee(x.UserId),
                 string.IsNullOrWhiteSpace(x.Comment) ? null : x.Comment,
-                FindLatestLabelNumber(scrapLabelLookup, x.PartId, x.SectionId, x.OpNumber, x.RecordedAt)))
+                FormatLabelList(_labelLookupService.FindLabelsUpToDate(
+                    scrapLabelLookup,
+                    new LabelLookupKey(x.PartId, x.SectionId, x.OpNumber),
+                    x.RecordedAt))))
             .ToList();
 
         var filter = new ScrapReportFilterViewModel
@@ -658,7 +660,7 @@ public class ReportsController : Controller
             .Select(key => new LabelLookupKey(key.PartId, key.SectionId, key.OpNumber))
             .ToList();
 
-        var summaryLabelLookup = await LoadLabelLookupAsync(
+        var summaryLabelLookup = await _labelLookupService.LoadAsync(
                 summaryLabelKeys,
                 cancellationToken,
                 fromUtc,
@@ -671,14 +673,12 @@ public class ReportsController : Controller
             .ThenBy(x => x.OpNumber)
             .Select(builder =>
             {
-                var labels = FindLabelNumbersInRange(
+                var labels = _labelLookupService.FindLabelsInRange(
                     summaryLabelLookup,
-                    builder.PartId,
-                    builder.SectionId,
-                    builder.OpNumber,
+                    new LabelLookupKey(builder.PartId, builder.SectionId, builder.OpNumber),
                     fromUtc,
                     toUtcExclusive);
-                var labelText = labels.Count > 0 ? string.Join(", ", labels) : null;
+                var labelText = FormatLabelList(labels);
 
                 return new WipSummaryItemViewModel(
                     builder.PartName,
@@ -770,177 +770,14 @@ public class ReportsController : Controller
         return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
     }
 
-    private async Task<Dictionary<LabelLookupKey, List<ReceiptLabelInfo>>> LoadLabelLookupAsync(
-        IEnumerable<LabelLookupKey> in_keys,
-        CancellationToken in_cancellationToken,
-        DateTime? in_fromUtc,
-        DateTime? in_toUtcExclusive)
+    private static string? FormatLabelList(IReadOnlyList<string> in_labels)
     {
-        var materialized = in_keys
-            .Distinct()
-            .ToList();
-
-        var ret = new Dictionary<LabelLookupKey, List<ReceiptLabelInfo>>();
-        if (materialized.Count == 0)
-        {
-            return ret;
-        }
-
-        var partIds = materialized
-            .Select(x => x.PartId)
-            .Distinct()
-            .ToList();
-
-        var sectionIds = materialized
-            .Select(x => x.SectionId)
-            .Distinct()
-            .ToList();
-
-        var opNumbers = materialized
-            .Select(x => x.OpNumber)
-            .Distinct()
-            .ToList();
-
-        var query = _dbContext.WipReceipts
-            .AsNoTracking()
-            .Where(x =>
-                x.WipLabelId != null &&
-                partIds.Contains(x.PartId) &&
-                sectionIds.Contains(x.SectionId) &&
-                opNumbers.Contains(x.OpNumber));
-
-        if (in_fromUtc.HasValue)
-        {
-            var from = EnsureUtc(in_fromUtc.Value);
-            query = query.Where(x => x.ReceiptDate >= from);
-        }
-
-        if (in_toUtcExclusive.HasValue)
-        {
-            var to = EnsureUtc(in_toUtcExclusive.Value);
-            query = query.Where(x => x.ReceiptDate < to);
-        }
-
-        var receipts = await query
-            .Select(x => new
-            {
-                x.PartId,
-                x.SectionId,
-                x.OpNumber,
-                x.ReceiptDate,
-                LabelNumber = x.WipLabel != null ? x.WipLabel.Number : null,
-            })
-            .ToListAsync(in_cancellationToken)
-            .ConfigureAwait(false);
-
-        foreach (var receipt in receipts)
-        {
-            if (string.IsNullOrWhiteSpace(receipt.LabelNumber))
-            {
-                continue;
-            }
-
-            var key = new LabelLookupKey(receipt.PartId, receipt.SectionId, receipt.OpNumber);
-            if (!ret.TryGetValue(key, out var list))
-            {
-                list = new List<ReceiptLabelInfo>();
-                ret[key] = list;
-            }
-
-            var normalizedNumber = receipt.LabelNumber!.Trim();
-            var receiptDateUtc = EnsureUtc(receipt.ReceiptDate);
-            list.Add(new ReceiptLabelInfo(receiptDateUtc, normalizedNumber));
-        }
-
-        foreach (var pair in ret)
-        {
-            pair.Value.Sort((left, right) => right.DateUtc.CompareTo(left.DateUtc));
-        }
-
-        return ret;
-    }
-
-    private static string? FindLatestLabelNumber(
-        IReadOnlyDictionary<LabelLookupKey, List<ReceiptLabelInfo>> in_lookup,
-        Guid in_partId,
-        Guid in_sectionId,
-        int in_opNumber,
-        DateTime in_eventDate)
-    {
-        var key = new LabelLookupKey(in_partId, in_sectionId, in_opNumber);
-        if (!in_lookup.TryGetValue(key, out var labels) || labels.Count == 0)
+        if (in_labels is null || in_labels.Count == 0)
         {
             return null;
         }
 
-        var eventDateUtc = EnsureUtc(in_eventDate);
-        foreach (var label in labels)
-        {
-            if (label.DateUtc <= eventDateUtc)
-            {
-                return label.Number;
-            }
-        }
-
-        return null;
-    }
-
-    private static IReadOnlyList<string> FindLabelNumbersAtDate(
-        IReadOnlyDictionary<LabelLookupKey, List<ReceiptLabelInfo>> in_lookup,
-        Guid in_partId,
-        Guid in_sectionId,
-        int in_opNumber,
-        DateTime in_date)
-    {
-        var key = new LabelLookupKey(in_partId, in_sectionId, in_opNumber);
-        if (!in_lookup.TryGetValue(key, out var labels) || labels.Count == 0)
-        {
-            return Array.Empty<string>();
-        }
-
-        var targetDateUtc = EnsureUtc(in_date);
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var ret = new List<string>();
-
-        foreach (var label in labels)
-        {
-            if (label.DateUtc == targetDateUtc && seen.Add(label.Number))
-            {
-                ret.Add(label.Number);
-            }
-        }
-
-        return ret;
-    }
-
-    private static IReadOnlyList<string> FindLabelNumbersInRange(
-        IReadOnlyDictionary<LabelLookupKey, List<ReceiptLabelInfo>> in_lookup,
-        Guid in_partId,
-        Guid in_sectionId,
-        int in_opNumber,
-        DateTime in_fromUtc,
-        DateTime in_toUtcExclusive)
-    {
-        var key = new LabelLookupKey(in_partId, in_sectionId, in_opNumber);
-        if (!in_lookup.TryGetValue(key, out var labels) || labels.Count == 0)
-        {
-            return Array.Empty<string>();
-        }
-
-        var fromUtc = EnsureUtc(in_fromUtc);
-        var toUtc = EnsureUtc(in_toUtcExclusive);
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var ret = new List<string>();
-
-        foreach (var label in labels)
-        {
-            if (label.DateUtc >= fromUtc && label.DateUtc < toUtc && seen.Add(label.Number))
-            {
-                ret.Add(label.Number);
-            }
-        }
-
-        return ret;
+        return string.Join(", ", in_labels);
     }
 
     private static DateTime EnsureUtc(DateTime in_value)
@@ -953,7 +790,7 @@ public class ReportsController : Controller
         };
     }
 
-    private static string BuildTransferCellText(WipTransfer in_transfer, string? in_labelNumber)
+    private static string BuildTransferCellText(WipTransfer in_transfer, IReadOnlyList<string> in_labelNumbers)
     {
         var fromQuantity = in_transfer.Operations
             .Where(x => x.QuantityChange < 0m)
@@ -983,9 +820,10 @@ public class ReportsController : Controller
             OperationNumber.Format(in_transfer.ToOpNumber),
             toText);
 
-        if (!string.IsNullOrWhiteSpace(in_labelNumber))
+        if (in_labelNumbers is not null && in_labelNumbers.Count > 0)
         {
-            ret = string.Concat(ret, Environment.NewLine, "Ярлык: ", in_labelNumber);
+            var prefix = in_labelNumbers.Count == 1 ? "Ярлык" : "Ярлыки";
+            ret = string.Concat(ret, Environment.NewLine, prefix, ": ", string.Join(", ", in_labelNumbers));
         }
 
         return ret;
@@ -1054,10 +892,6 @@ public class ReportsController : Controller
     }
 
     private sealed record TransferPeriodCell(Guid PartId, string PartName, string? PartCode, DateTime Date, string Text);
-
-    private readonly record struct LabelLookupKey(Guid PartId, Guid SectionId, int OpNumber);
-
-    private sealed record ReceiptLabelInfo(DateTime DateUtc, string Number);
 
     private static string GetScrapTypeDisplayName(ScrapType scrapType)
         => scrapType switch

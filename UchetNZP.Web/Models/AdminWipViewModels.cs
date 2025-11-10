@@ -37,6 +37,8 @@ public class AdminWipBalanceRowViewModel
     public string OpNumber { get; init; } = string.Empty;
 
     public decimal Quantity { get; init; }
+
+    public IReadOnlyList<string> LabelNumbers { get; init; } = Array.Empty<string>();
 }
 
 public class AdminWipAdjustmentInputModel

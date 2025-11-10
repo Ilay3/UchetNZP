@@ -7,6 +7,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Admin;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
 using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
@@ -16,11 +17,13 @@ public class AdminWipController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly IAdminWipService _adminWipService;
+    private readonly IWipLabelLookupService _labelLookupService;
 
-    public AdminWipController(AppDbContext dbContext, IAdminWipService adminWipService)
+    public AdminWipController(AppDbContext dbContext, IAdminWipService adminWipService, IWipLabelLookupService labelLookupService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _adminWipService = adminWipService ?? throw new ArgumentNullException(nameof(adminWipService));
+        _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
     [HttpGet("")]
@@ -154,22 +157,55 @@ public class AdminWipController : Controller
             balancesQuery = balancesQuery.Where(x => x.OpNumber == parsedOpNumber.Value);
         }
 
-        var balances = await balancesQuery
+        var rawBalances = await balancesQuery
             .OrderBy(x => x.Section!.Name)
             .ThenBy(x => x.Part!.Name)
             .ThenBy(x => x.OpNumber)
-            .Select(x => new AdminWipBalanceRowViewModel
+            .Select(x => new
             {
-                BalanceId = x.Id,
-                PartId = x.PartId,
-                SectionId = x.SectionId,
-                PartDisplay = NameWithCodeFormatter.getNameWithCode(x.Part!.Name, x.Part.Code),
-                SectionDisplay = NameWithCodeFormatter.getNameWithCode(x.Section!.Name, x.Section.Code),
-                OpNumber = OperationNumber.Format(x.OpNumber),
-                Quantity = x.Quantity,
+                x.Id,
+                x.PartId,
+                x.SectionId,
+                x.OpNumber,
+                x.Quantity,
+                PartName = x.Part!.Name,
+                PartCode = x.Part.Code,
+                SectionName = x.Section!.Name,
+                SectionCode = x.Section.Code,
             })
             .ToListAsync()
             .ConfigureAwait(false);
+
+        var labelKeys = rawBalances
+            .Select(x => new LabelLookupKey(x.PartId, x.SectionId, x.OpNumber))
+            .ToList();
+
+        var labelLookup = await _labelLookupService
+            .LoadAsync(labelKeys, CancellationToken.None, null, DateTime.UtcNow.AddDays(1))
+            .ConfigureAwait(false);
+
+        var balances = rawBalances
+            .Select(x =>
+            {
+                var partDisplay = NameWithCodeFormatter.getNameWithCode(x.PartName, x.PartCode);
+                var sectionDisplay = NameWithCodeFormatter.getNameWithCode(x.SectionName, x.SectionCode);
+                var labels = _labelLookupService.GetAllLabels(
+                    labelLookup,
+                    new LabelLookupKey(x.PartId, x.SectionId, x.OpNumber));
+
+                return new AdminWipBalanceRowViewModel
+                {
+                    BalanceId = x.Id,
+                    PartId = x.PartId,
+                    SectionId = x.SectionId,
+                    PartDisplay = partDisplay,
+                    SectionDisplay = sectionDisplay,
+                    OpNumber = OperationNumber.Format(x.OpNumber),
+                    Quantity = x.Quantity,
+                    LabelNumbers = labels,
+                };
+            })
+            .ToList();
 
         return new AdminWipIndexViewModel
         {
