@@ -168,6 +168,7 @@ public class ReportsController : Controller
             .AsNoTracking()
             .Where(x => x.TransferDate >= fromUtc && x.TransferDate < toUtcExclusive)
             .Include(x => x.Part)
+            .Include(x => x.WipLabel)
             .Include(x => x.Operations)
                 .ThenInclude(x => x.Section);
 
@@ -820,10 +821,31 @@ public class ReportsController : Controller
             OperationNumber.Format(in_transfer.ToOpNumber),
             toText);
 
-        if (in_labelNumbers is not null && in_labelNumbers.Count > 0)
+        var actualLabelNumbers = new List<string>();
+
+        if (in_transfer.WipLabel is not null && !string.IsNullOrWhiteSpace(in_transfer.WipLabel.Number))
         {
-            var prefix = in_labelNumbers.Count == 1 ? "Ярлык" : "Ярлыки";
-            ret = string.Concat(ret, Environment.NewLine, prefix, ": ", string.Join(", ", in_labelNumbers));
+            var labelText = in_transfer.WipLabel.Number;
+            if (!string.IsNullOrWhiteSpace(in_transfer.Comment))
+            {
+                labelText = string.Concat(labelText, " (", in_transfer.Comment, ")");
+            }
+
+            actualLabelNumbers.Add(labelText);
+        }
+        else if (in_labelNumbers is not null && in_labelNumbers.Count > 0)
+        {
+            actualLabelNumbers.AddRange(in_labelNumbers);
+        }
+
+        if (actualLabelNumbers.Count > 0)
+        {
+            var prefix = actualLabelNumbers.Count == 1 ? "Ярлык" : "Ярлыки";
+            ret = string.Concat(ret, Environment.NewLine, prefix, ": ", string.Join(", ", actualLabelNumbers));
+        }
+        else if (!string.IsNullOrWhiteSpace(in_transfer.Comment))
+        {
+            ret = string.Concat(ret, Environment.NewLine, "Комментарий: ", in_transfer.Comment);
         }
 
         return ret;
