@@ -401,8 +401,13 @@ public class TransferService : ITransferService
 
             if (label is null)
             {
-                throw new InvalidOperationException("Свободный ярлык для выбранной операции не найден или имеет недостаточный остаток.");
+                return null;
             }
+        }
+
+        if (label is null)
+        {
+            return null;
         }
 
         if (label.PartId != item.PartId)

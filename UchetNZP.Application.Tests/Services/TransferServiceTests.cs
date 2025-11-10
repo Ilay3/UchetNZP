@@ -77,6 +77,9 @@ public class TransferServiceTests
         Assert.Equal(55m, updatedToBalance.Quantity);
 
         Assert.Empty(dbContext.WipScraps);
+
+        var storedTransfer = await dbContext.WipTransfers.SingleAsync();
+        Assert.Null(storedTransfer.WipLabelId);
     }
 
     [Fact]
