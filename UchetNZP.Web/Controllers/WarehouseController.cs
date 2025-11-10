@@ -178,9 +178,12 @@ public class WarehouseController : Controller
                             .Select(x => x.UpdatedAt!.Value)
                             .ToList();
 
-                        var lastUpdated = updates.Count > 0
-                            ? updates.Max()
-                            : null;
+                        DateTime? lastUpdated = null;
+
+                        if (updates.Count > 0)
+                        {
+                            lastUpdated = updates.Max();
+                        }
 
                         return new WarehouseLabelGroupViewModel
                         {
