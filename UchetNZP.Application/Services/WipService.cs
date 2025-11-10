@@ -39,12 +39,14 @@ public class WipService : IWipService
         {
             var results = new List<ReceiptItemSummaryDto>(materialized.Count);
             var reservedLabelIds = new HashSet<Guid>();
+            var balancesCache = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber), WipBalance>();
 
             foreach (var item in materialized)
             {
                 var now = DateTime.UtcNow;
                 var userId = _currentUserService.UserId;
                 var receiptDate = NormalizeToUtc(item.ReceiptDate);
+                var balanceKey = (item.PartId, item.SectionId, item.OpNumber);
 
                 if (item.Quantity <= 0)
                 {
@@ -66,11 +68,19 @@ public class WipService : IWipService
                     throw new InvalidOperationException($"Операция {item.OpNumber} для детали {item.PartId} относится к виду работ {route.SectionId}, а не к {item.SectionId}.");
                 }
 
-                var balance = await _dbContext.WipBalances
-                    .FirstOrDefaultAsync(
-                        x => x.PartId == item.PartId && x.OpNumber == item.OpNumber && x.SectionId == item.SectionId,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                if (!balancesCache.TryGetValue(balanceKey, out var balance))
+                {
+                    balance = await _dbContext.WipBalances
+                        .FirstOrDefaultAsync(
+                            x => x.PartId == item.PartId && x.OpNumber == item.OpNumber && x.SectionId == item.SectionId,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (balance is not null)
+                    {
+                        balancesCache[balanceKey] = balance;
+                    }
+                }
 
                 if (balance is null)
                 {
@@ -84,6 +94,7 @@ public class WipService : IWipService
                     };
 
                     await _dbContext.WipBalances.AddAsync(balance, cancellationToken).ConfigureAwait(false);
+                    balancesCache[balanceKey] = balance;
                 }
 
                 var was = balance.Quantity;
