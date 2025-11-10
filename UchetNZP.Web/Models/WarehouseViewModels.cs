@@ -11,6 +11,8 @@ public class WarehouseIndexViewModel
 
     public IReadOnlyCollection<WarehouseItemRowViewModel> Items { get; init; } = Array.Empty<WarehouseItemRowViewModel>();
 
+    public IReadOnlyCollection<WarehousePartGroupViewModel> PartGroups { get; init; } = Array.Empty<WarehousePartGroupViewModel>();
+
     public decimal TotalQuantity { get; init; }
 
     public string? StatusMessage { get; init; }
@@ -37,6 +39,32 @@ public class WarehouseItemRowViewModel
     public string? Comment { get; init; }
 
     public IReadOnlyCollection<WarehouseLabelRowViewModel> LabelRows { get; init; } = Array.Empty<WarehouseLabelRowViewModel>();
+}
+
+public class WarehousePartGroupViewModel
+{
+    public Guid PartId { get; init; }
+
+    public string PartDisplay { get; init; } = string.Empty;
+
+    public decimal TotalQuantity { get; init; }
+
+    public IReadOnlyCollection<WarehouseLabelGroupViewModel> LabelGroups { get; init; } = Array.Empty<WarehouseLabelGroupViewModel>();
+
+    public IReadOnlyCollection<WarehouseItemRowViewModel> Items { get; init; } = Array.Empty<WarehouseItemRowViewModel>();
+}
+
+public class WarehouseLabelGroupViewModel
+{
+    public Guid LabelId { get; init; }
+
+    public string LabelNumber { get; init; } = string.Empty;
+
+    public decimal TotalQuantity { get; init; }
+
+    public DateTime FirstAddedAt { get; init; }
+
+    public DateTime? LastUpdatedAt { get; init; }
 }
 
 public class WarehouseLabelRowViewModel
