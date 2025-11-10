@@ -221,9 +221,11 @@ public class TransferService : ITransferService
 
                 await _dbContext.WipTransferOperations.AddRangeAsync(new[] { fromOperation, toOperation }, cancellationToken).ConfigureAwait(false);
 
+                WarehouseItem? warehouseItem = null;
+
                 if (isWarehouseTransfer)
                 {
-                    var warehouseItem = new WarehouseItem
+                    warehouseItem = new WarehouseItem
                     {
                         Id = Guid.NewGuid(),
                         PartId = item.PartId,
@@ -295,6 +297,23 @@ public class TransferService : ITransferService
                     labelQuantityBefore = labelUsage.RemainingBefore;
                     labelQuantityAfter = labelUsage.RemainingAfter;
                     transfer.WipLabelId = transferLabelId;
+
+                    if (isWarehouseTransfer && warehouseItem is not null)
+                    {
+                        var warehouseLabelItem = new WarehouseLabelItem
+                        {
+                            Id = Guid.NewGuid(),
+                            WarehouseItemId = warehouseItem.Id,
+                            WipLabelId = labelUsage.Label.Id,
+                            Quantity = item.Quantity,
+                            AddedAt = transferDate,
+                            UpdatedAt = now,
+                        };
+
+                        await _dbContext.WarehouseLabelItems
+                            .AddAsync(warehouseLabelItem, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
                 }
 
                 results.Add(new TransferItemSummaryDto(
