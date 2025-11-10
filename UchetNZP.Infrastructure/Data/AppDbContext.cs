@@ -36,6 +36,8 @@ public class AppDbContext : DbContext
 
     public DbSet<WarehouseItem> WarehouseItems => Set<WarehouseItem>();
 
+    public DbSet<WarehouseLabelItem> WarehouseLabelItems => Set<WarehouseLabelItem>();
+
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
     public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();

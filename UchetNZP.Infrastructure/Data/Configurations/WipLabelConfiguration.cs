@@ -42,5 +42,10 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
             .WithOne(x => x.WipLabel)
             .HasForeignKey(x => x.WipLabelId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasMany(x => x.WarehouseLabelItems)
+            .WithOne(x => x.WipLabel)
+            .HasForeignKey(x => x.WipLabelId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

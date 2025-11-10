@@ -115,6 +115,8 @@ public class WarehouseController : Controller
         var query = _dbContext.WarehouseItems
             .AsNoTracking()
             .Include(x => x.Part)
+            .Include(x => x.WarehouseLabelItems)
+            .ThenInclude(x => x.WipLabel)
             .AsQueryable();
 
         if (partId.HasValue)
@@ -135,6 +137,17 @@ public class WarehouseController : Controller
                 CreatedAt = x.CreatedAt,
                 UpdatedAt = x.UpdatedAt,
                 Comment = x.Comment,
+                LabelRows = x.WarehouseLabelItems
+                    .OrderByDescending(labelItem => labelItem.AddedAt)
+                    .Select(labelItem => new WarehouseLabelRowViewModel
+                    {
+                        LabelId = labelItem.WipLabelId,
+                        LabelNumber = labelItem.WipLabel != null ? labelItem.WipLabel.Number : string.Empty,
+                        Quantity = labelItem.Quantity,
+                        AddedAt = labelItem.AddedAt,
+                        UpdatedAt = labelItem.UpdatedAt,
+                    })
+                    .ToArray(),
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);

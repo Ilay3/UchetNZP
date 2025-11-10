@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace UchetNZP.Domain.Entities;
 
 public class WarehouseItem
@@ -21,4 +23,6 @@ public class WarehouseItem
     public virtual Part? Part { get; set; }
 
     public virtual WipTransfer? Transfer { get; set; }
+
+    public virtual ICollection<WarehouseLabelItem> WarehouseLabelItems { get; set; } = new List<WarehouseLabelItem>();
 }

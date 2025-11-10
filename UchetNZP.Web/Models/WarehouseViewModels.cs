@@ -35,6 +35,21 @@ public class WarehouseItemRowViewModel
     public DateTime? UpdatedAt { get; init; }
 
     public string? Comment { get; init; }
+
+    public IReadOnlyCollection<WarehouseLabelRowViewModel> LabelRows { get; init; } = Array.Empty<WarehouseLabelRowViewModel>();
+}
+
+public class WarehouseLabelRowViewModel
+{
+    public Guid LabelId { get; init; }
+
+    public string LabelNumber { get; init; } = string.Empty;
+
+    public decimal Quantity { get; init; }
+
+    public DateTime AddedAt { get; init; }
+
+    public DateTime? UpdatedAt { get; init; }
 }
 
 public class WarehouseItemEditModel
