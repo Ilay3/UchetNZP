@@ -51,6 +51,7 @@
     const labelSearchInput = document.getElementById("receiptLabelSearchInput");
     const labelSelect = document.getElementById("receiptLabelSelect");
     const labelHiddenInput = document.getElementById("receiptLabelId");
+    const labelMessage = document.getElementById("receiptLabelMessage");
     const addButton = document.getElementById("receiptAddButton");
     const saveButton = document.getElementById("receiptSaveButton");
     const resetButton = document.getElementById("receiptResetButton");
@@ -169,6 +170,10 @@
             return false;
         }
 
+        if (!selectedLabel && !isLoadingLabels && loadedLabelsPartId === part.id && labels.length === 0) {
+            return false;
+        }
+
         if (selectedLabel) {
             const labelQuantity = Number(selectedLabel.quantity);
             if (!Number.isFinite(labelQuantity) || Math.abs(labelQuantity - quantity) > 0.000001) {
@@ -180,9 +185,84 @@
     }
 
     function updateFormState() {
-        addButton.disabled = !canAddToCart();
+        const canAdd = canAddToCart();
+        addButton.disabled = !canAdd;
         saveButton.disabled = cart.length === 0;
         updateLabelControlsState();
+        updateLabelAvailabilityMessage();
+    }
+
+    function showLabelMessage(text, type = "warning")
+    {
+        if (!labelMessage)
+        {
+            return;
+        }
+
+        labelMessage.textContent = text;
+        labelMessage.classList.remove("d-none");
+        labelMessage.classList.remove("alert-warning", "alert-info", "alert-danger");
+
+        let alertClass = "alert-warning";
+        if (type === "info")
+        {
+            alertClass = "alert-info";
+        }
+        else if (type === "danger")
+        {
+            alertClass = "alert-danger";
+        }
+
+        labelMessage.classList.add(alertClass);
+    }
+
+    function hideLabelMessage()
+    {
+        if (!labelMessage)
+        {
+            return;
+        }
+
+        labelMessage.textContent = "";
+        labelMessage.classList.add("d-none");
+        labelMessage.classList.remove("alert-warning", "alert-info", "alert-danger");
+    }
+
+    function updateLabelAvailabilityMessage()
+    {
+        if (!labelMessage)
+        {
+            return;
+        }
+
+        const part = partLookup.getSelected();
+        if (!part || !part.id)
+        {
+            hideLabelMessage();
+            return;
+        }
+
+        if (isLoadingLabels || loadedLabelsPartId !== part.id)
+        {
+            hideLabelMessage();
+            return;
+        }
+
+        if (!selectedLabel && labels.length === 0)
+        {
+            const quantity = Number(quantityInput.value);
+            let messageText = "Для выбранной детали нет свободных ярлыков. Создайте ярлык и выберите его перед сохранением.";
+
+            if (Number.isFinite(quantity) && quantity > 0)
+            {
+                messageText = `Для выбранной детали нет свободных ярлыков на ${quantity.toLocaleString("ru-RU")} шт. Создайте новый ярлык или выберите другой, чтобы продолжить.`;
+            }
+
+            showLabelMessage(messageText, "warning");
+            return;
+        }
+
+        hideLabelMessage();
     }
 
     async function loadOperations(partId) {
@@ -564,6 +644,7 @@
 
         renderLabelOptions();
         updateLabelControlsState();
+        hideLabelMessage();
     }
 
     function removeLabelFromList(labelId) {
@@ -662,6 +743,7 @@
                 isLoadingLabels = false;
                 labelsAbortController = null;
                 updateLabelControlsState();
+                updateLabelAvailabilityMessage();
             }
         }
     }

@@ -171,7 +171,7 @@ public class WipService : IWipService
 
             if (ret is null)
             {
-                throw new InvalidOperationException($"Свободный ярлык для детали {in_item.PartId} с количеством {in_item.Quantity} не найден.");
+                throw new InvalidOperationException("Свободный ярлык с подходящим количеством не найден. Создайте новый ярлык или выберите существующий перед сохранением прихода.");
             }
         }
 
