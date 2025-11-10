@@ -85,6 +85,28 @@
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
 
+    function getManualLabelNumber()
+    {
+        if (!labelSearchInput)
+        {
+            return "";
+        }
+
+        const rawValue = typeof labelSearchInput.value === "string" ? labelSearchInput.value.trim() : "";
+
+        if (!rawValue)
+        {
+            return "";
+        }
+
+        if (!/^[0-9]{1,5}$/.test(rawValue))
+        {
+            return "";
+        }
+
+        return rawValue;
+    }
+
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
         if (!part || !part.id) {
@@ -170,13 +192,15 @@
             return false;
         }
 
-        if (!selectedLabel && !isLoadingLabels && loadedLabelsPartId === part.id && labels.length === 0) {
-            return false;
-        }
-
         if (selectedLabel) {
             const labelQuantity = Number(selectedLabel.quantity);
             if (!Number.isFinite(labelQuantity) || Math.abs(labelQuantity - quantity) > 0.000001) {
+                return false;
+            }
+        }
+        else {
+            const manualLabelNumber = getManualLabelNumber();
+            if (!manualLabelNumber) {
                 return false;
             }
         }
@@ -248,14 +272,25 @@
             return;
         }
 
-        if (!selectedLabel && labels.length === 0)
+        const manualLabelNumber = getManualLabelNumber();
+        const rawInput = labelSearchInput && typeof labelSearchInput.value === "string"
+            ? labelSearchInput.value.trim()
+            : "";
+
+        if (rawInput && !manualLabelNumber && !/^[0-9]{1,5}$/.test(rawInput))
+        {
+            showLabelMessage("Номер ярлыка должен состоять из 1–5 цифр.", "danger");
+            return;
+        }
+
+        if (!selectedLabel && !manualLabelNumber && labels.length === 0)
         {
             const quantity = Number(quantityInput.value);
-            let messageText = "Для выбранной детали нет свободных ярлыков. Создайте ярлык и выберите его перед сохранением.";
+            let messageText = "Для выбранной детали нет свободных ярлыков. Введите номер ярлыка, чтобы создать его автоматически.";
 
             if (Number.isFinite(quantity) && quantity > 0)
             {
-                messageText = `Для выбранной детали нет свободных ярлыков на ${quantity.toLocaleString("ru-RU")} шт. Создайте новый ярлык или выберите другой, чтобы продолжить.`;
+                messageText = `Для выбранной детали нет свободных ярлыков на ${quantity.toLocaleString("ru-RU")} шт. Введите номер ярлыка, чтобы создать его автоматически.`;
             }
 
             showLabelMessage(messageText, "warning");
@@ -911,6 +946,11 @@
         dateInput.value = item.date;
 
         await loadLabels(item.partId, { ensureLabel: labelOption });
+        if (!labelOption && labelSearchInput)
+        {
+            labelSearchInput.value = typeof item.labelNumber === "string" ? item.labelNumber : "";
+            filterLabels(labelSearchInput.value);
+        }
         await loadOperations(item.partId);
         selectedOperation = operations.find(op => op.opNumber === item.opNumber) ?? null;
         renderOperations();
@@ -933,6 +973,10 @@
         dateInput.value = new Date().toISOString().slice(0, 10);
         selectedOperation = null;
         setSelectedLabel(null);
+        if (labelSearchInput)
+        {
+            labelSearchInput.value = "";
+        }
         renderOperations();
         updateBalanceLabel();
         updateFormState();
@@ -984,9 +1028,10 @@
 
         const partDisplay = formatNameWithCode(part.name, part.code);
         const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
+        const manualLabelNumber = getManualLabelNumber();
         const labelId = selectedLabel ? selectedLabel.id : null;
-        const labelNumber = selectedLabel ? selectedLabel.number : null;
-        const labelIsAssigned = selectedLabel ? Boolean(selectedLabel.isAssigned) : false;
+        const labelNumber = selectedLabel ? selectedLabel.number : (manualLabelNumber || null);
+        const labelIsAssigned = selectedLabel ? Boolean(selectedLabel.isAssigned) : Boolean(manualLabelNumber);
 
         const item = {
             partId: part.id,
@@ -1012,6 +1057,10 @@
         if (labelId) {
             removeLabelFromList(labelId);
             setSelectedLabel(null);
+        }
+        else if (labelSearchInput)
+        {
+            labelSearchInput.value = "";
         }
         editingIndex = null;
         renderCart();

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -160,6 +161,13 @@ public class WipService : IWipService
 
         WipLabel? ret = null;
 
+        string? normalizedLabelNumber = null;
+
+        if (!string.IsNullOrWhiteSpace(in_item.LabelNumber))
+        {
+            normalizedLabelNumber = NormalizeLabelNumber(in_item.LabelNumber);
+        }
+
         if (in_item.WipLabelId.HasValue)
         {
             ret = await _dbContext.WipLabels
@@ -169,6 +177,28 @@ public class WipService : IWipService
             if (ret is null)
             {
                 throw new InvalidOperationException($"Ярлык с идентификатором {in_item.WipLabelId.Value} не найден.");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(normalizedLabelNumber))
+        {
+            ret = await _dbContext.WipLabels
+                .FirstOrDefaultAsync(x => x.Number == normalizedLabelNumber, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (ret is null)
+            {
+                ret = new WipLabel
+                {
+                    Id = Guid.NewGuid(),
+                    PartId = in_item.PartId,
+                    LabelDate = NormalizeLabelDate(in_item.ReceiptDate),
+                    Quantity = in_item.Quantity,
+                    RemainingQuantity = in_item.Quantity,
+                    Number = normalizedLabelNumber,
+                    IsAssigned = true,
+                };
+
+                await _dbContext.WipLabels.AddAsync(ret, cancellationToken).ConfigureAwait(false);
             }
         }
         else
@@ -206,9 +236,9 @@ public class WipService : IWipService
             throw new InvalidOperationException($"Ярлык {ret.Number} уже назначен и не может быть использован повторно.");
         }
 
-        if (!string.IsNullOrWhiteSpace(in_item.LabelNumber) && !string.Equals(in_item.LabelNumber, ret.Number, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(normalizedLabelNumber) && !string.Equals(normalizedLabelNumber, ret.Number, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException($"Переданный номер ярлыка {in_item.LabelNumber} не совпадает с фактическим номером {ret.Number}.");
+            throw new InvalidOperationException($"Переданный номер ярлыка {normalizedLabelNumber} не совпадает с фактическим номером {ret.Number}.");
         }
 
         return ret;
@@ -308,5 +338,39 @@ public class WipService : IWipService
             DateTimeKind.Local => value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
+    }
+
+    private static string NormalizeLabelNumber(string in_labelNumber)
+    {
+        if (string.IsNullOrWhiteSpace(in_labelNumber))
+        {
+            throw new InvalidOperationException("Номер ярлыка не может быть пустым.");
+        }
+
+        var trimmed = in_labelNumber.Trim();
+
+        if (trimmed.Length > 5)
+        {
+            throw new InvalidOperationException("Номер ярлыка не может содержать более 5 символов.");
+        }
+
+        if (!trimmed.All(char.IsDigit))
+        {
+            throw new InvalidOperationException("Номер ярлыка должен содержать только цифры.");
+        }
+
+        if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+        {
+            throw new InvalidOperationException("Номер ярлыка должен быть положительным числом.");
+        }
+
+        var ret = number.ToString("D5", CultureInfo.InvariantCulture);
+        return ret;
+    }
+
+    private static DateTime NormalizeLabelDate(DateTime in_date)
+    {
+        var ret = DateTime.SpecifyKind(in_date.Date, DateTimeKind.Utc);
+        return ret;
     }
 }
