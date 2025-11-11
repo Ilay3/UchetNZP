@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Models;
@@ -82,4 +84,31 @@ public class WipLabelUpdateInputModel
     public decimal Quantity { get; set; }
 
     public string Number { get; set; } = string.Empty;
+}
+
+public class WipLabelListResponseModel
+{
+    public WipLabelListResponseModel(
+        IReadOnlyCollection<WipLabelListItemViewModel>? in_items,
+        int in_page,
+        int in_totalPages,
+        int in_totalCount)
+    {
+        Items = in_items ?? Array.Empty<WipLabelListItemViewModel>();
+        Page = Math.Max(1, in_page);
+        TotalPages = Math.Max(0, in_totalPages);
+        TotalCount = Math.Max(0, in_totalCount);
+    }
+
+    [JsonPropertyName("items")]
+    public IReadOnlyCollection<WipLabelListItemViewModel> Items { get; }
+
+    [JsonPropertyName("page")]
+    public int Page { get; }
+
+    [JsonPropertyName("totalPages")]
+    public int TotalPages { get; }
+
+    [JsonPropertyName("totalCount")]
+    public int TotalCount { get; }
 }

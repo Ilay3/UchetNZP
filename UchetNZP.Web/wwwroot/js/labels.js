@@ -31,6 +31,7 @@
     const filterToInput = document.getElementById("labelsFilterTo");
     const refreshButton = document.getElementById("labelsRefreshButton");
     const tableBody = document.querySelector("#labelsTable tbody");
+    const paginationContainer = document.getElementById("labelsPagination");
     const modeRadios = document.querySelectorAll('input[name="labelMode"]');
     const manualNumberRow = document.getElementById("labelManualNumberRow");
     const manualNumberInput = document.getElementById("labelNumberInput");
@@ -57,6 +58,10 @@
     let currentMode = "auto";
     let editLabelId = "";
     let isUpdating = false;
+    const pageSize = 25;
+    let currentPage = 1;
+    let totalPages = 0;
+    let totalCount = 0;
 
     function hideMessages() {
         if (typeof namespace.hideInlineMessage === "function") {
@@ -289,6 +294,83 @@
         });
     }
 
+    function resetPagination() {
+        currentPage = 1;
+        totalPages = 0;
+        totalCount = 0;
+
+        if (paginationContainer) {
+            paginationContainer.innerHTML = "";
+            paginationContainer.classList.add("d-none");
+        }
+    }
+
+    function renderPagination() {
+        if (!paginationContainer) {
+            return;
+        }
+
+        paginationContainer.innerHTML = "";
+
+        if (totalCount <= 0) {
+            paginationContainer.classList.add("d-none");
+            return;
+        }
+
+        const normalizedTotalPages = totalPages > 0 ? totalPages : 1;
+        const normalizedPage = Math.min(Math.max(currentPage, 1), normalizedTotalPages);
+
+        paginationContainer.classList.remove("d-none");
+
+        const info = document.createElement("div");
+        info.className = "small text-muted flex-grow-1";
+        info.textContent = `Страница ${normalizedPage} из ${normalizedTotalPages} (всего ${totalCount})`;
+        paginationContainer.appendChild(info);
+
+        const controls = document.createElement("div");
+        controls.className = "btn-group btn-group-sm ms-auto";
+
+        const prevButton = document.createElement("button");
+        prevButton.type = "button";
+        prevButton.className = "btn btn-outline-secondary";
+        prevButton.textContent = "Назад";
+        prevButton.disabled = normalizedPage <= 1;
+        prevButton.addEventListener("click", () => {
+            goToPage(normalizedPage - 1);
+        });
+        controls.appendChild(prevButton);
+
+        const nextButton = document.createElement("button");
+        nextButton.type = "button";
+        nextButton.className = "btn btn-outline-secondary";
+        nextButton.textContent = "Вперёд";
+        nextButton.disabled = normalizedPage >= normalizedTotalPages;
+        nextButton.addEventListener("click", () => {
+            goToPage(normalizedPage + 1);
+        });
+        controls.appendChild(nextButton);
+
+        paginationContainer.appendChild(controls);
+    }
+
+    function goToPage(page) {
+        if (isLoading) {
+            return;
+        }
+
+        const numericPage = Number(page);
+        if (!Number.isFinite(numericPage)) {
+            return;
+        }
+
+        const normalizedPage = Math.max(1, Math.floor(numericPage));
+        if (normalizedPage === currentPage) {
+            return;
+        }
+
+        loadLabels(true, normalizedPage);
+    }
+
     function getSelectedPartId() {
         const selected = typeof partLookup.getSelected === "function" ? partLookup.getSelected() : null;
         let ret = "";
@@ -344,17 +426,28 @@
         addButton.disabled = isDisabled;
     }
 
-    async function loadLabels(showErrors) {
+    async function loadLabels(showErrors, page) {
         if (isLoading) {
             return;
         }
 
         const shouldShowErrors = showErrors !== false;
+        let targetPage = currentPage;
+        if (typeof page === "number" && Number.isFinite(page) && page > 0) {
+            targetPage = Math.floor(page);
+        }
+        else if (!Number.isFinite(targetPage) || targetPage < 1) {
+            targetPage = 1;
+        }
+
         isLoading = true;
         if (listMessage) {
             namespace.hideInlineMessage?.(listMessage);
         }
         renderLoadingState();
+        if (paginationContainer) {
+            paginationContainer.classList.add("d-none");
+        }
 
         try {
             const url = new URL("/wip/labels/list", window.location.origin);
@@ -371,6 +464,9 @@
                 url.searchParams.set("to", filterToInput.value);
             }
 
+            url.searchParams.set("page", String(targetPage));
+            url.searchParams.set("pageSize", String(pageSize));
+
             const response = await fetch(url.toString(), { headers: { "Accept": "application/json" } });
             if (!response.ok) {
                 const errorText = await response.text();
@@ -378,11 +474,36 @@
             }
 
             const data = await response.json();
-            const items = Array.isArray(data) ? data : [];
+            const items = Array.isArray(data?.items) ? data.items : [];
+            const responsePage = typeof data?.page === "number" && Number.isFinite(data.page)
+                ? data.page
+                : targetPage;
+            const responseTotalPages = typeof data?.totalPages === "number" && Number.isFinite(data.totalPages)
+                ? data.totalPages
+                : 0;
+            const responseTotalCount = typeof data?.totalCount === "number" && Number.isFinite(data.totalCount)
+                ? data.totalCount
+                : items.length;
+
+            currentPage = responsePage > 0 ? responsePage : 1;
+            totalPages = responseTotalPages > 0 ? responseTotalPages : 0;
+            totalCount = responseTotalCount >= 0 ? responseTotalCount : items.length;
+
+            if (totalPages > 0 && currentPage > totalPages) {
+                currentPage = totalPages;
+            }
+
+            if (totalCount === 0) {
+                currentPage = 1;
+                totalPages = 0;
+            }
+
             renderLabels(items);
+            renderPagination();
         }
         catch (error) {
             renderLabels([]);
+            resetPagination();
             if (shouldShowErrors) {
                 const message = error instanceof Error ? error.message : "Не удалось загрузить список ярлыков.";
                 showMessage(listMessage, message, "danger");
@@ -656,6 +777,7 @@
     if (refreshButton) {
         refreshButton.addEventListener("click", () => {
             hideMessages();
+            currentPage = 1;
             loadLabels();
         });
     }
@@ -672,6 +794,7 @@
         partLookup.inputElement.addEventListener("lookup:selected", () => {
             hideMessages();
             updateButtonState();
+            currentPage = 1;
             loadLabels();
         });
 
@@ -680,6 +803,7 @@
                 if (tableBody) {
                     renderLabels([]);
                 }
+                resetPagination();
             }
 
             updateButtonState();
