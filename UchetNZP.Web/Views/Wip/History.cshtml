@@ -51,12 +51,12 @@
     }
 }
 
-<div class="page-header glass-panel mb-4">
+<div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">История операций НЗП</h1>
     <p class="lead">Анализируйте запуски, приходы и передачи по датам с единым фильтром и подробными деталями.</p>
 </div>
 
-<div class="card glass-panel shadow-sm mb-4">
+<div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end" autocomplete="off">
             <div class="col-sm-6 col-md-3 col-lg-2">
@@ -101,7 +101,7 @@
 {
     <div class="row g-3 mb-4">
         <div class="col-md-4">
-            <div class="card glass-panel border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="text-muted text-uppercase small fw-semibold mb-1">Количество записей</div>
                     <div class="display-6">@Model.TotalEntries</div>
@@ -109,7 +109,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card glass-panel border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="text-muted text-uppercase small fw-semibold mb-1">Суммарное количество, шт</div>
                     <div class="display-6">@Model.TotalQuantity.ToString("0.###")</div>
@@ -117,7 +117,7 @@
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card glass-panel border-0 shadow-sm h-100">
+            <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="text-muted text-uppercase small fw-semibold mb-1">Выбранный период</div>
                     <div class="fs-4">@Model.Filter.From.ToString("dd.MM.yyyy") — @Model.Filter.To.ToString("dd.MM.yyyy")</div>
@@ -128,8 +128,8 @@
 
     @foreach (var group in Model.Groups)
     {
-        <div class="card glass-panel shadow-sm mb-4">
-            <div class="card-header d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                 <div>
                     <div class="h4 mb-1">@group.Date.ToString("dd.MM.yyyy")</div>
                     <div class="text-muted small">Записей: @group.EntryCount • Количество: @group.TotalQuantity.ToString("0.###") шт</div>

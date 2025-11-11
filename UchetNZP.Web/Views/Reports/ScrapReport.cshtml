@@ -3,12 +3,12 @@
     ViewData["Title"] = "Отчёт по браку";
 }
 
-<div class="page-header glass-panel mb-4">
+<div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Отчёт по браку</h1>
     <p class="lead mb-0">Фиксация случаев брака с фильтрами по датам, видам работ и типам.</p>
 </div>
 
-<div class="card glass-panel shadow-sm mb-4">
+<div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-3" autocomplete="off">
             <div class="col-md-3">
@@ -71,13 +71,13 @@
 
 @if (Model.HasData)
 {
-    <div class="card glass-panel shadow-sm mb-4">
-        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
             <span>Найдено записей: @Model.Items.Count</span>
             <span>Суммарное количество: @Model.TotalQuantity.ToString("0.###")</span>
         </div>
         <div class="card-body">
-            <div class="table-responsive glass-table">
+            <div class="table-responsive">
                 <table class="table table-striped align-middle" aria-describedby="scrapReportCaption">
                     <caption id="scrapReportCaption" class="visually-hidden">Результаты отчёта по браку</caption>
                     <thead class="table-light">

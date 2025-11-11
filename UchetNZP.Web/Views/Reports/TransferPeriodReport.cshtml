@@ -4,12 +4,12 @@
     ViewData["Title"] = "Отчёт по передаче НЗП за период";
 }
 
-<div class="page-header glass-panel mb-4">
+<div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Отчёт по передаче НЗП за период</h1>
     <p class="lead mb-0">Просматривайте движения НЗП по дням и деталям, чтобы контролировать передачи между операциями.</p>
 </div>
 
-<div class="card glass-panel shadow-sm mb-4">
+<div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-3" autocomplete="off">
             <div class="col-md-3">
@@ -40,8 +40,8 @@
 
 @if (Model.HasData)
 {
-    <div class="card glass-panel shadow-sm mb-4">
-        <div class="card-header fw-semibold">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light fw-semibold">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
                 <div class="d-flex flex-wrap gap-4">
                     <span>Деталей в отчёте: @Model.Items.Count</span>
@@ -51,7 +51,7 @@
             </div>
         </div>
         <div class="card-body">
-            <div class="table-responsive glass-table">
+            <div class="table-responsive">
                 <table class="table table-bordered align-middle" aria-describedby="transferPeriodReportCaption">
                     <caption id="transferPeriodReportCaption" class="visually-hidden">Результаты отчёта по передачам НЗП</caption>
                     <thead class="table-light">

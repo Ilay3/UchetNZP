@@ -4,7 +4,7 @@
     ViewData["Title"] = "Склад НЗП";
 }
 
-<div class="page-header glass-panel mb-4">
+<div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Склад НЗП</h1>
     <p class="lead mb-0">Просматривайте остатки деталей на складе и при необходимости корректируйте запись.</p>
 </div>
@@ -25,8 +25,8 @@
     </div>
 }
 
-<div class="card glass-panel shadow-sm mb-4">
-    <div class="card-header fw-semibold">Фильтр</div>
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Фильтр</div>
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end">
             <div class="col-lg-6">
@@ -44,8 +44,8 @@
     </div>
 </div>
 
-<div class="card glass-panel shadow-sm">
-    <div class="card-header fw-semibold">Записи склада</div>
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Записи склада</div>
     <div class="card-body">
         @if (Model.PartGroups.Count == 0)
         {
@@ -90,7 +90,7 @@
                                     }
                                     else
                                     {
-                                        <div class="table-responsive glass-table">
+                                        <div class="table-responsive">
                                             <table class="table table-sm align-middle mb-0">
                                                 <thead>
                                                     <tr>

@@ -15,12 +15,12 @@
         : Model.NormHours.ToString("0.###", CultureInfo.InvariantCulture);
 }
 
-<div class="page-header glass-panel mb-4">
+<div class="page-header mb-4">
     <h1 class="display-6 fw-semibold">@Model.Title</h1>
     <p class="text-muted mb-0">Укажите ключевые параметры маршрута и сохраните изменения.</p>
 </div>
 
-<div class="card glass-panel shadow-sm mb-4">
+<div class="card shadow-sm mb-4">
     <div class="card-body">
         <form asp-action="@formAction" asp-controller="Routes" asp-route-id="@Model.Id" method="post" class="row g-4" autocomplete="off">
             @Html.AntiForgeryToken()
