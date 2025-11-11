@@ -5,7 +5,7 @@
     ViewData["Title"] = "Администрирование остатков НЗП";
 }
 
-<div class="page-header mb-4">
+<div class="page-header glass-panel mb-4">
     <h1 class="display-5 fw-semibold">Администрирование остатков НЗП</h1>
     <p class="lead mb-0">Отфильтруйте список и скорректируйте количество по нужным операциям.</p>
 </div>
@@ -26,8 +26,8 @@
     </div>
 }
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Фильтры</div>
+<div class="card glass-panel shadow-sm mb-4">
+    <div class="card-header fw-semibold">Фильтры</div>
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end">
             <div class="col-lg-4">
@@ -50,8 +50,8 @@
     </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+<div class="card glass-panel shadow-sm">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
         <span>Остатки НЗП</span>
         <span class="small text-muted">Всего записей: @Model.Balances.Count</span>
     </div>
@@ -62,7 +62,7 @@
         }
         else
         {
-            <div class="table-responsive">
+            <div class="table-responsive glass-table">
                 <table class="table table-striped align-middle" aria-describedby="adminWipTableCaption">
                     <caption id="adminWipTableCaption" class="visually-hidden">Текущие остатки НЗП по фильтру</caption>
                     <thead class="table-light">

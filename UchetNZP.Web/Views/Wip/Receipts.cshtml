@@ -2,13 +2,13 @@
     ViewData["Title"] = "Приход НЗП";
 }
 
-<div class="page-header mb-4">
+<div class="page-header glass-panel mb-4">
     <h1 class="display-5 fw-semibold">Приход НЗП</h1>
     <p class="lead">Заполните поля ниже, чтобы добавить приход НЗП и сохранить его одной партией.</p>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Шаг 1. Параметры прихода</div>
+<div class="card glass-panel shadow-sm mb-4">
+    <div class="card-header fw-semibold">Шаг 1. Параметры прихода</div>
     <div class="card-body">
         <form id="receiptForm" class="row g-4" autocomplete="off">
             <div class="col-lg-4">
@@ -61,13 +61,13 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+<div class="card glass-panel shadow-sm mb-4">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
         <span>Шаг 2. Выберите операцию детали</span>
         <div class="small text-muted">Выберите одну операцию из списка ниже.</div>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="table-responsive glass-table">
             <table class="table table-hover align-middle" id="receiptOperationsTable" aria-describedby="receiptOperationsCaption">
                 <caption id="receiptOperationsCaption" class="visually-hidden">Список операций выбранной детали</caption>
                 <thead class="table-light">
@@ -97,15 +97,15 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-5">
-    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+<div class="card glass-panel shadow-sm mb-5">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
         <span>Корзина приходов</span>
         <button type="button" class="btn btn-success btn-lg" id="receiptSaveButton">
             Сохранить все приходы (Ctrl+S)
         </button>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="table-responsive glass-table">
             <table class="table table-striped align-middle" id="receiptCartTable" aria-describedby="receiptCartCaption">
                 <caption id="receiptCartCaption" class="visually-hidden">Приходы, подготовленные к сохранению</caption>
                 <thead class="table-light">
@@ -132,13 +132,13 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-5">
-    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+<div class="card glass-panel shadow-sm mb-5">
+    <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
         <span>Последние сохранённые приходы</span>
         <div class="small text-muted">Вы можете отменить сохранённые записи при необходимости.</div>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="table-responsive glass-table">
             <table class="table table-bordered align-middle" id="receiptHistoryTable" aria-describedby="receiptHistoryCaption">
                 <caption id="receiptHistoryCaption" class="visually-hidden">Список последних сохранённых приходов</caption>
                 <thead class="table-light">
@@ -172,7 +172,7 @@
             </div>
             <div class="modal-body">
                 <p class="mb-3" id="receiptSummaryIntro"></p>
-                <div class="table-responsive">
+                <div class="table-responsive glass-table">
                     <table class="table table-bordered align-middle" id="receiptSummaryTable">
                         <thead class="table-light">
                             <tr>

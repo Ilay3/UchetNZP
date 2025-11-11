@@ -2,13 +2,13 @@
     ViewData["Title"] = "Передача НЗП";
 }
 
-<div class="page-header mb-4">
+<div class="page-header glass-panel mb-4">
     <h1 class="display-5 fw-semibold">Передача НЗП</h1>
     <p class="lead">Выберите деталь, укажите операции и количество, чтобы передать НЗП между видами работ.</p>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Шаг 1. Заполните данные передачи</div>
+<div class="card glass-panel shadow-sm mb-4">
+    <div class="card-header fw-semibold">Шаг 1. Заполните данные передачи</div>
     <div class="card-body">
         <form id="transferForm" class="row g-4" autocomplete="off">
             <div class="col-12 col-xl-4">
@@ -78,13 +78,13 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-5">
-    <div class="card-header bg-light fw-semibold d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
+<div class="card glass-panel shadow-sm mb-5">
+    <div class="card-header fw-semibold d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
         <span class="fs-4">Корзина передач</span>
         <button type="button" class="btn btn-success btn-lg" id="transferSaveButton">Сохранить все передачи (Ctrl+S)</button>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="table-responsive glass-table">
             <table class="table table-striped align-middle" id="transferCartTable" aria-describedby="transferCartCaption">
                 <caption id="transferCartCaption" class="visually-hidden">Передачи НЗП, подготовленные к сохранению</caption>
                 <thead class="table-light">
@@ -112,11 +112,11 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-5" id="transferRecentContainer">
-    <div class="card-header bg-light fw-semibold">Последние передачи</div>
+<div class="card glass-panel shadow-sm mb-5" id="transferRecentContainer">
+    <div class="card-header fw-semibold">Последние передачи</div>
     <div class="card-body">
         <p class="text-muted mb-0" id="transferRecentEmpty">Сохранённых передач пока нет. После сохранения они появятся здесь, и каждую можно будет отменить.</p>
-        <div class="table-responsive d-none" id="transferRecentTableWrapper">
+        <div class="table-responsive glass-table d-none" id="transferRecentTableWrapper">
             <table class="table table-hover align-middle" id="transferRecentTable" aria-describedby="transferRecentCaption">
                 <caption id="transferRecentCaption" class="visually-hidden">Список последних сохранённых передач НЗП</caption>
                 <thead class="table-light">
@@ -148,7 +148,7 @@
             </div>
             <div class="modal-body">
                 <p class="mb-3" id="transferSummaryIntro"></p>
-                <div class="table-responsive">
+                <div class="table-responsive glass-table">
                     <table class="table table-bordered align-middle" id="transferSummaryTable">
                         <thead class="table-light">
                             <tr>
