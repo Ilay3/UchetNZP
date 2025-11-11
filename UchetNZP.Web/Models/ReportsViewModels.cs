@@ -36,37 +36,6 @@ public record ReceiptReportViewModel(
     public bool HasData => Items.Count > 0;
 }
 
-public class WipSummaryFilterViewModel
-{
-    public DateTime From { get; init; }
-
-    public DateTime To { get; init; }
-
-    public string? Part { get; init; }
-
-    public string? Section { get; init; }
-}
-
-public record WipSummaryItemViewModel(
-    string PartName,
-    string? PartCode,
-    string SectionName,
-    string OpNumber,
-    decimal Receipt,
-    decimal Launch,
-    decimal Balance,
-    string? LabelNumbers);
-
-public record WipSummaryViewModel(
-    WipSummaryFilterViewModel Filter,
-    IReadOnlyList<WipSummaryItemViewModel> Items,
-    decimal TotalReceipt,
-    decimal TotalLaunch,
-    decimal TotalBalance)
-{
-    public bool HasData => Items.Count > 0;
-}
-
 public class ScrapReportFilterViewModel
 {
     public DateTime From { get; init; }
