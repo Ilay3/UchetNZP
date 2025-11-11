@@ -49,6 +49,35 @@ body {
   font-size: 1rem;
 }
 
+.searchable-input__dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 1080;
+  max-height: 18rem;
+  overflow-y: auto;
+  border-radius: 0.75rem;
+  background-color: var(--bs-body-bg, #fff);
+  border: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.175));
+  box-shadow: 0 0.5rem 1rem rgba(13, 37, 62, 0.15);
+}
+
+.searchable-input__dropdown--visible {
+  display: block;
+}
+
+.searchable-input__option {
+  font-size: 1rem;
+}
+
+.searchable-input__option.active {
+  background-color: var(--bs-primary, #0d6efd);
+  border-color: var(--bs-primary, #0d6efd);
+  color: #fff;
+}
+
 .card {
   border-radius: 1rem;
   border: none;
