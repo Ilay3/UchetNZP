@@ -1,7 +1,9 @@
 @model UchetNZP.Web.Models.WipHistoryViewModel
 @using UchetNZP.Web.Models
 @using System.Collections.Generic
-@{
+@using System.Linq
+@using Microsoft.AspNetCore.Routing
+@{ 
     ViewData["Title"] = "История операций НЗП";
     var types = new[]
     {
@@ -9,6 +11,8 @@
         WipHistoryEntryType.Receipt,
         WipHistoryEntryType.Transfer
     };
+    var pageSizes = new[] { 10, 20, 50, 100 };
+    var hasCustomPageSize = Array.IndexOf(pageSizes, Model.PageSize) < 0;
 }
 
 @functions {
@@ -59,6 +63,9 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end" autocomplete="off">
+            <div class="col-12">
+                <input type="hidden" name="page" value="1" />
+            </div>
             <div class="col-sm-6 col-md-3 col-lg-2">
                 <label class="form-label" for="historyFilterFrom">Период с</label>
                 <input id="historyFilterFrom" class="form-control form-control-lg" type="date" name="from" value="@Model.Filter.From.ToString("yyyy-MM-dd")" />
@@ -74,6 +81,19 @@
             <div class="col-sm-6 col-md-3 col-lg-3">
                 <label class="form-label" for="historyFilterSection">Вид работ</label>
                 <input id="historyFilterSection" class="form-control form-control-lg" type="text" name="section" value="@Model.Filter.SectionSearch" placeholder="Участок или код" />
+            </div>
+            <div class="col-sm-6 col-md-3 col-lg-2">
+                <label class="form-label" for="historyFilterPageSize">На странице</label>
+                <select id="historyFilterPageSize" class="form-select form-select-lg" name="pageSize">
+                    @foreach (var size in pageSizes)
+                    {
+                        <option value="@size" @(Model.PageSize == size ? "selected" : string.Empty)>@size</option>
+                    }
+                    @if (hasCustomPageSize)
+                    {
+                        <option value="@Model.PageSize" selected>@Model.PageSize</option>
+                    }
+                </select>
             </div>
             <div class="col-sm-6 col-md-3 col-lg-2">
                 <button type="submit" class="btn btn-primary btn-lg w-100">Показать</button>
@@ -105,6 +125,7 @@
                 <div class="card-body">
                     <div class="text-muted text-uppercase small fw-semibold mb-1">Количество записей</div>
                     <div class="display-6">@Model.TotalEntries</div>
+                    <div class="text-muted small">На странице: @Model.PageEntryCount</div>
                 </div>
             </div>
         </div>
@@ -113,6 +134,7 @@
                 <div class="card-body">
                     <div class="text-muted text-uppercase small fw-semibold mb-1">Суммарное количество, шт</div>
                     <div class="display-6">@Model.TotalQuantity.ToString("0.###")</div>
+                    <div class="text-muted small">На странице: @Model.PageQuantity.ToString("0.###")</div>
                 </div>
             </div>
         </div>
@@ -125,6 +147,56 @@
             </div>
         </div>
     </div>
+
+    var baseRoute = new RouteValueDictionary
+    {
+        ["from"] = Model.Filter.From.ToString("yyyy-MM-dd"),
+        ["to"] = Model.Filter.To.ToString("yyyy-MM-dd"),
+        ["part"] = Model.Filter.PartSearch,
+        ["section"] = Model.Filter.SectionSearch,
+        ["pageSize"] = Model.PageSize,
+    };
+    if (Model.Filter.Types.Count > 0)
+    {
+        baseRoute["types"] = Model.Filter.Types.Select(GetTypeValue).ToArray();
+    }
+
+    if (Model.HasPagination)
+    {
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+            <div class="text-muted">Страница @Model.CurrentPage из @Model.TotalPages</div>
+            <nav aria-label="Навигация по страницам">
+                <ul class="pagination mb-0">
+                    @{
+                        var prevRoute = new RouteValueDictionary(baseRoute)
+                        {
+                            ["page"] = Model.CurrentPage - 1
+                        };
+                        var nextRoute = new RouteValueDictionary(baseRoute)
+                        {
+                            ["page"] = Model.CurrentPage + 1
+                        };
+                    }
+                    <li class="page-item @(Model.CurrentPage == 1 ? "disabled" : string.Empty)">
+                        <a class="page-link" asp-action="Index" asp-controller="WipHistory" asp-all-route-data="prevRoute" tabindex="-1" aria-disabled="@(Model.CurrentPage == 1)">Назад</a>
+                    </li>
+                    @for (var page = 1; page <= Model.TotalPages; page++)
+                    {
+                        var pageRoute = new RouteValueDictionary(baseRoute)
+                        {
+                            ["page"] = page
+                        };
+                        <li class="page-item @(page == Model.CurrentPage ? "active" : string.Empty)">
+                            <a class="page-link" asp-action="Index" asp-controller="WipHistory" asp-all-route-data="pageRoute">@page</a>
+                        </li>
+                    }
+                    <li class="page-item @(Model.CurrentPage == Model.TotalPages ? "disabled" : string.Empty)">
+                        <a class="page-link" asp-action="Index" asp-controller="WipHistory" asp-all-route-data="nextRoute">Вперёд</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    }
 
     @foreach (var group in Model.Groups)
     {
@@ -233,6 +305,42 @@
                     </div>
                 }
             </div>
+        </div>
+    }
+    if (Model.HasPagination)
+    {
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div class="text-muted">Страница @Model.CurrentPage из @Model.TotalPages</div>
+            <nav aria-label="Навигация по страницам">
+                <ul class="pagination mb-0">
+                    @{
+                        var prevRoute = new RouteValueDictionary(baseRoute)
+                        {
+                            ["page"] = Model.CurrentPage - 1
+                        };
+                        var nextRoute = new RouteValueDictionary(baseRoute)
+                        {
+                            ["page"] = Model.CurrentPage + 1
+                        };
+                    }
+                    <li class="page-item @(Model.CurrentPage == 1 ? "disabled" : string.Empty)">
+                        <a class="page-link" asp-action="Index" asp-controller="WipHistory" asp-all-route-data="prevRoute" tabindex="-1" aria-disabled="@(Model.CurrentPage == 1)">Назад</a>
+                    </li>
+                    @for (var page = 1; page <= Model.TotalPages; page++)
+                    {
+                        var pageRoute = new RouteValueDictionary(baseRoute)
+                        {
+                            ["page"] = page
+                        };
+                        <li class="page-item @(page == Model.CurrentPage ? "active" : string.Empty)">
+                            <a class="page-link" asp-action="Index" asp-controller="WipHistory" asp-all-route-data="pageRoute">@page</a>
+                        </li>
+                    }
+                    <li class="page-item @(Model.CurrentPage == Model.TotalPages ? "disabled" : string.Empty)">
+                        <a class="page-link" asp-action="Index" asp-controller="WipHistory" asp-all-route-data="nextRoute">Вперёд</a>
+                    </li>
+                </ul>
+            </nav>
         </div>
     }
 }

@@ -246,21 +246,49 @@ public class WipHistoryDateGroupViewModel
 
 public class WipHistoryViewModel
 {
-    public WipHistoryViewModel(WipHistoryFilterViewModel filter, IReadOnlyList<WipHistoryDateGroupViewModel> groups)
+    public WipHistoryViewModel(
+        WipHistoryFilterViewModel filter,
+        IReadOnlyList<WipHistoryDateGroupViewModel> groups,
+        int totalEntries,
+        decimal totalQuantity,
+        int pageEntryCount,
+        decimal pageQuantity,
+        int currentPage,
+        int pageSize,
+        int totalPages)
     {
         Filter = filter ?? throw new ArgumentNullException(nameof(filter));
         Groups = groups ?? throw new ArgumentNullException(nameof(groups));
+        TotalEntries = totalEntries;
+        TotalQuantity = totalQuantity;
+        PageEntryCount = pageEntryCount;
+        PageQuantity = pageQuantity;
+        CurrentPage = currentPage;
+        PageSize = pageSize;
+        TotalPages = totalPages;
     }
 
     public WipHistoryFilterViewModel Filter { get; }
 
     public IReadOnlyList<WipHistoryDateGroupViewModel> Groups { get; }
 
-    public bool HasData => Groups.Count > 0;
+    public int TotalEntries { get; }
 
-    public int TotalEntries => Groups.Sum(x => x.EntryCount);
+    public decimal TotalQuantity { get; }
 
-    public decimal TotalQuantity => Groups.Sum(x => x.TotalQuantity);
+    public int PageEntryCount { get; }
+
+    public decimal PageQuantity { get; }
+
+    public int CurrentPage { get; }
+
+    public int PageSize { get; }
+
+    public int TotalPages { get; }
+
+    public bool HasData => TotalEntries > 0;
+
+    public bool HasPagination => TotalPages > 1;
 }
 
 public class WipHistoryQuery
@@ -274,4 +302,8 @@ public class WipHistoryQuery
     public string? Part { get; set; }
 
     public string? Section { get; set; }
+
+    public int? Page { get; set; }
+
+    public int? PageSize { get; set; }
 }
