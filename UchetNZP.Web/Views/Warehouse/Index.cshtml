@@ -115,7 +115,7 @@
                                                                 }
                                                             </td>
                                                             <td class="text-end">@label.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
-                                                            <td>@label.FirstAddedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)</td>
+                                                            <td>@label.FirstAddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</td>
                                                             <td>
                                                                 @if (label.LastUpdatedAt.HasValue)
                                                                 {
@@ -154,7 +154,6 @@
                                                         <div>
                                                             <div class="fw-semibold">Запись от @row.AddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</div>
                                                             <div class="text-muted small">
-                                                                Создано: @row.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
                                                                 @if (row.UpdatedAt.HasValue)
                                                                 {
                                                                     <text> • Обновлено: @row.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)</text>
