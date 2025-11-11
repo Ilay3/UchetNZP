@@ -110,11 +110,12 @@
                                             <td class="text-end">
                                                 <button
                                                     type="button"
-                                                    class="btn btn-outline-danger btn-sm"
+                                                    class="btn btn-outline-danger btn-sm btn-icon"
                                                     data-launch-delete
                                                     data-launch-id="@launch.Id"
                                                     data-confirm="Удалить запуск по детали '@launch.PartDisplayName' от @(launch.LaunchDate.ToString("dd.MM.yyyy"))?">
-                                                    Удалить
+                                                    <span class="visually-hidden">Удалить запуск по детали '@launch.PartDisplayName' от @launch.LaunchDate.ToString("dd.MM.yyyy")</span>
+                                                    <i class="bi bi-trash" aria-hidden="true"></i>
                                                 </button>
                                             </td>
                                         </tr>
