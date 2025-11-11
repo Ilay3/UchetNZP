@@ -53,7 +53,6 @@ public class WipLabelService : IWipLabelService
         var entities = await query
             .OrderByDescending(x => x.LabelDate)
             .ThenBy(x => x.Number)
-            .Take(250)
             .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
 

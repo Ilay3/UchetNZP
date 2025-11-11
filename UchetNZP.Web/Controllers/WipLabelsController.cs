@@ -55,11 +55,16 @@ public class WipLabelsController : Controller
         return ret;
     }
 
+    private const int DefaultPageSize = 25;
+    private const int MaxPageSize = 100;
+
     [HttpGet("list")]
     public async Task<IActionResult> GetLabels(
         [FromQuery(Name = "from")] DateTime? in_from,
         [FromQuery(Name = "to")] DateTime? in_to,
         [FromQuery(Name = "partId")] Guid? in_partId,
+        [FromQuery(Name = "page")] int? in_page,
+        [FromQuery(Name = "pageSize")] int? in_pageSize,
         CancellationToken in_cancellationToken)
     {
         var filter = new WipLabelFilterDto(in_from, in_to, in_partId);
@@ -67,11 +72,52 @@ public class WipLabelsController : Controller
             .GetLabelsAsync(filter, in_cancellationToken)
             .ConfigureAwait(false);
 
+        var page = in_page.GetValueOrDefault(1);
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        var pageSize = in_pageSize.GetValueOrDefault(DefaultPageSize);
+        if (pageSize < 1)
+        {
+            pageSize = DefaultPageSize;
+        }
+        else if (pageSize > MaxPageSize)
+        {
+            pageSize = MaxPageSize;
+        }
+
+        var totalCount = labels.Count;
+        var totalPages = totalCount > 0
+            ? (int)Math.Ceiling(totalCount / (double)pageSize)
+            : 0;
+
+        if (totalPages > 0 && page > totalPages)
+        {
+            page = totalPages;
+        }
+
+        if (totalPages == 0)
+        {
+            page = 1;
+        }
+
+        var skip = (page - 1) * pageSize;
+        if (skip < 0)
+        {
+            skip = 0;
+        }
+
         var items = labels
+            .Skip(skip)
+            .Take(pageSize)
             .Select(MapToViewModel)
             .ToList();
 
-        var ret = Ok(items);
+        var response = new WipLabelListResponseModel(items, page, totalPages, totalCount);
+
+        var ret = Ok(response);
         return ret;
     }
 
