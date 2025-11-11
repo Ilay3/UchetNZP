@@ -227,6 +227,9 @@
 
         addButton.disabled = !canAddToCart();
         saveButton.disabled = cart.length === 0;
+        if (exportButton) {
+            exportButton.disabled = cart.length === 0;
+        }
     }
 
     async function loadOperations(partId) {
@@ -680,20 +683,47 @@
     }
 
     async function exportLaunches() {
-        const from = exportFromInput.value || today;
-        const to = exportToInput.value || from;
+        if (!cart.length) {
+            alert("Корзина пуста.");
+            return;
+        }
+
+        const payload = {
+            items: cart.map(item => ({
+                partId: item.partId,
+                fromOpNumber: item.fromOp,
+                launchDate: item.date,
+                quantity: item.quantity,
+                comment: item.comment,
+            })),
+        };
+
+        if (exportButton) {
+            exportButton.disabled = true;
+        }
 
         try {
-            const response = await fetch(`/wip/launch/export?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+            const response = await fetch("/wip/launch/export-cart", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                },
+                body: JSON.stringify(payload),
+            });
+
             if (!response.ok) {
-                throw new Error("Не удалось сформировать файл.");
+                const message = await readErrorMessage(response);
+                throw new Error(message || "Не удалось сформировать файл.");
             }
 
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.download = `Запуски_${from}_${to}.xlsx`;
+            const fileName = getFileNameFromDisposition(response.headers.get("Content-Disposition"))
+                || "Запуски_корзина.xlsx";
+            link.download = fileName;
             document.body.appendChild(link);
             link.click();
             window.setTimeout(() => {
@@ -703,8 +733,66 @@
         }
         catch (error) {
             console.error(error);
-            alert("Не удалось выполнить экспорт. Попробуйте ещё раз.");
+            const message = error instanceof Error && error.message ? error.message : "Не удалось выполнить экспорт. Попробуйте ещё раз.";
+            alert(message);
         }
+        finally {
+            if (exportButton) {
+                exportButton.disabled = cart.length === 0;
+            }
+        }
+    }
+
+    async function readErrorMessage(response) {
+        const contentType = response.headers.get("Content-Type") || "";
+        if (contentType.includes("application/json")) {
+            try {
+                const data = await response.json();
+                if (typeof data === "string") {
+                    return data;
+                }
+
+                if (data && typeof data.message === "string") {
+                    return data.message;
+                }
+            }
+            catch (error) {
+                console.error(error);
+            }
+        }
+
+        try {
+            const text = await response.text();
+            return text ? text.trim() : null;
+        }
+        catch (error) {
+            console.error(error);
+            return null;
+        }
+    }
+
+    function getFileNameFromDisposition(disposition) {
+        if (!disposition) {
+            return null;
+        }
+
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match && utf8Match[1]) {
+            try {
+                return decodeURIComponent(utf8Match[1]);
+            }
+            catch (error) {
+                console.error(error);
+                return utf8Match[1];
+            }
+        }
+
+        const simpleMatch = disposition.match(/filename="?([^";]+)"?/i);
+        if (simpleMatch && simpleMatch[1]) {
+            return simpleMatch[1];
+        }
+
+        return null;
     }
 
     updateStepState();

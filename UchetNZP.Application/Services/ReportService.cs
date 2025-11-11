@@ -5,6 +5,7 @@ using System.Text;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
+using UchetNZP.Application.Contracts.Launches;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Shared;
@@ -141,6 +142,137 @@ public class ReportService : IReportService
             $"Запуски НЗП за {displayDate:dd.MM.yyyy}",
             displayDate,
             displayDate);
+    }
+
+
+    public async Task<byte[]> ExportLaunchCartAsync(IReadOnlyList<LaunchItemDto> items, CancellationToken cancellationToken = default)
+    {
+        if (items is null)
+        {
+            throw new ArgumentNullException(nameof(items));
+        }
+
+        if (items.Count == 0)
+        {
+            throw new ArgumentException("Корзина запусков пуста.", nameof(items));
+        }
+
+        var normalizedItems = items
+            .Select(x => new
+            {
+                x.PartId,
+                x.FromOpNumber,
+                LaunchDate = NormalizeToUtc(x.LaunchDate),
+                x.Quantity,
+                Comment = string.IsNullOrWhiteSpace(x.Comment) ? null : x.Comment.Trim(),
+            })
+            .ToList();
+
+        foreach (var item in normalizedItems)
+        {
+            if (item.Quantity <= 0m)
+            {
+                throw new InvalidOperationException($"Количество запуска должно быть больше нуля для детали {item.PartId}.");
+            }
+        }
+
+        var partIds = normalizedItems
+            .Select(x => x.PartId)
+            .Distinct()
+            .ToList();
+
+        var parts = await _dbContext.Parts
+            .AsNoTracking()
+            .Where(x => partIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var partId in partIds)
+        {
+            if (!parts.ContainsKey(partId))
+            {
+                throw new KeyNotFoundException($"Деталь {partId} не найдена.");
+            }
+        }
+
+        var routes = await _dbContext.PartRoutes
+            .AsNoTracking()
+            .Where(x => partIds.Contains(x.PartId))
+            .Include(x => x.Operation)
+            .Include(x => x.Section)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var routesByPart = routes
+            .GroupBy(x => x.PartId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(r => r.OpNumber).ToList());
+
+        var launches = new List<WipLaunch>(normalizedItems.Count);
+
+        foreach (var item in normalizedItems)
+        {
+            if (!routesByPart.TryGetValue(item.PartId, out var partRoutes))
+            {
+                throw new InvalidOperationException($"Маршрут для детали {item.PartId} не найден.");
+            }
+
+            var tailRoutes = partRoutes
+                .Where(r => r.OpNumber >= item.FromOpNumber)
+                .OrderBy(r => r.OpNumber)
+                .ToList();
+
+            if (tailRoutes.Count == 0)
+            {
+                throw new InvalidOperationException($"Операция {item.FromOpNumber} отсутствует в маршруте детали {item.PartId}.");
+            }
+
+            var launchId = Guid.NewGuid();
+            var operations = tailRoutes
+                .Select(route => new WipLaunchOperation
+                {
+                    Id = Guid.NewGuid(),
+                    WipLaunchId = launchId,
+                    OperationId = route.OperationId,
+                    SectionId = route.SectionId,
+                    OpNumber = route.OpNumber,
+                    PartRouteId = route.Id,
+                    Quantity = item.Quantity,
+                    Hours = route.NormHours * item.Quantity,
+                    NormHours = route.NormHours,
+                    Operation = route.Operation,
+                    Section = route.Section,
+                })
+                .ToList();
+
+            var sumHours = operations.Sum(op => op.Hours);
+
+            var launch = new WipLaunch
+            {
+                Id = launchId,
+                PartId = item.PartId,
+                SectionId = tailRoutes[0].SectionId,
+                FromOpNumber = item.FromOpNumber,
+                LaunchDate = item.LaunchDate,
+                CreatedAt = DateTime.UtcNow,
+                Quantity = item.Quantity,
+                Comment = item.Comment,
+                SumHoursToFinish = sumHours,
+                Part = parts[item.PartId],
+                Section = tailRoutes[0].Section,
+                Operations = operations,
+            };
+
+            launches.Add(launch);
+        }
+
+        var balanceLookup = await BuildBalanceLookupAsync(launches, cancellationToken).ConfigureAwait(false);
+
+        return BuildLaunchesWorkbook(
+            launches,
+            balanceLookup,
+            "Корзина запусков НЗП",
+            null,
+            null);
     }
 
     private static byte[] BuildRoutesWorkbook(
