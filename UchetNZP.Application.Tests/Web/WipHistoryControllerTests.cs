@@ -163,6 +163,12 @@ public class WipHistoryControllerTests
         Assert.True(model.HasData);
         Assert.Equal("редукт", model.Filter.PartSearch);
         Assert.Equal("сбороч", model.Filter.SectionSearch);
+        Assert.Equal(3, model.TotalEntries);
+        Assert.Equal(model.TotalEntries, model.PageEntryCount);
+        Assert.Equal(model.TotalQuantity, model.PageQuantity);
+        Assert.Equal(1, model.CurrentPage);
+        Assert.Equal(25, model.PageSize);
+        Assert.Equal(1, model.TotalPages);
 
         var entries = model.Groups.SelectMany(group => group.Entries).ToList();
 
@@ -182,6 +188,83 @@ public class WipHistoryControllerTests
         });
 
         Assert.DoesNotContain(entries, entry => entry.PartDisplayName.Contains("Вал привода", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Index_PaginatesEntries()
+    {
+        await using var dbContext = CreateContext();
+
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+
+        dbContext.Parts.Add(new Part
+        {
+            Id = partId,
+            Name = "Корпус",
+            Code = "PRT-100",
+        });
+
+        dbContext.Sections.Add(new Section
+        {
+            Id = sectionId,
+            Name = "Сборка",
+            Code = "SB-10",
+        });
+
+        var now = DateTime.UtcNow;
+
+        for (var index = 0; index < 5; index++)
+        {
+            dbContext.WipLaunches.Add(new WipLaunch
+            {
+                Id = Guid.NewGuid(),
+                UserId = Guid.NewGuid(),
+                PartId = partId,
+                SectionId = sectionId,
+                FromOpNumber = 10,
+                LaunchDate = now.AddDays(-index),
+                CreatedAt = now.AddDays(-index),
+                Quantity = 1 + index,
+                SumHoursToFinish = 0.5m,
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+
+        var controller = new WipHistoryController(dbContext);
+
+        var query = new WipHistoryQuery
+        {
+            Page = 2,
+            PageSize = 2,
+        };
+
+        var actionResult = await controller.Index(query, CancellationToken.None);
+
+        var viewResult = Assert.IsType<ViewResult>(actionResult);
+        var model = Assert.IsType<WipHistoryViewModel>(viewResult.Model);
+
+        Assert.True(model.HasData);
+        Assert.Equal(5, model.TotalEntries);
+        Assert.Equal(2, model.PageEntryCount);
+        Assert.Equal(2, model.PageSize);
+        Assert.Equal(3, model.TotalPages);
+        Assert.Equal(2, model.CurrentPage);
+        Assert.Equal(15m, model.TotalQuantity);
+        Assert.Equal(7m, model.PageQuantity);
+        Assert.Equal(2, model.Groups.Count);
+
+        var entries = model.Groups.SelectMany(group => group.Entries).ToList();
+        Assert.Equal(2, entries.Count);
+
+        var expectedDates = new[]
+        {
+            now.AddDays(-2).Date,
+            now.AddDays(-3).Date,
+        };
+
+        Assert.Equal(expectedDates, entries.Select(entry => entry.Date).ToArray());
     }
 
     private static AppDbContext CreateContext()

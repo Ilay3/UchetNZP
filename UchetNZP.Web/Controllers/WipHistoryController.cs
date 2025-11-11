@@ -338,7 +338,49 @@ public class WipHistoryController : Controller
             }
         }
 
-        var grouped = entries
+        var pageSize = query?.PageSize ?? 25;
+        if (pageSize < 1)
+        {
+            pageSize = 1;
+        }
+        else if (pageSize > 200)
+        {
+            pageSize = 200;
+        }
+
+        var orderedEntries = entries
+            .OrderByDescending(x => x.OccurredAt.Date)
+            .ThenBy(x => x.OccurredAt)
+            .ThenBy(x => x.PartDisplayName, typeComparer)
+            .ThenBy(x => x.Type)
+            .ToList();
+
+        var totalEntries = orderedEntries.Count;
+        var totalQuantity = orderedEntries.Sum(x => x.Quantity);
+
+        var totalPages = totalEntries == 0
+            ? 1
+            : (int)Math.Ceiling(totalEntries / (decimal)pageSize);
+
+        var currentPage = query?.Page ?? 1;
+        if (currentPage < 1)
+        {
+            currentPage = 1;
+        }
+
+        if (currentPage > totalPages)
+        {
+            currentPage = totalPages;
+        }
+
+        var pageEntries = orderedEntries
+            .Skip((currentPage - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        var pageQuantity = pageEntries.Sum(x => x.Quantity);
+
+        var grouped = pageEntries
             .GroupBy(x => x.Date)
             .OrderByDescending(g => g.Key)
             .Select(g =>
@@ -375,7 +417,16 @@ public class WipHistoryController : Controller
             SectionSearch = sectionSearch,
         };
 
-        var model = new WipHistoryViewModel(filter, grouped);
+        var model = new WipHistoryViewModel(
+            filter,
+            grouped,
+            totalEntries,
+            totalQuantity,
+            pageEntries.Count,
+            pageQuantity,
+            currentPage,
+            pageSize,
+            totalPages);
 
         return View("~/Views/Wip/History.cshtml", model);
     }
