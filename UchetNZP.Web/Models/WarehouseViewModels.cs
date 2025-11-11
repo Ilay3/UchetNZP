@@ -18,6 +18,12 @@ public class WarehouseIndexViewModel
     public string? StatusMessage { get; init; }
 
     public string? ErrorMessage { get; init; }
+
+    public int CurrentPage { get; init; }
+
+    public int PageSize { get; init; }
+
+    public int TotalPages { get; init; }
 }
 
 public class WarehouseItemRowViewModel
@@ -95,4 +101,8 @@ public class WarehouseItemEditModel
     public string? Comment { get; set; }
 
     public Guid? FilterPartId { get; set; }
+
+    public int? FilterPage { get; set; }
+
+    public int? FilterPageSize { get; set; }
 }

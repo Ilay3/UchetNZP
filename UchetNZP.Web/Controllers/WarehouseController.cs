@@ -14,6 +14,8 @@ namespace UchetNZP.Web.Controllers;
 [Route("warehouse")]
 public class WarehouseController : Controller
 {
+    private const int DefaultPageSize = 20;
+
     private readonly AppDbContext _dbContext;
 
     public WarehouseController(AppDbContext dbContext)
@@ -22,12 +24,12 @@ public class WarehouseController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(Guid? partId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Index(Guid? partId, int page = 1, int pageSize = DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var statusMessage = TempData["WarehouseMessage"] as string;
         var errorMessage = TempData["WarehouseError"] as string;
 
-        var model = await BuildIndexViewModelAsync(partId, statusMessage, errorMessage, cancellationToken).ConfigureAwait(false);
+        var model = await BuildIndexViewModelAsync(partId, statusMessage, errorMessage, page, pageSize, cancellationToken).ConfigureAwait(false);
         return View(model);
     }
 
@@ -79,11 +81,16 @@ public class WarehouseController : Controller
 
     private RedirectToActionResult RedirectToIndex(WarehouseItemEditModel model)
     {
+        var currentPage = model.FilterPage.HasValue && model.FilterPage.Value > 0 ? model.FilterPage.Value : 1;
+        var currentPageSize = model.FilterPageSize.HasValue && model.FilterPageSize.Value > 0 ? model.FilterPageSize.Value : DefaultPageSize;
+
         return RedirectToAction(
             nameof(Index),
             new
             {
                 partId = model.FilterPartId,
+                page = currentPage,
+                pageSize = currentPageSize,
             });
     }
 
@@ -91,8 +98,13 @@ public class WarehouseController : Controller
         Guid? partId,
         string? statusMessage,
         string? errorMessage,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken)
     {
+        var normalizedPageSize = pageSize <= 0 ? DefaultPageSize : pageSize;
+        var normalizedPage = page < 1 ? 1 : page;
+
         var parts = await _dbContext.Parts
             .AsNoTracking()
             .OrderBy(x => x.Name)
@@ -124,9 +136,30 @@ public class WarehouseController : Controller
             query = query.Where(x => x.PartId == partId.Value);
         }
 
+        var totalItems = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var totalQuantity = await query.SumAsync(x => (decimal?)x.Quantity, cancellationToken).ConfigureAwait(false) ?? 0m;
+        var totalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)normalizedPageSize);
+
+        if (totalPages == 0)
+        {
+            normalizedPage = 1;
+        }
+        else if (normalizedPage > totalPages)
+        {
+            normalizedPage = totalPages;
+        }
+
+        var skip = (normalizedPage - 1) * normalizedPageSize;
+        if (skip < 0)
+        {
+            skip = 0;
+        }
+
         var items = await query
             .OrderByDescending(x => x.AddedAt)
             .ThenBy(x => x.Part!.Name)
+            .Skip(skip)
+            .Take(normalizedPageSize)
             .Select(x => new WarehouseItemRowViewModel
             {
                 Id = x.Id,
@@ -151,8 +184,6 @@ public class WarehouseController : Controller
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-
-        var totalQuantity = items.Sum(x => x.Quantity);
 
         var partGroups = items
             .GroupBy(x => x.PartId)
@@ -229,6 +260,9 @@ public class WarehouseController : Controller
             TotalQuantity = totalQuantity,
             StatusMessage = statusMessage,
             ErrorMessage = errorMessage,
+            CurrentPage = normalizedPage,
+            PageSize = normalizedPageSize,
+            TotalPages = totalPages,
         };
     }
 
