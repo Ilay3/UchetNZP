@@ -223,14 +223,7 @@ public class WipLaunchesController : Controller
         List<LaunchItemDto> dtos;
         try
         {
-            dtos = request.Items
-                .Select(x => new LaunchItemDto(
-                    x.PartId,
-                    OperationNumber.Parse(x.FromOpNumber, nameof(LaunchSaveItem.FromOpNumber)),
-                    x.LaunchDate,
-                    x.Quantity,
-                    x.Comment))
-                .ToList();
+            dtos = CreateLaunchItemDtos(request.Items);
         }
         catch (ArgumentException ex)
         {
@@ -253,6 +246,42 @@ public class WipLaunchesController : Controller
                 .ToList());
 
         return Ok(model);
+    }
+
+    [HttpPost("export-cart")]
+    public async Task<IActionResult> ExportCart([FromBody] LaunchSaveRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null || request.Items is null || request.Items.Count == 0)
+        {
+            return BadRequest("Список запусков пуст.");
+        }
+
+        List<LaunchItemDto> dtos;
+        try
+        {
+            dtos = CreateLaunchItemDtos(request.Items);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
+        try
+        {
+            var file = await _reportService.ExportLaunchCartAsync(dtos, cancellationToken).ConfigureAwait(false);
+            return File(
+                file,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "Запуски_корзина.xlsx");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpDelete("{id:guid}")]
@@ -350,5 +379,23 @@ public class WipLaunchesController : Controller
         var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
         var local = utcValue.ToLocalTime();
         return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+    }
+
+    private static List<LaunchItemDto> CreateLaunchItemDtos(IReadOnlyList<LaunchSaveItem> items)
+    {
+        var ret = new List<LaunchItemDto>(items.Count);
+
+        foreach (var item in items)
+        {
+            var dto = new LaunchItemDto(
+                item.PartId,
+                OperationNumber.Parse(item.FromOpNumber, nameof(LaunchSaveItem.FromOpNumber)),
+                item.LaunchDate,
+                item.Quantity,
+                item.Comment);
+            ret.Add(dto);
+        }
+
+        return ret;
     }
 }
