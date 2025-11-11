@@ -120,6 +120,53 @@
 
         return ret;
     }
+
+    private static IDictionary<string, string?> createBaseQuery(WipHistoryViewModel in_model)
+    {
+        var ret = new Dictionary<string, string?>
+        {
+            ["from"] = in_model.Filter.From.ToString("yyyy-MM-dd"),
+            ["to"] = in_model.Filter.To.ToString("yyyy-MM-dd"),
+            ["part"] = in_model.Filter.PartSearch,
+            ["section"] = in_model.Filter.SectionSearch,
+            ["pageSize"] = in_model.PageSize.ToString(CultureInfo.InvariantCulture)
+        };
+
+        return ret;
+    }
+
+    private static string buildPageUrl(IUrlHelper in_urlHelper, WipHistoryViewModel in_model, int in_page)
+    {
+        var baseUrl = in_urlHelper.Action("Index", "WipHistory");
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            return string.Empty;
+        }
+
+        var targetPage = in_page;
+        if (targetPage < 1)
+        {
+            targetPage = 1;
+        }
+        else if (in_model.TotalPages > 0 && targetPage > in_model.TotalPages)
+        {
+            targetPage = in_model.TotalPages;
+        }
+
+        var routeValues = createBaseQuery(in_model);
+        routeValues["page"] = targetPage.ToString(CultureInfo.InvariantCulture);
+
+        var ret = QueryHelpers.AddQueryString(baseUrl, routeValues);
+        if (in_model.Filter.Types.Count > 0)
+        {
+            var typeValues = in_model.Filter.Types
+                .Select(GetTypeValue)
+                .ToArray();
+            ret = QueryHelpers.AddQueryString(ret, "types", typeValues);
+        }
+
+        return ret;
+    }
 }
 
 <h2 class="mb-4">История операций НЗП</h2>
