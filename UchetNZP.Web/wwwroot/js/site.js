@@ -137,4 +137,35 @@
             command.action();
         }
     });
+
+    function animateGlassPanels() {
+        const panels = Array.from(document.querySelectorAll(".glass-panel"));
+        if (panels.length === 0) {
+            return;
+        }
+
+        panels.forEach(panel => panel.classList.add("glass-panel--animated"));
+
+        const prefersReducedMotion = typeof window.matchMedia === "function"
+            && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        if (!("IntersectionObserver" in window) || prefersReducedMotion) {
+            panels.forEach(panel => panel.classList.add("glass-panel--visible"));
+            return;
+        }
+
+        const observer = new IntersectionObserver((in_entries, in_observer) => {
+            in_entries.forEach(in_entry => {
+                if (!in_entry.isIntersecting) {
+                    return;
+                }
+
+                in_entry.target.classList.add("glass-panel--visible");
+                in_observer.unobserve(in_entry.target);
+            });
+        }, { threshold: 0.15 });
+
+        panels.forEach(panel => observer.observe(panel));
+    }
+
+    window.addEventListener("DOMContentLoaded", animateGlassPanels);
 })();

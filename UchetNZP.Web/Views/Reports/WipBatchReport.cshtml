@@ -4,12 +4,12 @@
     ViewData["Title"] = "Остатки партий НЗП";
 }
 
-<div class="page-header mb-4">
+<div class="page-header glass-panel mb-4">
     <h1 class="display-5 fw-semibold">Остатки партий НЗП</h1>
     <p class="lead mb-0">Просматривайте текущие остатки по деталям и операциям с указанием даты последнего прихода партии.</p>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="card glass-panel shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end" autocomplete="off">
             <div class="col-md-3">
@@ -45,13 +45,13 @@
 
 @if (Model.HasData)
 {
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+    <div class="card glass-panel shadow-sm mb-4">
+        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
             <span>Найдено записей: @Model.Items.Count</span>
             <span>Суммарный остаток: @Model.TotalQuantity.ToString("0.###")</span>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
+            <div class="table-responsive glass-table">
                 <table class="table table-striped align-middle" aria-describedby="batchReportCaption">
                     <caption id="batchReportCaption" class="visually-hidden">Отчёт по остаткам партий НЗП</caption>
                     <thead class="table-light">

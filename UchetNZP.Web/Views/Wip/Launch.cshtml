@@ -2,13 +2,13 @@
     ViewData["Title"] = "Запуск НЗП";
 }
 
-<div class="page-header mb-4">
+<div class="page-header glass-panel mb-4">
     <h1 class="display-5 fw-semibold">Запуск НЗП</h1>
     <p class="lead">Выберите деталь и операцию, рассчитайте хвост и добавьте запуск в корзину.</p>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Шаг 1. Заполните параметры запуска</div>
+<div class="card glass-panel shadow-sm mb-4">
+    <div class="card-header fw-semibold">Шаг 1. Заполните параметры запуска</div>
     <div class="card-body">
         <form id="launchForm" class="row g-4" autocomplete="off">
             <div class="col-lg-4">
@@ -51,12 +51,12 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Шаг 2. Расчёт до конца маршрута</div>
+<div class="card glass-panel shadow-sm mb-4">
+    <div class="card-header fw-semibold">Шаг 2. Расчёт до конца маршрута</div>
     <div class="card-body">
         <div class="row g-4">
             <div class="col-12 col-xl-6">
-                <div class="table-responsive">
+                <div class="table-responsive glass-table">
                     <table class="table table-hover align-middle" id="launchTailTable" aria-describedby="launchTailCaption">
                         <caption id="launchTailCaption" class="visually-hidden">Операции до завершения маршрута</caption>
                         <thead class="table-light">
@@ -94,8 +94,8 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-5">
-    <div class="card-header bg-light fw-semibold d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
+<div class="card glass-panel shadow-sm mb-5">
+    <div class="card-header fw-semibold d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
         <div class="d-flex align-items-center gap-3">
             <span class="fs-4">Корзина запусков</span>
             <div class="d-flex gap-2">
@@ -115,7 +115,7 @@
         </div>
     </div>
     <div class="card-body">
-        <div class="table-responsive">
+        <div class="table-responsive glass-table">
             <table class="table table-striped align-middle" id="launchCartTable" aria-describedby="launchCartCaption">
                 <caption id="launchCartCaption" class="visually-hidden">Запуски, подготовленные к сохранению</caption>
                 <thead class="table-light">
@@ -148,7 +148,7 @@
             </div>
             <div class="modal-body">
                 <p class="mb-3" id="launchSummaryIntro"></p>
-                <div class="table-responsive">
+                <div class="table-responsive glass-table">
                     <table class="table table-bordered align-middle" id="launchSummaryTable">
                         <thead class="table-light">
                             <tr>

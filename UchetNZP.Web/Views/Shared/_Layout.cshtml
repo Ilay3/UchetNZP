@@ -9,10 +9,10 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/UchetNZP.Web.styles.css" asp-append-version="true" />
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm mb-4">
-            <div class="container-fluid">
+<body class="d-flex flex-column min-vh-100">
+    <header class="container-xl py-4">
+        <nav class="navbar navbar-expand-lg navbar-light glass-panel glass-nav">
+            <div class="container-fluid gap-3">
                 <a class="navbar-brand fw-semibold" asp-area="" asp-controller="Home" asp-action="Index">Учёт НЗП</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Переключить навигацию">
@@ -98,14 +98,16 @@
             </div>
         </nav>
     </header>
-    <div class="container pb-5">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
+    <div class="container-xl pb-5 flex-grow-1">
+        <div class="glass-panel p-4 p-md-5">
+            <main role="main" class="pb-3">
+                @RenderBody()
+            </main>
+        </div>
     </div>
 
-    <footer class="border-top footer text-muted mt-auto py-3 bg-white">
-        <div class="container text-center">
+    <footer class="footer text-muted mt-auto py-3 glass-footer">
+        <div class="container-xl text-center">
             &copy; @DateTime.Now.Year - Учёт НЗП
         </div>
     </footer>
