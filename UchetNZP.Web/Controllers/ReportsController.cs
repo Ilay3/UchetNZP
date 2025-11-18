@@ -37,7 +37,7 @@ public class ReportsController : Controller
     public async Task<IActionResult> ReceiptReport([FromQuery] ReceiptReportQuery? query, CancellationToken cancellationToken)
     {
         var now = DateTime.Now.Date;
-        var defaultFrom = now.AddDays(-29);
+        var defaultFrom = now.AddDays(-6);
         var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
 
         var fromUtc = ToUtcStartOfDay(fromDate);
@@ -156,7 +156,7 @@ public class ReportsController : Controller
     private async Task<TransferPeriodReportViewModel> LoadTransferPeriodReportAsync(TransferPeriodReportQuery? in_query, CancellationToken in_cancellationToken)
     {
         var now = DateTime.Now.Date;
-        var defaultFrom = now.AddDays(-29);
+        var defaultFrom = now.AddDays(-6);
         var period = NormalizePeriod(in_query?.From ?? defaultFrom, in_query?.To ?? now);
         var fromDate = period.From;
         var toDate = period.To;
@@ -272,7 +272,7 @@ public class ReportsController : Controller
     public async Task<IActionResult> WipBatchReport([FromQuery] WipBatchReportQuery? query, CancellationToken cancellationToken)
     {
         var now = DateTime.Now.Date;
-        var defaultFrom = now.AddDays(-29);
+        var defaultFrom = now.AddDays(-6);
         var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
 
         var fromUtc = ToUtcStartOfDay(fromDate);
@@ -328,6 +328,7 @@ public class ReportsController : Controller
                 on balance.PartId equals part.Id
             join section in _dbContext.Sections.AsNoTracking()
                 on balance.SectionId equals section.Id
+            where balance.Quantity > 0
             select new
             {
                 balance.PartId,
@@ -358,6 +359,7 @@ public class ReportsController : Controller
         }
 
         var rawBatchItems = await balancesQuery
+            .Where(x => x.Quantity > 0)
             .OrderByDescending(x => x.LastReceiptDate)
             .ThenBy(x => x.PartName)
             .ThenBy(x => x.OpNumber)
@@ -419,7 +421,7 @@ public class ReportsController : Controller
         CancellationToken cancellationToken)
     {
         var now = DateTime.Now.Date;
-        var defaultFrom = now.AddDays(-29);
+        var defaultFrom = now.AddDays(-6);
         var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
 
         var fromUtc = ToUtcStartOfDay(fromDate);
