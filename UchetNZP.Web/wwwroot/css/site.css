@@ -94,3 +94,22 @@ table {
     min-width: 28rem;
   }
 }
+
+.transfer-operation-input {
+  width: min(100%, 78ch);
+  min-width: 64ch;
+}
+
+@media (min-width: 992px) {
+  .transfer-operation-input {
+    width: min(100%, 96ch);
+    min-width: 88ch;
+  }
+}
+
+@media (min-width: 1400px) {
+  .transfer-operation-input {
+    width: min(100%, 112ch);
+    min-width: 104ch;
+  }
+}
