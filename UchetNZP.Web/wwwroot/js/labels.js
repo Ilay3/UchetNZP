@@ -276,15 +276,7 @@
             deleteButton.setAttribute("aria-label", "Удалить");
             deleteButton.innerHTML = "<span aria-hidden=\"true\">🗑</span>";
 
-            if (item.isAssigned) {
-                editButton.disabled = true;
-                deleteButton.disabled = true;
-                editButton.title = "Ярлык назначен и не может быть изменён";
-                deleteButton.title = "Ярлык назначен и не может быть удалён";
-                editButton.classList.add("disabled", "text-muted");
-                deleteButton.classList.add("disabled", "text-muted");
-                deleteButton.classList.remove("text-danger");
-            }
+            
 
             actionsCell.appendChild(editButton);
             actionsCell.appendChild(deleteButton);

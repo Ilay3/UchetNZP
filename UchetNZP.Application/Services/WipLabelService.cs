@@ -428,11 +428,6 @@ public class WipLabelService : IWipLabelService
             throw new InvalidOperationException("Ярлык не найден.");
         }
 
-        if (label.IsAssigned)
-        {
-            throw new InvalidOperationException("Ярлык уже назначен и не может быть изменён или удалён.");
-        }
-
         if (label.RemainingQuantity != label.Quantity)
         {
             throw new InvalidOperationException("Нельзя изменить или удалить ярлык, по которому уже списан остаток.");
