@@ -31,9 +31,11 @@
 
     const fromOperationInput = document.getElementById("transferFromOperationInput");
     const fromOperationOptions = document.getElementById("transferFromOperationOptions");
+    const fromOperationHelper = document.getElementById("transferFromOperationHelper");
     const fromOperationNumberInput = document.getElementById("transferFromOperationNumber");
     const toOperationInput = document.getElementById("transferToOperationInput");
     const toOperationOptions = document.getElementById("transferToOperationOptions");
+    const toOperationHelper = document.getElementById("transferToOperationHelper");
     const toOperationNumberInput = document.getElementById("transferToOperationNumber");
     const dateInput = document.getElementById("transferDateInput");
     const quantityInput = document.getElementById("transferQuantityInput");
@@ -143,6 +145,7 @@
         fromOperationNumberInput.value = "";
         resetLabels();
         updateToOperationsDatalist();
+        updateFromOperationHelper();
         updateBalanceLabels();
         updateFormState();
     });
@@ -150,6 +153,7 @@
     toOperationInput.addEventListener("input", () => {
         selectedToOperation = null;
         toOperationNumberInput.value = "";
+        updateToOperationHelper();
         updateBalanceLabels();
         updateFormState();
     });
@@ -166,6 +170,7 @@
                 toOperationNumberInput.value = "";
             }
             updateToOperationsDatalist();
+            updateToOperationHelper();
             const part = partLookup.getSelected();
             if (part && part.id) {
                 void loadLabels(part.id, operation.opNumber);
@@ -177,6 +182,7 @@
             fromOperationNumberInput.value = "";
             resetLabels();
             updateToOperationsDatalist();
+            updateToOperationHelper();
             updateBalanceLabels();
         }
         updateFormState();
@@ -188,6 +194,7 @@
         if (!operation) {
             selectedToOperation = null;
             toOperationNumberInput.value = "";
+            updateToOperationHelper();
             updateBalanceLabels();
             updateFormState();
             return;
@@ -198,6 +205,7 @@
             toOperationInput.value = "";
             toOperationNumberInput.value = "";
             selectedToOperation = null;
+            updateToOperationHelper();
             updateBalanceLabels();
             updateFormState();
             return;
@@ -377,6 +385,69 @@
 
     function parseOpNumber(value) {
         return Number(value ?? 0);
+    }
+
+    function handleHelperSelection(inputElement, operation, refreshHelper) {
+        inputElement.value = formatOperation(operation);
+        const event = new Event("change", { bubbles: true });
+        inputElement.dispatchEvent(event);
+        if (typeof refreshHelper === "function") {
+            refreshHelper();
+        }
+    }
+
+    function getFromOperationCandidates() {
+        return operations.filter(operation => !operation.isWarehouse);
+    }
+
+    function getToOperationCandidates() {
+        const fromNumber = selectedFromOperation?.opNumber ?? null;
+        return operations.filter(operation => !fromNumber || operation.isWarehouse || parseOpNumber(operation.opNumber) > parseOpNumber(fromNumber));
+    }
+
+    function updateOperationHelper(inputElement, helperElement, candidates, onSelect) {
+        if (!helperElement) {
+            return;
+        }
+
+        helperElement.innerHTML = "";
+        const filter = (inputElement?.value ?? "").trim().toLowerCase();
+        const matches = candidates
+            .filter(operation => {
+                if (!filter.length) {
+                    return true;
+                }
+
+                return formatOperation(operation).toLowerCase().includes(filter);
+            })
+            .slice(0, 50);
+
+        if (!matches.length) {
+            helperElement.classList.add("d-none");
+            return;
+        }
+
+        const fragment = document.createDocumentFragment();
+        matches.forEach(operation => {
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "list-group-item list-group-item-action transfer-operation-helper__item";
+            item.textContent = formatOperation(operation);
+            item.title = item.textContent;
+            item.addEventListener("click", () => onSelect(operation));
+            fragment.appendChild(item);
+        });
+
+        helperElement.appendChild(fragment);
+        helperElement.classList.remove("d-none");
+    }
+
+    function updateFromOperationHelper() {
+        updateOperationHelper(fromOperationInput, fromOperationHelper, getFromOperationCandidates(), operation => handleHelperSelection(fromOperationInput, operation, updateFromOperationHelper));
+    }
+
+    function updateToOperationHelper() {
+        updateOperationHelper(toOperationInput, toOperationHelper, getToOperationCandidates(), operation => handleHelperSelection(toOperationInput, operation, updateToOperationHelper));
     }
 
     function formatOperation(operation) {
@@ -1910,6 +1981,8 @@
 
         updateFromOperationsDatalist();
         updateToOperationsDatalist();
+        updateFromOperationHelper();
+        updateToOperationHelper();
 
         if (selectedFromOperation) {
             const refreshedFrom = operations.find(op => op.opNumber === selectedFromOperation.opNumber);

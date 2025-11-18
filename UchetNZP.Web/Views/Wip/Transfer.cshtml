@@ -24,6 +24,7 @@
                 <input id="transferFromOperationInput" class="form-control form-control-lg transfer-operation-input" type="text" list="transferFromOperationOptions" placeholder="Выберите операцию, откуда снимается НЗП" autocomplete="off" />
                 <datalist id="transferFromOperationOptions"></datalist>
                 <input type="hidden" id="transferFromOperationNumber" />
+                <div class="transfer-operation-helper list-group d-none" id="transferFromOperationHelper" role="listbox" aria-label="Подсказки для операции до"></div>
                 <div class="form-text">Доступен поиск по номеру и названию операции.</div>
             </div>
             <div class="col-12">
@@ -31,6 +32,7 @@
                 <input id="transferToOperationInput" class="form-control form-control-lg transfer-operation-input" type="text" list="transferToOperationOptions" placeholder="Выберите следующую операцию" autocomplete="off" />
                 <datalist id="transferToOperationOptions"></datalist>
                 <input type="hidden" id="transferToOperationNumber" />
+                <div class="transfer-operation-helper list-group d-none" id="transferToOperationHelper" role="listbox" aria-label="Подсказки для операции после"></div>
                 <div class="form-text">Выберите операцию, на которую передаётся НЗП.</div>
             </div>
             <div class="col-12 col-xl-6">
