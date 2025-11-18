@@ -94,3 +94,55 @@ table {
     min-width: 28rem;
   }
 }
+
+.transfer-operation-input {
+  width: 100%;
+}
+
+.transfer-operation-helper {
+  margin-top: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid #ced4da;
+  border-radius: 0.75rem;
+  background-color: #fff;
+  box-shadow: 0 0.5rem 1rem rgba(13, 37, 62, 0.15);
+  max-height: 18rem;
+  overflow-y: auto;
+  width: 100%;
+  min-width: 100%;
+}
+
+.transfer-operation-helper__item {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (min-width: 992px) {
+  .transfer-operation-input {
+    min-width: 56rem;
+  }
+
+  .transfer-operation-helper {
+    min-width: 48rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .transfer-operation-input {
+    min-width: 64rem;
+  }
+
+  .transfer-operation-helper {
+    min-width: 60rem;
+  }
+}
+
+@media (min-width: 1400px) {
+  .transfer-operation-input {
+    min-width: 72rem;
+  }
+
+  .transfer-operation-helper {
+    min-width: 72rem;
+  }
+}
