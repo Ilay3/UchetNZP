@@ -46,9 +46,24 @@
 @if (Model.HasData)
 {
     <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
-            <span>Найдено записей: @Model.Items.Count</span>
-            <span>Суммарный остаток: @Model.TotalQuantity.ToString("0.###")</span>
+        <div class="card-header bg-light fw-semibold">
+            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+                <div class="d-flex flex-column flex-md-row gap-3">
+                    <span>Найдено записей: @Model.Items.Count</span>
+                    <span>Суммарный остаток: @Model.TotalQuantity.ToString("0.###")</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-success"
+                       asp-action="WipBatchReportExport"
+                       asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
+                       asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
+                       asp-route-part='@Model.Filter.Part'
+                       asp-route-section='@Model.Filter.Section'
+                       asp-route-opNumber='@Model.Filter.OpNumber'>
+                        Экспорт в Excel
+                    </a>
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">

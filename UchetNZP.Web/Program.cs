@@ -40,6 +40,7 @@ builder.Services.AddScoped<IWipLabelLookupService, WipLabelLookupService>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IScrapReportExcelExporter, ScrapReportExcelExporter>();
 builder.Services.AddSingleton<ITransferPeriodReportExcelExporter, TransferPeriodReportExcelExporter>();
+builder.Services.AddSingleton<IWipBatchReportExcelExporter, WipBatchReportExcelExporter>();
 
 var app = builder.Build();
 

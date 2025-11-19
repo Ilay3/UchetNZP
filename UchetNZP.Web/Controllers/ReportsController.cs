@@ -19,17 +19,20 @@ public class ReportsController : Controller
     private readonly AppDbContext _dbContext;
     private readonly IScrapReportExcelExporter _scrapReportExcelExporter;
     private readonly ITransferPeriodReportExcelExporter _transferPeriodReportExcelExporter;
+    private readonly IWipBatchReportExcelExporter _wipBatchReportExcelExporter;
     private readonly IWipLabelLookupService _labelLookupService;
 
     public ReportsController(
         AppDbContext dbContext,
         IScrapReportExcelExporter scrapReportExcelExporter,
         ITransferPeriodReportExcelExporter transferPeriodReportExcelExporter,
+        IWipBatchReportExcelExporter wipBatchReportExcelExporter,
         IWipLabelLookupService labelLookupService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _scrapReportExcelExporter = scrapReportExcelExporter ?? throw new ArgumentNullException(nameof(scrapReportExcelExporter));
         _transferPeriodReportExcelExporter = transferPeriodReportExcelExporter ?? throw new ArgumentNullException(nameof(transferPeriodReportExcelExporter));
+        _wipBatchReportExcelExporter = wipBatchReportExcelExporter ?? throw new ArgumentNullException(nameof(wipBatchReportExcelExporter));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
@@ -271,6 +274,26 @@ public class ReportsController : Controller
     [HttpGet("wip-batches")]
     public async Task<IActionResult> WipBatchReport([FromQuery] WipBatchReportQuery? query, CancellationToken cancellationToken)
     {
+        var model = await LoadWipBatchReportAsync(query, cancellationToken).ConfigureAwait(false);
+        return View("~/Views/Reports/WipBatchReport.cshtml", model);
+    }
+
+    [HttpGet("wip-batches/export")]
+    public async Task<IActionResult> WipBatchReportExport([FromQuery] WipBatchReportQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await LoadWipBatchReportAsync(query, cancellationToken).ConfigureAwait(false);
+        var content = _wipBatchReportExcelExporter.Export(model.Filter, model.Items, model.TotalQuantity);
+        var fileName = string.Format(
+            "wip-batch-report-{0:yyyyMMdd}-{1:yyyyMMdd}.xlsx",
+            model.Filter.From,
+            model.Filter.To);
+        return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    private async Task<WipBatchReportViewModel> LoadWipBatchReportAsync(
+        WipBatchReportQuery? query,
+        CancellationToken cancellationToken)
+    {
         var now = DateTime.Now.Date;
         var defaultFrom = now.AddDays(-6);
         var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
@@ -298,7 +321,7 @@ public class ReportsController : Controller
             else
             {
                 var emptyModel = new WipBatchReportViewModel(filter, Array.Empty<WipBatchReportItemViewModel>(), 0m);
-                return View("~/Views/Reports/WipBatchReport.cshtml", emptyModel);
+                return emptyModel;
             }
         }
 
@@ -413,7 +436,7 @@ public class ReportsController : Controller
             .ToList();
 
         var model = new WipBatchReportViewModel(filter, items, items.Sum(x => x.Quantity));
-        return View("~/Views/Reports/WipBatchReport.cshtml", model);
+        return model;
     }
 
     private async Task<(ScrapReportFilterViewModel Filter, List<ScrapReportItemViewModel> Items)> LoadScrapReportAsync(
