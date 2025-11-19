@@ -19,20 +19,18 @@
                 <div class="form-text">Введите минимум 2 символа наименования или обозначения.</div>
             </div>
             <div class="col-12 d-none d-xl-block"></div>
-            <div class="col-12">
+            <div class="col-12 col-lg-6 col-xl-6">
                 <label class="form-label" for="transferFromOperationInput">Операция до</label>
-                <input id="transferFromOperationInput" class="form-control form-control-lg transfer-operation-input" type="text" list="transferFromOperationOptions" placeholder="Выберите операцию, откуда снимается НЗП" autocomplete="off" />
+                <input id="transferFromOperationInput" class="form-control form-control-lg" type="text" list="transferFromOperationOptions" placeholder="Выберите операцию, откуда снимается НЗП" autocomplete="off" />
                 <datalist id="transferFromOperationOptions"></datalist>
                 <input type="hidden" id="transferFromOperationNumber" />
-                <div class="transfer-operation-helper list-group d-none" id="transferFromOperationHelper" role="listbox" aria-label="Подсказки для операции до"></div>
                 <div class="form-text">Доступен поиск по номеру и названию операции.</div>
             </div>
-            <div class="col-12">
+            <div class="col-12 col-lg-6 col-xl-6">
                 <label class="form-label" for="transferToOperationInput">Операция после</label>
-                <input id="transferToOperationInput" class="form-control form-control-lg transfer-operation-input" type="text" list="transferToOperationOptions" placeholder="Выберите следующую операцию" autocomplete="off" />
+                <input id="transferToOperationInput" class="form-control form-control-lg" type="text" list="transferToOperationOptions" placeholder="Выберите следующую операцию" autocomplete="off" />
                 <datalist id="transferToOperationOptions"></datalist>
                 <input type="hidden" id="transferToOperationNumber" />
-                <div class="transfer-operation-helper list-group d-none" id="transferToOperationHelper" role="listbox" aria-label="Подсказки для операции после"></div>
                 <div class="form-text">Выберите операцию, на которую передаётся НЗП.</div>
             </div>
             <div class="col-12 col-xl-6">
