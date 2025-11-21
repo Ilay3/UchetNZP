@@ -405,6 +405,16 @@ public class RoutesController : Controller
                 return BadRequest("Укажите вид работ для каждой операции.");
             }
 
+            var normalizedOperationName = NormalizeName(operation.OperationName);
+            var normalizedSectionName = NormalizeName(operation.SectionName);
+
+            if (!string.IsNullOrEmpty(normalizedOperationName) &&
+                !string.IsNullOrEmpty(normalizedSectionName) &&
+                !string.Equals(normalizedOperationName, normalizedSectionName, StringComparison.Ordinal))
+            {
+                return BadRequest("Наименование операции и выбранный вид работ должны совпадать.");
+            }
+
             int opNumber;
             try
             {
@@ -446,6 +456,17 @@ public class RoutesController : Controller
         var summary = await _importService.ImportRoutesExcelAsync(stream, file.FileName, cancellationToken).ConfigureAwait(false);
 
         return Ok(summary);
+    }
+
+    private static string NormalizeName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = new string(value.Where(character => !char.IsWhiteSpace(character)).ToArray());
+        return normalized.ToLowerInvariant();
     }
 
     public class RouteListQuery

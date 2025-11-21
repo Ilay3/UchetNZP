@@ -246,12 +246,12 @@
                                         </ul>
                                     </details>
                                 }
-                                @if ((entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions) || entry.Type == WipHistoryEntryType.Receipt)
+                                @if ((entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions && entry.AuditId.HasValue) || entry.Type == WipHistoryEntryType.Receipt)
                                 {
                                     <div class="mt-3 border-top pt-3">
                                         <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 js-history-actions">
                                             <div class="d-flex flex-wrap gap-3">
-                                                @if (entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions)
+                                                @if (entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions && entry.AuditId.HasValue)
                                                 {
                                                     <button type="button" class="btn btn-danger btn-lg px-4 py-3 d-inline-flex flex-column align-items-center justify-content-center gap-1 shadow-sm rounded-3 js-history-transfer-revert" data-type="@entryType" @(entry.IsCancelled ? "disabled" : string.Empty)>
                                                         <i class="bi bi-arrow-counterclockwise fs-3" aria-hidden="true"></i>

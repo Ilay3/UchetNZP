@@ -485,25 +485,39 @@ public class WipService : IWipService
 
             if (restoredQuantity < 0)
             {
-                var outgoingTransfers = await _dbContext.TransferAudits
+                var auditTransfers = await _dbContext.TransferAudits
                     .AsNoTracking()
                     .Where(transfer =>
                         transfer.PartId == receipt.PartId &&
                             transfer.FromSectionId == receipt.SectionId &&
                             transfer.FromOpNumber == receipt.OpNumber &&
-                            !transfer.IsReverted)
+                            !transfer.IsReverted &&
+                            transfer.TransferDate >= receipt.ReceiptDate)
                     .Select(transfer => transfer.Quantity)
                     .ToListAsync(cancellationToken)
                     .ConfigureAwait(false);
 
-                var transfersCount = outgoingTransfers.Count;
-                var transferredQuantity = outgoingTransfers.Sum();
+                var pendingTransfers = await _dbContext.WipTransfers
+                    .AsNoTracking()
+                    .Where(transfer =>
+                        transfer.PartId == receipt.PartId &&
+                            transfer.FromSectionId == receipt.SectionId &&
+                            transfer.FromOpNumber == receipt.OpNumber &&
+                            transfer.TransferDate >= receipt.ReceiptDate)
+                    .Select(transfer => transfer.Quantity)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
 
-                var message = transfersCount > 0
-                    ? $"Нельзя удалить приход: по нему проведено {transfersCount} передач на {transferredQuantity:0.###} шт. Сначала отмените передачи."
-                    : "Отмена прихода приведёт к отрицательному остатку.";
+                var transfersCount = auditTransfers.Count + pendingTransfers.Count;
+                var transferredQuantity = auditTransfers.Sum() + pendingTransfers.Sum();
 
-                throw new InvalidOperationException(message);
+                if (transfersCount > 0)
+                {
+                    var message = $"Нельзя удалить приход: по нему проведено {transfersCount} передач на {transferredQuantity:0.###} шт. Сначала отмените передачи.";
+                    throw new InvalidOperationException(message);
+                }
+
+                throw new InvalidOperationException("Отмена прихода приведёт к отрицательному остатку.");
             }
 
             balance.Quantity = restoredQuantity;

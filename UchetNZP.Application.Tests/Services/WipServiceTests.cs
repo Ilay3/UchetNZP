@@ -189,6 +189,87 @@ public class WipServiceTests
         Assert.NotEqual(Guid.Empty, revertResult.VersionId);
     }
 
+    [Fact]
+    public async Task DeleteReceiptAsync_BlocksWhenTransfersWithoutAuditExist()
+    {
+        await using var dbContext = createContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        var currentUser = new TestCurrentUserService();
+        const int opNumber = 9;
+        const decimal receiptQuantity = 8m;
+        const decimal transferQuantity = 3m;
+
+        dbContext.Parts.Add(new Part
+        {
+            Id = partId,
+            Name = "Деталь",
+            Code = "DTL-2",
+        });
+
+        dbContext.Sections.Add(new Section
+        {
+            Id = sectionId,
+            Name = "Секция",
+        });
+
+        dbContext.Operations.Add(new Operation
+        {
+            Id = operationId,
+            Name = "Операция",
+        });
+
+        dbContext.PartRoutes.Add(new PartRoute
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OperationId = operationId,
+            OpNumber = opNumber,
+            NormHours = 1m,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new WipService(dbContext, currentUser);
+        var receiptDate = DateTime.SpecifyKind(new DateTime(2024, 6, 1), DateTimeKind.Unspecified);
+
+        var result = await service.AddReceiptsBatchAsync(
+            new[]
+            {
+                new ReceiptItemDto(partId, opNumber, sectionId, receiptDate, receiptQuantity, null, null, null, false),
+            });
+
+        var receiptId = Assert.Single(result.Items).ReceiptId;
+
+        var balance = await dbContext.WipBalances.SingleAsync();
+        balance.Quantity = receiptQuantity - transferQuantity;
+
+        dbContext.WipTransfers.Add(new WipTransfer
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            FromSectionId = sectionId,
+            FromOpNumber = opNumber,
+            ToSectionId = sectionId,
+            ToOpNumber = opNumber + 1,
+            TransferDate = receiptDate.AddDays(1),
+            CreatedAt = receiptDate,
+            Quantity = transferQuantity,
+            Comment = "Передача без аудита",
+            UserId = currentUser.UserId,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DeleteReceiptAsync(receiptId));
+
+        Assert.Contains("передач", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(transferQuantity.ToString("0.###"), exception.Message);
+    }
+
     private static AppDbContext createContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
