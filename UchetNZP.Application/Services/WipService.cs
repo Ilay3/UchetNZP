@@ -485,7 +485,25 @@ public class WipService : IWipService
 
             if (restoredQuantity < 0)
             {
-                throw new InvalidOperationException("Отмена прихода приведёт к отрицательному остатку.");
+                var outgoingTransfers = await _dbContext.TransferAudits
+                    .AsNoTracking()
+                    .Where(transfer =>
+                        transfer.PartId == receipt.PartId &&
+                            transfer.FromSectionId == receipt.SectionId &&
+                            transfer.FromOpNumber == receipt.OpNumber &&
+                            !transfer.IsReverted)
+                    .Select(transfer => transfer.Quantity)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                var transfersCount = outgoingTransfers.Count;
+                var transferredQuantity = outgoingTransfers.Sum();
+
+                var message = transfersCount > 0
+                    ? $"Нельзя удалить приход: по нему проведено {transfersCount} передач на {transferredQuantity:0.###} шт. Сначала отмените передачи."
+                    : "Отмена прихода приведёт к отрицательному остатку.";
+
+                throw new InvalidOperationException(message);
             }
 
             balance.Quantity = restoredQuantity;
