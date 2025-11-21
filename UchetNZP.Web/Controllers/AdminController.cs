@@ -159,6 +159,9 @@ public class AdminController : Controller
                 PartName = x.PartName,
                 SectionId = x.SectionId,
                 SectionName = x.SectionName,
+                OperationId = x.OperationId,
+                OperationName = x.OperationName,
+                OperationLabel = x.OperationLabel,
                 OpNumber = x.OpNumber,
                 Quantity = x.Quantity,
             })
@@ -185,6 +188,8 @@ public class AdminController : Controller
                 .Where(x =>
                     ContainsText(x.PartName, search)
                     || ContainsText(x.SectionName, search)
+                    || ContainsText(x.OperationName, search)
+                    || (!string.IsNullOrEmpty(x.OperationLabel) && ContainsText(x.OperationLabel!, search))
                     || x.OpNumber.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase)
                     || x.Quantity.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase))
                 .ToList();
@@ -907,6 +912,9 @@ public class AdminController : Controller
                 PartName = x.PartName,
                 SectionId = x.SectionId,
                 SectionName = x.SectionName,
+                OperationId = x.OperationId,
+                OperationName = x.OperationName,
+                OperationLabel = x.OperationLabel,
                 OpNumber = x.OpNumber,
                 Quantity = x.Quantity,
             })
@@ -935,12 +943,22 @@ public class AdminController : Controller
                 .Where(x =>
                     ContainsText(x.PartName, search)
                     || ContainsText(x.SectionName, search)
+                    || ContainsText(x.OperationName, search)
+                    || (!string.IsNullOrEmpty(x.OperationLabel) && ContainsText(x.OperationLabel!, search))
                     || x.OpNumber.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase)
                     || x.Quantity.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase))
                 .ToList();
         }
 
         var partOptions = partRows
+            .Select(x => new SelectListItem
+            {
+                Value = x.Id.ToString(),
+                Text = FormatEntityDisplay(x.Name, x.Code),
+            })
+            .ToList();
+
+        var operationOptions = operationRows
             .Select(x => new SelectListItem
             {
                 Value = x.Id.ToString(),
@@ -963,6 +981,7 @@ public class AdminController : Controller
             Sections = sections,
             WipBalances = balances,
             PartOptions = partOptions,
+            OperationOptions = operationOptions,
             SectionOptions = sectionOptions,
             PartInput = partInput ?? new AdminPartInputModel(),
             OperationInput = operationInput ?? new AdminOperationInputModel(),
@@ -1017,6 +1036,9 @@ public class AdminController : Controller
             PartName = dto.PartName,
             SectionId = dto.SectionId,
             SectionName = dto.SectionName,
+            OperationId = dto.OperationId,
+            OperationName = dto.OperationName,
+            OperationLabel = dto.OperationLabel,
             OpNumber = dto.OpNumber,
             Quantity = dto.Quantity,
         };
@@ -1048,6 +1070,12 @@ public class AdminController : Controller
 
         return sort switch
         {
+            "operationName" => descending
+                ? source.OrderByDescending(x => x.OperationName)
+                : source.OrderBy(x => x.OperationName),
+            "operationLabel" => descending
+                ? source.OrderByDescending(x => x.OperationLabel)
+                : source.OrderBy(x => x.OperationLabel),
             "sectionName" => descending
                 ? source.OrderByDescending(x => x.SectionName)
                 : source.OrderBy(x => x.SectionName),

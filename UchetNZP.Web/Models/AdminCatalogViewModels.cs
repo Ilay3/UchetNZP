@@ -25,6 +25,8 @@ public class AdminIndexViewModel
 
     public IReadOnlyCollection<SelectListItem> PartOptions { get; init; } = Array.Empty<SelectListItem>();
 
+    public IReadOnlyCollection<SelectListItem> OperationOptions { get; init; } = Array.Empty<SelectListItem>();
+
     public IReadOnlyCollection<SelectListItem> SectionOptions { get; init; } = Array.Empty<SelectListItem>();
 
     public string? PartSearch { get; init; }
@@ -64,6 +66,12 @@ public class AdminCatalogWipBalanceRowViewModel
     public Guid SectionId { get; init; }
 
     public string SectionName { get; init; } = string.Empty;
+
+    public Guid? OperationId { get; init; }
+
+    public string OperationName { get; init; } = string.Empty;
+
+    public string? OperationLabel { get; init; }
 
     public int OpNumber { get; init; }
 
