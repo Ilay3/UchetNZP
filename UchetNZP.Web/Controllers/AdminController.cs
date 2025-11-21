@@ -59,6 +59,146 @@ public class AdminController : Controller
         return View(viewModel);
     }
 
+    [HttpGet("parts/data")]
+    public async Task<IActionResult> GetPartsData(
+        string? partSearch,
+        string? sort,
+        string? order,
+        int offset = 0,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var filters = NormalizeFilters(new AdminCatalogFilters(partSearch: partSearch));
+        var partDtos = await _catalogService.GetPartsAsync(cancellationToken).ConfigureAwait(false);
+        var partRows = partDtos
+            .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
+            .ToList();
+
+        var filtered = FilterEntities(partRows, filters.PartSearch);
+        var total = filtered.Count;
+        var sorted = SortEntities(filtered, sort, order)
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+
+        return Json(new { total, rows = sorted });
+    }
+
+    [HttpGet("operations/data")]
+    public async Task<IActionResult> GetOperationsData(
+        string? operationSearch,
+        string? sort,
+        string? order,
+        int offset = 0,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var filters = NormalizeFilters(new AdminCatalogFilters(operationSearch: operationSearch));
+        var operationDtos = await _catalogService.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
+        var operationRows = operationDtos
+            .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
+            .ToList();
+
+        var filtered = FilterEntities(operationRows, filters.OperationSearch);
+        var total = filtered.Count;
+        var sorted = SortEntities(filtered, sort, order)
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+
+        return Json(new { total, rows = sorted });
+    }
+
+    [HttpGet("sections/data")]
+    public async Task<IActionResult> GetSectionsData(
+        string? sectionSearch,
+        string? sort,
+        string? order,
+        int offset = 0,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var filters = NormalizeFilters(new AdminCatalogFilters(sectionSearch: sectionSearch));
+        var sectionDtos = await _catalogService.GetSectionsAsync(cancellationToken).ConfigureAwait(false);
+        var sectionRows = sectionDtos
+            .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
+            .ToList();
+
+        var filtered = FilterEntities(sectionRows, filters.SectionSearch);
+        var total = filtered.Count;
+        var sorted = SortEntities(filtered, sort, order)
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+
+        return Json(new { total, rows = sorted });
+    }
+
+    [HttpGet("balances/data")]
+    public async Task<IActionResult> GetBalancesData(
+        Guid? wipBalancePartFilter,
+        Guid? wipBalanceSectionFilter,
+        string? wipBalanceSearch,
+        string? sort,
+        string? order,
+        int offset = 0,
+        int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var filters = NormalizeFilters(new AdminCatalogFilters(
+            wipBalancePartFilter: wipBalancePartFilter,
+            wipBalanceSectionFilter: wipBalanceSectionFilter,
+            wipBalanceSearch: wipBalanceSearch));
+
+        var balanceDtos = await _catalogService.GetWipBalancesAsync(cancellationToken).ConfigureAwait(false);
+        var balances = balanceDtos
+            .Select(x => new AdminCatalogWipBalanceRowViewModel
+            {
+                Id = x.Id,
+                PartId = x.PartId,
+                PartName = x.PartName,
+                SectionId = x.SectionId,
+                SectionName = x.SectionName,
+                OpNumber = x.OpNumber,
+                Quantity = x.Quantity,
+            })
+            .ToList();
+
+        if (filters.WipBalancePartFilter.HasValue)
+        {
+            balances = balances
+                .Where(x => x.PartId == filters.WipBalancePartFilter.Value)
+                .ToList();
+        }
+
+        if (filters.WipBalanceSectionFilter.HasValue)
+        {
+            balances = balances
+                .Where(x => x.SectionId == filters.WipBalanceSectionFilter.Value)
+                .ToList();
+        }
+
+        if (!string.IsNullOrEmpty(filters.WipBalanceSearch))
+        {
+            var search = filters.WipBalanceSearch;
+            balances = balances
+                .Where(x =>
+                    ContainsText(x.PartName, search)
+                    || ContainsText(x.SectionName, search)
+                    || x.OpNumber.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                    || x.Quantity.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase))
+                .ToList();
+        }
+
+        var total = balances.Count;
+        var sorted = SortBalances(balances, sort, order)
+            .Skip(offset)
+            .Take(limit)
+            .ToList();
+
+        return Json(new { total, rows = sorted });
+    }
+
     [HttpPost("parts/create")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreatePart(AdminPartInputModel input, CancellationToken cancellationToken)
@@ -443,6 +583,272 @@ public class AdminController : Controller
         return RedirectToAction(nameof(Index), BuildRouteValues(filters));
     }
 
+    [HttpPost("api/parts")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreatePartApi([FromBody] AdminPartInputModel input, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.CreatePartAsync(new AdminPartEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
+            return Json(new AdminEntityRowViewModel { Id = result.Id, Name = result.Name, Code = result.Code });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpPut("api/parts/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdatePartApi(Guid id, [FromBody] AdminPartInputModel input, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.UpdatePartAsync(id, new AdminPartEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
+            return Json(new AdminEntityRowViewModel { Id = result.Id, Name = result.Name, Code = result.Code });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpDelete("api/parts/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeletePartApi(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            await _catalogService.DeletePartAsync(id, cancellationToken).ConfigureAwait(false);
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpPost("api/operations")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateOperationApi([FromBody] AdminOperationInputModel input, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.CreateOperationAsync(new AdminOperationEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
+            return Json(new AdminEntityRowViewModel { Id = result.Id, Name = result.Name, Code = result.Code });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpPut("api/operations/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateOperationApi(Guid id, [FromBody] AdminOperationInputModel input, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.UpdateOperationAsync(id, new AdminOperationEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
+            return Json(new AdminEntityRowViewModel { Id = result.Id, Name = result.Name, Code = result.Code });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpDelete("api/operations/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteOperationApi(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            await _catalogService.DeleteOperationAsync(id, cancellationToken).ConfigureAwait(false);
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpPost("api/sections")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateSectionApi([FromBody] AdminSectionInputModel input, CancellationToken cancellationToken)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.CreateSectionAsync(new AdminSectionEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
+            return Json(new AdminEntityRowViewModel { Id = result.Id, Name = result.Name, Code = result.Code });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpPut("api/sections/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateSectionApi(Guid id, [FromBody] AdminSectionInputModel input, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.UpdateSectionAsync(id, new AdminSectionEditDto(input.Name, input.Code), cancellationToken).ConfigureAwait(false);
+            return Json(new AdminEntityRowViewModel { Id = result.Id, Name = result.Name, Code = result.Code });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpDelete("api/sections/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteSectionApi(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            await _catalogService.DeleteSectionAsync(id, cancellationToken).ConfigureAwait(false);
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpPost("api/balances")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateWipBalanceApi([FromBody] AdminWipBalanceInputModel input, CancellationToken cancellationToken)
+    {
+        ValidateBalance(input);
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.CreateWipBalanceAsync(new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity), cancellationToken).ConfigureAwait(false);
+            return Json(MapBalance(result));
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpPut("api/balances/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateWipBalanceApi(Guid id, [FromBody] AdminWipBalanceInputModel input, CancellationToken cancellationToken)
+    {
+        ValidateBalance(input);
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            var result = await _catalogService.UpdateWipBalanceAsync(id, new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity), cancellationToken).ConfigureAwait(false);
+            return Json(MapBalance(result));
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
+    [HttpDelete("api/balances/{id}")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteWipBalanceApi(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(id), "Некорректный идентификатор.");
+            return BuildValidationProblem();
+        }
+
+        try
+        {
+            await _catalogService.DeleteWipBalanceAsync(id, cancellationToken).ConfigureAwait(false);
+            return Json(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return BuildErrorResponse(ex.Message);
+        }
+    }
+
     private async Task<AdminIndexViewModel> BuildIndexViewModelAsync(
         CancellationToken cancellationToken,
         AdminCatalogFilters? filters = null,
@@ -570,6 +976,90 @@ public class AdminController : Controller
             WipBalanceSearch = normalizedFilters.WipBalanceSearch,
             StatusMessage = NormalizeMessage(statusMessage),
             ErrorMessage = NormalizeMessage(errorMessage),
+        };
+    }
+
+    private IActionResult BuildValidationProblem()
+    {
+        var messages = ModelState.Values
+            .SelectMany(x => x.Errors)
+            .Select(x => x.ErrorMessage)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToArray();
+
+        return BadRequest(new { errors = messages });
+    }
+
+    private IActionResult BuildErrorResponse(string message)
+    {
+        return BadRequest(new { errors = new[] { message } });
+    }
+
+    private void ValidateBalance(AdminWipBalanceInputModel input)
+    {
+        if (input.PartId == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(AdminWipBalanceInputModel.PartId), "Выберите деталь.");
+        }
+
+        if (input.SectionId == Guid.Empty)
+        {
+            ModelState.AddModelError(nameof(AdminWipBalanceInputModel.SectionId), "Выберите участок.");
+        }
+    }
+
+    private static AdminCatalogWipBalanceRowViewModel MapBalance(AdminWipBalanceDto dto)
+    {
+        return new AdminCatalogWipBalanceRowViewModel
+        {
+            Id = dto.Id,
+            PartId = dto.PartId,
+            PartName = dto.PartName,
+            SectionId = dto.SectionId,
+            SectionName = dto.SectionName,
+            OpNumber = dto.OpNumber,
+            Quantity = dto.Quantity,
+        };
+    }
+
+    private static IEnumerable<AdminEntityRowViewModel> SortEntities(
+        IEnumerable<AdminEntityRowViewModel> source,
+        string? sort,
+        string? order)
+    {
+        var descending = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
+        return sort switch
+        {
+            "code" => descending
+                ? source.OrderByDescending(x => x.Code)
+                : source.OrderBy(x => x.Code),
+            _ => descending
+                ? source.OrderByDescending(x => x.Name)
+                : source.OrderBy(x => x.Name),
+        };
+    }
+
+    private static IEnumerable<AdminCatalogWipBalanceRowViewModel> SortBalances(
+        IEnumerable<AdminCatalogWipBalanceRowViewModel> source,
+        string? sort,
+        string? order)
+    {
+        var descending = string.Equals(order, "desc", StringComparison.OrdinalIgnoreCase);
+
+        return sort switch
+        {
+            "sectionName" => descending
+                ? source.OrderByDescending(x => x.SectionName)
+                : source.OrderBy(x => x.SectionName),
+            "opNumber" => descending
+                ? source.OrderByDescending(x => x.OpNumber)
+                : source.OrderBy(x => x.OpNumber),
+            "quantity" => descending
+                ? source.OrderByDescending(x => x.Quantity)
+                : source.OrderBy(x => x.Quantity),
+            _ => descending
+                ? source.OrderByDescending(x => x.PartName)
+                : source.OrderBy(x => x.PartName),
         };
     }
 

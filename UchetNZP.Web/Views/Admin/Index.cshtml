@@ -1,4 +1,4 @@
-@using System.Globalization
+@using System.Text.Json
 @model AdminIndexViewModel
 @{
     ViewData["Title"] = "Администрирование";
@@ -16,458 +16,259 @@
     <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
 }
 
-<section id="parts" class="mb-5">
-    <h2 class="h4">Детали</h2>
+<form id="adminAntiForgery" class="d-none">
+    @Html.AntiForgeryToken()
+</form>
 
-    <form method="get" class="row g-3 align-items-end mb-3">
-        <div class="col-md-6 col-lg-4">
-            <label for="partSearch" class="form-label">Поиск</label>
-            <input type="text" id="partSearch" name="partSearch" value="@Model.PartSearch" class="form-control" placeholder="Название или код" />
-        </div>
-        <div class="col-md-3 col-lg-2">
-            <button type="submit" class="btn btn-outline-primary w-100">Найти</button>
-        </div>
-        <div class="col-md-3 col-lg-2">
-            <a class="btn btn-link w-100" href="@Url.Action("Index", new { operationSearch = Model.OperationSearch, sectionSearch = Model.SectionSearch, wipBalancePartFilter = Model.WipBalancePartFilter, wipBalanceSectionFilter = Model.WipBalanceSectionFilter, wipBalanceSearch = Model.WipBalanceSearch })">Сбросить</a>
-        </div>
-        @if (!string.IsNullOrEmpty(Model.OperationSearch))
-        {
-            <input type="hidden" name="operationSearch" value="@Model.OperationSearch" />
-        }
-        @if (!string.IsNullOrEmpty(Model.SectionSearch))
-        {
-            <input type="hidden" name="sectionSearch" value="@Model.SectionSearch" />
-        }
-        @if (Model.WipBalancePartFilter.HasValue)
-        {
-            <input type="hidden" name="wipBalancePartFilter" value="@Model.WipBalancePartFilter" />
-        }
-        @if (Model.WipBalanceSectionFilter.HasValue)
-        {
-            <input type="hidden" name="wipBalanceSectionFilter" value="@Model.WipBalanceSectionFilter" />
-        }
-        @if (!string.IsNullOrEmpty(Model.WipBalanceSearch))
-        {
-            <input type="hidden" name="wipBalanceSearch" value="@Model.WipBalanceSearch" />
-        }
-    </form>
+<div id="adminOptions" data-part-options='@Html.Raw(JsonSerializer.Serialize(Model.PartOptions))' data-section-options='@Html.Raw(JsonSerializer.Serialize(Model.SectionOptions))'></div>
 
-    <div class="card mb-3">
-        <div class="card-body">
-            <h3 class="h5">Добавить деталь</h3>
-            <form asp-action="CreatePart" method="post" class="row g-3">
-                @Html.AntiForgeryToken()
-                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                <div class="col-md-5">
-                    <label asp-for="PartInput.Name" class="form-label"></label>
-                    <input asp-for="PartInput.Name" class="form-control" />
-                    <span asp-validation-for="PartInput.Name" class="text-danger"></span>
-                </div>
-                <div class="col-md-4">
-                    <label asp-for="PartInput.Code" class="form-label"></label>
-                    <input asp-for="PartInput.Code" class="form-control" />
-                    <span asp-validation-for="PartInput.Code" class="text-danger"></span>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary">Создать</button>
-                </div>
-            </form>
-        </div>
-    </div>
+<ul class="nav nav-tabs mb-3" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="parts-tab" data-bs-toggle="tab" data-bs-target="#partsTab" type="button" role="tab" aria-controls="partsTab" aria-selected="true">Детали</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="operations-tab" data-bs-toggle="tab" data-bs-target="#operationsTab" type="button" role="tab" aria-controls="operationsTab" aria-selected="false">Операции</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="sections-tab" data-bs-toggle="tab" data-bs-target="#sectionsTab" type="button" role="tab" aria-controls="sectionsTab" aria-selected="false">Участки</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="balances-tab" data-bs-toggle="tab" data-bs-target="#balancesTab" type="button" role="tab" aria-controls="balancesTab" aria-selected="false">Остатки</button>
+    </li>
+</ul>
 
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr>
-                    <th style="width: 30%">Название</th>
-                    <th style="width: 20%">Код</th>
-                    <th class="text-end">Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var part in Model.Parts)
+<div class="tab-content" id="adminTabsContent">
+    <div class="tab-pane fade show active" id="partsTab" role="tabpanel" aria-labelledby="parts-tab">
+        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+        {
+            FormId = "partsFilterForm",
+            TargetTableId = "partsTable",
+            Inputs = new[]
             {
-                var formId = $"update-part-{part.Id}";
-                <tr>
-                    <td>
-                        <input form="@formId" type="text" name="Name" value="@part.Name" class="form-control form-control-sm" required />
-                    </td>
-                    <td>
-                        <input form="@formId" type="text" name="Code" value="@part.Code" class="form-control form-control-sm" />
-                    </td>
-                    <td class="text-end">
-                        <form id="@formId" asp-action="UpdatePart" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="Id" value="@part.Id" />
-                            <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения детали?');">Сохранить</button>
-                        </form>
-                        <form asp-action="DeletePart" method="post" class="d-inline" onsubmit="return confirm('Удалить деталь? Это действие нельзя отменить.');">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="id" value="@part.Id" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-</section>
+                new AdminFilterInputViewModel("partSearch", "partSearch", "Поиск", Model.PartSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
+            },
+        })
 
-<section id="operations" class="mb-5">
-    <h2 class="h4">Операции</h2>
-
-    <form method="get" class="row g-3 align-items-end mb-3">
-        <div class="col-md-6 col-lg-4">
-            <label for="operationSearch" class="form-label">Поиск</label>
-            <input type="text" id="operationSearch" name="operationSearch" value="@Model.OperationSearch" class="form-control" placeholder="Название или код" />
-        </div>
-        <div class="col-md-3 col-lg-2">
-            <button type="submit" class="btn btn-outline-primary w-100">Найти</button>
-        </div>
-        <div class="col-md-3 col-lg-2">
-            <a class="btn btn-link w-100" href="@Url.Action("Index", new { partSearch = Model.PartSearch, sectionSearch = Model.SectionSearch, wipBalancePartFilter = Model.WipBalancePartFilter, wipBalanceSectionFilter = Model.WipBalanceSectionFilter, wipBalanceSearch = Model.WipBalanceSearch })">Сбросить</a>
-        </div>
-        @if (!string.IsNullOrEmpty(Model.PartSearch))
-        {
-            <input type="hidden" name="partSearch" value="@Model.PartSearch" />
-        }
-        @if (!string.IsNullOrEmpty(Model.SectionSearch))
-        {
-            <input type="hidden" name="sectionSearch" value="@Model.SectionSearch" />
-        }
-        @if (Model.WipBalancePartFilter.HasValue)
-        {
-            <input type="hidden" name="wipBalancePartFilter" value="@Model.WipBalancePartFilter" />
-        }
-        @if (Model.WipBalanceSectionFilter.HasValue)
-        {
-            <input type="hidden" name="wipBalanceSectionFilter" value="@Model.WipBalanceSectionFilter" />
-        }
-        @if (!string.IsNullOrEmpty(Model.WipBalanceSearch))
-        {
-            <input type="hidden" name="wipBalanceSearch" value="@Model.WipBalanceSearch" />
-        }
-    </form>
-
-    <div class="card mb-3">
-        <div class="card-body">
-            <h3 class="h5">Добавить операцию</h3>
-            <form asp-action="CreateOperation" method="post" class="row g-3">
-                @Html.AntiForgeryToken()
-                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                <div class="col-md-5">
-                    <label asp-for="OperationInput.Name" class="form-label"></label>
-                    <input asp-for="OperationInput.Name" class="form-control" />
-                    <span asp-validation-for="OperationInput.Name" class="text-danger"></span>
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Детали</h2>
+                <button type="button" class="btn btn-primary admin-create" data-entity="parts">Создать</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="partsTable"
+                           class="table table-striped"
+                           data-toggle="table"
+                           data-unique-id="id"
+                           data-pagination="true"
+                           data-side-pagination="server"
+                           data-page-size="10"
+                           data-url="@Url.Action("GetPartsData", "Admin")"
+                           data-sort-name="name"
+                           data-sort-order="asc"
+                           data-locale="ru-RU">
+                        <thead>
+                            <tr>
+                                <th data-field="name" data-sortable="true">Название</th>
+                                <th data-field="code" data-sortable="true">Код</th>
+                                <th data-field="id" data-formatter="partsActionFormatter" data-align="right">Действия</th>
+                            </tr>
+                        </thead>
+                    </table>
                 </div>
-                <div class="col-md-4">
-                    <label asp-for="OperationInput.Code" class="form-label"></label>
-                    <input asp-for="OperationInput.Code" class="form-control" />
-                    <span asp-validation-for="OperationInput.Code" class="text-danger"></span>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary">Создать</button>
-                </div>
-            </form>
+            </div>
         </div>
+        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "partsActionTemplate", EntityKey = "parts" })
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr>
-                    <th style="width: 30%">Название</th>
-                    <th style="width: 20%">Код</th>
-                    <th class="text-end">Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var operation in Model.Operations)
+    <div class="tab-pane fade" id="operationsTab" role="tabpanel" aria-labelledby="operations-tab">
+        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+        {
+            FormId = "operationsFilterForm",
+            TargetTableId = "operationsTable",
+            Inputs = new[]
             {
-                var formId = $"update-operation-{operation.Id}";
-                <tr>
-                    <td>
-                        <input form="@formId" type="text" name="Name" value="@operation.Name" class="form-control form-control-sm" required />
-                    </td>
-                    <td>
-                        <input form="@formId" type="text" name="Code" value="@operation.Code" class="form-control form-control-sm" />
-                    </td>
-                    <td class="text-end">
-                        <form id="@formId" asp-action="UpdateOperation" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="Id" value="@operation.Id" />
-                            <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения операции?');">Сохранить</button>
-                        </form>
-                        <form asp-action="DeleteOperation" method="post" class="d-inline" onsubmit="return confirm('Удалить операцию? Это действие нельзя отменить.');">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="id" value="@operation.Id" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
+                new AdminFilterInputViewModel("operationSearch", "operationSearch", "Поиск", Model.OperationSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
+            },
+        })
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Операции</h2>
+                <button type="button" class="btn btn-primary admin-create" data-entity="operations">Создать</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="operationsTable"
+                           class="table table-striped"
+                           data-toggle="table"
+                           data-unique-id="id"
+                           data-pagination="true"
+                           data-side-pagination="server"
+                           data-page-size="10"
+                           data-url="@Url.Action("GetOperationsData", "Admin")"
+                           data-sort-name="name"
+                           data-sort-order="asc"
+                           data-locale="ru-RU">
+                        <thead>
+                            <tr>
+                                <th data-field="name" data-sortable="true">Название</th>
+                                <th data-field="code" data-sortable="true">Код</th>
+                                <th data-field="id" data-formatter="operationsActionFormatter" data-align="right">Действия</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </div>
+        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "operationsActionTemplate", EntityKey = "operations" })
     </div>
-</section>
 
-<section id="sections" class="mb-5">
-    <h2 class="h4">Участки</h2>
+    <div class="tab-pane fade" id="sectionsTab" role="tabpanel" aria-labelledby="sections-tab">
+        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+        {
+            FormId = "sectionsFilterForm",
+            TargetTableId = "sectionsTable",
+            Inputs = new[]
+            {
+                new AdminFilterInputViewModel("sectionSearch", "sectionSearch", "Поиск", Model.SectionSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
+            },
+        })
 
-    <form method="get" class="row g-3 align-items-end mb-3">
-        <div class="col-md-6 col-lg-4">
-            <label for="sectionSearch" class="form-label">Поиск</label>
-            <input type="text" id="sectionSearch" name="sectionSearch" value="@Model.SectionSearch" class="form-control" placeholder="Название или код" />
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Участки</h2>
+                <button type="button" class="btn btn-primary admin-create" data-entity="sections">Создать</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="sectionsTable"
+                           class="table table-striped"
+                           data-toggle="table"
+                           data-unique-id="id"
+                           data-pagination="true"
+                           data-side-pagination="server"
+                           data-page-size="10"
+                           data-url="@Url.Action("GetSectionsData", "Admin")"
+                           data-sort-name="name"
+                           data-sort-order="asc"
+                           data-locale="ru-RU">
+                        <thead>
+                            <tr>
+                                <th data-field="name" data-sortable="true">Название</th>
+                                <th data-field="code" data-sortable="true">Код</th>
+                                <th data-field="id" data-formatter="sectionsActionFormatter" data-align="right">Действия</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </div>
+        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "sectionsActionTemplate", EntityKey = "sections" })
+    </div>
+
+    <div class="tab-pane fade" id="balancesTab" role="tabpanel" aria-labelledby="balances-tab">
+        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+        {
+            FormId = "balancesFilterForm",
+            TargetTableId = "balancesTable",
+            Inputs = new[]
+            {
+                new AdminFilterInputViewModel("wipBalancePartFilter", "wipBalancePartFilter", "Деталь", Model.WipBalancePartFilter?.ToString(), "select", cssClass: "col-md-4 col-lg-3", options: Model.PartOptions),
+                new AdminFilterInputViewModel("wipBalanceSectionFilter", "wipBalanceSectionFilter", "Участок", Model.WipBalanceSectionFilter?.ToString(), "select", cssClass: "col-md-4 col-lg-3", options: Model.SectionOptions),
+                new AdminFilterInputViewModel("wipBalanceSearch", "wipBalanceSearch", "Поиск", Model.WipBalanceSearch, placeholder: "Деталь, участок или операция", cssClass: "col-md-4 col-lg-3"),
+            },
+        })
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h2 class="h5 mb-0">Остатки</h2>
+                <button type="button" class="btn btn-primary admin-create" data-entity="balances">Создать</button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table id="balancesTable"
+                           class="table table-striped"
+                           data-toggle="table"
+                           data-unique-id="id"
+                           data-pagination="true"
+                           data-side-pagination="server"
+                           data-page-size="10"
+                           data-url="@Url.Action("GetBalancesData", "Admin")"
+                           data-sort-name="partName"
+                           data-sort-order="asc"
+                           data-locale="ru-RU">
+                        <thead>
+                            <tr>
+                                <th data-field="partName" data-sortable="true">Деталь</th>
+                                <th data-field="sectionName" data-sortable="true">Участок</th>
+                                <th data-field="opNumber" data-sortable="true">Операция</th>
+                                <th data-field="quantity" data-sortable="true">Количество</th>
+                                <th data-field="id" data-formatter="balancesActionFormatter" data-align="right">Действия</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </div>
+        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "balancesActionTemplate", EntityKey = "balances" })
+    </div>
+</div>
+
+<div class="modal fade" id="adminEntityModal" tabindex="-1" aria-labelledby="adminEntityModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <form class="modal-content" id="adminEntityForm">
+            <div class="modal-header">
+                <h5 class="modal-title" id="adminEntityModalLabel"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div id="adminEntityValidation" class="alert alert-danger d-none" role="alert"></div>
+                <div id="adminEntityFields"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script type="text/template" id="partFormTemplate">
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label class="form-label">Название</label>
+            <input type="text" name="name" class="form-control" value="{{name}}" required />
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">Код</label>
+            <input type="text" name="code" class="form-control" value="{{code}}" />
+        </div>
+    </div>
+</script>
+
+<script type="text/template" id="balanceFormTemplate">
+    <div class="row g-3">
+        <div class="col-md-6 col-lg-5">
+            <label class="form-label">Деталь</label>
+            <select name="partId" class="form-select">{{partOptions}}</select>
+        </div>
+        <div class="col-md-6 col-lg-5">
+            <label class="form-label">Участок</label>
+            <select name="sectionId" class="form-select">{{sectionOptions}}</select>
         </div>
         <div class="col-md-3 col-lg-2">
-            <button type="submit" class="btn btn-outline-primary w-100">Найти</button>
+            <label class="form-label">Операция</label>
+            <input type="number" name="opNumber" class="form-control" value="{{opNumber}}" min="0" required />
         </div>
         <div class="col-md-3 col-lg-2">
-            <a class="btn btn-link w-100" href="@Url.Action("Index", new { partSearch = Model.PartSearch, operationSearch = Model.OperationSearch, wipBalancePartFilter = Model.WipBalancePartFilter, wipBalanceSectionFilter = Model.WipBalanceSectionFilter, wipBalanceSearch = Model.WipBalanceSearch })">Сбросить</a>
-        </div>
-        @if (!string.IsNullOrEmpty(Model.PartSearch))
-        {
-            <input type="hidden" name="partSearch" value="@Model.PartSearch" />
-        }
-        @if (!string.IsNullOrEmpty(Model.OperationSearch))
-        {
-            <input type="hidden" name="operationSearch" value="@Model.OperationSearch" />
-        }
-        @if (Model.WipBalancePartFilter.HasValue)
-        {
-            <input type="hidden" name="wipBalancePartFilter" value="@Model.WipBalancePartFilter" />
-        }
-        @if (Model.WipBalanceSectionFilter.HasValue)
-        {
-            <input type="hidden" name="wipBalanceSectionFilter" value="@Model.WipBalanceSectionFilter" />
-        }
-        @if (!string.IsNullOrEmpty(Model.WipBalanceSearch))
-        {
-            <input type="hidden" name="wipBalanceSearch" value="@Model.WipBalanceSearch" />
-        }
-    </form>
-
-    <div class="card mb-3">
-        <div class="card-body">
-            <h3 class="h5">Добавить участок</h3>
-            <form asp-action="CreateSection" method="post" class="row g-3">
-                @Html.AntiForgeryToken()
-                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                <div class="col-md-5">
-                    <label asp-for="SectionInput.Name" class="form-label"></label>
-                    <input asp-for="SectionInput.Name" class="form-control" />
-                    <span asp-validation-for="SectionInput.Name" class="text-danger"></span>
-                </div>
-                <div class="col-md-4">
-                    <label asp-for="SectionInput.Code" class="form-label"></label>
-                    <input asp-for="SectionInput.Code" class="form-control" />
-                    <span asp-validation-for="SectionInput.Code" class="text-danger"></span>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary">Создать</button>
-                </div>
-            </form>
+            <label class="form-label">Количество</label>
+            <input type="number" name="quantity" class="form-control" step="0.01" value="{{quantity}}" min="0" required />
         </div>
     </div>
-
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr>
-                    <th style="width: 30%">Название</th>
-                    <th style="width: 20%">Код</th>
-                    <th class="text-end">Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var sections in Model.Sections)
-            {
-                var formId = $"update-section-{sections.Id}";
-                <tr>
-                    <td>
-                        <input form="@formId" type="text" name="Name" value="@sections.Name" class="form-control form-control-sm" required />
-                    </td>
-                    <td>
-                        <input form="@formId" type="text" name="Code" value="@sections.Code" class="form-control form-control-sm" />
-                    </td>
-                    <td class="text-end">
-                        <form id="@formId" asp-action="UpdateSection" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="Id" value="@sections.Id" />
-                            <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения участка?');">Сохранить</button>
-                        </form>
-                        <form asp-action="DeleteSection" method="post" class="d-inline" onsubmit="return confirm('Удалить участок? Это действие нельзя отменить.');">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="id" value="@sections.Id" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<section id="balances" class="mb-5">
-    <h2 class="h4">Остатки</h2>
-
-    <form method="get" class="row g-3 align-items-end mb-3">
-        <div class="col-md-4 col-lg-3">
-            <label for="wipBalancePartFilter" class="form-label">Деталь</label>
-            <select id="wipBalancePartFilter" name="wipBalancePartFilter" class="form-select">
-                <option value="">Все детали</option>
-                @foreach (var option in Model.PartOptions)
-                {
-                    var selected = Model.WipBalancePartFilter.HasValue && option.Value == Model.WipBalancePartFilter.Value.ToString() ? "selected" : null;
-                    <option value="@option.Value" selected="@selected">@option.Text</option>
-                }
-            </select>
-        </div>
-        <div class="col-md-4 col-lg-3">
-            <label for="wipBalanceSectionFilter" class="form-label">Участок</label>
-            <select id="wipBalanceSectionFilter" name="wipBalanceSectionFilter" class="form-select">
-                <option value="">Все участки</option>
-                @foreach (var option in Model.SectionOptions)
-                {
-                    var selected = Model.WipBalanceSectionFilter.HasValue && option.Value == Model.WipBalanceSectionFilter.Value.ToString() ? "selected" : null;
-                    <option value="@option.Value" selected="@selected">@option.Text</option>
-                }
-            </select>
-        </div>
-        <div class="col-md-4 col-lg-3">
-            <label for="wipBalanceSearch" class="form-label">Поиск</label>
-            <input type="text" id="wipBalanceSearch" name="wipBalanceSearch" value="@Model.WipBalanceSearch" class="form-control" placeholder="Деталь, участок или операция" />
-        </div>
-        <div class="col-md-2 col-lg-1">
-            <button type="submit" class="btn btn-outline-primary w-100">Фильтр</button>
-        </div>
-        <div class="col-md-2 col-lg-1">
-            <a class="btn btn-link w-100" href="@Url.Action("Index", new { partSearch = Model.PartSearch, operationSearch = Model.OperationSearch, sectionSearch = Model.SectionSearch })">Сбросить</a>
-        </div>
-        @if (!string.IsNullOrEmpty(Model.PartSearch))
-        {
-            <input type="hidden" name="partSearch" value="@Model.PartSearch" />
-        }
-        @if (!string.IsNullOrEmpty(Model.OperationSearch))
-        {
-            <input type="hidden" name="operationSearch" value="@Model.OperationSearch" />
-        }
-        @if (!string.IsNullOrEmpty(Model.SectionSearch))
-        {
-            <input type="hidden" name="sectionSearch" value="@Model.SectionSearch" />
-        }
-    </form>
-
-    <div class="card mb-3">
-        <div class="card-body">
-            <h3 class="h5">Добавить остаток</h3>
-            <form asp-action="CreateWipBalance" method="post" class="row g-3">
-                @Html.AntiForgeryToken()
-                @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-                <div class="col-md-4">
-                    <label asp-for="WipBalanceInput.PartId" class="form-label"></label>
-                    <select asp-for="WipBalanceInput.PartId" class="form-select" asp-items="Model.PartOptions">
-                        <option value="">Выберите деталь</option>
-                    </select>
-                    <span asp-validation-for="WipBalanceInput.PartId" class="text-danger"></span>
-                </div>
-                <div class="col-md-4">
-                    <label asp-for="WipBalanceInput.SectionId" class="form-label"></label>
-                    <select asp-for="WipBalanceInput.SectionId" class="form-select" asp-items="Model.SectionOptions">
-                        <option value="">Выберите участок</option>
-                    </select>
-                    <span asp-validation-for="WipBalanceInput.SectionId" class="text-danger"></span>
-                </div>
-                <div class="col-md-2">
-                    <label asp-for="WipBalanceInput.OpNumber" class="form-label"></label>
-                    <input asp-for="WipBalanceInput.OpNumber" class="form-control" />
-                    <span asp-validation-for="WipBalanceInput.OpNumber" class="text-danger"></span>
-                </div>
-                <div class="col-md-2">
-                    <label asp-for="WipBalanceInput.Quantity" class="form-label"></label>
-                    <input asp-for="WipBalanceInput.Quantity" class="form-control" />
-                    <span asp-validation-for="WipBalanceInput.Quantity" class="text-danger"></span>
-                </div>
-                <div class="col-12 d-flex justify-content-end">
-                    <button type="submit" class="btn btn-primary">Создать</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-sm align-middle">
-            <thead>
-                <tr>
-                    <th style="width: 25%">Деталь</th>
-                    <th style="width: 25%">Участок</th>
-                    <th style="width: 15%">Операция</th>
-                    <th style="width: 15%">Количество</th>
-                    <th class="text-end">Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-            @foreach (var balance in Model.WipBalances)
-            {
-                var formId = $"update-balance-{balance.Id}";
-                <tr>
-                    <td>
-                        <select form="@formId" name="PartId" class="form-select form-select-sm">
-                            @foreach (var option in Model.PartOptions)
-                            {
-                                var selected = option.Value == balance.PartId.ToString() ? "selected" : null;
-                                <option value="@option.Value" selected="@selected">@option.Text</option>
-                            }
-                        </select>
-                    </td>
-                    <td>
-                        <select form="@formId" name="SectionId" class="form-select form-select-sm">
-                            @foreach (var option in Model.SectionOptions)
-                            {
-                                var selected = option.Value == balance.SectionId.ToString() ? "selected" : null;
-                                <option value="@option.Value" selected="@selected">@option.Text</option>
-                            }
-                        </select>
-                    </td>
-                    <td>
-                        <input form="@formId" type="number" name="OpNumber" value="@balance.OpNumber" class="form-control form-control-sm" min="0" />
-                    </td>
-                    <td>
-                        <input form="@formId" type="number" step="0.01" name="Quantity" value="@balance.Quantity.ToString(CultureInfo.InvariantCulture)" class="form-control form-control-sm" min="0" />
-                    </td>
-                    <td class="text-end">
-                        <form id="@formId" asp-action="UpdateWipBalance" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="Id" value="@balance.Id" />
-                            <button type="submit" class="btn btn-primary btn-sm me-2" onclick="return confirm('Сохранить изменения остатка?');">Сохранить</button>
-                        </form>
-                        <form asp-action="DeleteWipBalance" method="post" class="d-inline" onsubmit="return confirm('Удалить остаток? Это действие нельзя отменить.');">
-                            @Html.AntiForgeryToken()
-                            @await Html.PartialAsync("_AdminFiltersHiddenFields", Model)
-                            <input type="hidden" name="id" value="@balance.Id" />
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
-                        </form>
-                    </td>
-                </tr>
-            }
-            </tbody>
-        </table>
-    </div>
-</section>
+</script>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/admin-index.js" asp-append-version="true"></script>
 }
