@@ -150,7 +150,8 @@
             });
 
             if (!response.ok) {
-                throw new Error("Не удалось сохранить маршрут.");
+                const errorText = await response.text().catch(() => "");
+                throw new Error(errorText?.trim() || "Не удалось сохранить маршрут.");
             }
 
             const result = await response.json().catch(() => null);
@@ -161,7 +162,11 @@
         }
         catch (error) {
             console.error(error);
-            namespace.showInlineMessage(messageBox, "Ошибка при сохранении маршрута.", "danger");
+            const message = error && typeof error.message === "string" && error.message.trim().length > 0
+                ? error.message
+                : "Ошибка при сохранении маршрута.";
+
+            namespace.showInlineMessage(messageBox, message, "danger");
         }
         finally {
             saveButton.disabled = false;
@@ -281,6 +286,17 @@
         if (!sectionName) {
             if (showAlerts) {
                 alert("Укажите вид работ.");
+            }
+
+            return null;
+        }
+
+        const normalizedOperationName = operationName.replace(/\s+/g, "").toLowerCase();
+        const normalizedSectionName = sectionName.replace(/\s+/g, "").toLowerCase();
+
+        if (normalizedOperationName && normalizedSectionName && normalizedOperationName !== normalizedSectionName) {
+            if (showAlerts) {
+                alert("Наименование операции и выбранный вид работ должны совпадать.");
             }
 
             return null;
