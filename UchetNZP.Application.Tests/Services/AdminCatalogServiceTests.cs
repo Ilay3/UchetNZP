@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using UchetNZP.Application.Abstractions;
@@ -86,6 +87,66 @@ public class AdminCatalogServiceTests
         Assert.Equal(section2.Id, persisted.SectionId);
         Assert.Equal(8, persisted.OpNumber);
         Assert.Equal(22.5m, persisted.Quantity);
+    }
+
+    [Fact]
+    public async Task GetWipBalancesAsync_ReturnsBalancesWithRouteInfo()
+    {
+        await using var dbContext = CreateContext();
+        var service = CreateService(dbContext);
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь X" };
+        var section = new Section { Id = Guid.NewGuid(), Name = "Участок A" };
+        var operation = new Operation { Id = Guid.NewGuid(), Name = "Фрезеровка", Code = "OP-10" };
+
+        var routedBalance = new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = section.Id,
+            OpNumber = 3,
+            Quantity = 7m,
+        };
+
+        var orphanBalance = new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = section.Id,
+            OpNumber = 5,
+            Quantity = 4m,
+        };
+
+        var partRoute = new PartRoute
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = section.Id,
+            OpNumber = 3,
+            OperationId = operation.Id,
+            Operation = operation,
+        };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.Add(section);
+        dbContext.Operations.Add(operation);
+        dbContext.PartRoutes.Add(partRoute);
+        dbContext.WipBalances.AddRange(routedBalance, orphanBalance);
+        await dbContext.SaveChangesAsync();
+
+        var result = await service.GetWipBalancesAsync();
+
+        Assert.Equal(2, result.Count);
+
+        var routedDto = result.Single(x => x.OpNumber == routedBalance.OpNumber);
+        Assert.Equal(operation.Id, routedDto.OperationId);
+        Assert.Equal(operation.Name, routedDto.OperationName);
+        Assert.Equal(operation.Code, routedDto.OperationLabel);
+
+        var orphanDto = result.Single(x => x.OpNumber == orphanBalance.OpNumber);
+        Assert.Null(orphanDto.OperationId);
+        Assert.Equal(string.Empty, orphanDto.OperationName);
+        Assert.Null(orphanDto.OperationLabel);
     }
 
     private static AppDbContext CreateContext()
