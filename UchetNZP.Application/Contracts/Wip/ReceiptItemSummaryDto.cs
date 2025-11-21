@@ -11,5 +11,6 @@ public record ReceiptItemSummaryDto(
     Guid ReceiptId,
     Guid? WipLabelId,
     string? LabelNumber,
-    bool IsAssigned
+    bool IsAssigned,
+    Guid VersionId
 );

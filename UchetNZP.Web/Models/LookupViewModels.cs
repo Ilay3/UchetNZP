@@ -32,7 +32,8 @@ public record ReceiptSummaryItemViewModel(
     Guid ReceiptId,
     Guid? WipLabelId,
     string? LabelNumber,
-    bool IsAssigned);
+    bool IsAssigned,
+    Guid VersionId);
 
 public record ReceiptBatchSummaryViewModel(int Saved, IReadOnlyList<ReceiptSummaryItemViewModel> Items);
 
@@ -45,7 +46,19 @@ public record ReceiptDeleteResultViewModel(
     decimal ReceiptQuantity,
     decimal PreviousQuantity,
     decimal RestoredQuantity,
-    decimal Delta);
+    decimal Delta,
+    Guid VersionId);
+
+public record ReceiptRevertResultViewModel(
+    Guid ReceiptId,
+    Guid BalanceId,
+    Guid PartId,
+    Guid SectionId,
+    string OpNumber,
+    decimal TargetQuantity,
+    decimal PreviousQuantity,
+    decimal NewQuantity,
+    Guid VersionId);
 
 public record LaunchOperationLookupViewModel(
     string OpNumber,

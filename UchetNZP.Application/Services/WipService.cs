@@ -102,8 +102,11 @@ public class WipService : IWipService
                 balance.Quantity = was + item.Quantity;
 
                 var label = await ResolveLabelAsync(item, reservedLabelIds, cancellationToken).ConfigureAwait(false);
+                var previousLabelAssigned = label.IsAssigned;
                 label.IsAssigned = true;
                 reservedLabelIds.Add(label.Id);
+
+                var versionId = Guid.NewGuid();
 
                 var receipt = new WipReceipt
                 {
@@ -121,6 +124,31 @@ public class WipService : IWipService
 
                 await _dbContext.WipReceipts.AddAsync(receipt, cancellationToken).ConfigureAwait(false);
 
+                await _dbContext.ReceiptAudits.AddAsync(
+                    new ReceiptAudit
+                    {
+                        Id = Guid.NewGuid(),
+                        VersionId = versionId,
+                        ReceiptId = receipt.Id,
+                        PartId = item.PartId,
+                        SectionId = item.SectionId,
+                        OpNumber = item.OpNumber,
+                        PreviousQuantity = was,
+                        NewQuantity = receipt.Quantity,
+                        ReceiptDate = receiptDate,
+                        Comment = item.Comment,
+                        PreviousBalance = was,
+                        NewBalance = balance.Quantity,
+                        PreviousLabelId = label.Id,
+                        NewLabelId = label.Id,
+                        PreviousLabelAssigned = previousLabelAssigned,
+                        NewLabelAssigned = true,
+                        Action = "Created",
+                        UserId = userId,
+                        CreatedAt = now,
+                    },
+                    cancellationToken).ConfigureAwait(false);
+
                 results.Add(new ReceiptItemSummaryDto(
                     item.PartId,
                     item.OpNumber,
@@ -132,7 +160,8 @@ public class WipService : IWipService
                     receipt.Id,
                     label.Id,
                     label.Number,
-                    label.IsAssigned));
+                    label.IsAssigned,
+                    versionId));
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -244,6 +273,178 @@ public class WipService : IWipService
         return ret;
     }
 
+    public async Task<ReceiptRevertResultDto> RevertReceiptAsync(Guid in_receiptId, Guid in_versionId, CancellationToken cancellationToken = default)
+    {
+        if (in_receiptId == Guid.Empty)
+        {
+            throw new ArgumentException("Идентификатор прихода не задан.", nameof(in_receiptId));
+        }
+
+        if (in_versionId == Guid.Empty)
+        {
+            throw new ArgumentException("Идентификатор версии не задан.", nameof(in_versionId));
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            var audit = await _dbContext.ReceiptAudits
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.ReceiptId == in_receiptId && x.VersionId == in_versionId, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (audit is null)
+            {
+                throw new KeyNotFoundException($"Версия {in_versionId} для прихода {in_receiptId} не найдена.");
+            }
+
+            if (audit.NewBalance < 0)
+            {
+                throw new InvalidOperationException("Откат версии приведёт к отрицательному остатку.");
+            }
+
+            var balance = await _dbContext.WipBalances
+                .FirstOrDefaultAsync(
+                    x => x.PartId == audit.PartId && x.SectionId == audit.SectionId && x.OpNumber == audit.OpNumber,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (balance is null)
+            {
+                balance = new WipBalance
+                {
+                    Id = Guid.NewGuid(),
+                    PartId = audit.PartId,
+                    SectionId = audit.SectionId,
+                    OpNumber = audit.OpNumber,
+                    Quantity = 0m,
+                };
+
+                await _dbContext.WipBalances.AddAsync(balance, cancellationToken).ConfigureAwait(false);
+            }
+
+            var receipt = await _dbContext.WipReceipts
+                .FirstOrDefaultAsync(x => x.Id == in_receiptId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var label = audit.NewLabelId.HasValue
+                ? await _dbContext.WipLabels.FirstOrDefaultAsync(x => x.Id == audit.NewLabelId.Value, cancellationToken)
+                    .ConfigureAwait(false)
+                : null;
+
+            if (audit.NewLabelId.HasValue && label is null)
+            {
+                throw new InvalidOperationException("Ярлык, зафиксированный в версии, не найден.");
+            }
+
+            var previousBalance = balance.Quantity;
+            var previousQuantity = receipt?.Quantity;
+            var previousLabelId = receipt?.WipLabelId;
+            var previousLabelAssigned = label?.IsAssigned ?? false;
+            var versionId = Guid.NewGuid();
+            var now = DateTime.UtcNow;
+
+            if (audit.NewQuantity.HasValue)
+            {
+                if (receipt is null)
+                {
+                    receipt = new WipReceipt
+                    {
+                        Id = audit.ReceiptId,
+                        UserId = _currentUserService.UserId,
+                        PartId = audit.PartId,
+                        SectionId = audit.SectionId,
+                        OpNumber = audit.OpNumber,
+                        ReceiptDate = audit.ReceiptDate,
+                        CreatedAt = now,
+                        Quantity = audit.NewQuantity.Value,
+                        Comment = audit.Comment,
+                        WipLabelId = label?.Id,
+                    };
+
+                    await _dbContext.WipReceipts.AddAsync(receipt, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    receipt.PartId = audit.PartId;
+                    receipt.SectionId = audit.SectionId;
+                    receipt.OpNumber = audit.OpNumber;
+                    receipt.ReceiptDate = audit.ReceiptDate;
+                    receipt.Quantity = audit.NewQuantity.Value;
+                    receipt.Comment = audit.Comment;
+                    receipt.WipLabelId = label?.Id;
+                    receipt.UserId = _currentUserService.UserId;
+                }
+
+                if (label is not null)
+                {
+                    label.IsAssigned = audit.NewLabelAssigned;
+                }
+
+                balance.Quantity = audit.NewBalance;
+            }
+            else
+            {
+                if (receipt is not null)
+                {
+                    _dbContext.WipReceipts.Remove(receipt);
+                }
+
+                if (label is not null)
+                {
+                    label.IsAssigned = audit.NewLabelAssigned;
+                }
+
+                balance.Quantity = audit.NewBalance;
+            }
+
+            await _dbContext.ReceiptAudits.AddAsync(
+                new ReceiptAudit
+                {
+                    Id = Guid.NewGuid(),
+                    VersionId = versionId,
+                    ReceiptId = audit.ReceiptId,
+                    PartId = audit.PartId,
+                    SectionId = audit.SectionId,
+                    OpNumber = audit.OpNumber,
+                    PreviousQuantity = previousQuantity,
+                    NewQuantity = audit.NewQuantity,
+                    ReceiptDate = audit.ReceiptDate,
+                    Comment = audit.Comment,
+                    PreviousBalance = previousBalance,
+                    NewBalance = audit.NewBalance,
+                    PreviousLabelId = previousLabelId,
+                    NewLabelId = audit.NewLabelId,
+                    PreviousLabelAssigned = previousLabelAssigned,
+                    NewLabelAssigned = audit.NewLabelAssigned,
+                    Action = "Reverted",
+                    UserId = _currentUserService.UserId,
+                    CreatedAt = now,
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+            return new ReceiptRevertResultDto(
+                audit.ReceiptId,
+                balance.Id,
+                audit.PartId,
+                audit.SectionId,
+                audit.OpNumber,
+                audit.NewQuantity ?? 0m,
+                previousQuantity ?? 0m,
+                audit.NewQuantity ?? 0m,
+                versionId);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
     public async Task<ReceiptDeleteResultDto> DeleteReceiptAsync(Guid in_receiptId, CancellationToken cancellationToken = default)
     {
         if (in_receiptId == Guid.Empty)
@@ -289,6 +490,20 @@ public class WipService : IWipService
 
             balance.Quantity = restoredQuantity;
 
+            var label = receipt.WipLabelId.HasValue
+                ? await _dbContext.WipLabels.FirstOrDefaultAsync(x => x.Id == receipt.WipLabelId.Value, cancellationToken)
+                    .ConfigureAwait(false)
+                : null;
+
+            var previousLabelAssigned = label?.IsAssigned ?? false;
+            if (label is not null)
+            {
+                label.IsAssigned = false;
+            }
+
+            var versionId = Guid.NewGuid();
+            var now = DateTime.UtcNow;
+
             var adjustment = new WipBalanceAdjustment
             {
                 Id = Guid.NewGuid(),
@@ -301,10 +516,34 @@ public class WipService : IWipService
                 Delta = restoredQuantity - previousQuantity,
                 Comment = $"Отмена прихода {receipt.Id}",
                 UserId = _currentUserService.UserId,
-                CreatedAt = DateTime.UtcNow,
+                CreatedAt = now,
             };
 
             _dbContext.WipBalanceAdjustments.Add(adjustment);
+            await _dbContext.ReceiptAudits.AddAsync(
+                new ReceiptAudit
+                {
+                    Id = Guid.NewGuid(),
+                    VersionId = versionId,
+                    ReceiptId = receipt.Id,
+                    PartId = receipt.PartId,
+                    SectionId = receipt.SectionId,
+                    OpNumber = receipt.OpNumber,
+                    PreviousQuantity = receipt.Quantity,
+                    NewQuantity = null,
+                    ReceiptDate = receipt.ReceiptDate,
+                    Comment = receipt.Comment,
+                    PreviousBalance = previousQuantity,
+                    NewBalance = restoredQuantity,
+                    PreviousLabelId = label?.Id,
+                    NewLabelId = label?.Id,
+                    PreviousLabelAssigned = previousLabelAssigned,
+                    NewLabelAssigned = label?.IsAssigned ?? false,
+                    Action = "Deleted",
+                    UserId = _currentUserService.UserId,
+                    CreatedAt = now,
+                },
+                cancellationToken).ConfigureAwait(false);
             _dbContext.WipReceipts.Remove(receipt);
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -319,7 +558,8 @@ public class WipService : IWipService
                 receipt.Quantity,
                 previousQuantity,
                 restoredQuantity,
-                adjustment.Delta);
+                adjustment.Delta,
+                versionId);
         }
         catch
         {

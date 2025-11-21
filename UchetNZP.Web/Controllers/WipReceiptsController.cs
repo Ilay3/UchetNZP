@@ -170,20 +170,21 @@ public class WipReceiptsController : Controller
 
         var model = new ReceiptBatchSummaryViewModel(
             summary.Saved,
-            summary.Items
-                .Select(x => new ReceiptSummaryItemViewModel(
-                    x.PartId,
-                    OperationNumber.Format(x.OpNumber),
-                    x.SectionId,
-                    x.Quantity,
-                    x.Was,
-                    x.Become,
-                    x.BalanceId,
-                    x.ReceiptId,
-                    x.WipLabelId,
-                    x.LabelNumber,
-                    x.IsAssigned))
-                .ToList());
+                    summary.Items
+                        .Select(x => new ReceiptSummaryItemViewModel(
+                            x.PartId,
+                            OperationNumber.Format(x.OpNumber),
+                            x.SectionId,
+                            x.Quantity,
+                            x.Was,
+                            x.Become,
+                            x.BalanceId,
+                            x.ReceiptId,
+                            x.WipLabelId,
+                            x.LabelNumber,
+                            x.IsAssigned,
+                            x.VersionId))
+                        .ToList());
 
         return Ok(model);
     }
@@ -209,7 +210,48 @@ public class WipReceiptsController : Controller
                 result.ReceiptQuantity,
                 result.PreviousQuantity,
                 result.RestoredQuantity,
-                result.Delta);
+                result.Delta,
+                result.VersionId);
+
+            return Ok(viewModel);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("{id:guid}/revert")]
+    public async Task<IActionResult> Revert(Guid id, [FromBody] ReceiptRevertRequest? request, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор прихода.");
+        }
+
+        if (request is null || request.VersionId == Guid.Empty)
+        {
+            return BadRequest("Версия отката не задана.");
+        }
+
+        try
+        {
+            var result = await _wipService.RevertReceiptAsync(id, request.VersionId, cancellationToken).ConfigureAwait(false);
+
+            var viewModel = new ReceiptRevertResultViewModel(
+                result.ReceiptId,
+                result.BalanceId,
+                result.PartId,
+                result.SectionId,
+                OperationNumber.Format(result.OpNumber),
+                result.TargetQuantity,
+                result.PreviousQuantity,
+                result.NewQuantity,
+                result.VersionId);
 
             return Ok(viewModel);
         }
@@ -235,4 +277,6 @@ public class WipReceiptsController : Controller
         Guid? WipLabelId,
         string? LabelNumber,
         bool IsAssigned = false);
+
+    public record ReceiptRevertRequest(Guid VersionId);
 }
