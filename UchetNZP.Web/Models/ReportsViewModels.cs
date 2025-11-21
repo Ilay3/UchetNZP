@@ -57,6 +57,7 @@ public record ScrapReportItemViewModel(
     string PartName,
     string? PartCode,
     string OpNumber,
+    string OperationName,
     decimal Quantity,
     string ScrapType,
     string Employee,

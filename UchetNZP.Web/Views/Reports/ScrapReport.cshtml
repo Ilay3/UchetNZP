@@ -83,7 +83,6 @@
                     <thead class="table-light">
                         <tr>
                             <th scope="col">Дата</th>
-                            <th scope="col">Вид работ</th>
                             <th scope="col">Деталь</th>
                             <th scope="col">Ярлык</th>
                             <th scope="col">Операция</th>
@@ -97,7 +96,6 @@
                         {
                             <tr>
                                 <td>@item.Date.ToString("dd.MM.yyyy")</td>
-                                <td>@item.SectionName</td>
                                 <td>
                                     <div class="fw-semibold">@item.PartName</div>
                                     @if (!string.IsNullOrWhiteSpace(item.PartCode))
@@ -106,7 +104,13 @@
                                     }
                                 </td>
                                 <td>@(string.IsNullOrWhiteSpace(item.LabelNumber) ? "—" : item.LabelNumber)</td>
-                                <td>@item.OpNumber</td>
+                                <td>
+                                    <div class="fw-semibold">@item.OpNumber</div>
+                                    @if (!string.IsNullOrWhiteSpace(item.OperationName))
+                                    {
+                                        <div class="text-muted small">@item.OperationName</div>
+                                    }
+                                </td>
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@item.ScrapType</td>
                                 <td>@(string.IsNullOrWhiteSpace(item.Comment) ? "—" : item.Comment)</td>

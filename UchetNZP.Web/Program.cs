@@ -1,3 +1,4 @@
+using System.Threading;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -48,6 +49,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.Migrate();
+    await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
 }
 
 if (!app.Environment.IsDevelopment())
