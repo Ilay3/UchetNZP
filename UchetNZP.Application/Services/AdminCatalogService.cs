@@ -242,29 +242,29 @@ public class AdminCatalogService : IAdminCatalogService
                 OperationLabel = x.Operation != null ? x.Operation.Code : null
             });
 
-        return await _dbContext.WipBalances
-            .AsNoTracking()
-            .Include(x => x.Part)
-            .Include(x => x.Section)
-            .GroupJoin(
-                routes,
-                balance => new { balance.PartId, balance.SectionId, balance.OpNumber },
-                route => new { route.PartId, route.SectionId, route.OpNumber },
-                (balance, routeGroup) => new { balance, route = routeGroup.FirstOrDefault() })
-            .OrderBy(x => x.balance.Part != null ? x.balance.Part.Name : string.Empty)
-            .ThenBy(x => x.balance.Section != null ? x.balance.Section.Name : string.Empty)
-            .ThenBy(x => x.balance.OpNumber)
-            .Select(x => new AdminWipBalanceDto(
-                x.balance.Id,
-                x.balance.PartId,
-                x.balance.Part != null ? x.balance.Part.Name : string.Empty,
-                x.balance.SectionId,
-                x.balance.Section != null ? x.balance.Section.Name : string.Empty,
-                x.balance.OpNumber,
-                x.balance.Quantity,
-                x.route != null ? x.route.OperationId : null,
-                x.route != null ? x.route.OperationName : string.Empty,
-                x.route != null ? x.route.OperationLabel : null))
+        return await (
+                from balance in _dbContext.WipBalances
+                    .AsNoTracking()
+                    .Include(x => x.Part)
+                    .Include(x => x.Section)
+                join route in routes
+                    on (balance.PartId, balance.SectionId, balance.OpNumber)
+                    equals (route.PartId, route.SectionId, route.OpNumber) into routeGroup
+                from route in routeGroup.DefaultIfEmpty()
+                orderby balance.Part != null ? balance.Part.Name : string.Empty,
+                    balance.Section != null ? balance.Section.Name : string.Empty,
+                    balance.OpNumber
+                select new AdminWipBalanceDto(
+                    balance.Id,
+                    balance.PartId,
+                    balance.Part != null ? balance.Part.Name : string.Empty,
+                    balance.SectionId,
+                    balance.Section != null ? balance.Section.Name : string.Empty,
+                    balance.OpNumber,
+                    balance.Quantity,
+                    route != null ? route.OperationId : null,
+                    route != null ? route.OperationName : string.Empty,
+                    route != null ? route.OperationLabel : null))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
