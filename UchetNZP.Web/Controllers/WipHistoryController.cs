@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using UchetNZP.Application.Abstractions;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Shared;
@@ -16,10 +18,12 @@ namespace UchetNZP.Web.Controllers;
 public class WipHistoryController : Controller
 {
     private readonly AppDbContext _dbContext;
+    private readonly IWipService? _wipService;
 
-    public WipHistoryController(AppDbContext dbContext)
+    public WipHistoryController(AppDbContext dbContext, IWipService? wipService = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _wipService = wipService;
     }
 
     [HttpGet("")]
@@ -458,6 +462,51 @@ public class WipHistoryController : Controller
         }
 
         return result;
+    }
+
+    [HttpDelete("receipt/{id:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> DeleteReceipt(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор прихода.");
+        }
+
+        if (_wipService is null)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Сервис обработки НЗП недоступен.");
+        }
+
+        try
+        {
+            var result = await _wipService.DeleteReceiptAsync(id, cancellationToken).ConfigureAwait(false);
+
+            var viewModel = new ReceiptDeleteResultViewModel(
+                result.ReceiptId,
+                result.BalanceId,
+                result.PartId,
+                result.SectionId,
+                OperationNumber.Format(result.OpNumber),
+                result.ReceiptQuantity,
+                result.PreviousQuantity,
+                result.RestoredQuantity,
+                result.Delta,
+                result.VersionId);
+
+            return Ok(viewModel);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     private static bool TryParseType(string? value, out WipHistoryEntryType type)
