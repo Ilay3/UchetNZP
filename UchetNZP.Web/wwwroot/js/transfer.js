@@ -1144,8 +1144,10 @@
 
         const label = selectedLabelOption;
         if (labelOptions.length > 0 && !label) {
-            alert("Выберите ярлык для списания.");
-            return;
+            const confirmed = confirm("Добавить передачу без списания по ярлыку?");
+            if (!confirmed) {
+                return;
+            }
         }
 
         const fromAvailable = getAvailableBalance(part.id, selectedFromOperation.opNumber, label?.id ?? null);
