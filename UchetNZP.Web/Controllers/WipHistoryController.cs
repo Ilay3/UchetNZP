@@ -278,7 +278,7 @@ public class WipHistoryController : Controller
             var fromUtc = ToUtcStartOfDay(fromDate);
             var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
 
-            var transfersQuery = _dbContext.TransferAudits
+            var transferAuditsQuery = _dbContext.TransferAudits
                 .AsNoTracking()
                 .Where(x => x.TransferDate >= fromUtc && x.TransferDate < toUtcExclusive)
                 .Include(x => x.Operations)
@@ -286,21 +286,48 @@ public class WipHistoryController : Controller
 
             if (hasPartFilter)
             {
-                transfersQuery = transfersQuery.Where(x => partIds.Contains(x.PartId));
+                transferAuditsQuery = transferAuditsQuery.Where(x => partIds.Contains(x.PartId));
             }
 
             if (hasSectionFilter)
             {
-                transfersQuery = transfersQuery.Where(x => sectionIds.Contains(x.FromSectionId) || sectionIds.Contains(x.ToSectionId));
+                transferAuditsQuery = transferAuditsQuery.Where(x => sectionIds.Contains(x.FromSectionId) || sectionIds.Contains(x.ToSectionId));
             }
 
-            var transfers = await transfersQuery
+            var wipTransfersQuery = _dbContext.WipTransfers
+                .AsNoTracking()
+                .Where(x => x.TransferDate >= fromUtc && x.TransferDate < toUtcExclusive)
+                .Include(x => x.Operations)
+                .Include(x => x.Scrap)
+                .Include(x => x.WipLabel)
+                .AsQueryable();
+
+            if (hasPartFilter)
+            {
+                wipTransfersQuery = wipTransfersQuery.Where(x => partIds.Contains(x.PartId));
+            }
+
+            if (hasSectionFilter)
+            {
+                wipTransfersQuery = wipTransfersQuery.Where(x =>
+                    sectionIds.Contains(x.FromSectionId) ||
+                    sectionIds.Contains(x.ToSectionId) ||
+                    x.Operations.Any(operation => sectionIds.Contains(operation.SectionId)));
+            }
+
+            var transferAudits = await transferAuditsQuery
                 .OrderBy(x => x.TransferDate)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            var transferSectionIds = transfers
+            var wipTransfers = await wipTransfersQuery
+                .OrderBy(x => x.TransferDate)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var transferSectionIds = transferAudits
                 .SelectMany(x => new[] { x.FromSectionId, x.ToSectionId }.Concat(x.Operations.Select(o => o.SectionId)))
+                .Concat(wipTransfers.SelectMany(x => new[] { x.FromSectionId, x.ToSectionId }.Concat(x.Operations.Select(o => o.SectionId))))
                 .Where(id => id != Guid.Empty)
                 .Distinct()
                 .ToList();
@@ -313,8 +340,9 @@ public class WipHistoryController : Controller
                     .ToDictionaryAsync(section => section.Id, section => section.Name, cancellationToken)
                     .ConfigureAwait(false);
 
-            var transferPartIds = transfers
+            var transferPartIds = transferAudits
                 .Select(x => x.PartId)
+                .Concat(wipTransfers.Select(x => x.PartId))
                 .Distinct()
                 .ToList();
 
@@ -326,11 +354,13 @@ public class WipHistoryController : Controller
                     .ToDictionaryAsync(part => part.Id, part => (part.Name, part.Code), cancellationToken)
                     .ConfigureAwait(false);
 
-            var operationIds = transfers
+            var operationIds = transferAudits
                 .SelectMany(x => x.Operations)
                 .Select(x => x.OperationId)
                 .Where(x => x.HasValue)
                 .Select(x => x!.Value)
+                .Concat(wipTransfers.SelectMany(x => x.Operations).Select(x => x.OperationId))
+                .Where(id => id != Guid.Empty)
                 .Distinct()
                 .ToList();
 
@@ -342,7 +372,7 @@ public class WipHistoryController : Controller
                     .ToDictionaryAsync(operation => operation.Id, operation => operation.Name, cancellationToken)
                     .ConfigureAwait(false);
 
-            foreach (var transfer in transfers)
+            foreach (var transfer in transferAudits)
             {
                 var orderedOperations = transfer.Operations
                     .OrderBy(op => op.OpNumber)
@@ -377,7 +407,7 @@ public class WipHistoryController : Controller
                     transfer.TransferId,
                     WipHistoryEntryType.Transfer,
                     ToLocalDateTime(transfer.TransferDate),
-                    partInfo.Name,
+                    partInfo.Name ?? string.Empty,
                     partInfo.Code,
                     fromSectionName ?? string.Empty,
                     toSectionName ?? string.Empty,
@@ -393,6 +423,65 @@ public class WipHistoryController : Controller
                     transfer.IsReverted,
                     null,
                     transfer.Id);
+
+                entries.Add(entry);
+            }
+
+            foreach (var transfer in wipTransfers)
+            {
+                var orderedOperations = transfer.Operations
+                    .OrderBy(op => op.OpNumber)
+                    .Select(op =>
+                    {
+                        operationLookup.TryGetValue(op.OperationId, out var operationName);
+                        sectionLookup.TryGetValue(op.SectionId, out var opSectionName);
+
+                        return new WipHistoryOperationDetailViewModel(
+                            OperationNumber.Format(op.OpNumber),
+                            operationName ?? string.Empty,
+                            opSectionName ?? string.Empty,
+                            null,
+                            null,
+                            op.QuantityChange);
+                    })
+                    .ToList();
+
+                var scrap = transfer.Scrap is null || transfer.Scrap.Quantity <= 0m
+                    ? null
+                    : new WipHistoryScrapViewModel(
+                        GetScrapDisplayName(transfer.Scrap.ScrapType),
+                        transfer.Scrap.Quantity,
+                        transfer.Scrap.Comment);
+
+                sectionLookup.TryGetValue(transfer.FromSectionId, out var fromSection);
+                sectionLookup.TryGetValue(transfer.ToSectionId, out var toSection);
+
+                transferPartLookup.TryGetValue(transfer.PartId, out var partInfo);
+
+                var labelNumber = transfer.WipLabel is not null && !string.IsNullOrWhiteSpace(transfer.WipLabel.Number)
+                    ? transfer.WipLabel.Number
+                    : null;
+
+                var entry = new WipHistoryEntryViewModel(
+                    transfer.Id,
+                    WipHistoryEntryType.Transfer,
+                    ToLocalDateTime(transfer.TransferDate),
+                    partInfo.Name ?? string.Empty,
+                    partInfo.Code,
+                    fromSection ?? string.Empty,
+                    toSection ?? string.Empty,
+                    OperationNumber.Format(transfer.FromOpNumber),
+                    OperationNumber.Format(transfer.ToOpNumber),
+                    transfer.Quantity,
+                    null,
+                    transfer.Comment,
+                    labelNumber,
+                    orderedOperations,
+                    scrap,
+                    false,
+                    false,
+                    null,
+                    null);
 
                 entries.Add(entry);
             }

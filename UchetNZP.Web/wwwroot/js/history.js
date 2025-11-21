@@ -233,7 +233,6 @@
     async function revertTransfer(entry) {
         const auditId = entry.getAttribute("data-audit-id");
         if (!auditId) {
-            showMessage("danger", "Не найден идентификатор аудита передачи.");
             return false;
         }
 
