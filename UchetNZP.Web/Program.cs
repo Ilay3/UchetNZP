@@ -48,8 +48,15 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
-    await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
+    if (db.Database.IsRelational())
+    {
+        db.Database.Migrate();
+        await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
+    }
+    else
+    {
+        await db.Database.EnsureCreatedAsync(CancellationToken.None);
+    }
 }
 
 if (!app.Environment.IsDevelopment())
@@ -71,3 +78,7 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+public partial class Program
+{
+}

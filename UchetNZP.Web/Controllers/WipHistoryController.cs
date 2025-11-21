@@ -160,7 +160,10 @@ public class WipHistoryController : Controller
                     null,
                     orderedOperations,
                     null,
-                    false);
+                    false,
+                    false,
+                    null,
+                    null);
 
                 entries.Add(entry);
             }
@@ -194,9 +197,23 @@ public class WipHistoryController : Controller
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
+            var receiptIds = receipts.Select(x => x.Id).Distinct().ToList();
             var receiptPartIds = receipts.Select(x => x.PartId).Distinct().ToList();
             var receiptSectionIds = receipts.Select(x => x.SectionId).Distinct().ToList();
             var opNumbers = receipts.Select(x => x.OpNumber).Distinct().ToList();
+
+            var receiptAudits = receipts.Count == 0
+                ? new List<ReceiptAudit>()
+                : await _dbContext.ReceiptAudits
+                    .AsNoTracking()
+                    .Where(audit => receiptIds.Contains(audit.ReceiptId))
+                    .OrderByDescending(audit => audit.CreatedAt)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+            var receiptAuditLookup = receiptAudits
+                .GroupBy(audit => audit.ReceiptId)
+                .ToDictionary(group => group.Key, group => group.ToList());
 
             var routes = await _dbContext.PartRoutes
                 .AsNoTracking()
@@ -215,6 +232,9 @@ public class WipHistoryController : Controller
             foreach (var receipt in receipts)
             {
                 routeLookup.TryGetValue((receipt.PartId, receipt.SectionId, receipt.OpNumber), out var route);
+                receiptAuditLookup.TryGetValue(receipt.Id, out var audits);
+                var hasVersions = audits is { Count: > 0 };
+                Guid? latestVersionId = hasVersions ? audits![0].VersionId : null;
 
                 var entry = new WipHistoryEntryViewModel(
                     receipt.Id,
@@ -232,20 +252,23 @@ public class WipHistoryController : Controller
                     receipt.WipLabel != null && !string.IsNullOrWhiteSpace(receipt.WipLabel.Number)
                         ? receipt.WipLabel.Number
                         : null,
-                        route != null
-                            ? new List<WipHistoryOperationDetailViewModel>
-                            {
-                                new WipHistoryOperationDetailViewModel(
-                                    OperationNumber.Format(route.OpNumber),
-                                    route.Operation != null ? route.Operation.Name : string.Empty,
-                                    receipt.Section != null ? receipt.Section.Name : string.Empty,
-                                    route.NormHours,
-                                    null,
-                                    null)
-                            }
-                            : Array.Empty<WipHistoryOperationDetailViewModel>(),
-                        null,
-                        false);
+                    route != null
+                        ? new List<WipHistoryOperationDetailViewModel>
+                        {
+                            new WipHistoryOperationDetailViewModel(
+                                OperationNumber.Format(route.OpNumber),
+                                route.Operation != null ? route.Operation.Name : string.Empty,
+                                receipt.Section != null ? receipt.Section.Name : string.Empty,
+                                route.NormHours,
+                                null,
+                                null)
+                        }
+                        : Array.Empty<WipHistoryOperationDetailViewModel>(),
+                    null,
+                    hasVersions,
+                    false,
+                    latestVersionId,
+                    null);
 
                 entries.Add(entry);
             }
@@ -367,7 +390,10 @@ public class WipHistoryController : Controller
                     transfer.LabelNumber,
                     orderedOperations,
                     scrap,
-                    transfer.IsReverted);
+                    true,
+                    transfer.IsReverted,
+                    null,
+                    transfer.Id);
 
                 entries.Add(entry);
             }
