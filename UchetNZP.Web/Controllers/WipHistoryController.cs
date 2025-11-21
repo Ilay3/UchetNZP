@@ -487,7 +487,16 @@ public class WipHistoryController : Controller
             }
         }
 
-        var grouped = entries
+        var deduplicatedEntries = entries
+    .GroupBy(entry => (entry.Type, entry.Id))
+    .Select(group => group
+        .OrderByDescending(HasActionButtons)
+        .ThenByDescending(entry => entry.HasVersions)
+        .ThenByDescending(entry => entry.OccurredAt)
+        .First())
+    .ToList();
+
+        var grouped = deduplicatedEntries
             .GroupBy(x => x.Date)
             .OrderByDescending(g => g.Key)
             .Select(g =>
@@ -528,6 +537,13 @@ public class WipHistoryController : Controller
 
         return View("~/Views/Wip/History.cshtml", model);
     }
+
+    private static bool HasActionButtons(WipHistoryEntryViewModel entry)
+    {
+        return entry.Type == WipHistoryEntryType.Receipt ||
+            (entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions && entry.AuditId.HasValue);
+    }
+
 
     private static HashSet<WipHistoryEntryType> ParseTypes(string[]? types)
     {
