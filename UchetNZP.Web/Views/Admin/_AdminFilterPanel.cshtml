@@ -1,0 +1,32 @@
+@using System
+@model AdminFilterPanelViewModel
+
+<form id="@Model.FormId" class="card card-body mb-3 admin-filter-form" data-table-target="@Model.TargetTableId">
+    <div class="row g-3 align-items-end">
+        @foreach (var input in Model.Inputs)
+        {
+            <div class="@input.CssClass">
+                <label for="@input.Id" class="form-label">@input.Label</label>
+                @if (string.Equals(input.Type, "select", StringComparison.OrdinalIgnoreCase) && input.Options is not null)
+                {
+                    <select id="@input.Id" name="@input.Name" class="form-select">
+                        <option value="">Все</option>
+                        @foreach (var option in input.Options)
+                        {
+                            var selected = option.Value == input.Value ? "selected" : null;
+                            <option value="@option.Value" selected="@selected">@option.Text</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <input type="@input.Type" id="@input.Id" name="@input.Name" value="@input.Value" class="form-control" placeholder="@input.Placeholder" />
+                }
+            </div>
+        }
+        <div class="col-md-2 col-lg-1 d-flex gap-2">
+            <button type="submit" class="btn btn-outline-primary flex-fill">@Model.SubmitLabel</button>
+            <button type="button" class="btn btn-link text-decoration-none admin-filter-reset" title="Сбросить фильтры">Сброс</button>
+        </div>
+    </div>
+</form>

@@ -138,3 +138,60 @@ public class AdminWipBalanceUpdateInputModel : AdminWipBalanceInputModel
     [Required]
     public Guid Id { get; set; }
 }
+
+public class AdminFilterInputViewModel
+{
+    public AdminFilterInputViewModel(
+        string id,
+        string name,
+        string label,
+        string? value = null,
+        string type = "text",
+        string? placeholder = null,
+        string cssClass = "col-md-4",
+        IEnumerable<SelectListItem>? options = null)
+    {
+        Id = id;
+        Name = name;
+        Label = label;
+        Value = value;
+        Type = type;
+        Placeholder = placeholder;
+        CssClass = cssClass;
+        Options = options;
+    }
+
+    public string Id { get; }
+
+    public string Name { get; }
+
+    public string Label { get; }
+
+    public string Type { get; }
+
+    public string? Placeholder { get; }
+
+    public string? Value { get; }
+
+    public string CssClass { get; }
+
+    public IEnumerable<SelectListItem>? Options { get; }
+}
+
+public class AdminFilterPanelViewModel
+{
+    public string FormId { get; init; } = string.Empty;
+
+    public string TargetTableId { get; init; } = string.Empty;
+
+    public string SubmitLabel { get; init; } = "Применить";
+
+    public IReadOnlyCollection<AdminFilterInputViewModel> Inputs { get; init; } = Array.Empty<AdminFilterInputViewModel>();
+}
+
+public class AdminTableActionsViewModel
+{
+    public string TemplateId { get; init; } = string.Empty;
+
+    public string EntityKey { get; init; } = string.Empty;
+}
