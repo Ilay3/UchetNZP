@@ -324,24 +324,26 @@
             return;
         }
 
-        if (target.classList.contains("js-history-transfer-revert")) {
-            const entry = target.closest(".js-history-entry");
+        const transferButton = target.closest(".js-history-transfer-revert");
+        if (transferButton instanceof HTMLButtonElement) {
+            const entry = transferButton.closest(".js-history-entry");
             if (entry) {
-                target.disabled = true;
+                transferButton.disabled = true;
                 revertTransfer(entry)
                     .then(success => {
                         if (!success) {
-                            target.disabled = false;
+                            transferButton.disabled = false;
                         }
                     })
                     .catch(() => {
-                        target.disabled = false;
+                        transferButton.disabled = false;
                     });
             }
         }
 
-        if (target.classList.contains("js-history-receipt-revert")) {
-            const entry = target.closest(".js-history-entry");
+        const receiptButton = target.closest(".js-history-receipt-revert");
+        if (receiptButton instanceof HTMLButtonElement) {
+            const entry = receiptButton.closest(".js-history-entry");
             if (entry) {
                 loadReceiptVersions(entry).catch(() => {
                     showMessage("danger", "Не удалось загрузить версии прихода.");
