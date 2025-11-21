@@ -134,6 +134,11 @@ public class AdminWipBalanceInputModel
     [Required]
     public Guid SectionId { get; set; }
 
+    public Guid? OperationId { get; set; }
+
+    [MaxLength(64)]
+    public string? OperationLabel { get; set; }
+
     [Range(0, int.MaxValue)]
     public int OpNumber { get; set; }
 

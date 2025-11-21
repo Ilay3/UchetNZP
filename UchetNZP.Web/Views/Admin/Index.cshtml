@@ -263,6 +263,11 @@
             <label class="form-label">Операция</label>
             <select name="operationId" class="form-select">{{operationOptions}}</select>
         </div>
+        <div class="col-md-6 col-lg-4">
+            <label class="form-label">Ярлык операции</label>
+            <input type="text" name="operationLabel" class="form-control" value="{{operationLabel}}" placeholder="Код операции" />
+            <div class="form-text">Если указан новый ярлык, он будет создан и связан с записью.</div>
+        </div>
         <div class="col-md-3 col-lg-2">
             <label class="form-label">№ операции</label>
             <input type="number" name="opNumber" class="form-control" value="{{opNumber}}" min="0" required />

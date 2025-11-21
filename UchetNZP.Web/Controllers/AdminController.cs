@@ -43,12 +43,12 @@ public class AdminController : Controller
         var errorMessage = ReadTempData(ErrorTempDataKey);
 
         var filters = NormalizeFilters(new AdminCatalogFilters(
-            partSearch,
-            operationSearch,
-            sectionSearch,
-            wipBalancePartFilter,
-            wipBalanceSectionFilter,
-            wipBalanceSearch));
+            PartSearch: partSearch,
+            OperationSearch: operationSearch,
+            SectionSearch: sectionSearch,
+            WipBalancePartFilter: wipBalancePartFilter,
+            WipBalanceSectionFilter: wipBalanceSectionFilter,
+            WipBalanceSearch: wipBalanceSearch));
 
         var viewModel = await BuildIndexViewModelAsync(
             cancellationToken,
@@ -68,7 +68,7 @@ public class AdminController : Controller
         int limit = 10,
         CancellationToken cancellationToken = default)
     {
-        var filters = NormalizeFilters(new AdminCatalogFilters(partSearch: partSearch));
+        var filters = NormalizeFilters(new AdminCatalogFilters(PartSearch: partSearch));
         var partDtos = await _catalogService.GetPartsAsync(cancellationToken).ConfigureAwait(false);
         var partRows = partDtos
             .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
@@ -93,7 +93,7 @@ public class AdminController : Controller
         int limit = 10,
         CancellationToken cancellationToken = default)
     {
-        var filters = NormalizeFilters(new AdminCatalogFilters(operationSearch: operationSearch));
+        var filters = NormalizeFilters(new AdminCatalogFilters(OperationSearch: operationSearch));
         var operationDtos = await _catalogService.GetOperationsAsync(cancellationToken).ConfigureAwait(false);
         var operationRows = operationDtos
             .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
@@ -118,7 +118,7 @@ public class AdminController : Controller
         int limit = 10,
         CancellationToken cancellationToken = default)
     {
-        var filters = NormalizeFilters(new AdminCatalogFilters(sectionSearch: sectionSearch));
+        var filters = NormalizeFilters(new AdminCatalogFilters(SectionSearch: sectionSearch));
         var sectionDtos = await _catalogService.GetSectionsAsync(cancellationToken).ConfigureAwait(false);
         var sectionRows = sectionDtos
             .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
@@ -146,9 +146,9 @@ public class AdminController : Controller
         CancellationToken cancellationToken = default)
     {
         var filters = NormalizeFilters(new AdminCatalogFilters(
-            wipBalancePartFilter: wipBalancePartFilter,
-            wipBalanceSectionFilter: wipBalanceSectionFilter,
-            wipBalanceSearch: wipBalanceSearch));
+            WipBalancePartFilter: wipBalancePartFilter,
+            WipBalanceSectionFilter: wipBalanceSectionFilter,
+            WipBalanceSearch: wipBalanceSearch));
 
         var balanceDtos = await _catalogService.GetWipBalancesAsync(cancellationToken).ConfigureAwait(false);
         var balances = balanceDtos
@@ -497,7 +497,7 @@ public class AdminController : Controller
         try
         {
             await _catalogService.CreateWipBalanceAsync(
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity),
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Остаток успешно создан.";
@@ -551,7 +551,7 @@ public class AdminController : Controller
         {
             await _catalogService.UpdateWipBalanceAsync(
                 input.Id,
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity),
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Изменения остатка сохранены.";
@@ -798,7 +798,9 @@ public class AdminController : Controller
 
         try
         {
-            var result = await _catalogService.CreateWipBalanceAsync(new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity), cancellationToken).ConfigureAwait(false);
+            var result = await _catalogService.CreateWipBalanceAsync(
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                cancellationToken).ConfigureAwait(false);
             return Json(MapBalance(result));
         }
         catch (Exception ex)
@@ -824,7 +826,10 @@ public class AdminController : Controller
 
         try
         {
-            var result = await _catalogService.UpdateWipBalanceAsync(id, new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity), cancellationToken).ConfigureAwait(false);
+            var result = await _catalogService.UpdateWipBalanceAsync(
+                id,
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                cancellationToken).ConfigureAwait(false);
             return Json(MapBalance(result));
         }
         catch (Exception ex)
