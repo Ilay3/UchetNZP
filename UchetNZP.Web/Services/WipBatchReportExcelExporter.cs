@@ -61,12 +61,11 @@ public class WipBatchReportExcelExporter : IWipBatchReportExcelExporter
         }
 
         worksheet.Cell(rowIndex, 1).Value = "Деталь";
-        worksheet.Cell(rowIndex, 2).Value = "Обозначение";
-        worksheet.Cell(rowIndex, 3).Value = "Вид работ";
-        worksheet.Cell(rowIndex, 4).Value = "Операция";
-        worksheet.Cell(rowIndex, 5).Value = "Ярлыки";
-        worksheet.Cell(rowIndex, 6).Value = "Остаток";
-        worksheet.Cell(rowIndex, 7).Value = "Дата партии";
+        worksheet.Cell(rowIndex, 2).Value = "Вид работ";
+        worksheet.Cell(rowIndex, 3).Value = "Операция";
+        worksheet.Cell(rowIndex, 4).Value = "Ярлыки";
+        worksheet.Cell(rowIndex, 5).Value = "Остаток";
+        worksheet.Cell(rowIndex, 6).Value = "Дата партии";
         worksheet.Row(rowIndex).Style.Font.SetBold(true);
         worksheet.Row(rowIndex).Style.Fill.BackgroundColor = XLColor.FromHtml("#f8f9fa");
         worksheet.Row(rowIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
@@ -84,14 +83,13 @@ public class WipBatchReportExcelExporter : IWipBatchReportExcelExporter
             foreach (var item in items)
             {
                 worksheet.Cell(rowIndex, 1).Value = item.PartName;
-                worksheet.Cell(rowIndex, 2).Value = item.PartCode ?? string.Empty;
-                worksheet.Cell(rowIndex, 3).Value = item.SectionName;
-                worksheet.Cell(rowIndex, 4).Value = item.OpNumber;
-                worksheet.Cell(rowIndex, 5).Value = item.LabelNumbers ?? string.Empty;
-                worksheet.Cell(rowIndex, 6).Value = item.Quantity;
-                worksheet.Cell(rowIndex, 6).Style.NumberFormat.Format = "0.###";
-                worksheet.Cell(rowIndex, 7).Value = item.BatchDate;
-                worksheet.Cell(rowIndex, 7).Style.DateFormat.Format = "dd.MM.yyyy";
+                worksheet.Cell(rowIndex, 2).Value = item.SectionName;
+                worksheet.Cell(rowIndex, 3).Value = item.OpNumber;
+                worksheet.Cell(rowIndex, 4).Value = item.LabelNumbers ?? string.Empty;
+                worksheet.Cell(rowIndex, 5).Value = item.Quantity;
+                worksheet.Cell(rowIndex, 5).Style.NumberFormat.Format = "0.###";
+                worksheet.Cell(rowIndex, 6).Value = item.BatchDate;
+                worksheet.Cell(rowIndex, 6).Style.DateFormat.Format = "dd.MM.yyyy";
                 rowIndex++;
             }
 
