@@ -248,8 +248,8 @@ public class AdminCatalogService : IAdminCatalogService
                     .Include(x => x.Part)
                     .Include(x => x.Section)
                 join route in routes
-                    on (balance.PartId, balance.SectionId, balance.OpNumber)
-                    equals (route.PartId, route.SectionId, route.OpNumber) into routeGroup
+                    on new { balance.PartId, balance.SectionId, balance.OpNumber }
+                    equals new { route.PartId, route.SectionId, route.OpNumber } into routeGroup
                 from route in routeGroup.DefaultIfEmpty()
                 orderby balance.Part != null ? balance.Part.Name : string.Empty,
                     balance.Section != null ? balance.Section.Name : string.Empty,
