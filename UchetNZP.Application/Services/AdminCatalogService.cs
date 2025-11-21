@@ -247,10 +247,9 @@ public class AdminCatalogService : IAdminCatalogService
                     .AsNoTracking()
                     .Include(x => x.Part)
                     .Include(x => x.Section)
-                join route in routes
-                    on (balance.PartId, balance.SectionId, balance.OpNumber)
-                    equals (route.PartId, route.SectionId, route.OpNumber) into routeGroup
-                from route in routeGroup.DefaultIfEmpty()
+                from route in routes
+                    .Where(x => x.PartId == balance.PartId && x.SectionId == balance.SectionId && x.OpNumber == balance.OpNumber)
+                    .DefaultIfEmpty()
                 orderby balance.Part != null ? balance.Part.Name : string.Empty,
                     balance.Section != null ? balance.Section.Name : string.Empty,
                     balance.OpNumber
@@ -280,6 +279,8 @@ public class AdminCatalogService : IAdminCatalogService
 
         await EnsurePartExistsAsync(input.PartId, cancellationToken).ConfigureAwait(false);
         await EnsureSectionExistsAsync(input.SectionId, cancellationToken).ConfigureAwait(false);
+
+        await UpsertRouteAsync(input, cancellationToken).ConfigureAwait(false);
 
         var entity = new WipBalance
         {
@@ -311,6 +312,8 @@ public class AdminCatalogService : IAdminCatalogService
         await EnsurePartExistsAsync(input.PartId, cancellationToken).ConfigureAwait(false);
         await EnsureSectionExistsAsync(input.SectionId, cancellationToken).ConfigureAwait(false);
 
+        await UpsertRouteAsync(input, cancellationToken).ConfigureAwait(false);
+
         entity.PartId = input.PartId;
         entity.SectionId = input.SectionId;
         entity.OpNumber = input.OpNumber;
@@ -319,6 +322,94 @@ public class AdminCatalogService : IAdminCatalogService
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return await MapWipBalanceAsync(entity.Id, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task UpsertRouteAsync(AdminWipBalanceEditDto input, CancellationToken cancellationToken)
+    {
+        if (input.OperationId is null && string.IsNullOrWhiteSpace(input.OperationLabel))
+        {
+            return;
+        }
+
+        var route = await _dbContext.PartRoutes
+            .Include(x => x.Operation)
+            .FirstOrDefaultAsync(x => x.PartId == input.PartId && x.OpNumber == input.OpNumber, cancellationToken)
+            .ConfigureAwait(false);
+
+        var operation = await ResolveOperationAsync(input, route, cancellationToken).ConfigureAwait(false);
+
+        if (operation is null)
+        {
+            return;
+        }
+
+        if (route is null)
+        {
+            route = new PartRoute
+            {
+                Id = Guid.NewGuid(),
+                PartId = input.PartId,
+                OpNumber = input.OpNumber,
+            };
+
+            await _dbContext.PartRoutes.AddAsync(route, cancellationToken).ConfigureAwait(false);
+        }
+
+        route.SectionId = input.SectionId;
+        route.OperationId = operation.Id;
+    }
+
+    private async Task<Operation?> ResolveOperationAsync(AdminWipBalanceEditDto input, PartRoute? route, CancellationToken cancellationToken)
+    {
+        Operation? operation = null;
+
+        if (input.OperationId.HasValue)
+        {
+            operation = await _dbContext.Operations
+                .FirstOrDefaultAsync(x => x.Id == input.OperationId.Value, cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException($"Операция с идентификатором {input.OperationId.Value} не найдена.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(input.OperationLabel))
+        {
+            var normalizedLabel = input.OperationLabel.Trim();
+
+            if (operation is null)
+            {
+                operation = await _dbContext.Operations
+                    .FirstOrDefaultAsync(x => x.Code == normalizedLabel, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            if (operation is null)
+            {
+                operation = new Operation
+                {
+                    Id = Guid.NewGuid(),
+                    Name = normalizedLabel,
+                    Code = normalizedLabel,
+                };
+
+                await _dbContext.Operations.AddAsync(operation, cancellationToken).ConfigureAwait(false);
+            }
+            else if (string.IsNullOrWhiteSpace(operation.Code))
+            {
+                operation.Code = normalizedLabel;
+            }
+        }
+
+        if (operation is not null)
+        {
+            return operation;
+        }
+
+        if (route?.Operation is not null)
+        {
+            return route.Operation;
+        }
+
+        return null;
     }
 
     public async Task DeleteWipBalanceAsync(Guid id, CancellationToken cancellationToken = default)
@@ -363,6 +454,11 @@ public class AdminCatalogService : IAdminCatalogService
         {
             throw new InvalidOperationException("Количество не может быть отрицательным.");
         }
+
+        if (!string.IsNullOrWhiteSpace(input.OperationLabel) && input.OperationLabel.Trim().Length > 64)
+        {
+            throw new InvalidOperationException("Ярлык операции не может превышать 64 символа.");
+        }
     }
 
     private async Task EnsurePartExistsAsync(Guid partId, CancellationToken cancellationToken)
@@ -390,13 +486,16 @@ public class AdminCatalogService : IAdminCatalogService
             .Include(x => x.Part)
             .Include(x => x.Section)
             .Where(x => x.Id == id)
-            .GroupJoin(
-                _dbContext.PartRoutes
+            .SelectMany(
+                balance => _dbContext.PartRoutes
                     .AsNoTracking()
-                    .Include(x => x.Operation),
-                balance => new { balance.PartId, balance.SectionId, balance.OpNumber },
-                route => new { route.PartId, route.SectionId, route.OpNumber },
-                (balance, routeGroup) => new { balance, route = routeGroup.FirstOrDefault() })
+                    .Include(x => x.Operation)
+                    .Where(route =>
+                        route.PartId == balance.PartId
+                        && route.SectionId == balance.SectionId
+                        && route.OpNumber == balance.OpNumber)
+                    .DefaultIfEmpty(),
+                (balance, route) => new { balance, route })
             .Select(x => new AdminWipBalanceDto(
                 x.balance.Id,
                 x.balance.PartId,

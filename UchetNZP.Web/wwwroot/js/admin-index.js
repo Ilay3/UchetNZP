@@ -76,11 +76,21 @@
         return ret;
     }
 
+    function resolveOptionValue(option) {
+        return option.value ?? option.Value ?? '';
+    }
+
+    function resolveOptionText(option) {
+        return option.text ?? option.Text ?? '';
+    }
+
     function optionMarkup(options, selected) {
         return options
             .map((item) => {
-                const isSelected = selected && item.value === selected;
-                return `<option value="${item.value}" ${isSelected ? 'selected' : ''}>${item.text}</option>`;
+                const value = resolveOptionValue(item);
+                const text = resolveOptionText(item);
+                const isSelected = Boolean(selected) && value === selected;
+                return `<option value="${value}" ${isSelected ? 'selected' : ''}>${text}</option>`;
             })
             .join('');
     }
@@ -96,11 +106,12 @@
         const values = {
             name: row ? row.name : '',
             code: row ? row.code : '',
-            opNumber: row ? row.opNumber : '',
+            opNumber: row ? row.opNumberFormatted : '',
             quantity: row ? row.quantity : '',
             partOptions: optionMarkup(partOptions, row ? row.partId : ''),
             sectionOptions: optionMarkup(sectionOptions, row ? row.sectionId : ''),
-            operationOptions: optionMarkup(operationOptions, row ? row.operationId : '')
+            operationOptions: optionMarkup(operationOptions, row ? row.operationId : ''),
+            operationLabel: row ? row.operationLabel || '' : ''
         };
 
         modalFields.innerHTML = replacePlaceholders(rawTemplate, values);
@@ -125,8 +136,10 @@
             return {
                 partId: raw.partId,
                 sectionId: raw.sectionId,
-                opNumber: Number(raw.opNumber || 0),
-                quantity: Number(raw.quantity || 0)
+                opNumber: (raw.opNumber || '').trim(),
+                quantity: Number(raw.quantity || 0),
+                operationId: raw.operationId || null,
+                operationLabel: raw.operationLabel ? raw.operationLabel.trim() : null
             };
         }
 

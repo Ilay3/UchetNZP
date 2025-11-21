@@ -75,6 +75,8 @@ public class AdminCatalogWipBalanceRowViewModel
 
     public int OpNumber { get; init; }
 
+    public string OpNumberFormatted { get; init; } = string.Empty;
+
     public decimal Quantity { get; init; }
 }
 
@@ -134,8 +136,14 @@ public class AdminWipBalanceInputModel
     [Required]
     public Guid SectionId { get; set; }
 
-    [Range(0, int.MaxValue)]
-    public int OpNumber { get; set; }
+    public Guid? OperationId { get; set; }
+
+    [MaxLength(64)]
+    public string? OperationLabel { get; set; }
+
+    [Required]
+    [RegularExpression(UchetNZP.Shared.OperationNumber.AllowedPattern)]
+    public string OpNumber { get; set; } = string.Empty;
 
     [Range(0, 999999999)]
     public decimal Quantity { get; set; }

@@ -26,4 +26,10 @@ public record AdminWipBalanceDto(
     string OperationName,
     string? OperationLabel);
 
-public record AdminWipBalanceEditDto(Guid PartId, Guid SectionId, int OpNumber, decimal Quantity);
+public record AdminWipBalanceEditDto(
+    Guid PartId,
+    Guid SectionId,
+    int OpNumber,
+    decimal Quantity,
+    Guid? OperationId = null,
+    string? OperationLabel = null);
