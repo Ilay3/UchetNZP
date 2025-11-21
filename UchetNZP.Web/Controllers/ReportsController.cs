@@ -491,6 +491,31 @@ public class ReportsController : Controller
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var partIds = scraps
+            .Select(x => x.PartId)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        var opNumbers = scraps
+            .Select(x => x.OpNumber)
+            .Distinct()
+            .ToList();
+
+        var routeLookup = await _dbContext.PartRoutes
+            .AsNoTracking()
+            .Include(x => x.Section)
+            .Include(x => x.Operation)
+            .Where(x => partIds.Contains(x.PartId) && opNumbers.Contains(x.OpNumber))
+            .GroupBy(x => new { x.PartId, x.OpNumber })
+            .ToDictionaryAsync(
+                x => (x.Key.PartId, x.Key.OpNumber),
+                x => new ScrapRouteInfo(
+                    x.Select(route => route.Operation?.Name).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)),
+                    x.Select(route => route.Section?.Name).FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))),
+                cancellationToken)
+            .ConfigureAwait(false);
+
         var scrapLabelKeys = scraps
             .Select(x => new LabelLookupKey(x.PartId, x.SectionId, x.OpNumber))
             .ToList();
@@ -517,10 +542,11 @@ public class ReportsController : Controller
         var items = scraps
             .Select(x => new ScrapReportItemViewModel(
                 ConvertToLocal(x.RecordedAt),
-                x.Section != null ? x.Section.Name : "Вид работ не задан",
+                GetSectionName(x, routeLookup),
                 x.Part != null ? x.Part.Name : string.Empty,
                 x.Part?.Code,
                 OperationNumber.Format(x.OpNumber),
+                GetOperationName(x, routeLookup),
                 x.Quantity,
                 GetScrapTypeDisplayName(x.ScrapType),
                 FormatEmployee(x.UserId),
@@ -694,4 +720,36 @@ public class ReportsController : Controller
 
     private static bool ContainsUserId(Guid userId, string term)
         => userId != Guid.Empty && userId.ToString().IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0;
+
+    private static string GetOperationName(
+        WipScrap in_scrap,
+        IReadOnlyDictionary<(Guid PartId, int OpNumber), ScrapRouteInfo> in_routeLookup)
+    {
+        var ret = GetSectionName(in_scrap, in_routeLookup);
+
+        if (in_routeLookup.TryGetValue((in_scrap.PartId, in_scrap.OpNumber), out var routeInfo) &&
+            !string.IsNullOrWhiteSpace(routeInfo.OperationName))
+        {
+            ret = routeInfo.OperationName!;
+        }
+
+        return ret;
+    }
+
+    private static string GetSectionName(
+        WipScrap in_scrap,
+        IReadOnlyDictionary<(Guid PartId, int OpNumber), ScrapRouteInfo> in_routeLookup)
+    {
+        var ret = in_scrap.Section != null ? in_scrap.Section.Name : "Вид работ не задан";
+
+        if (in_routeLookup.TryGetValue((in_scrap.PartId, in_scrap.OpNumber), out var routeInfo) &&
+            !string.IsNullOrWhiteSpace(routeInfo.SectionName))
+        {
+            ret = routeInfo.SectionName!;
+        }
+
+        return ret;
+    }
+
+    private sealed record ScrapRouteInfo(string? OperationName, string? SectionName);
 }

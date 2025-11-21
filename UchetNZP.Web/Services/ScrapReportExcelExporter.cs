@@ -62,21 +62,20 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
         }
 
         worksheet.Cell(rowIndex, 1).Value = "Дата";
-        worksheet.Cell(rowIndex, 2).Value = "Вид работ";
-        worksheet.Cell(rowIndex, 3).Value = "Деталь";
-        worksheet.Cell(rowIndex, 4).Value = "Обозначение";
-        worksheet.Cell(rowIndex, 5).Value = "№ операции";
-        worksheet.Cell(rowIndex, 6).Value = "Количество";
-        worksheet.Cell(rowIndex, 7).Value = "Тип брака";
-        worksheet.Cell(rowIndex, 8).Value = "Ярлык";
-        worksheet.Cell(rowIndex, 9).Value = "Комментарий";
+        worksheet.Cell(rowIndex, 2).Value = "Деталь";
+        worksheet.Cell(rowIndex, 3).Value = "Обозначение";
+        worksheet.Cell(rowIndex, 4).Value = "Операция";
+        worksheet.Cell(rowIndex, 5).Value = "Количество";
+        worksheet.Cell(rowIndex, 6).Value = "Тип брака";
+        worksheet.Cell(rowIndex, 7).Value = "Ярлык";
+        worksheet.Cell(rowIndex, 8).Value = "Комментарий";
         worksheet.Row(rowIndex).Style.Font.SetBold(true);
         rowIndex++;
 
         if (items.Count == 0)
         {
             worksheet.Cell(rowIndex, 1).Value = "По выбранным условиям данные не найдены.";
-            worksheet.Range(rowIndex, 1, rowIndex, 9).Merge();
+            worksheet.Range(rowIndex, 1, rowIndex, 8).Merge();
             worksheet.Row(rowIndex).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
             worksheet.Row(rowIndex).Style.Font.SetItalic(true);
         }
@@ -86,15 +85,14 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
             {
                 worksheet.Cell(rowIndex, 1).Value = item.Date;
                 worksheet.Cell(rowIndex, 1).Style.DateFormat.Format = "dd.MM.yyyy HH:mm";
-                worksheet.Cell(rowIndex, 2).Value = item.SectionName;
-                worksheet.Cell(rowIndex, 3).Value = item.PartName;
-                worksheet.Cell(rowIndex, 4).Value = item.PartCode ?? string.Empty;
-                worksheet.Cell(rowIndex, 5).Value = item.OpNumber;
-                worksheet.Cell(rowIndex, 6).Value = item.Quantity;
-                worksheet.Cell(rowIndex, 6).Style.NumberFormat.Format = "0.###";
-                worksheet.Cell(rowIndex, 7).Value = item.ScrapType;
-                worksheet.Cell(rowIndex, 8).Value = item.LabelNumber ?? string.Empty;
-                worksheet.Cell(rowIndex, 9).Value = item.Comment ?? string.Empty;
+                worksheet.Cell(rowIndex, 2).Value = item.PartName;
+                worksheet.Cell(rowIndex, 3).Value = item.PartCode ?? string.Empty;
+                worksheet.Cell(rowIndex, 4).Value = BuildOperationCellValue(item);
+                worksheet.Cell(rowIndex, 5).Value = item.Quantity;
+                worksheet.Cell(rowIndex, 5).Style.NumberFormat.Format = "0.###";
+                worksheet.Cell(rowIndex, 6).Value = item.ScrapType;
+                worksheet.Cell(rowIndex, 7).Value = item.LabelNumber ?? string.Empty;
+                worksheet.Cell(rowIndex, 8).Value = item.Comment ?? string.Empty;
                 rowIndex++;
             }
         }
@@ -112,6 +110,18 @@ public class ScrapReportExcelExporter : IScrapReportExcelExporter
         worksheet.Cell(rowIndex, 1).Style.Font.SetBold(true);
         worksheet.Cell(rowIndex, 2).Value = value;
         return rowIndex + 1;
+    }
+
+    private static string BuildOperationCellValue(ScrapReportItemViewModel in_item)
+    {
+        var ret = in_item.OpNumber;
+
+        if (!string.IsNullOrWhiteSpace(in_item.OperationName))
+        {
+            ret = string.Concat(in_item.OpNumber, " — ", in_item.OperationName);
+        }
+
+        return ret;
     }
 
     private static string GetScrapTypeDisplayName(string scrapType)
