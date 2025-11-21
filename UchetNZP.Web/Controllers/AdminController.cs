@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Routing;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Admin;
+using UchetNZP.Shared;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Controllers;
@@ -163,6 +164,7 @@ public class AdminController : Controller
                 OperationName = x.OperationName,
                 OperationLabel = x.OperationLabel,
                 OpNumber = x.OpNumber,
+                OpNumberFormatted = OperationNumber.Format(x.OpNumber),
                 Quantity = x.Quantity,
             })
             .ToList();
@@ -190,7 +192,7 @@ public class AdminController : Controller
                     || ContainsText(x.SectionName, search)
                     || ContainsText(x.OperationName, search)
                     || (!string.IsNullOrEmpty(x.OperationLabel) && ContainsText(x.OperationLabel!, search))
-                    || x.OpNumber.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                    || x.OpNumberFormatted.Contains(search, StringComparison.CurrentCultureIgnoreCase)
                     || x.Quantity.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase))
                 .ToList();
         }
@@ -497,7 +499,13 @@ public class AdminController : Controller
         try
         {
             await _catalogService.CreateWipBalanceAsync(
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                new AdminWipBalanceEditDto(
+                    input.PartId,
+                    input.SectionId,
+                    ParseOperationNumber(input.OpNumber, nameof(AdminWipBalanceInputModel.OpNumber)),
+                    input.Quantity,
+                    input.OperationId,
+                    input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Остаток успешно создан.";
@@ -551,7 +559,13 @@ public class AdminController : Controller
         {
             await _catalogService.UpdateWipBalanceAsync(
                 input.Id,
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                new AdminWipBalanceEditDto(
+                    input.PartId,
+                    input.SectionId,
+                    ParseOperationNumber(input.OpNumber, nameof(AdminWipBalanceInputModel.OpNumber)),
+                    input.Quantity,
+                    input.OperationId,
+                    input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Изменения остатка сохранены.";
@@ -799,7 +813,13 @@ public class AdminController : Controller
         try
         {
             var result = await _catalogService.CreateWipBalanceAsync(
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                new AdminWipBalanceEditDto(
+                    input.PartId,
+                    input.SectionId,
+                    ParseOperationNumber(input.OpNumber, nameof(AdminWipBalanceInputModel.OpNumber)),
+                    input.Quantity,
+                    input.OperationId,
+                    input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
             return Json(MapBalance(result));
         }
@@ -828,7 +848,13 @@ public class AdminController : Controller
         {
             var result = await _catalogService.UpdateWipBalanceAsync(
                 id,
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                new AdminWipBalanceEditDto(
+                    input.PartId,
+                    input.SectionId,
+                    ParseOperationNumber(input.OpNumber, nameof(AdminWipBalanceInputModel.OpNumber)),
+                    input.Quantity,
+                    input.OperationId,
+                    input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
             return Json(MapBalance(result));
         }
@@ -917,13 +943,14 @@ public class AdminController : Controller
                 PartName = x.PartName,
                 SectionId = x.SectionId,
                 SectionName = x.SectionName,
-                OperationId = x.OperationId,
-                OperationName = x.OperationName,
-                OperationLabel = x.OperationLabel,
-                OpNumber = x.OpNumber,
-                Quantity = x.Quantity,
-            })
-            .ToList();
+            OperationId = x.OperationId,
+            OperationName = x.OperationName,
+            OperationLabel = x.OperationLabel,
+            OpNumber = x.OpNumber,
+            OpNumberFormatted = OperationNumber.Format(x.OpNumber),
+            Quantity = x.Quantity,
+        })
+        .ToList();
 
         if (normalizedFilters.WipBalancePartFilter.HasValue)
         {
@@ -950,7 +977,7 @@ public class AdminController : Controller
                     || ContainsText(x.SectionName, search)
                     || ContainsText(x.OperationName, search)
                     || (!string.IsNullOrEmpty(x.OperationLabel) && ContainsText(x.OperationLabel!, search))
-                    || x.OpNumber.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase)
+                    || x.OpNumberFormatted.Contains(search, StringComparison.CurrentCultureIgnoreCase)
                     || x.Quantity.ToString(CultureInfo.CurrentCulture).Contains(search, StringComparison.CurrentCultureIgnoreCase))
                 .ToList();
         }
@@ -1030,6 +1057,11 @@ public class AdminController : Controller
         {
             ModelState.AddModelError(nameof(AdminWipBalanceInputModel.SectionId), "Выберите участок.");
         }
+
+        if (!OperationNumber.TryParse(input.OpNumber, out _))
+        {
+            ModelState.AddModelError(nameof(AdminWipBalanceInputModel.OpNumber), "Номер операции должен содержать от 1 до 10 цифр и может включать дробную часть через «/».");
+        }
     }
 
     private static AdminCatalogWipBalanceRowViewModel MapBalance(AdminWipBalanceDto dto)
@@ -1045,6 +1077,7 @@ public class AdminController : Controller
             OperationName = dto.OperationName,
             OperationLabel = dto.OperationLabel,
             OpNumber = dto.OpNumber,
+            OpNumberFormatted = OperationNumber.Format(dto.OpNumber),
             Quantity = dto.Quantity,
         };
     }
@@ -1124,6 +1157,11 @@ public class AdminController : Controller
         }
 
         return string.Format(CultureInfo.CurrentCulture, "{0} ({1})", name, code);
+    }
+
+    private static int ParseOperationNumber(string value, string parameterName)
+    {
+        return OperationNumber.Parse(OperationNumber.Normalize(value), parameterName);
     }
 
     private AdminCatalogFilters ReadFilters()

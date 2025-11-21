@@ -247,10 +247,9 @@ public class AdminCatalogService : IAdminCatalogService
                     .AsNoTracking()
                     .Include(x => x.Part)
                     .Include(x => x.Section)
-                join route in routes
-                    on new { balance.PartId, balance.SectionId, balance.OpNumber }
-                    equals new { route.PartId, route.SectionId, route.OpNumber } into routeGroup
-                from route in routeGroup.DefaultIfEmpty()
+                from route in routes
+                    .Where(x => x.PartId == balance.PartId && x.SectionId == balance.SectionId && x.OpNumber == balance.OpNumber)
+                    .DefaultIfEmpty()
                 orderby balance.Part != null ? balance.Part.Name : string.Empty,
                     balance.Section != null ? balance.Section.Name : string.Empty,
                     balance.OpNumber
@@ -487,13 +486,16 @@ public class AdminCatalogService : IAdminCatalogService
             .Include(x => x.Part)
             .Include(x => x.Section)
             .Where(x => x.Id == id)
-            .GroupJoin(
-                _dbContext.PartRoutes
+            .SelectMany(
+                balance => _dbContext.PartRoutes
                     .AsNoTracking()
-                    .Include(x => x.Operation),
-                balance => new { balance.PartId, balance.SectionId, balance.OpNumber },
-                route => new { route.PartId, route.SectionId, route.OpNumber },
-                (balance, routeGroup) => new { balance, route = routeGroup.FirstOrDefault() })
+                    .Include(x => x.Operation)
+                    .Where(route =>
+                        route.PartId == balance.PartId
+                        && route.SectionId == balance.SectionId
+                        && route.OpNumber == balance.OpNumber)
+                    .DefaultIfEmpty(),
+                (balance, route) => new { balance, route })
             .Select(x => new AdminWipBalanceDto(
                 x.balance.Id,
                 x.balance.PartId,
