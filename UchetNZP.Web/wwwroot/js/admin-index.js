@@ -1,6 +1,7 @@
 (function () {
     const optionsElement = document.getElementById('adminOptions');
     const partOptions = JSON.parse(optionsElement.dataset.partOptions || '[]');
+    const operationOptions = JSON.parse(optionsElement.dataset.operationOptions || '[]');
     const sectionOptions = JSON.parse(optionsElement.dataset.sectionOptions || '[]');
 
     const tokenElement = document.querySelector('#adminAntiForgery input[name="__RequestVerificationToken"]');
@@ -98,7 +99,8 @@
             opNumber: row ? row.opNumber : '',
             quantity: row ? row.quantity : '',
             partOptions: optionMarkup(partOptions, row ? row.partId : ''),
-            sectionOptions: optionMarkup(sectionOptions, row ? row.sectionId : '')
+            sectionOptions: optionMarkup(sectionOptions, row ? row.sectionId : ''),
+            operationOptions: optionMarkup(operationOptions, row ? row.operationId : '')
         };
 
         modalFields.innerHTML = replacePlaceholders(rawTemplate, values);
