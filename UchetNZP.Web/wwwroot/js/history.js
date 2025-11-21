@@ -110,6 +110,15 @@
         });
     }
 
+    function cleanupEmptyGroups() {
+        root.querySelectorAll(".js-history-group").forEach(group => {
+            const hasEntries = group.querySelector(".js-history-entry") !== null;
+            if (!hasEntries) {
+                group.remove();
+            }
+        });
+    }
+
     function buildVersionItem(version, index) {
         const label = document.createElement("label");
         label.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3";
@@ -314,7 +323,58 @@
 
         const previousText = formatQuantity(result?.previousQuantity ?? 0);
         const newText = formatQuantity(result?.newQuantity ?? result?.targetQuantity ?? 0);
-        showMessage("success", `Приход обновлён: ${previousText} → ${newText} шт.`);
+        showMessage("success", `Приход восстановлен: ${previousText} → ${newText} шт.`);
+        return true;
+    }
+
+    async function deleteReceipt(entry) {
+        const receiptId = entry.getAttribute("data-entry-id");
+        if (!receiptId) {
+            showMessage("danger", "Не удалось определить идентификатор прихода для удаления.");
+            return false;
+        }
+
+        const partName = entry.getAttribute("data-part-name") ?? "Приход";
+        const opRange = entry.getAttribute("data-operation-range") ?? "";
+        const quantityText = formatQuantity(entry.dataset.quantity ?? 0);
+        const labelNumber = entry.getAttribute("data-label-number") ?? "";
+        const warning = "Удаление окончательное. Будет создан аудит, ярлык отвяжется.";
+
+        const confirmLines = [
+            `Удалить приход ${partName}?`,
+            opRange,
+            `${quantityText} шт${labelNumber ? ` • ярлык ${labelNumber}` : ""}`,
+            warning,
+        ].filter(Boolean);
+
+        if (!window.confirm(confirmLines.join("\n"))) {
+            return false;
+        }
+
+        const response = await fetch(`/wip/history/receipt/${encodeURIComponent(receiptId)}`, {
+            method: "DELETE",
+            headers: { Accept: "application/json" },
+        });
+
+        if (!response.ok) {
+            const text = await response.text();
+            showMessage("danger", text?.trim() || "Не удалось удалить приход.");
+            return false;
+        }
+
+        const result = await response.json();
+        entry.remove();
+        cleanupEmptyGroups();
+        recalcTotals();
+
+        const previousText = formatQuantity(result?.previousQuantity ?? 0);
+        const restoredText = formatQuantity(result?.restoredQuantity ?? 0);
+        const messageParts = [
+            "Приход удалён.",
+            `Баланс: ${previousText} → ${restoredText} шт.`,
+        ];
+
+        showMessage("success", messageParts.join(" "));
         return true;
     }
 
@@ -348,6 +408,23 @@
                 loadReceiptVersions(entry).catch(() => {
                     showMessage("danger", "Не удалось загрузить версии прихода.");
                 });
+            }
+        }
+
+        const deleteButton = target.closest(".js-history-receipt-delete");
+        if (deleteButton instanceof HTMLButtonElement) {
+            const entry = deleteButton.closest(".js-history-entry");
+            if (entry) {
+                deleteButton.disabled = true;
+                deleteReceipt(entry)
+                    .then(success => {
+                        if (!success) {
+                            deleteButton.disabled = false;
+                        }
+                    })
+                    .catch(() => {
+                        deleteButton.disabled = false;
+                    });
             }
         }
 
