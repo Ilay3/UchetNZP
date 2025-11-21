@@ -497,7 +497,7 @@ public class AdminController : Controller
         try
         {
             await _catalogService.CreateWipBalanceAsync(
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity),
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Остаток успешно создан.";
@@ -551,7 +551,7 @@ public class AdminController : Controller
         {
             await _catalogService.UpdateWipBalanceAsync(
                 input.Id,
-                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity),
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
                 cancellationToken).ConfigureAwait(false);
 
             TempData[StatusTempDataKey] = "Изменения остатка сохранены.";
@@ -798,7 +798,9 @@ public class AdminController : Controller
 
         try
         {
-            var result = await _catalogService.CreateWipBalanceAsync(new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity), cancellationToken).ConfigureAwait(false);
+            var result = await _catalogService.CreateWipBalanceAsync(
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                cancellationToken).ConfigureAwait(false);
             return Json(MapBalance(result));
         }
         catch (Exception ex)
@@ -824,7 +826,10 @@ public class AdminController : Controller
 
         try
         {
-            var result = await _catalogService.UpdateWipBalanceAsync(id, new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity), cancellationToken).ConfigureAwait(false);
+            var result = await _catalogService.UpdateWipBalanceAsync(
+                id,
+                new AdminWipBalanceEditDto(input.PartId, input.SectionId, input.OpNumber, input.Quantity, input.OperationId, input.OperationLabel),
+                cancellationToken).ConfigureAwait(false);
             return Json(MapBalance(result));
         }
         catch (Exception ex)
