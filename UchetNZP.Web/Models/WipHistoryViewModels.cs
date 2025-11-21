@@ -103,7 +103,10 @@ public class WipHistoryEntryViewModel
         string? labelNumber,
         IReadOnlyList<WipHistoryOperationDetailViewModel> operations,
         WipHistoryScrapViewModel? scrap,
-        bool isCancelled)
+        bool hasVersions,
+        bool isReverted,
+        Guid? versionId,
+        Guid? auditId)
     {
         Id = id;
         Type = type;
@@ -120,7 +123,10 @@ public class WipHistoryEntryViewModel
         LabelNumber = labelNumber;
         Operations = operations ?? Array.Empty<WipHistoryOperationDetailViewModel>();
         Scrap = scrap;
-        IsCancelled = isCancelled;
+        HasVersions = hasVersions;
+        IsReverted = isReverted;
+        VersionId = versionId;
+        AuditId = auditId;
     }
 
     public Guid Id { get; }
@@ -153,7 +159,13 @@ public class WipHistoryEntryViewModel
 
     public WipHistoryScrapViewModel? Scrap { get; }
 
-    public bool IsCancelled { get; }
+    public bool HasVersions { get; }
+
+    public bool IsReverted { get; }
+
+    public Guid? VersionId { get; }
+
+    public Guid? AuditId { get; }
 
     public DateTime Date => OccurredAt.Date;
 
@@ -200,7 +212,11 @@ public class WipHistoryEntryViewModel
 
     public bool HasTargetSection => !string.IsNullOrWhiteSpace(TargetSectionName);
 
+    public bool IsCancelled => IsReverted;
+
     public string Status => IsCancelled ? "Отменено" : "Активно";
+
+    public bool CanRevert => HasVersions && !IsReverted;
 }
 
 public class WipHistoryTypeSummaryViewModel
@@ -268,6 +284,21 @@ public class WipHistoryViewModel
 
     public decimal TotalQuantity => Groups.Sum(x => x.TotalQuantity);
 }
+
+public record WipHistoryReceiptVersionViewModel(
+    Guid VersionId,
+    string Action,
+    decimal? PreviousQuantity,
+    decimal? NewQuantity,
+    DateTime CreatedAt,
+    string? Comment,
+    string? LabelNumber,
+    decimal PreviousBalance,
+    decimal NewBalance);
+
+public record WipHistoryReceiptVersionsViewModel(
+    Guid ReceiptId,
+    IReadOnlyList<WipHistoryReceiptVersionViewModel> Versions);
 
 public class WipHistoryQuery
 {

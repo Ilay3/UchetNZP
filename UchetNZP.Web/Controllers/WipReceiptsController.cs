@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -189,6 +190,64 @@ public class WipReceiptsController : Controller
         return Ok(model);
     }
 
+    [HttpGet("{id:guid}/versions")]
+    public async Task<IActionResult> GetVersions(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор прихода.");
+        }
+
+        var audits = await _dbContext.ReceiptAudits
+            .AsNoTracking()
+            .Where(audit => audit.ReceiptId == id)
+            .OrderByDescending(audit => audit.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var labelIds = audits
+            .SelectMany(audit => new[] { audit.PreviousLabelId, audit.NewLabelId })
+            .Where(labelId => labelId.HasValue)
+            .Select(labelId => labelId!.Value)
+            .Distinct()
+            .ToList();
+
+        var labelLookup = labelIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.WipLabels
+                .AsNoTracking()
+                .Where(label => labelIds.Contains(label.Id))
+                .ToDictionaryAsync(label => label.Id, label => label.Number, cancellationToken)
+                .ConfigureAwait(false);
+
+        var versions = audits
+            .Select(audit =>
+            {
+                string? labelNumber = null;
+                var labelId = audit.NewLabelId ?? audit.PreviousLabelId;
+
+                if (labelId.HasValue)
+                {
+                    labelLookup.TryGetValue(labelId.Value, out labelNumber);
+                }
+
+                return new WipHistoryReceiptVersionViewModel(
+                    audit.VersionId,
+                    audit.Action,
+                    audit.PreviousQuantity,
+                    audit.NewQuantity,
+                    ToLocalDateTime(audit.CreatedAt),
+                    audit.Comment,
+                    labelNumber,
+                    audit.PreviousBalance,
+                    audit.NewBalance);
+            })
+            .ToList();
+
+        var response = new WipHistoryReceiptVersionsViewModel(id, versions);
+        return Ok(response);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
@@ -277,6 +336,13 @@ public class WipReceiptsController : Controller
         Guid? WipLabelId,
         string? LabelNumber,
         bool IsAssigned = false);
+
+    private static DateTime ToLocalDateTime(DateTime value)
+    {
+        var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        var local = utcValue.ToLocalTime();
+        return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+    }
 
     public record ReceiptRevertRequest(Guid VersionId);
 }
