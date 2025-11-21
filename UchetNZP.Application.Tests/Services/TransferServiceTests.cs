@@ -462,6 +462,77 @@ public class TransferServiceTests
         Assert.Equal(20m, storedLabels[1].RemainingQuantity);
     }
 
+    [Fact]
+    public async Task RevertTransferAsync_RestoresBalancesAndMarksAudit()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var toSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
+        var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "010" };
+        var toOperation = new Operation { Id = Guid.NewGuid(), Name = "020" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(fromSection, toSection);
+        dbContext.Operations.AddRange(fromOperation, toOperation);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, fromSection.Id, fromOperation.Id, 10),
+            CreateRoute(part.Id, toSection.Id, toOperation.Id, 20));
+
+        var fromBalance = new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = fromSection.Id,
+            OpNumber = 10,
+            Quantity = 90m,
+        };
+
+        var toBalance = new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = toSection.Id,
+            OpNumber = 20,
+            Quantity = 5m,
+        };
+
+        dbContext.WipBalances.AddRange(fromBalance, toBalance);
+
+        var initialFrom = fromBalance.Quantity;
+        var initialTo = toBalance.Quantity;
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var transferDate = new DateTime(2025, 6, 6, 0, 0, 0, DateTimeKind.Utc);
+
+        var summary = await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, 20, transferDate, 30m, null, null, null),
+        });
+
+        var audit = await dbContext.TransferAudits.SingleAsync();
+        Assert.Equal(initialFrom - 30m, audit.FromBalanceAfter);
+        Assert.False(audit.IsReverted);
+
+        var revertResult = await service.RevertTransferAsync(audit.Id);
+
+        Assert.Equal(initialFrom, revertResult.FromBalanceAfter);
+        Assert.Equal(initialTo, revertResult.ToBalanceAfter);
+        Assert.Empty(dbContext.WipTransfers);
+
+        var restoredFrom = await dbContext.WipBalances.SingleAsync(x => x.Id == fromBalance.Id);
+        var restoredTo = await dbContext.WipBalances.SingleAsync(x => x.Id == toBalance.Id);
+        Assert.Equal(initialFrom, restoredFrom.Quantity);
+        Assert.Equal(initialTo, restoredTo.Quantity);
+
+        var updatedAudit = await dbContext.TransferAudits.SingleAsync();
+        Assert.True(updatedAudit.IsReverted);
+        Assert.NotNull(updatedAudit.RevertedAt);
+    }
+
     private static (WipLabel Label, WipReceipt Receipt) CreateLabelWithReceipt(Guid partId, Guid sectionId, int opNumber, string number, decimal quantity)
     {
         var labelId = Guid.NewGuid();

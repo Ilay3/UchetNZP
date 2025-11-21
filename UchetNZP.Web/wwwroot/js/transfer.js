@@ -261,7 +261,7 @@
             return;
         }
 
-        if (target.dataset.action !== "cancel") {
+        if (target.dataset.action !== "revert") {
             return;
         }
 
@@ -270,7 +270,7 @@
             return;
         }
 
-        void cancelRecentTransfer(index);
+        void revertRecentTransfer(index);
     });
 
     scrapMarkButton?.addEventListener("click", () => {
@@ -1495,6 +1495,7 @@
             const toBalanceText = formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter);
             const fromName = item.fromOperationName ? `<div class=\"small text-muted\">${escapeHtml(item.fromOperationName)}</div>` : "";
             const toName = item.toOperationName ? `<div class=\"small text-muted\">${escapeHtml(item.toOperationName)}</div>` : "";
+            const statusBadge = `<span class=\"badge ${item.isReverted ? "bg-danger" : "bg-success"}\">${item.isReverted ? "Отменено" : "Активно"}</span>`;
 
             row.innerHTML = `
                 <td>${item.date ? escapeHtml(item.date) : ""}</td>
@@ -1512,8 +1513,9 @@
                 <td>${fromBalanceText}</td>
                 <td>${toBalanceText}</td>
                 <td>${formatScrapCell(item)}</td>
+                <td>${statusBadge}</td>
                 <td class="text-center">
-                    <button type="button" class="btn btn-outline-danger btn-sm" data-action="cancel" data-index="${index}" data-transfer-id="${item.transferId}">Отменить</button>
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-action="revert" data-index="${index}" data-audit-id="${item.transferAuditId}" ${item.isReverted ? "disabled" : ""}>Откатить</button>
                 </td>`;
 
             recentTableBody.appendChild(row);
@@ -1538,6 +1540,8 @@
 
             additions.push({
                 transferId: item.transferId,
+                transferAuditId: item.transferAuditId,
+                transactionId: item.transactionId,
                 partId: item.partId,
                 partDisplay,
                 date: cartItem?.date ?? null,
@@ -1557,6 +1561,7 @@
                 toBalanceAfter: Number(item.toBalanceAfter) || 0,
                 fromSectionId: item.fromSectionId,
                 toSectionId: item.toSectionId,
+                isReverted: Boolean(item.isReverted),
                 scrapType: scrapInfo?.scrapType ?? null,
                 scrapTypeLabel: scrapInfo?.scrapTypeLabel ?? null,
                 scrapQuantity: scrapInfo?.scrapQuantity ?? 0,
@@ -1570,7 +1575,7 @@
         }
 
         additions.reverse().forEach(entry => {
-            recentTransfers = recentTransfers.filter(existing => existing.transferId !== entry.transferId);
+            recentTransfers = recentTransfers.filter(existing => existing.transferAuditId !== entry.transferAuditId);
             recentTransfers.unshift(entry);
         });
 
@@ -1581,19 +1586,30 @@
         renderRecentTransfers();
     }
 
-    async function cancelRecentTransfer(index) {
+    async function revertRecentTransfer(index) {
         const item = recentTransfers[index];
         if (!item) {
             return;
         }
 
-        if (!window.confirm("Отменить выбранную передачу?")) {
+        const description = [
+            item.partDisplay ?? item.partId ?? "",
+            item.fromOpNumber && item.toOpNumber ? `${item.fromOpNumber} → ${item.toOpNumber}` : "",
+            Number(item.quantity).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 }),
+        ].filter(Boolean).join(" / ");
+
+        if (!window.confirm(`Откатить передачу?\n${description}`)) {
+            return;
+        }
+
+        if (!item.transferAuditId) {
+            alert("Не найден идентификатор аудита для отката.");
             return;
         }
 
         try {
-            const response = await fetch(`/wip/transfer/${encodeURIComponent(item.transferId)}`, {
-                method: "DELETE",
+            const response = await fetch(`/wip/transfer/revert/${encodeURIComponent(item.transferAuditId)}`, {
+                method: "POST",
                 headers: { "Accept": "application/json" },
             });
 
@@ -1619,10 +1635,10 @@
             }
 
             const result = await response.json();
-            recentTransfers.splice(index, 1);
+            recentTransfers[index] = { ...item, isReverted: true };
             renderRecentTransfers();
             applyDeleteResult(result);
-            alert("Передача отменена.");
+            alert("Передача откатена.");
         }
         catch (error) {
             console.error(error);

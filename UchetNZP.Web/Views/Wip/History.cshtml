@@ -149,6 +149,7 @@
                             <div class="flex-grow-1">
                                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                                     <span class="badge @GetTypeBadgeClass(entry.Type)">@entry.TypeDisplayName</span>
+                                    <span class="badge @(entry.IsCancelled ? "bg-danger" : "bg-success")">@entry.Status</span>
                                     @if (!string.IsNullOrWhiteSpace(entry.OperationRange))
                                     {
                                         <span class="badge bg-light text-dark border">@entry.OperationRange</span>

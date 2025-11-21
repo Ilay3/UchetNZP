@@ -40,6 +40,10 @@ public class AppDbContext : DbContext
 
     public DbSet<WarehouseLabelItem> WarehouseLabelItems => Set<WarehouseLabelItem>();
 
+    public DbSet<TransferAudit> TransferAudits => Set<TransferAudit>();
+
+    public DbSet<TransferAuditOperation> TransferAuditOperations => Set<TransferAuditOperation>();
+
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
     public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();
