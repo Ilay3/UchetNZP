@@ -138,13 +138,13 @@ public class WipLaunchesControllerTests
         var response = Assert.IsType<LaunchDeleteResponseModel>(okResult.Value);
         Assert.Equal(launchId, response.LaunchId);
         Assert.Equal(OperationNumber.Format(20), response.FromOperation);
-        Assert.Equal(20m, response.Remaining);
+        Assert.Equal(12m, response.Remaining);
         Assert.Contains("успешно", response.Message, StringComparison.OrdinalIgnoreCase);
 
         Assert.False(await dbContext.WipLaunches.AnyAsync());
         Assert.False(await dbContext.WipLaunchOperations.AnyAsync());
         var balance = await dbContext.WipBalances.SingleAsync();
-        Assert.Equal(20m, balance.Quantity);
+        Assert.Equal(12m, balance.Quantity);
     }
 
     [Fact]

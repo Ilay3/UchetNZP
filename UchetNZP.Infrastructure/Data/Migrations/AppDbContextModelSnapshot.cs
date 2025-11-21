@@ -269,6 +269,82 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.ToTable("WipBalanceAdjustments", (string)null);
                 });
 
+            modelBuilder.Entity("UchetNZP.Domain.Entities.ReceiptAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<decimal>("NewBalance")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<bool>("NewLabelAssigned")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("NewLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("NewQuantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<int>("OpNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PartId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PreviousBalance")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<bool>("PreviousLabelAssigned")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("PreviousLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PreviousQuantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<DateTime>("ReceiptDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceiptId");
+
+                    b.HasIndex("VersionId");
+
+                    b.ToTable("ReceiptAudits", (string)null);
+                });
+
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipLaunch", b =>
                 {
                     b.Property<Guid>("Id")

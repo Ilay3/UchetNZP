@@ -229,31 +229,32 @@ public class AdminCatalogService : IAdminCatalogService
 
     public async Task<IReadOnlyCollection<AdminWipBalanceDto>> GetWipBalancesAsync(CancellationToken cancellationToken = default)
     {
-        var routes = _dbContext.PartRoutes
+        var routes = await _dbContext.PartRoutes
             .AsNoTracking()
             .Include(x => x.Operation)
-            .Select(x => new
-            {
-                x.PartId,
-                x.SectionId,
-                x.OpNumber,
-                x.OperationId,
-                OperationName = x.Operation != null ? x.Operation.Name : string.Empty,
-                OperationLabel = x.Operation != null ? x.Operation.Code : null
-            });
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 
-        return await (
-                from balance in _dbContext.WipBalances
-                    .AsNoTracking()
-                    .Include(x => x.Part)
-                    .Include(x => x.Section)
-                from route in routes
-                    .Where(x => x.PartId == balance.PartId && x.SectionId == balance.SectionId && x.OpNumber == balance.OpNumber)
-                    .DefaultIfEmpty()
-                orderby balance.Part != null ? balance.Part.Name : string.Empty,
-                    balance.Section != null ? balance.Section.Name : string.Empty,
-                    balance.OpNumber
-                select new AdminWipBalanceDto(
+        var routeLookup = routes.ToDictionary(
+            x => (x.PartId, x.SectionId, x.OpNumber),
+            x => x);
+
+        var balances = await _dbContext.WipBalances
+            .AsNoTracking()
+            .Include(x => x.Part)
+            .Include(x => x.Section)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var ret = balances
+            .OrderBy(x => x.Part != null ? x.Part.Name : string.Empty)
+            .ThenBy(x => x.Section != null ? x.Section.Name : string.Empty)
+            .ThenBy(x => x.OpNumber)
+            .Select(balance =>
+            {
+                routeLookup.TryGetValue((balance.PartId, balance.SectionId, balance.OpNumber), out var route);
+
+                return new AdminWipBalanceDto(
                     balance.Id,
                     balance.PartId,
                     balance.Part != null ? balance.Part.Name : string.Empty,
@@ -262,10 +263,12 @@ public class AdminCatalogService : IAdminCatalogService
                     balance.OpNumber,
                     balance.Quantity,
                     route != null ? route.OperationId : null,
-                    route != null ? route.OperationName : string.Empty,
-                    route != null ? route.OperationLabel : null))
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+                    route != null && route.Operation != null ? route.Operation.Name : string.Empty,
+                    route != null && route.Operation != null ? route.Operation.Code : null);
+            })
+            .ToList();
+
+        return ret;
     }
 
     public async Task<AdminWipBalanceDto> CreateWipBalanceAsync(AdminWipBalanceEditDto input, CancellationToken cancellationToken = default)

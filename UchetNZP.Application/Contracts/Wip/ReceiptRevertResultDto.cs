@@ -1,16 +1,12 @@
-using System;
-
 namespace UchetNZP.Application.Contracts.Wip;
 
-public record ReceiptDeleteResultDto(
+public record ReceiptRevertResultDto(
     Guid ReceiptId,
     Guid BalanceId,
     Guid PartId,
     Guid SectionId,
     int OpNumber,
-    decimal ReceiptQuantity,
+    decimal TargetQuantity,
     decimal PreviousQuantity,
-    decimal RestoredQuantity,
-    decimal Delta,
-    Guid VersionId
-);
+    decimal NewQuantity,
+    Guid VersionId);

@@ -178,7 +178,7 @@ public class WarehouseControllerTests
             }
         };
 
-        controller.TempData = new TempDataDictionary(controller.HttpContext!, new DictionaryTempDataProvider());
+        controller.TempData = new TempDataDictionary(controller.HttpContext!, new TestTempDataProvider());
 
         return controller;
     }
@@ -191,5 +191,17 @@ public class WarehouseControllerTests
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private sealed class TestTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object?> LoadTempData(HttpContext context)
+        {
+            return new Dictionary<string, object?>();
+        }
+
+        public void SaveTempData(HttpContext context, IDictionary<string, object?> values)
+        {
+        }
     }
 }
