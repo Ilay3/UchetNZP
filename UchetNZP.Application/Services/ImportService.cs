@@ -251,6 +251,7 @@ public class ImportService : IImportService
                 var operation = await ResolveOperationAsync(operationName, operationCache, cancellationToken).ConfigureAwait(false);
 
                 var routeKey = $"{part.Id}:{opNumber}";
+                var isNewRoute = false;
                 if (!routeCache.TryGetValue(routeKey, out var route))
                 {
                     route = await _dbContext.PartRoutes
@@ -267,9 +268,24 @@ public class ImportService : IImportService
                         };
 
                         await _dbContext.PartRoutes.AddAsync(route, cancellationToken).ConfigureAwait(false);
+                        isNewRoute = true;
                     }
 
                     routeCache[routeKey] = route;
+                }
+
+                if (!isNewRoute)
+                {
+                    var existingNames = await GetRouteNamesAsync(route, cancellationToken).ConfigureAwait(false);
+                    if (!NamesEqual(existingNames.OperationName, operation.Name) || !NamesEqual(existingNames.SectionName, section.Name))
+                    {
+                        var reason = "В файле указан другой вид работ или наименование операции для уже существующей строки.";
+                        items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
+                        results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
+                        RegisterErrorRow(row, reason, rowNumber);
+                        skipped++;
+                        continue;
+                    }
                 }
 
                 route.OperationId = operation.Id;
@@ -499,6 +515,36 @@ public class ImportService : IImportService
         cache[key] = balance;
 
         return balance;
+    }
+
+    private async Task<(string OperationName, string SectionName)> GetRouteNamesAsync(PartRoute route, CancellationToken cancellationToken)
+    {
+        var operationName = route.Operation?.Name;
+        if (string.IsNullOrWhiteSpace(operationName))
+        {
+            operationName = await _dbContext.Operations
+                .Where(x => x.Id == route.OperationId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var sectionName = route.Section?.Name;
+        if (string.IsNullOrWhiteSpace(sectionName))
+        {
+            sectionName = await _dbContext.Sections
+                .Where(x => x.Id == route.SectionId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return (operationName ?? string.Empty, sectionName ?? string.Empty);
+    }
+
+    private static bool NamesEqual(string left, string right)
+    {
+        return string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryParseDecimal(string value, out decimal result)
