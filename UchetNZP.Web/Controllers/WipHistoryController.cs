@@ -36,12 +36,7 @@ public class WipHistoryController : Controller
         var selectedTypes = ParseTypes(query?.Types);
         if (selectedTypes.Count == 0)
         {
-            selectedTypes = new HashSet<WipHistoryEntryType>
-            {
-                WipHistoryEntryType.Launch,
-                WipHistoryEntryType.Receipt,
-                WipHistoryEntryType.Transfer,
-            };
+            selectedTypes = GetDefaultTypes();
         }
 
         var partSearch = query?.Part;
@@ -462,6 +457,12 @@ public class WipHistoryController : Controller
         }
 
         return result;
+    }
+
+    private static HashSet<WipHistoryEntryType> GetDefaultTypes()
+    {
+        return Enum.GetValues<WipHistoryEntryType>()
+            .ToHashSet();
     }
 
     [HttpDelete("receipt/{id:guid}")]
