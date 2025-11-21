@@ -12,9 +12,12 @@ public record TransferItemSummaryDto(
     decimal ToBalanceAfter,
     decimal Quantity,
     Guid TransferId,
+    Guid TransferAuditId,
+    Guid TransactionId,
     TransferScrapSummaryDto? Scrap,
     Guid? WipLabelId,
     string? LabelNumber,
     decimal? LabelQuantityBefore,
-    decimal? LabelQuantityAfter
+    decimal? LabelQuantityAfter,
+    bool IsReverted
 );

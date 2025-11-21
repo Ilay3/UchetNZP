@@ -350,11 +350,11 @@ public class WipTransfersController : Controller
                 .Distinct()
                 .ToList();
 
-            var labelLookup = await LoadLabelNumbersAsync(labelKeys, cancellationToken).ConfigureAwait(false);
+                    var labelLookup = await LoadLabelNumbersAsync(labelKeys, cancellationToken).ConfigureAwait(false);
 
-            summaryItems = summary.Items
-                .Select(item =>
-                {
+                    summaryItems = summary.Items
+                        .Select(item =>
+                        {
                     var key = (item.PartId, item.FromSectionId, item.FromOpNumber);
                     var labels = labelLookup.TryGetValue(key, out var list) ? list : Array.Empty<string>();
 
@@ -366,27 +366,30 @@ public class WipTransfersController : Controller
                             item.Scrap.Quantity,
                             item.Scrap.Comment);
 
-                    return new TransferSummaryItemViewModel(
-                        item.PartId,
-                        OperationNumber.Format(item.FromOpNumber),
-                        item.FromSectionId,
-                        item.FromBalanceBefore,
-                        item.FromBalanceAfter,
-                        OperationNumber.Format(item.ToOpNumber),
-                        item.ToSectionId,
-                        item.ToBalanceBefore,
-                        item.ToBalanceAfter,
-                        item.Quantity,
-                        item.TransferId,
-                        scrapSummary,
-                        labels,
-                        item.WipLabelId,
-                        item.LabelNumber,
-                        item.LabelQuantityBefore,
-                        item.LabelQuantityAfter);
-                })
-                .ToList();
-        }
+                            return new TransferSummaryItemViewModel(
+                                item.PartId,
+                                OperationNumber.Format(item.FromOpNumber),
+                                item.FromSectionId,
+                                item.FromBalanceBefore,
+                                item.FromBalanceAfter,
+                                OperationNumber.Format(item.ToOpNumber),
+                                item.ToSectionId,
+                                item.ToBalanceBefore,
+                                item.ToBalanceAfter,
+                                item.Quantity,
+                                item.TransferId,
+                                item.TransferAuditId,
+                                item.TransactionId,
+                                scrapSummary,
+                                labels,
+                                item.WipLabelId,
+                                item.LabelNumber,
+                                item.LabelQuantityBefore,
+                                item.LabelQuantityAfter,
+                                item.IsReverted);
+                        })
+                        .ToList();
+                }
 
         var model = new TransferBatchSummaryViewModel(summary.Saved, summaryItems);
 
@@ -404,6 +407,65 @@ public class WipTransfersController : Controller
         try
         {
             var result = await _transferService.DeleteTransferAsync(id, cancellationToken).ConfigureAwait(false);
+
+            var viewModel = new TransferDeleteResultViewModel(
+                result.TransferId,
+                result.PartId,
+                OperationNumber.Format(result.FromOpNumber),
+                result.FromSectionId,
+                result.FromBalanceBefore,
+                result.FromBalanceAfter,
+                OperationNumber.Format(result.ToOpNumber),
+                result.ToSectionId,
+                result.ToBalanceBefore,
+                result.ToBalanceAfter,
+                result.Quantity,
+                result.IsWarehouseTransfer,
+                result.DeletedOperationIds,
+                result.Scrap is null
+                    ? null
+                    : new TransferDeleteScrapViewModel(
+                        result.Scrap.ScrapId,
+                        result.Scrap.ScrapType,
+                        result.Scrap.Quantity,
+                        result.Scrap.Comment),
+                result.WarehouseItem is null
+                    ? null
+                    : new TransferDeleteWarehouseItemViewModel(
+                        result.WarehouseItem.WarehouseItemId,
+                        result.WarehouseItem.Quantity),
+                result.WipLabelId,
+                result.LabelNumber,
+                result.LabelQuantityBefore,
+                result.LabelQuantityAfter);
+
+            return Ok(viewModel);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("revert/{auditId:guid}")]
+    public async Task<IActionResult> Revert(Guid auditId, CancellationToken cancellationToken)
+    {
+        if (auditId == Guid.Empty)
+        {
+            return BadRequest("Не указан идентификатор аудита передачи.");
+        }
+
+        try
+        {
+            var result = await _transferService.RevertTransferAsync(auditId, cancellationToken).ConfigureAwait(false);
 
             var viewModel = new TransferDeleteResultViewModel(
                 result.TransferId,

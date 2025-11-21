@@ -7,4 +7,6 @@ public interface ITransferService
     Task<TransferBatchSummaryDto> AddTransfersBatchAsync(IEnumerable<TransferItemDto> items, CancellationToken cancellationToken = default);
 
     Task<TransferDeleteResultDto> DeleteTransferAsync(Guid transferId, CancellationToken cancellationToken = default);
+
+    Task<TransferDeleteResultDto> RevertTransferAsync(Guid transferAuditId, CancellationToken cancellationToken = default);
 }

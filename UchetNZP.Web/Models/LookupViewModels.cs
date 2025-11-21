@@ -138,12 +138,15 @@ public record TransferSummaryItemViewModel(
     decimal ToBalanceAfter,
     decimal Quantity,
     Guid TransferId,
+    Guid TransferAuditId,
+    Guid TransactionId,
     TransferScrapSummaryViewModel? Scrap,
     IReadOnlyList<string> LabelNumbers,
     Guid? WipLabelId,
     string? LabelNumber,
     decimal? LabelQuantityBefore,
-    decimal? LabelQuantityAfter);
+    decimal? LabelQuantityAfter,
+    bool IsReverted);
 
 public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);
 

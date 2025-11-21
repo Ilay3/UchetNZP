@@ -102,7 +102,8 @@ public class WipHistoryEntryViewModel
         string? comment,
         string? labelNumber,
         IReadOnlyList<WipHistoryOperationDetailViewModel> operations,
-        WipHistoryScrapViewModel? scrap)
+        WipHistoryScrapViewModel? scrap,
+        bool isCancelled)
     {
         Id = id;
         Type = type;
@@ -119,6 +120,7 @@ public class WipHistoryEntryViewModel
         LabelNumber = labelNumber;
         Operations = operations ?? Array.Empty<WipHistoryOperationDetailViewModel>();
         Scrap = scrap;
+        IsCancelled = isCancelled;
     }
 
     public Guid Id { get; }
@@ -150,6 +152,8 @@ public class WipHistoryEntryViewModel
     public IReadOnlyList<WipHistoryOperationDetailViewModel> Operations { get; }
 
     public WipHistoryScrapViewModel? Scrap { get; }
+
+    public bool IsCancelled { get; }
 
     public DateTime Date => OccurredAt.Date;
 
@@ -195,6 +199,8 @@ public class WipHistoryEntryViewModel
     public bool HasLabel => !string.IsNullOrWhiteSpace(LabelNumber);
 
     public bool HasTargetSection => !string.IsNullOrWhiteSpace(TargetSectionName);
+
+    public string Status => IsCancelled ? "Отменено" : "Активно";
 }
 
 public class WipHistoryTypeSummaryViewModel
