@@ -67,6 +67,45 @@ public class WipHistoryOperationDetailViewModel
     public bool HasQuantityChange => QuantityChange.HasValue && QuantityChange.Value != 0m;
 }
 
+public class WipHistoryLabelStepViewModel
+{
+    public WipHistoryLabelStepViewModel(
+        Guid entryId,
+        DateTime occurredAt,
+        string typeDisplayName,
+        string sectionName,
+        string targetSectionName,
+        string? operationRange,
+        decimal quantity,
+        bool isCancelled)
+    {
+        EntryId = entryId;
+        OccurredAt = occurredAt;
+        TypeDisplayName = typeDisplayName ?? string.Empty;
+        SectionName = sectionName ?? string.Empty;
+        TargetSectionName = targetSectionName ?? string.Empty;
+        OperationRange = operationRange;
+        Quantity = quantity;
+        IsCancelled = isCancelled;
+    }
+
+    public Guid EntryId { get; }
+
+    public DateTime OccurredAt { get; }
+
+    public string TypeDisplayName { get; }
+
+    public string SectionName { get; }
+
+    public string TargetSectionName { get; }
+
+    public string? OperationRange { get; }
+
+    public decimal Quantity { get; }
+
+    public bool IsCancelled { get; }
+}
+
 public class WipHistoryScrapViewModel
 {
     public WipHistoryScrapViewModel(string type, decimal quantity, string? comment)
@@ -168,6 +207,8 @@ public class WipHistoryEntryViewModel
     public Guid? AuditId { get; }
 
     public bool CanDeleteReceipt { get; set; } = true;
+
+    public IReadOnlyList<WipHistoryLabelStepViewModel> LabelTimeline { get; set; } = Array.Empty<WipHistoryLabelStepViewModel>();
 
     public DateTime Date => OccurredAt.Date;
 

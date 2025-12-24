@@ -568,6 +568,35 @@ public class WipHistoryController : Controller
         .First())
     .ToList();
 
+        var labelTimelineLookup = deduplicatedEntries
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.LabelNumber))
+            .GroupBy(entry => entry.LabelNumber!, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<WipHistoryLabelStepViewModel>)group
+                    .OrderBy(entry => entry.OccurredAt)
+                    .ThenBy(entry => entry.Type)
+                    .Select(entry => new WipHistoryLabelStepViewModel(
+                        entry.Id,
+                        entry.OccurredAt,
+                        entry.TypeDisplayName,
+                        entry.SectionName,
+                        entry.TargetSectionName,
+                        entry.OperationRange,
+                        entry.Quantity,
+                        entry.IsCancelled))
+                    .ToList(),
+                StringComparer.Ordinal);
+
+        foreach (var entry in deduplicatedEntries)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.LabelNumber)
+                && labelTimelineLookup.TryGetValue(entry.LabelNumber, out var timeline))
+            {
+                entry.LabelTimeline = timeline;
+            }
+        }
+
         var grouped = deduplicatedEntries
             .GroupBy(x => x.Date)
             .OrderByDescending(g => g.Key)
