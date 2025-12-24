@@ -253,24 +253,24 @@
                                             <div class="d-flex flex-wrap gap-3">
                                                 @if (entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions && entry.AuditId.HasValue)
                                                 {
-                                                    <button type="button" class="btn btn-danger d-inline-flex flex-column align-items-center justify-content-center gap-1 shadow-sm rounded-3 js-history-transfer-revert" data-type="@entryType" @(entry.IsCancelled ? "disabled" : string.Empty)>
-                                                        <i class="bi bi-arrow-counterclockwise fs-3" aria-hidden="true"></i>
-                                                        <span class="fw-semibold">Отменить</span>
-                                                        <span class="small text-white-50">передачу</span>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2 js-history-transfer-revert" data-type="@entryType" @(entry.IsCancelled ? "disabled" : string.Empty)>
+                                                        <i class="bi bi-arrow-counterclockwise fs-5" aria-hidden="true"></i>
+                                                        <span class="fw-semibold">Отменить передачу</span>
                                                     </button>
                                                 }
                                                 @if (entry.Type == WipHistoryEntryType.Receipt && entry.HasVersions)
                                                 {
-                                                        <button type="button" class="btn btn-danger d-inline-flex flex-column align-items-center justify-content-center gap-1 shadow-sm rounded-3 js-history-transfer-revert" data-type="@entryType">
-                                                        <i class="bi bi-arrow-clockwise fs-3" aria-hidden="true"></i>
-                                                        <span class="fw-semibold">Восстановить</span>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2 js-history-transfer-revert" data-type="@entryType">
+                                                        <i class="bi bi-arrow-clockwise fs-5" aria-hidden="true"></i>
+                                                        <span class="fw-semibold">Восстановить приход</span>
                                                     </button>
                                                 }
                                                 @if (entry.Type == WipHistoryEntryType.Receipt)
                                                 {
-                                                        <button type="button" class="btn btn-danger d-inline-flex flex-column align-items-center justify-content-center gap-1 shadow-sm rounded-3 js-history-transfer-revert" data-type="@entryType">
-                                                        <i class="bi bi-trash3 fs-3" aria-hidden="true"></i>
-                                                        <span class="fw-semibold">Удалить</span>                                                    </button>
+                                                    <button type="button" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2 js-history-transfer-revert" data-type="@entryType">
+                                                        <i class="bi bi-trash3 fs-5" aria-hidden="true"></i>
+                                                        <span class="fw-semibold">Удалить приход</span>
+                                                    </button>
                                                 }
                                             </div>
                                             <div class="text-muted small">
