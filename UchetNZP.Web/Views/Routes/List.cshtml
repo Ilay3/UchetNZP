@@ -5,10 +5,24 @@
     ViewData["Title"] = "Маршруты деталей";
     var searchValue = Model.Filter.Search ?? string.Empty;
     var selectedSectionId = Model.Filter.SectionId;
+    var SelectedRouteId = Model.SelectedRouteId;
     var groupedRoutes = Model.Routes
         .GroupBy(route => new { route.PartId, route.PartDisplayName })
         .Select(group => group.OrderBy(r => r.OpNumber, StringComparer.Ordinal).ToList())
         .ToList();
+    var SelectedGroupIndex = -1;
+
+    if (SelectedRouteId.HasValue)
+    {
+        for (var i = 0; i < groupedRoutes.Count; i++)
+        {
+            if (groupedRoutes[i].Any(route => route.Id == SelectedRouteId))
+            {
+                SelectedGroupIndex = i;
+                break;
+            }
+        }
+    }
 }
 
 <div class="page-header mb-4">
@@ -88,14 +102,15 @@ else
                     var first = routes[0];
                     var collapseId = $"routesGroup{i}";
                     var headingId = $"routesHeading{i}";
+                    var isSelectedGroup = i == SelectedGroupIndex || (SelectedGroupIndex < 0 && i == 0);
                     <div class="accordion-item mb-3 border-0 shadow-sm rounded-4">
                         <h2 class="accordion-header" id="@headingId">
-                            <button class="accordion-button d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="@(i == 0 ? "true" : "false")" aria-controls="@collapseId">
+                            <button class="accordion-button d-flex flex-column flex-md-row gap-3 align-items-start align-items-md-center" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="@(isSelectedGroup ? "true" : "false")" aria-controls="@collapseId">
                                 <span class="fs-5 fw-semibold">@first.PartDisplayName</span>
                                 <span class="badge bg-light text-dark">Операций: @routes.Count</span>
                             </button>
                         </h2>
-                        <div id="@collapseId" class="accordion-collapse collapse @(i == 0 ? "show" : string.Empty)" aria-labelledby="@headingId" data-bs-parent="#routesAccordion">
+                        <div id="@collapseId" class="accordion-collapse collapse @(isSelectedGroup ? "show" : string.Empty)" aria-labelledby="@headingId" data-bs-parent="#routesAccordion">
                             <div class="accordion-body">
                                 <div class="table-responsive">
                                     <table class="table table-striped align-middle mb-0" aria-label="Маршрут детали @first.PartDisplayName">
@@ -110,7 +125,7 @@ else
                                         <tbody>
                                             @foreach (var route in routes)
                                             {
-                                                <tr>
+                                                <tr class="@(SelectedRouteId.HasValue && route.Id == SelectedRouteId ? "table-success" : string.Empty)">
                                                     <td>@route.OperationDisplay</td>
                                                     <td>@route.NormHours.ToString("0.###")</td>
                                                     <td>@route.SectionName</td>

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using UchetNZP.Shared;
 
@@ -34,10 +33,11 @@ public class RouteListFilterViewModel
 
 public class RouteListViewModel
 {
-    public RouteListViewModel(RouteListFilterViewModel filter, IReadOnlyList<RouteListItemViewModel> routes)
+    public RouteListViewModel(RouteListFilterViewModel filter, IReadOnlyList<RouteListItemViewModel> routes, Guid? selectedRouteId)
     {
         Filter = filter ?? throw new ArgumentNullException(nameof(filter));
         Routes = routes ?? throw new ArgumentNullException(nameof(routes));
+        SelectedRouteId = selectedRouteId;
     }
 
     public RouteListFilterViewModel Filter { get; }
@@ -45,9 +45,11 @@ public class RouteListViewModel
     public IReadOnlyList<RouteListItemViewModel> Routes { get; }
 
     public int Total => Routes.Count;
+
+    public Guid? SelectedRouteId { get; }
 }
 
-public class RouteEditInputModel : IValidatableObject
+public class RouteEditInputModel
 {
     public Guid? Id { get; set; }
 
@@ -68,6 +70,8 @@ public class RouteEditInputModel : IValidatableObject
     public string OpNumber { get; set; } = string.Empty;
 
     [Display(Name = "Норматив (н/ч)")]
+    [Required(ErrorMessage = "Укажите норматив.")]
+    [Range(typeof(decimal), "0.001", "79228162514264337593543950335", ErrorMessage = "Норматив должен быть больше нуля.")]
     public decimal NormHours { get; set; }
 
     [Required(ErrorMessage = "Укажите вид работ.")]
@@ -76,16 +80,6 @@ public class RouteEditInputModel : IValidatableObject
     public string SectionName { get; set; } = string.Empty;
 
     public string Title => Id.HasValue ? "Редактирование маршрута" : "Добавление маршрута";
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (NormHours <= 0)
-        {
-            yield return new ValidationResult(
-                "Норматив должен быть больше нуля.",
-                new[] { nameof(NormHours) });
-        }
-    }
 
     public int GetOpNumberValue()
     {
