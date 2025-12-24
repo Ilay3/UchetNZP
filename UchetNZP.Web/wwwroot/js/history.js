@@ -4,6 +4,38 @@
         return;
     }
 
+    const namespace = window.UchetNZP;
+    if (!namespace) {
+        throw new Error("Не инициализировано пространство имён UchetNZP.");
+    }
+
+    const partInput = document.getElementById("historyFilterPart");
+    const partOptions = document.getElementById("historyPartOptions");
+    const partHiddenInput = document.getElementById("historyFilterPartId");
+    const sectionInput = document.getElementById("historyFilterSection");
+    const sectionOptions = document.getElementById("historySectionOptions");
+    const sectionHiddenInput = document.getElementById("historyFilterSectionId");
+
+    if (partInput && partOptions && partHiddenInput) {
+        namespace.initSearchableInput({
+            input: partInput,
+            datalist: partOptions,
+            hiddenInput: partHiddenInput,
+            fetchUrl: "/wip/history/parts",
+            minLength: 2,
+        });
+    }
+
+    if (sectionInput && sectionOptions && sectionHiddenInput) {
+        namespace.initSearchableInput({
+            input: sectionInput,
+            datalist: sectionOptions,
+            hiddenInput: sectionHiddenInput,
+            fetchUrl: "/wip/history/sections",
+            minLength: 2,
+        });
+    }
+
     const feedback = document.getElementById("historyActionFeedback");
     const modalElement = document.getElementById("historyRevertModal");
     const versionsContainer = document.getElementById("historyRevertVersions");

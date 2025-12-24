@@ -71,11 +71,15 @@
             </div>
             <div class="col-sm-6 col-md-3 col-lg-3">
                 <label class="form-label" for="historyFilterPart">Деталь</label>
-                <input id="historyFilterPart" class="form-control form-control-lg" type="text" name="part" value="@Model.Filter.PartSearch" placeholder="Название или код" />
+                <input id="historyFilterPart" class="form-control form-control-lg" type="text" name="part" value="@Model.Filter.PartSearch" list="historyPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
+                <datalist id="historyPartOptions"></datalist>
+                <input type="hidden" id="historyFilterPartId" />
             </div>
             <div class="col-sm-6 col-md-3 col-lg-3">
                 <label class="form-label" for="historyFilterSection">Вид работ</label>
-                <input id="historyFilterSection" class="form-control form-control-lg" type="text" name="section" value="@Model.Filter.SectionSearch" placeholder="Участок или код" />
+                <input id="historyFilterSection" class="form-control form-control-lg" type="text" name="section" value="@Model.Filter.SectionSearch" list="historySectionOptions" placeholder="Начните вводить вид работ" autocomplete="off" />
+                <datalist id="historySectionOptions"></datalist>
+                <input type="hidden" id="historyFilterSectionId" />
             </div>
             <div class="col-sm-6 col-md-3 col-lg-2">
                 <button type="submit" class="btn btn-primary btn-lg w-100">Показать</button>
