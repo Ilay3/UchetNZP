@@ -167,6 +167,8 @@ public class WipHistoryEntryViewModel
 
     public Guid? AuditId { get; }
 
+    public bool CanDeleteReceipt { get; set; } = true;
+
     public DateTime Date => OccurredAt.Date;
 
     public string PartDisplayName => NameWithCodeFormatter.getNameWithCode(PartName, PartCode);
