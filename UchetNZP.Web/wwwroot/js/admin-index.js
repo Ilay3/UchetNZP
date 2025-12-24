@@ -21,6 +21,23 @@
     const formElement = document.getElementById('adminEntityForm');
     const activeEntityLabel = document.getElementById('adminActiveEntityLabel');
     const selectionHint = document.getElementById('adminSelectionHint');
+    const ui = window.UchetNZP || {};
+    const showToast = ui.showToast || function () { };
+    const openConfirmDialog = ui.openConfirmDialog || function () { };
+    const setButtonLoading = ui.setButtonLoading || function () { };
+    const formatNameWithCode = ui.formatNameWithCode || function (name, code) {
+        const normalizedName = (name || '').trim();
+        const normalizedCode = (code || '').trim();
+        if (!normalizedName) {
+            return normalizedCode;
+        }
+
+        if (normalizedCode && !normalizedName.toLowerCase().includes(normalizedCode.toLowerCase())) {
+            return `${normalizedName} (${normalizedCode})`;
+        }
+
+        return normalizedName;
+    };
 
     let currentEntity = null;
     let currentId = null;
@@ -34,7 +51,10 @@
             updateUrl: (id) => `/admin/api/parts/${id}`,
             deleteUrl: (id) => `/admin/api/parts/${id}`,
             formTemplateId: 'partFormTemplate',
-            columns: ['name', 'code']
+            columns: ['name', 'code'],
+            successCreateMessage: 'Деталь создана.',
+            successUpdateMessage: 'Изменения детали сохранены.',
+            successDeleteMessage: 'Деталь удалена.'
         },
         operations: {
             titleCreate: 'Новая операция',
@@ -44,7 +64,10 @@
             updateUrl: (id) => `/admin/api/operations/${id}`,
             deleteUrl: (id) => `/admin/api/operations/${id}`,
             formTemplateId: 'partFormTemplate',
-            columns: ['name', 'code']
+            columns: ['name', 'code'],
+            successCreateMessage: 'Операция создана.',
+            successUpdateMessage: 'Изменения операции сохранены.',
+            successDeleteMessage: 'Операция удалена.'
         },
         sections: {
             titleCreate: 'Новый участок',
@@ -54,7 +77,10 @@
             updateUrl: (id) => `/admin/api/sections/${id}`,
             deleteUrl: (id) => `/admin/api/sections/${id}`,
             formTemplateId: 'partFormTemplate',
-            columns: ['name', 'code']
+            columns: ['name', 'code'],
+            successCreateMessage: 'Участок создан.',
+            successUpdateMessage: 'Изменения участка сохранены.',
+            successDeleteMessage: 'Участок удалён.'
         },
         balances: {
             titleCreate: 'Новый остаток',
@@ -64,7 +90,10 @@
             updateUrl: (id) => `/admin/api/balances/${id}`,
             deleteUrl: (id) => `/admin/api/balances/${id}`,
             formTemplateId: 'balanceFormTemplate',
-            columns: ['partId', 'sectionId', 'opNumber', 'quantity']
+            columns: ['partId', 'sectionId', 'opNumber', 'quantity'],
+            successCreateMessage: 'Остаток создан.',
+            successUpdateMessage: 'Изменения остатка сохранены.',
+            successDeleteMessage: 'Остаток удалён.'
         }
     };
 
@@ -150,6 +179,14 @@
         };
     }
 
+    function onSaveComplete(in_isSuccess, in_message) {
+        const submitButton = formElement.querySelector('button[type="submit"]');
+        setButtonLoading(submitButton, false);
+        if (in_message) {
+            showToast(in_message, in_isSuccess ? 'success' : 'danger');
+        }
+    }
+
     async function submitEntity() {
         if (!currentEntity) {
             return;
@@ -160,6 +197,8 @@
         const isEdit = Boolean(currentId);
         const url = isEdit ? config.updateUrl(currentId) : config.createUrl;
         const method = isEdit ? 'PUT' : 'POST';
+        const submitButton = formElement.querySelector('button[type="submit"]');
+        setButtonLoading(submitButton, true);
 
         try {
             const response = await fetch(url, {
@@ -174,22 +213,21 @@
             if (!response.ok) {
                 const error = await response.json();
                 showErrors(error.errors || ['Не удалось сохранить изменения.']);
+                onSaveComplete(false, 'Не удалось сохранить изменения.');
                 return;
             }
 
             refreshTable(config.tableId);
             panelHint.textContent = 'Изменения сохранены.';
+            onSaveComplete(true, isEdit ? config.successUpdateMessage : config.successCreateMessage);
         } catch (e) {
             showErrors(['Произошла ошибка при сохранении.']);
+            onSaveComplete(false, 'Произошла ошибка при сохранении.');
         }
     }
 
-    async function deleteEntity(entity, id) {
+    async function deleteEntity(entity, id, triggerButton) {
         const config = entityConfig[entity];
-        if (!confirm('Удалить запись? Это действие нельзя отменить.')) {
-            return;
-        }
-
         try {
             const response = await fetch(config.deleteUrl(id), {
                 method: 'DELETE',
@@ -201,12 +239,19 @@
             if (!response.ok) {
                 const error = await response.json();
                 showErrors(error.errors || ['Не удалось удалить запись.']);
+                showToast('Не удалось удалить запись.', 'danger');
                 return;
             }
 
             refreshTable(config.tableId);
+            showToast(config.successDeleteMessage, 'success');
         } catch (e) {
             showErrors(['Произошла ошибка при удалении.']);
+            showToast('Произошла ошибка при удалении.', 'danger');
+        } finally {
+            if (triggerButton) {
+                setButtonLoading(triggerButton, false);
+            }
         }
     }
 
@@ -271,6 +316,64 @@
         const table = $(`#${config.tableId}`);
         const rows = table.bootstrapTable('getSelections') || [];
         return rows;
+    }
+
+    function buildEntityLabel(entity, row) {
+        if (!row) {
+            return '';
+        }
+
+        if (entity === 'balances') {
+            const partLabel = row.partName || '';
+            const sectionLabel = row.sectionName || '';
+            const opLabel = row.opNumberFormatted || '';
+            return `Остаток: ${[partLabel, sectionLabel, opLabel].filter(Boolean).join(' • ')}`;
+        }
+
+        return formatNameWithCode(row.name || '', row.code || '');
+    }
+
+    function buildEntityTitle(entity, count) {
+        const map = {
+            parts: 'Детали',
+            operations: 'Операции',
+            sections: 'Участки',
+            balances: 'Остатки'
+        };
+        const base = map[entity] || 'Записи';
+        return count && count > 1 ? `${base}: ${count}` : base;
+    }
+
+    function openDeleteConfirm(entity, rows, triggerButton) {
+        const list = Array.isArray(rows) ? rows : [rows];
+        const count = list.filter(Boolean).length;
+        if (!count) {
+            return;
+        }
+
+        const entityName = count === 1 ? buildEntityLabel(entity, list[0]) : buildEntityTitle(entity, count);
+        openConfirmDialog({
+            message: 'Удалить запись? Это действие нельзя отменить.',
+            entityName,
+            confirmLabel: 'Удалить',
+            triggerButton,
+            onConfirm: async () => {
+                if (count === 1) {
+                    await deleteEntity(entity, list[0].id, triggerButton);
+                    return;
+                }
+
+                for (const row of list) {
+                    await deleteEntity(entity, row.id, null);
+                }
+
+                if (triggerButton) {
+                    setButtonLoading(triggerButton, false);
+                }
+
+                showToast(`Удалено записей: ${count}`, 'success');
+            }
+        });
     }
 
     function formatActions(entity, id) {
@@ -350,11 +453,8 @@
         openPanel(entity, row || null);
     }
 
-    async function onDelete(entity, ids) {
-        const idList = Array.isArray(ids) ? ids : [ids];
-        for (const id of idList) {
-            await deleteEntity(entity, id);
-        }
+    function onDelete(entity, rows, triggerButton) {
+        openDeleteConfirm(entity, rows, triggerButton);
     }
 
     function initQuickActions() {
@@ -371,11 +471,11 @@
             const rows = getSelectedRows(entity);
             if (!rows.length) {
                 showErrors(['Выберите запись для удаления.']);
+                showToast('Выберите запись для удаления.', 'danger');
                 return;
             }
 
-            const ids = rows.map((row) => row.id);
-            await onDelete(entity, ids);
+            onDelete(entity, rows, this);
         });
 
         $('.admin-quick-export').on('click', function () {
@@ -398,7 +498,10 @@
         $(document).on('click', '.admin-delete', function () {
             const entity = $(this).data('entity');
             const id = $(this).data('id');
-            onDelete(entity, id);
+            const config = entityConfig[entity];
+            const table = $(`#${config.tableId}`);
+            const row = table.bootstrapTable('getRowByUniqueId', id);
+            onDelete(entity, row || { id }, this);
         });
     }
 

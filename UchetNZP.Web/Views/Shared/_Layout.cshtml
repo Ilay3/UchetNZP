@@ -105,6 +105,27 @@
         </main>
     </div>
 
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="appToastContainer" aria-live="polite" aria-atomic="true"></div>
+
+    <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-labelledby="appConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="appConfirmModalLabel">Подтверждение</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2" id="appConfirmModalMessage">Подтвердите действие.</p>
+                    <div class="fw-semibold" id="appConfirmModalEntity"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" id="appConfirmModalSubmit">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <footer class="border-top footer text-muted mt-auto py-3 bg-white">
         <div class="container text-center">
             &copy; @DateTime.Now.Year - Учёт НЗП
