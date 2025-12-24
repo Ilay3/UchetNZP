@@ -12,7 +12,7 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm mb-4">
+        <nav class="navbar navbar-expand-lg navbar-light app-surface border-bottom shadow-sm mb-4">
             <div class="container-fluid">
                 <a class="navbar-brand fw-semibold" asp-area="" asp-controller="Home" asp-action="Index">Учёт НЗП</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
@@ -119,14 +119,14 @@
                     <div class="fw-semibold" id="appConfirmModalEntity"></div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                     <button type="button" class="btn btn-danger" id="appConfirmModalSubmit">Удалить</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="border-top footer text-muted mt-auto py-3 bg-white">
+    <footer class="border-top footer text-muted mt-auto py-3 app-surface">
         <div class="container text-center">
             &copy; @DateTime.Now.Year - Учёт НЗП
         </div>

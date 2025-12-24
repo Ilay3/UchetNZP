@@ -43,7 +43,7 @@
                             <span class="badge bg-light text-dark">Изделий: @dateGroup.Quantity.ToString("0.###")</span>
                             <span class="badge bg-light text-dark">Часы: @dateGroup.Hours.ToString("0.###")</span>
                         </button>
-                        <a class="btn btn-outline-primary flex-shrink-0 d-flex align-items-center justify-content-center px-3" asp-action="ExportByDate" asp-route-date='@dateGroup.Date.ToString("yyyy-MM-dd")' title="Экспорт за @dateGroup.Date.ToString("dd.MM.yyyy")">
+                        <a class="btn btn-secondary flex-shrink-0 d-flex align-items-center justify-content-center px-3" asp-action="ExportByDate" asp-route-date='@dateGroup.Date.ToString("yyyy-MM-dd")' title="Экспорт за @dateGroup.Date.ToString("dd.MM.yyyy")">
                             <span class="visually-hidden">Экспорт за @dateGroup.Date.ToString("dd.MM.yyyy")</span>
                             <span aria-hidden="true">Экспорт за @dateGroup.Date.ToString("dd.MM.yyyy")</span>
                         </a>

@@ -20,7 +20,7 @@
     <div class="text-muted small">Всего маршрутов: @Model.Total</div>
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-primary" asp-action="Create">Добавить маршрут</a>
-        <a class="btn btn-outline-primary" asp-action="Import">Импорт</a>
+        <a class="btn btn-secondary" asp-action="Import">Импорт</a>
         <a class="btn btn-outline-success" asp-action="Export" asp-route-Search="@(string.IsNullOrWhiteSpace(searchValue) ? null : searchValue)" asp-route-SectionId="@(selectedSectionId.HasValue ? selectedSectionId.Value : null)">Экспорт в Excel</a>
     </div>
 </div>
@@ -57,7 +57,7 @@
             </div>
             <div class="col-12 col-xl-3 d-flex flex-wrap gap-3">
                 <button type="submit" class="btn btn-primary btn-lg flex-grow-1">Применить</button>
-                <a class="btn btn-outline-secondary btn-lg flex-grow-1" asp-action="Index">Сбросить</a>
+                <a class="btn btn-secondary btn-lg flex-grow-1" asp-action="Index">Сбросить</a>
             </div>
         </form>
     </div>

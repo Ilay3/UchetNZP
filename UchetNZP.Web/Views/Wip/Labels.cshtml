@@ -6,7 +6,7 @@
 <div class="row g-4">
     <div class="col-lg-4">
         <div class="card shadow-sm h-100">
-            <div class="card-header bg-white">
+            <div class="card-header app-surface">
                 <h5 class="mb-0">Создание ярлыков</h5>
             </div>
             <div class="card-body">
@@ -14,9 +14,9 @@
                 <div class="mb-3">
                     <div class="btn-group w-100" role="group" aria-label="Способ создания ярлыка">
                         <input type="radio" class="btn-check" name="labelMode" id="labelModeAuto" value="auto" checked>
-                        <label class="btn btn-outline-primary" for="labelModeAuto">Автоматический номер</label>
+                        <label class="btn btn-secondary" for="labelModeAuto">Автоматический номер</label>
                         <input type="radio" class="btn-check" name="labelMode" id="labelModeManual" value="manual">
-                        <label class="btn btn-outline-primary" for="labelModeManual">Ручной ввод номера</label>
+                        <label class="btn btn-secondary" for="labelModeManual">Ручной ввод номера</label>
                     </div>
                 </div>
                 <div class="mb-3">
@@ -51,7 +51,7 @@
     </div>
     <div class="col-lg-8">
         <div class="card shadow-sm">
-            <div class="card-header bg-white d-flex flex-column flex-md-row align-items-md-center justify-content-md-between gap-3">
+            <div class="card-header app-surface d-flex flex-column flex-md-row align-items-md-center justify-content-md-between gap-3">
                 <div>
                     <h5 class="mb-0">Список ярлыков</h5>
                     <small class="text-muted">Выберите деталь и укажите период, чтобы увидеть созданные номера.</small>
@@ -65,7 +65,7 @@
                         <label for="labelsFilterTo" class="form-label small mb-1">По дату</label>
                         <input id="labelsFilterTo" type="date" class="form-control form-control-sm" />
                     </div>
-                    <button id="labelsRefreshButton" type="button" class="btn btn-outline-secondary btn-sm ms-md-2">Обновить</button>
+                    <button id="labelsRefreshButton" type="button" class="btn btn-secondary btn-sm ms-md-2">Обновить</button>
                 </div>
             </div>
             <div class="card-body">
@@ -123,7 +123,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button id="labelEditSaveButton" type="button" class="btn btn-primary">Сохранить</button>
             </div>
         </div>
