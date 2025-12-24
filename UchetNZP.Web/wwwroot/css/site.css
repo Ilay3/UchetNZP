@@ -137,3 +137,31 @@ table {
         min-width: 120ch;
     }
 }
+.admin-table-wrapper {
+     min-height: 240px;
+ }
+
+.admin-table-loading {
+     align-items: center;
+     background: rgba(255, 255, 255, 0.8);
+     border-radius: 0.5rem;
+     inset: 0.75rem;
+     justify-content: center;
+     position: absolute;
+     text-transform: uppercase;
+     font-size: 0.75rem;
+     letter-spacing: 0.05em;
+     z-index: 2;
+ }
+
+.admin-detail-panel {
+     border: 1px solid rgba(0, 0, 0, 0.08);
+     position: sticky;
+     top: 1rem;
+ }
+
+@media (max-width: 1199.98px) {
+    .admin-detail-panel {
+        position: static;
+    }
+}

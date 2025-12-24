@@ -224,6 +224,19 @@
         $(table).bootstrapTable('refresh');
     }
 
+    function setTableLoading(tableId, isLoading) {
+        const indicator = document.getElementById(`${tableId}Loading`);
+        if (!indicator) {
+            return;
+        }
+
+        if (isLoading) {
+            indicator.classList.remove('d-none');
+        } else {
+            indicator.classList.add('d-none');
+        }
+    }
+
     function getActiveEntity() {
         const activeTab = document.querySelector('#adminTabs .nav-link.active');
         const ret = activeTab ? activeTab.dataset.entity : null;
@@ -407,6 +420,31 @@
 
                 const rows = getSelectedRows(entity);
                 updateSelectionHint(rows.length);
+                if (rows.length) {
+                    openPanel(entity, rows[0]);
+                }
+            });
+
+            $(`#${tableId}`).on('click-row.bs.table', function (event, row) {
+                const entity = getActiveEntity();
+                if (!entity) {
+                    return;
+                }
+
+                openPanel(entity, row);
+            });
+        });
+    }
+
+    function initLoadingIndicators() {
+        const tableIds = ['partsTable', 'operationsTable', 'sectionsTable', 'balancesTable'];
+        tableIds.forEach((tableId) => {
+            setTableLoading(tableId, true);
+            $(`#${tableId}`).on('refresh.bs.table page-change.bs.table sort.bs.table search.bs.table', function () {
+                setTableLoading(tableId, true);
+            });
+            $(`#${tableId}`).on('post-body.bs.table load-success.bs.table load-error.bs.table', function () {
+                setTableLoading(tableId, false);
             });
         });
     }
@@ -482,6 +520,7 @@
         initSelectionTracking();
         initTabTracking();
         initFormReset();
+        initLoadingIndicators();
         updateActiveEntityLabel();
     });
 })();

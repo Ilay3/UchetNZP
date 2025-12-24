@@ -51,203 +51,232 @@
             </div>
         </div>
 
-        <div class="tab-content" id="adminTabsContent">
-            <div class="tab-pane fade show active" id="partsTab" role="tabpanel" aria-labelledby="parts-tab">
-                @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
-                {
-                    FormId = "partsFilterForm",
-                    TargetTableId = "partsTable",
-                    Inputs = new[]
-                    {
-                        new AdminFilterInputViewModel("partSearch", "partSearch", "Поиск", Model.PartSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
-                    },
-                })
+        <div class="row g-4">
+            <div class="col-xl-8">
+                <div class="tab-content" id="adminTabsContent">
+                    <div class="tab-pane fade show active" id="partsTab" role="tabpanel" aria-labelledby="parts-tab">
+                        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+                        {
+                            FormId = "partsFilterForm",
+                            TargetTableId = "partsTable",
+                            Inputs = new[]
+                            {
+                                new AdminFilterInputViewModel("partSearch", "partSearch", "Поиск", Model.PartSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
+                            },
+                        })
 
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h2 class="h5 mb-0">Список деталей</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table id="partsTable"
-                                   class="table table-striped"
-                                   data-toggle="table"
-                                   data-unique-id="id"
-                                   data-pagination="true"
-                                   data-side-pagination="server"
-                                   data-page-size="10"
-                                   data-click-to-select="true"
-                                   data-url="@Url.Action("GetPartsData", "Admin")"
-                                   data-sort-name="name"
-                                   data-sort-order="asc"
-                                   data-locale="ru-RU">
-                                <thead>
-                                    <tr>
-                                        <th data-checkbox="true"></th>
-                                        <th data-field="name" data-sortable="true">Название</th>
-                                        <th data-field="code" data-sortable="true">Код</th>
-                                        <th data-field="id" data-formatter="partsActionFormatter" data-align="right">Действия</th>
-                                    </tr>
-                                </thead>
-                            </table>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h2 class="h5 mb-0">Список деталей</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="admin-table-wrapper position-relative">
+                                    <div class="admin-table-loading d-flex" id="partsTableLoading" role="status" aria-live="polite">
+                                        <div class="spinner-border text-primary" aria-hidden="true"></div>
+                                        <span class="ms-2">Загрузка данных...</span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table id="partsTable"
+                                               class="table table-striped"
+                                               data-toggle="table"
+                                               data-unique-id="id"
+                                               data-pagination="true"
+                                               data-side-pagination="server"
+                                               data-page-size="10"
+                                               data-click-to-select="true"
+                                               data-url="@Url.Action("GetPartsData", "Admin")"
+                                               data-sort-name="name"
+                                               data-sort-order="asc"
+                                               data-locale="ru-RU">
+                                            <thead>
+                                                <tr>
+                                                    <th data-checkbox="true"></th>
+                                                    <th data-field="name" data-sortable="true">Название</th>
+                                                    <th data-field="code" data-sortable="true">Код</th>
+                                                    <th data-field="id" data-formatter="partsActionFormatter" data-align="right">Действия</th>
+                                                </tr>
+                                            </thead>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "partsActionTemplate", EntityKey = "parts" })
                     </div>
-                </div>
-                @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "partsActionTemplate", EntityKey = "parts" })
-            </div>
 
-            <div class="tab-pane fade" id="operationsTab" role="tabpanel" aria-labelledby="operations-tab">
-                @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
-                {
-                    FormId = "operationsFilterForm",
-                    TargetTableId = "operationsTable",
-                    Inputs = new[]
-                    {
-                        new AdminFilterInputViewModel("operationSearch", "operationSearch", "Поиск", Model.OperationSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
-                    },
-                })
+                    <div class="tab-pane fade" id="operationsTab" role="tabpanel" aria-labelledby="operations-tab">
+                        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+                        {
+                            FormId = "operationsFilterForm",
+                            TargetTableId = "operationsTable",
+                            Inputs = new[]
+                            {
+                                new AdminFilterInputViewModel("operationSearch", "operationSearch", "Поиск", Model.OperationSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
+                            },
+                        })
 
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h2 class="h5 mb-0">Список операций</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table id="operationsTable"
-                                   class="table table-striped"
-                                   data-toggle="table"
-                                   data-unique-id="id"
-                                   data-pagination="true"
-                                   data-side-pagination="server"
-                                   data-page-size="10"
-                                   data-click-to-select="true"
-                                   data-url="@Url.Action("GetOperationsData", "Admin")"
-                                   data-sort-name="name"
-                                   data-sort-order="asc"
-                                   data-locale="ru-RU">
-                                <thead>
-                                    <tr>
-                                        <th data-checkbox="true"></th>
-                                        <th data-field="name" data-sortable="true">Название</th>
-                                        <th data-field="code" data-sortable="true">Код</th>
-                                        <th data-field="id" data-formatter="operationsActionFormatter" data-align="right">Действия</th>
-                                    </tr>
-                                </thead>
-                            </table>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h2 class="h5 mb-0">Список операций</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="admin-table-wrapper position-relative">
+                                    <div class="admin-table-loading d-flex" id="operationsTableLoading" role="status" aria-live="polite">
+                                        <div class="spinner-border text-primary" aria-hidden="true"></div>
+                                        <span class="ms-2">Загрузка данных...</span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table id="operationsTable"
+                                               class="table table-striped"
+                                               data-toggle="table"
+                                               data-unique-id="id"
+                                               data-pagination="true"
+                                               data-side-pagination="server"
+                                               data-page-size="10"
+                                               data-click-to-select="true"
+                                               data-url="@Url.Action("GetOperationsData", "Admin")"
+                                               data-sort-name="name"
+                                               data-sort-order="asc"
+                                               data-locale="ru-RU">
+                                            <thead>
+                                                <tr>
+                                                    <th data-checkbox="true"></th>
+                                                    <th data-field="name" data-sortable="true">Название</th>
+                                                    <th data-field="code" data-sortable="true">Код</th>
+                                                    <th data-field="id" data-formatter="operationsActionFormatter" data-align="right">Действия</th>
+                                                </tr>
+                                            </thead>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "operationsActionTemplate", EntityKey = "operations" })
                     </div>
-                </div>
-                @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "operationsActionTemplate", EntityKey = "operations" })
-            </div>
 
-            <div class="tab-pane fade" id="sectionsTab" role="tabpanel" aria-labelledby="sections-tab">
-                @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
-                {
-                    FormId = "sectionsFilterForm",
-                    TargetTableId = "sectionsTable",
-                    Inputs = new[]
-                    {
-                        new AdminFilterInputViewModel("sectionSearch", "sectionSearch", "Поиск", Model.SectionSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
-                    },
-                })
+                    <div class="tab-pane fade" id="sectionsTab" role="tabpanel" aria-labelledby="sections-tab">
+                        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+                        {
+                            FormId = "sectionsFilterForm",
+                            TargetTableId = "sectionsTable",
+                            Inputs = new[]
+                            {
+                                new AdminFilterInputViewModel("sectionSearch", "sectionSearch", "Поиск", Model.SectionSearch, placeholder: "Название или код", cssClass: "col-md-4 col-lg-3"),
+                            },
+                        })
 
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h2 class="h5 mb-0">Список участков</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table id="sectionsTable"
-                                   class="table table-striped"
-                                   data-toggle="table"
-                                   data-unique-id="id"
-                                   data-pagination="true"
-                                   data-side-pagination="server"
-                                   data-page-size="10"
-                                   data-click-to-select="true"
-                                   data-url="@Url.Action("GetSectionsData", "Admin")"
-                                   data-sort-name="name"
-                                   data-sort-order="asc"
-                                   data-locale="ru-RU">
-                                <thead>
-                                    <tr>
-                                        <th data-checkbox="true"></th>
-                                        <th data-field="name" data-sortable="true">Название</th>
-                                        <th data-field="code" data-sortable="true">Код</th>
-                                        <th data-field="id" data-formatter="sectionsActionFormatter" data-align="right">Действия</th>
-                                    </tr>
-                                </thead>
-                            </table>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h2 class="h5 mb-0">Список участков</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="admin-table-wrapper position-relative">
+                                    <div class="admin-table-loading d-flex" id="sectionsTableLoading" role="status" aria-live="polite">
+                                        <div class="spinner-border text-primary" aria-hidden="true"></div>
+                                        <span class="ms-2">Загрузка данных...</span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table id="sectionsTable"
+                                               class="table table-striped"
+                                               data-toggle="table"
+                                               data-unique-id="id"
+                                               data-pagination="true"
+                                               data-side-pagination="server"
+                                               data-page-size="10"
+                                               data-click-to-select="true"
+                                               data-url="@Url.Action("GetSectionsData", "Admin")"
+                                               data-sort-name="name"
+                                               data-sort-order="asc"
+                                               data-locale="ru-RU">
+                                            <thead>
+                                                <tr>
+                                                    <th data-checkbox="true"></th>
+                                                    <th data-field="name" data-sortable="true">Название</th>
+                                                    <th data-field="code" data-sortable="true">Код</th>
+                                                    <th data-field="id" data-formatter="sectionsActionFormatter" data-align="right">Действия</th>
+                                                </tr>
+                                            </thead>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "sectionsActionTemplate", EntityKey = "sections" })
                     </div>
-                </div>
-                @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "sectionsActionTemplate", EntityKey = "sections" })
-            </div>
 
-            <div class="tab-pane fade" id="balancesTab" role="tabpanel" aria-labelledby="balances-tab">
-                @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
-                {
-                    FormId = "balancesFilterForm",
-                    TargetTableId = "balancesTable",
-                    Inputs = new[]
-                    {
-                        new AdminFilterInputViewModel("wipBalancePartFilter", "wipBalancePartFilter", "Деталь", Model.WipBalancePartFilter?.ToString(), "select", cssClass: "col-md-4 col-lg-3", options: Model.PartOptions),
-                        new AdminFilterInputViewModel("wipBalanceSectionFilter", "wipBalanceSectionFilter", "Участок", Model.WipBalanceSectionFilter?.ToString(), "select", cssClass: "col-md-4 col-lg-3", options: Model.SectionOptions),
-                        new AdminFilterInputViewModel("wipBalanceSearch", "wipBalanceSearch", "Поиск", Model.WipBalanceSearch, placeholder: "Деталь, участок, операция или ярлык", cssClass: "col-md-4 col-lg-3"),
-                    },
-                })
+                    <div class="tab-pane fade" id="balancesTab" role="tabpanel" aria-labelledby="balances-tab">
+                        @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
+                        {
+                            FormId = "balancesFilterForm",
+                            TargetTableId = "balancesTable",
+                            Inputs = new[]
+                            {
+                                new AdminFilterInputViewModel("wipBalancePartFilter", "wipBalancePartFilter", "Деталь", Model.WipBalancePartFilter?.ToString(), "select", cssClass: "col-md-4 col-lg-3", options: Model.PartOptions),
+                                new AdminFilterInputViewModel("wipBalanceSectionFilter", "wipBalanceSectionFilter", "Участок", Model.WipBalanceSectionFilter?.ToString(), "select", cssClass: "col-md-4 col-lg-3", options: Model.SectionOptions),
+                                new AdminFilterInputViewModel("wipBalanceSearch", "wipBalanceSearch", "Поиск", Model.WipBalanceSearch, placeholder: "Деталь, участок, операция или ярлык", cssClass: "col-md-4 col-lg-3"),
+                            },
+                        })
 
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h2 class="h5 mb-0">Список остатков</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table id="balancesTable"
-                                   class="table table-striped"
-                                   data-toggle="table"
-                                   data-unique-id="id"
-                                   data-pagination="true"
-                                   data-side-pagination="server"
-                                   data-page-size="10"
-                                   data-click-to-select="true"
-                                   data-url="@Url.Action("GetBalancesData", "Admin")"
-                                   data-sort-name="partName"
-                                   data-sort-order="asc"
-                                   data-locale="ru-RU">
-                                <thead>
-                                    <tr>
-                                        <th data-checkbox="true"></th>
-                                        <th data-field="partName" data-sortable="true">Деталь</th>
-                                        <th data-field="sectionName" data-sortable="true">Участок</th>
-                                        <th data-field="operationName" data-sortable="true">Операция</th>
-                                        <th data-field="operationLabel" data-sortable="true">Ярлык</th>
-                                        <th data-field="opNumberFormatted" data-sortable="true" data-sort-name="opNumber">№ операции</th>
-                                        <th data-field="quantity" data-sortable="true">Количество</th>
-                                        <th data-field="id" data-formatter="balancesActionFormatter" data-align="right">Действия</th>
-                                    </tr>
-                                </thead>
-                            </table>
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h2 class="h5 mb-0">Список остатков</h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="admin-table-wrapper position-relative">
+                                    <div class="admin-table-loading d-flex" id="balancesTableLoading" role="status" aria-live="polite">
+                                        <div class="spinner-border text-primary" aria-hidden="true"></div>
+                                        <span class="ms-2">Загрузка данных...</span>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table id="balancesTable"
+                                               class="table table-striped"
+                                               data-toggle="table"
+                                               data-unique-id="id"
+                                               data-pagination="true"
+                                               data-side-pagination="server"
+                                               data-page-size="10"
+                                               data-click-to-select="true"
+                                               data-url="@Url.Action("GetBalancesData", "Admin")"
+                                               data-sort-name="partName"
+                                               data-sort-order="asc"
+                                               data-locale="ru-RU">
+                                            <thead>
+                                                <tr>
+                                                    <th data-checkbox="true"></th>
+                                                    <th data-field="partName" data-sortable="true">Деталь</th>
+                                                    <th data-field="sectionName" data-sortable="true">Участок</th>
+                                                    <th data-field="operationName" data-sortable="true">Операция</th>
+                                                    <th data-field="operationLabel" data-sortable="true">Ярлык</th>
+                                                    <th data-field="opNumberFormatted" data-sortable="true" data-sort-name="opNumber">№ операции</th>
+                                                    <th data-field="quantity" data-sortable="true">Количество</th>
+                                                    <th data-field="id" data-formatter="balancesActionFormatter" data-align="right">Действия</th>
+                                                </tr>
+                                            </thead>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+                        @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "balancesActionTemplate", EntityKey = "balances" })
                     </div>
                 </div>
-                @await Html.PartialAsync("_AdminTableActions", new AdminTableActionsViewModel { TemplateId = "balancesActionTemplate", EntityKey = "balances" })
             </div>
-        </div>
-
-        <div class="card" id="adminEntityPanel">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h2 class="h5 mb-0" id="adminEntityPanelTitle">Форма</h2>
-                <span class="text-muted small" id="adminEntityPanelHint">Выберите запись в таблице или нажмите «Добавить».</span>
-            </div>
-            <form class="card-body" id="adminEntityForm">
-                <div id="adminEntityValidation" class="alert alert-danger d-none" role="alert"></div>
-                <div id="adminEntityFields"></div>
-                <div class="mt-3 d-flex justify-content-end gap-2">
-                    <button type="button" class="btn btn-outline-secondary admin-form-reset">Очистить</button>
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
+            <div class="col-xl-4">
+                <div class="card admin-detail-panel" id="adminEntityPanel">
+                    <div class="card-header d-flex flex-column gap-1">
+                        <h2 class="h5 mb-0" id="adminEntityPanelTitle">Форма</h2>
+                        <span class="text-muted small" id="adminEntityPanelHint">Выберите запись в таблице или нажмите «Добавить».</span>
+                    </div>
+                    <form class="card-body" id="adminEntityForm">
+                        <div id="adminEntityValidation" class="alert alert-danger d-none" role="alert"></div>
+                        <div id="adminEntityFields"></div>
+                        <div class="mt-3 d-flex justify-content-end gap-2">
+                            <button type="button" class="btn btn-outline-secondary admin-form-reset">Очистить</button>
+                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>

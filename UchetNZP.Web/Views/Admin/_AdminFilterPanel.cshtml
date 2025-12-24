@@ -2,6 +2,10 @@
 @model AdminFilterPanelViewModel
 
 <form id="@Model.FormId" class="card card-body mb-3 admin-filter-form" data-table-target="@Model.TargetTableId">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+        <span class="text-uppercase text-muted small fw-semibold">Фильтры</span>
+        <span class="text-muted small">Используйте поиск и фильтры для уточнения списка.</span>
+    </div>
     <div class="row g-3 align-items-end">
         @foreach (var input in Model.Inputs)
         {
@@ -24,9 +28,9 @@
                 }
             </div>
         }
-        <div class="col-md-2 col-lg-1 d-flex gap-2">
+        <div class="col-md-3 col-lg-2 d-flex gap-2">
             <button type="submit" class="btn btn-outline-primary flex-fill">@Model.SubmitLabel</button>
-            <button type="button" class="btn btn-link text-decoration-none admin-filter-reset" title="Сбросить фильтры">Сброс</button>
+            <button type="button" class="btn btn-outline-secondary flex-fill admin-filter-reset" title="Сбросить фильтры">Сброс</button>
         </div>
     </div>
 </form>
