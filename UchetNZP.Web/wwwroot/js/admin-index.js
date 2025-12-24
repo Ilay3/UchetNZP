@@ -14,12 +14,13 @@
         balances: document.getElementById('balancesActionTemplate').innerHTML
     };
 
-    const modalElement = document.getElementById('adminEntityModal');
-    const modal = new bootstrap.Modal(modalElement);
-    const modalTitle = document.getElementById('adminEntityModalLabel');
+    const panelTitle = document.getElementById('adminEntityPanelTitle');
+    const panelHint = document.getElementById('adminEntityPanelHint');
     const modalFields = document.getElementById('adminEntityFields');
     const validationElement = document.getElementById('adminEntityValidation');
     const formElement = document.getElementById('adminEntityForm');
+    const activeEntityLabel = document.getElementById('adminActiveEntityLabel');
+    const selectionHint = document.getElementById('adminSelectionHint');
 
     let currentEntity = null;
     let currentId = null;
@@ -95,7 +96,7 @@
             .join('');
     }
 
-    function openModal(entity, row) {
+    function openPanel(entity, row) {
         currentEntity = entity;
         currentId = row ? row.id : null;
         const config = entityConfig[entity];
@@ -115,10 +116,10 @@
         };
 
         modalFields.innerHTML = replacePlaceholders(rawTemplate, values);
-        modalTitle.textContent = row ? config.titleEdit : config.titleCreate;
+        panelTitle.textContent = row ? config.titleEdit : config.titleCreate;
+        panelHint.textContent = row ? 'Редактирование выбранной записи.' : 'Заполните поля и сохраните изменения.';
         validationElement.classList.add('d-none');
         validationElement.textContent = '';
-        modal.show();
     }
 
     function gatherFormData() {
@@ -176,8 +177,8 @@
                 return;
             }
 
-            modal.hide();
             refreshTable(config.tableId);
+            panelHint.textContent = 'Изменения сохранены.';
         } catch (e) {
             showErrors(['Произошла ошибка при сохранении.']);
         }
@@ -221,6 +222,42 @@
         }
 
         $(table).bootstrapTable('refresh');
+    }
+
+    function getActiveEntity() {
+        const activeTab = document.querySelector('#adminTabs .nav-link.active');
+        const ret = activeTab ? activeTab.dataset.entity : null;
+        return ret;
+    }
+
+    function updateActiveEntityLabel() {
+        const entity = getActiveEntity();
+        const map = {
+            parts: 'Детали',
+            operations: 'Операции',
+            sections: 'Участки',
+            balances: 'Остатки'
+        };
+        const text = entity ? map[entity] : '';
+        if (activeEntityLabel) {
+            activeEntityLabel.textContent = text ? `Активный раздел: ${text}` : '';
+        }
+    }
+
+    function updateSelectionHint(count) {
+        if (!selectionHint) {
+            return;
+        }
+
+        const text = count ? `Выбрано записей: ${count}` : 'Нет выбранных записей.';
+        selectionHint.textContent = text;
+    }
+
+    function getSelectedRows(entity) {
+        const config = entityConfig[entity];
+        const table = $(`#${config.tableId}`);
+        const rows = table.bootstrapTable('getSelections') || [];
+        return rows;
     }
 
     function formatActions(entity, id) {
@@ -284,10 +321,57 @@
         });
     }
 
-    function initCreateButtons() {
-        $('.admin-create').on('click', function () {
-            const entity = $(this).data('entity');
-            openModal(entity, null);
+    function onCreate(entity) {
+        const targetEntity = entity || getActiveEntity();
+        if (!targetEntity) {
+            return;
+        }
+
+        openPanel(targetEntity, null);
+    }
+
+    function onEdit(entity, id) {
+        const config = entityConfig[entity];
+        const table = $(`#${config.tableId}`);
+        const row = table.bootstrapTable('getRowByUniqueId', id);
+        openPanel(entity, row || null);
+    }
+
+    async function onDelete(entity, ids) {
+        const idList = Array.isArray(ids) ? ids : [ids];
+        for (const id of idList) {
+            await deleteEntity(entity, id);
+        }
+    }
+
+    function initQuickActions() {
+        $('.admin-quick-create').on('click', function () {
+            onCreate(null);
+        });
+
+        $('.admin-quick-delete').on('click', async function () {
+            const entity = getActiveEntity();
+            if (!entity) {
+                return;
+            }
+
+            const rows = getSelectedRows(entity);
+            if (!rows.length) {
+                showErrors(['Выберите запись для удаления.']);
+                return;
+            }
+
+            const ids = rows.map((row) => row.id);
+            await onDelete(entity, ids);
+        });
+
+        $('.admin-quick-export').on('click', function () {
+            const entity = getActiveEntity();
+            if (!entity) {
+                return;
+            }
+
+            exportTable(entity);
         });
     }
 
@@ -295,16 +379,13 @@
         $(document).on('click', '.admin-edit', function () {
             const entity = $(this).data('entity');
             const id = $(this).data('id');
-            const config = entityConfig[entity];
-            const table = $(`#${config.tableId}`);
-            const row = table.bootstrapTable('getRowByUniqueId', id);
-            openModal(entity, row || null);
+            onEdit(entity, id);
         });
 
         $(document).on('click', '.admin-delete', function () {
             const entity = $(this).data('entity');
             const id = $(this).data('id');
-            deleteEntity(entity, id);
+            onDelete(entity, id);
         });
     }
 
@@ -315,11 +396,92 @@
         });
     }
 
+    function initSelectionTracking() {
+        const tableIds = ['partsTable', 'operationsTable', 'sectionsTable', 'balancesTable'];
+        tableIds.forEach((tableId) => {
+            $(`#${tableId}`).on('check.bs.table uncheck.bs.table check-all.bs.table uncheck-all.bs.table', function () {
+                const entity = getActiveEntity();
+                if (!entity) {
+                    return;
+                }
+
+                const rows = getSelectedRows(entity);
+                updateSelectionHint(rows.length);
+            });
+        });
+    }
+
+    function initTabTracking() {
+        $('#adminTabs').on('shown.bs.tab', function () {
+            updateActiveEntityLabel();
+            const entity = getActiveEntity();
+            if (!entity) {
+                return;
+            }
+
+            const rows = getSelectedRows(entity);
+            updateSelectionHint(rows.length);
+        });
+    }
+
+    function exportTable(entity) {
+        const config = entityConfig[entity];
+        const table = $(`#${config.tableId}`);
+        const rows = table.bootstrapTable('getData') || [];
+        if (!rows.length) {
+            showErrors(['Нет данных для экспорта.']);
+            return;
+        }
+
+        const exportConfig = {
+            parts: { columns: ['name', 'code'], headers: ['Название', 'Код'] },
+            operations: { columns: ['name', 'code'], headers: ['Название', 'Код'] },
+            sections: { columns: ['name', 'code'], headers: ['Название', 'Код'] },
+            balances: { columns: ['partName', 'sectionName', 'operationName', 'operationLabel', 'opNumberFormatted', 'quantity'], headers: ['Деталь', 'Участок', 'Операция', 'Ярлык', '№ операции', 'Количество'] }
+        };
+
+        const exportItem = exportConfig[entity];
+        const lines = [];
+        lines.push(exportItem.headers.join(';'));
+        rows.forEach((row) => {
+            const values = exportItem.columns.map((column) => String(row[column] ?? '').replace(/;/g, ','));
+            lines.push(values.join(';'));
+        });
+
+        const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `admin-export-${entity}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function resetFormPanel() {
+        currentId = null;
+        currentEntity = getActiveEntity();
+        modalFields.innerHTML = '';
+        validationElement.classList.add('d-none');
+        validationElement.textContent = '';
+        panelTitle.textContent = 'Форма';
+        panelHint.textContent = 'Выберите запись в таблице или нажмите «Добавить».';
+    }
+
+    function initFormReset() {
+        $('.admin-form-reset').on('click', function () {
+            resetFormPanel();
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         initTables();
         initFilterForms();
-        initCreateButtons();
+        initQuickActions();
         initRowActions();
         initModalForm();
+        initSelectionTracking();
+        initTabTracking();
+        initFormReset();
+        updateActiveEntityLabel();
     });
 })();
