@@ -46,6 +46,157 @@
 
     globalNamespace.formatNameWithCode = formatNameWithCode;
 
+    function resolveToastContainer() {
+        return document.getElementById("appToastContainer");
+    }
+
+    function showToast(in_message, in_variant = "success") {
+        const container = resolveToastContainer();
+        if (!container || !in_message) {
+            return;
+        }
+
+        const toastElement = document.createElement("div");
+        toastElement.className = `toast align-items-center text-bg-${in_variant} border-0`;
+        toastElement.setAttribute("role", "status");
+        toastElement.setAttribute("aria-live", "polite");
+        toastElement.setAttribute("aria-atomic", "true");
+        toastElement.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${in_message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
+            </div>`;
+        container.appendChild(toastElement);
+
+        const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+        toastElement.addEventListener("hidden.bs.toast", () => {
+            toastElement.remove();
+        });
+        toast.show();
+    }
+
+    globalNamespace.showToast = showToast;
+
+    function setButtonLoading(in_button, in_isLoading, in_label) {
+        if (!in_button) {
+            return;
+        }
+
+        if (in_isLoading) {
+            if (!in_button.dataset.originalContent) {
+                in_button.dataset.originalContent = in_button.innerHTML;
+            }
+
+            const label = in_label || in_button.dataset.loadingLabel || "Выполняется...";
+            in_button.disabled = true;
+            in_button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span><span class="ms-2">${label}</span>`;
+            return;
+        }
+
+        if (in_button.dataset.originalContent) {
+            in_button.innerHTML = in_button.dataset.originalContent;
+        }
+        in_button.disabled = false;
+    }
+
+    globalNamespace.setButtonLoading = setButtonLoading;
+
+    const confirmModalElement = document.getElementById("appConfirmModal");
+    const confirmMessageElement = document.getElementById("appConfirmModalMessage");
+    const confirmEntityElement = document.getElementById("appConfirmModalEntity");
+    const confirmSubmitButton = document.getElementById("appConfirmModalSubmit");
+    const confirmModal = confirmModalElement ? new bootstrap.Modal(confirmModalElement) : null;
+    let confirmAction = null;
+    let confirmTriggerButton = null;
+
+    function openConfirmDialog(in_options) {
+        if (!confirmModal || !in_options) {
+            return;
+        }
+
+        const message = in_options.message || "Подтвердите действие.";
+        const entityName = in_options.entityName || "";
+        const confirmLabel = in_options.confirmLabel || "Подтвердить";
+
+        confirmMessageElement.textContent = message;
+        confirmEntityElement.textContent = entityName;
+        confirmEntityElement.classList.toggle("d-none", !entityName);
+        confirmSubmitButton.textContent = confirmLabel;
+
+        confirmAction = typeof in_options.onConfirm === "function" ? in_options.onConfirm : null;
+        confirmTriggerButton = in_options.triggerButton || null;
+
+        confirmModal.show();
+    }
+
+    globalNamespace.openConfirmDialog = openConfirmDialog;
+
+    function onDeleteConfirm() {
+        if (!confirmAction) {
+            return;
+        }
+
+        const action = confirmAction;
+        const triggerButton = confirmTriggerButton;
+        confirmAction = null;
+        confirmTriggerButton = null;
+
+        if (triggerButton) {
+            setButtonLoading(triggerButton, true);
+        }
+
+        action();
+        confirmModal.hide();
+    }
+
+    globalNamespace.onDeleteConfirm = onDeleteConfirm;
+
+    if (confirmSubmitButton) {
+        confirmSubmitButton.addEventListener("click", onDeleteConfirm);
+    }
+
+    document.addEventListener("click", event => {
+        const target = event.target.closest("[data-confirm-delete]");
+        if (!target) {
+            return;
+        }
+
+        event.preventDefault();
+        const message = target.dataset.confirmMessage || "Удалить запись?";
+        const entityName = target.dataset.confirmEntity || "";
+        const confirmLabel = target.dataset.confirmLabel || "Удалить";
+        const form = target.closest("form");
+
+        openConfirmDialog({
+            message,
+            entityName,
+            confirmLabel,
+            triggerButton: target,
+            onConfirm: () => {
+                if (form) {
+                    form.submit();
+                }
+            }
+        });
+    });
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document.querySelectorAll("[data-toast-message]").forEach(element => {
+            const message = element.dataset.toastMessage;
+            const variant = element.dataset.toastVariant || "success";
+            if (message) {
+                showToast(message, variant);
+            }
+        });
+
+        document.querySelectorAll("form[data-loading-submit]").forEach(form => {
+            form.addEventListener("submit", () => {
+                const submitButton = form.querySelector("button[type='submit']");
+                setButtonLoading(submitButton, true);
+            });
+        });
+    });
+
     function debounce(fn, delay) {
         let timeoutId;
         return function (...args) {

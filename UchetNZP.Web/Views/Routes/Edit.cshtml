@@ -22,7 +22,7 @@
 
 <div class="card shadow-sm mb-4">
     <div class="card-body">
-        <form asp-action="@formAction" asp-controller="Routes" asp-route-id="@Model.Id" method="post" class="row g-4" autocomplete="off">
+        <form asp-action="@formAction" asp-controller="Routes" asp-route-id="@Model.Id" method="post" class="row g-4" autocomplete="off" data-loading-submit>
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="Id" />
             <input type="hidden" asp-for="OperationName" />
@@ -49,7 +49,7 @@
                 <span asp-validation-for="SectionName" class="text-danger"></span>
             </div>
             <div class="col-12 d-flex flex-column flex-md-row gap-3">
-                <button type="submit" class="btn btn-primary btn-lg">Сохранить</button>
+                <button type="submit" class="btn btn-primary btn-lg" data-loading-label="Сохранение...">Сохранить</button>
                 <a asp-action="Index" class="btn btn-outline-secondary btn-lg">Отмена</a>
             </div>
         </form>

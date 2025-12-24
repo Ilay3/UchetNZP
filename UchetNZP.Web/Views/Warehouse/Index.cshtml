@@ -11,18 +11,12 @@
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @Model.StatusMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
-    </div>
+    <div class="d-none" data-toast-message="@Model.StatusMessage" data-toast-variant="success"></div>
 }
 
 @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
 {
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @Model.ErrorMessage
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
-    </div>
+    <div class="d-none" data-toast-message="@Model.ErrorMessage" data-toast-variant="danger"></div>
 }
 
 <div class="card shadow-sm mb-4">
@@ -173,7 +167,7 @@
                                                             <div class="text-muted small">Количество, шт</div>
                                                         </div>
                                                     </div>
-                                                    <form asp-action="Update" method="post" class="row g-2 g-lg-3 align-items-end">
+                                                    <form asp-action="Update" method="post" class="row g-2 g-lg-3 align-items-end" data-loading-submit>
                                                         @Html.AntiForgeryToken()
                                                         <input type="hidden" name="Id" value="@row.Id" />
                                                         <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
@@ -192,7 +186,7 @@
                                                             <input id="comment-@row.Id" class="form-control" type="text" name="Comment" maxlength="512" value="@(row.Comment ?? string.Empty)" placeholder="Комментарий" />
                                                         </div>
                                                         <div class="col-12 col-lg-2 d-flex gap-2 justify-content-end">
-                                                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                                                            <button type="submit" class="btn btn-primary" data-loading-label="Сохранение...">Сохранить</button>
                                                             <button type="reset" class="btn btn-outline-secondary">Отмена</button>
                                                         </div>
                                                     </form>

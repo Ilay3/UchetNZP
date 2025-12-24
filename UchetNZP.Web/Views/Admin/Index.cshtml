@@ -27,12 +27,12 @@
 
         @if (!string.IsNullOrEmpty(Model.StatusMessage))
         {
-            <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
+            <div class="d-none" data-toast-message="@Model.StatusMessage" data-toast-variant="success"></div>
         }
 
         @if (!string.IsNullOrEmpty(Model.ErrorMessage))
         {
-            <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+            <div class="d-none" data-toast-message="@Model.ErrorMessage" data-toast-variant="danger"></div>
         }
 
         <form id="adminAntiForgery" class="d-none">
@@ -272,7 +272,7 @@
                         <div id="adminEntityFields"></div>
                         <div class="mt-3 d-flex justify-content-end gap-2">
                             <button type="button" class="btn btn-outline-secondary admin-form-reset">Очистить</button>
-                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                            <button type="submit" class="btn btn-primary" data-loading-label="Сохранение...">Сохранить</button>
                         </div>
                     </form>
                 </div>

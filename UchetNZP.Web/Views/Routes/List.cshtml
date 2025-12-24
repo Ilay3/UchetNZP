@@ -27,12 +27,12 @@
 
 @if (TempData["RouteMessage"] is string successMessage)
 {
-    <div class="alert alert-success" role="status">@successMessage</div>
+    <div class="d-none" data-toast-message="@successMessage" data-toast-variant="success"></div>
 }
 
 @if (TempData["RouteError"] is string errorMessage)
 {
-    <div class="alert alert-danger" role="alert">@errorMessage</div>
+    <div class="d-none" data-toast-message="@errorMessage" data-toast-variant="danger"></div>
 }
 
 <div class="card shadow-sm mb-4">
@@ -116,9 +116,16 @@ else
                                                     <td>@route.SectionName</td>
                                                     <td class="text-end text-nowrap">
                                                         <a class="btn btn-link text-decoration-none" asp-action="Edit" asp-route-id="@route.Id">Изменить</a>
-                                                        <form asp-action="Delete" asp-route-id="@route.Id" method="post" class="d-inline">
+                                                        <form asp-action="Delete" asp-route-id="@route.Id" method="post" class="d-inline" data-loading-submit>
                                                             @Html.AntiForgeryToken()
-                                                            <button type="submit" class="btn btn-link text-danger text-decoration-none" onclick="return confirm('Удалить выбранный маршрут?');">Удалить</button>
+                                                            <button type="button"
+                                                                    class="btn btn-link text-danger text-decoration-none"
+                                                                    data-confirm-delete
+                                                                    data-confirm-message="Удалить маршрут?"
+                                                                    data-confirm-entity="Маршрут детали: @route.PartDisplayName"
+                                                                    data-loading-label="Удаление...">
+                                                                Удалить
+                                                            </button>
                                                         </form>
                                                     </td>
                                                 </tr>
