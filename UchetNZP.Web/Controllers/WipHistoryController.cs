@@ -639,6 +639,52 @@ public class WipHistoryController : Controller
         return View("~/Views/Wip/History.cshtml", model);
     }
 
+    [HttpGet("parts")]
+    public async Task<IActionResult> GetParts([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var partQuery = _dbContext.Parts.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            partQuery = partQuery.Where(part =>
+                part.Name.ToLower().Contains(term) ||
+                (part.Code != null && part.Code.ToLower().Contains(term)));
+        }
+
+        var items = await partQuery
+            .OrderBy(part => part.Name)
+            .Take(25)
+            .Select(part => new LookupItemViewModel(part.Id, part.Name, part.Code))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items);
+    }
+
+    [HttpGet("sections")]
+    public async Task<IActionResult> GetSections([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var sectionQuery = _dbContext.Sections.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            sectionQuery = sectionQuery.Where(section =>
+                section.Name.ToLower().Contains(term) ||
+                (section.Code != null && section.Code.ToLower().Contains(term)));
+        }
+
+        var items = await sectionQuery
+            .OrderBy(section => section.Name)
+            .Take(25)
+            .Select(section => new LookupItemViewModel(section.Id, section.Name, section.Code))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items);
+    }
+
     private static bool HasActionButtons(WipHistoryEntryViewModel entry)
     {
         return entry.Type == WipHistoryEntryType.Receipt ||
