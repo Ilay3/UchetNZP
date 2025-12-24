@@ -325,34 +325,38 @@
                                                     @foreach (var step in entry.LabelTimeline)
                                                     {
                                                         var isCurrentStep = step.EntryId == entry.Id;
-                                                        var stepDate = HasTimeComponent(step.OccurredAt)
-                                                            ? step.OccurredAt.ToString("dd.MM.yyyy HH:mm")
-                                                            : step.OccurredAt.ToString("dd.MM.yyyy");
+                                                        var stepDate = step.OccurredAt.ToString("dd.MM.yyyy");
                                                         <li class="mb-2">
-                                                            <div class="d-flex flex-column flex-md-row gap-2">
-                                                                <div class="fw-semibold @(isCurrentStep ? "text-primary" : string.Empty)">
-                                                                    @step.TypeDisplayName
-                                                                    @if (isCurrentStep)
+                                                            <div class="p-2 border rounded @(isCurrentStep ? "border-primary bg-primary-subtle" : "border-light")">
+                                                                <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                                                                    <div class="fw-semibold">
+                                                                        @step.TypeDisplayName
+                                                                        @if (step.IsCancelled)
+                                                                        {
+                                                                            <span class="badge bg-danger ms-1">Отменено</span>
+                                                                        }
+                                                                        @if (isCurrentStep)
+                                                                        {
+                                                                            <span class="badge bg-primary ms-1">Текущая запись</span>
+                                                                        }
+                                                                    </div>
+                                                                    <div class="text-muted">@stepDate</div>
+                                                                    <div class="text-muted">Количество: @step.Quantity.ToString("0.###") шт</div>
+                                                                </div>
+                                                                <div class="mt-2 d-flex flex-column flex-md-row gap-2">
+                                                                    @if (!string.IsNullOrWhiteSpace(step.SectionName))
                                                                     {
-                                                                        <span class="badge bg-primary ms-1">Текущая запись</span>
+                                                                        <div><span class="text-muted">От:</span> @step.SectionName</div>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(step.TargetSectionName))
+                                                                    {
+                                                                        <div><span class="text-muted">В:</span> @step.TargetSectionName</div>
+                                                                    }
+                                                                    @if (!string.IsNullOrWhiteSpace(step.OperationRange))
+                                                                    {
+                                                                        <div><span class="text-muted">Операции:</span> @step.OperationRange</div>
                                                                     }
                                                                 </div>
-                                                                <div class="text-muted">@stepDate</div>
-                                                                <div class="text-muted">Количество: @step.Quantity.ToString("0.###") шт</div>
-                                                            </div>
-                                                            <div class="mt-1">
-                                                                @if (!string.IsNullOrWhiteSpace(step.SectionName))
-                                                                {
-                                                                    <span class="me-2">От: @step.SectionName</span>
-                                                                }
-                                                                @if (!string.IsNullOrWhiteSpace(step.TargetSectionName))
-                                                                {
-                                                                    <span class="me-2">В: @step.TargetSectionName</span>
-                                                                }
-                                                                @if (!string.IsNullOrWhiteSpace(step.OperationRange))
-                                                                {
-                                                                    <span>Операции: @step.OperationRange</span>
-                                                                }
                                                             </div>
                                                         </li>
                                                     }

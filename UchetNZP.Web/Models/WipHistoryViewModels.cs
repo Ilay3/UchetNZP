@@ -76,7 +76,8 @@ public class WipHistoryLabelStepViewModel
         string sectionName,
         string targetSectionName,
         string? operationRange,
-        decimal quantity)
+        decimal quantity,
+        bool isCancelled)
     {
         EntryId = entryId;
         OccurredAt = occurredAt;
@@ -85,6 +86,7 @@ public class WipHistoryLabelStepViewModel
         TargetSectionName = targetSectionName ?? string.Empty;
         OperationRange = operationRange;
         Quantity = quantity;
+        IsCancelled = isCancelled;
     }
 
     public Guid EntryId { get; }
@@ -100,6 +102,8 @@ public class WipHistoryLabelStepViewModel
     public string? OperationRange { get; }
 
     public decimal Quantity { get; }
+
+    public bool IsCancelled { get; }
 }
 
 public class WipHistoryScrapViewModel

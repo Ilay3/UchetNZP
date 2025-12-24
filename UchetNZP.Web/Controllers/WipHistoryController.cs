@@ -583,7 +583,8 @@ public class WipHistoryController : Controller
                         entry.SectionName,
                         entry.TargetSectionName,
                         entry.OperationRange,
-                        entry.Quantity))
+                        entry.Quantity,
+                        entry.IsCancelled))
                     .ToList(),
                 StringComparer.Ordinal);
 
