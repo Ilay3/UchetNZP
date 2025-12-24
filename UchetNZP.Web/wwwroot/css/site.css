@@ -244,6 +244,27 @@ table {
      top: 1rem;
  }
 
+.admin-compact {
+    font-size: 0.9rem;
+}
+
+.admin-compact .table {
+    font-size: 0.85rem;
+}
+
+.admin-compact .form-label {
+    font-size: 0.8rem;
+}
+
+.admin-compact .form-text,
+.admin-compact .text-muted.small {
+    font-size: 0.75rem;
+}
+
+.admin-compact .btn {
+    font-size: 0.85rem;
+}
+
 @media (max-width: 1199.98px) {
     .admin-detail-panel {
         position: static;
