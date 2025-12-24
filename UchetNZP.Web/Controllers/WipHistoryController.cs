@@ -200,6 +200,71 @@ public class WipHistoryController : Controller
             var receiptPartIds = receipts.Select(x => x.PartId).Distinct().ToList();
             var receiptSectionIds = receipts.Select(x => x.SectionId).Distinct().ToList();
             var opNumbers = receipts.Select(x => x.OpNumber).Distinct().ToList();
+            var receiptTransferDates = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber), List<DateTime>>();
+
+            if (receipts.Count > 0)
+            {
+                var minReceiptDate = receipts.Min(x => x.ReceiptDate);
+
+                var transferAudits = await _dbContext.TransferAudits
+                    .AsNoTracking()
+                    .Where(transfer =>
+                        transfer.TransferDate >= minReceiptDate &&
+                            receiptPartIds.Contains(transfer.PartId) &&
+                            receiptSectionIds.Contains(transfer.FromSectionId) &&
+                            opNumbers.Contains(transfer.FromOpNumber) &&
+                            !transfer.IsReverted)
+                    .Select(transfer => new
+                    {
+                        transfer.PartId,
+                        transfer.FromSectionId,
+                        transfer.FromOpNumber,
+                        transfer.TransferDate,
+                    })
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var transfer in transferAudits)
+                {
+                    var key = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber);
+                    if (!receiptTransferDates.TryGetValue(key, out var dates))
+                    {
+                        dates = new List<DateTime>();
+                        receiptTransferDates[key] = dates;
+                    }
+
+                    dates.Add(transfer.TransferDate);
+                }
+
+                var pendingTransfers = await _dbContext.WipTransfers
+                    .AsNoTracking()
+                    .Where(transfer =>
+                        transfer.TransferDate >= minReceiptDate &&
+                            receiptPartIds.Contains(transfer.PartId) &&
+                            receiptSectionIds.Contains(transfer.FromSectionId) &&
+                            opNumbers.Contains(transfer.FromOpNumber))
+                    .Select(transfer => new
+                    {
+                        transfer.PartId,
+                        transfer.FromSectionId,
+                        transfer.FromOpNumber,
+                        transfer.TransferDate,
+                    })
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var transfer in pendingTransfers)
+                {
+                    var key = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber);
+                    if (!receiptTransferDates.TryGetValue(key, out var dates))
+                    {
+                        dates = new List<DateTime>();
+                        receiptTransferDates[key] = dates;
+                    }
+
+                    dates.Add(transfer.TransferDate);
+                }
+            }
 
             var receiptAudits = receipts.Count == 0
                 ? new List<ReceiptAudit>()
@@ -234,6 +299,12 @@ public class WipHistoryController : Controller
                 receiptAuditLookup.TryGetValue(receipt.Id, out var audits);
                 var hasVersions = audits is { Count: > 0 };
                 Guid? latestVersionId = hasVersions ? audits![0].VersionId : null;
+                var canDeleteReceipt = true;
+
+                if (receiptTransferDates.TryGetValue((receipt.PartId, receipt.SectionId, receipt.OpNumber), out var transferDates))
+                {
+                    canDeleteReceipt = !transferDates.Any(date => date >= receipt.ReceiptDate);
+                }
 
                 var entry = new WipHistoryEntryViewModel(
                     receipt.Id,
@@ -269,6 +340,7 @@ public class WipHistoryController : Controller
                     latestVersionId,
                     null);
 
+                entry.CanDeleteReceipt = canDeleteReceipt;
                 entries.Add(entry);
             }
         }
