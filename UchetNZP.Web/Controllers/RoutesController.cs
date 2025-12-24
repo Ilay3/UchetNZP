@@ -87,7 +87,8 @@ public class RoutesController : Controller
             Sections = sections,
         };
 
-        var model = new RouteListViewModel(filter, routes);
+        var SelectedRouteId = query.SelectedRouteId;
+        var model = new RouteListViewModel(filter, routes, SelectedRouteId);
 
         return View("~/Views/Routes/List.cshtml", model);
     }
@@ -128,7 +129,7 @@ public class RoutesController : Controller
 
         var opNumber = model.GetOpNumberValue();
 
-        await _routeService.UpsertRouteAsync(
+        var updatedRoute = await _routeService.UpsertRouteAsync(
             model.PartName,
             null,
             model.OperationName,
@@ -139,7 +140,7 @@ public class RoutesController : Controller
 
         TempData["RouteMessage"] = "Маршрут успешно добавлен.";
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { SelectedRouteId = updatedRoute.Id });
     }
 
     [HttpGet("{id:guid}/edit")]
@@ -213,7 +214,7 @@ public class RoutesController : Controller
 
         TempData["RouteMessage"] = "Маршрут успешно обновлён.";
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Index), new { SelectedRouteId = updatedRoute.Id });
     }
 
     [HttpPost("{id:guid}/delete")]
@@ -474,6 +475,8 @@ public class RoutesController : Controller
         public string? Search { get; set; }
 
         public Guid? SectionId { get; set; }
+
+        public Guid? SelectedRouteId { get; set; }
     }
 
     public record RouteUpsertRequest(

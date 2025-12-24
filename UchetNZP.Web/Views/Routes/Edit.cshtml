@@ -28,25 +28,36 @@
             <input type="hidden" asp-for="OperationName" />
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
+            <div class="col-12">
+                <h2 class="h5 mb-1">Основные</h2>
+                <div class="text-muted small">Поля со звёздочкой обязательны для заполнения.</div>
+            </div>
             <div class="col-lg-6">
-                <label asp-for="PartName" class="form-label"></label>
-                <input asp-for="PartName" class="form-control form-control-lg" placeholder="Наименование детали" />
+                <label class="form-label" for="PartName">@Html.DisplayNameFor(model => model.PartName) <span class="text-danger">*</span></label>
+                <input asp-for="PartName" class="form-control form-control-lg" placeholder="Например, Корпус" aria-describedby="PartNameHelp" required />
+                <div class="form-text" id="PartNameHelp">Введите наименование детали, можно указать обозначение.</div>
                 <span asp-validation-for="PartName" class="text-danger"></span>
             </div>
             <div class="col-lg-3">
-                <label asp-for="OpNumber" class="form-label"></label>
-                <input asp-for="OpNumber" class="form-control form-control-lg" type="text" inputmode="text" pattern="@OperationNumber.AllowedPattern" maxlength="16" />
+                <label class="form-label" for="OpNumber">@Html.DisplayNameFor(model => model.OpNumber) <span class="text-danger">*</span></label>
+                <input asp-for="OpNumber" class="form-control form-control-lg" type="text" inputmode="text" pattern="@OperationNumber.AllowedPattern" maxlength="16" placeholder="Например, 010/1" aria-describedby="OpNumberHelp" required />
+                <div class="form-text" id="OpNumberHelp">Допустимы 1–10 цифр и дробная часть через «/».</div>
                 <span asp-validation-for="OpNumber" class="text-danger"></span>
             </div>
-            <div class="col-lg-3">
-                <label asp-for="NormHours" class="form-label"></label>
-                <input asp-for="NormHours" class="form-control form-control-lg" type="number" min="0.001" step="0.001" inputmode="decimal" value="@normHoursValue" />
-                <span asp-validation-for="NormHours" class="text-danger"></span>
-            </div>
             <div class="col-lg-6">
-                <label asp-for="SectionName" class="form-label"></label>
-                <input asp-for="SectionName" class="form-control form-control-lg" placeholder="Наименование вида работ" />
+                <label class="form-label" for="SectionName">@Html.DisplayNameFor(model => model.SectionName) <span class="text-danger">*</span></label>
+                <input asp-for="SectionName" class="form-control form-control-lg" placeholder="Например, Механическая обработка" aria-describedby="SectionNameHelp" required />
+                <div class="form-text" id="SectionNameHelp">Укажите вид работ, на котором выполняется операция.</div>
                 <span asp-validation-for="SectionName" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <h2 class="h5 mb-1">Дополнительно</h2>
+            </div>
+            <div class="col-lg-3">
+                <label class="form-label" for="NormHours">@Html.DisplayNameFor(model => model.NormHours) <span class="text-danger">*</span></label>
+                <input asp-for="NormHours" class="form-control form-control-lg" type="number" min="0.001" step="0.001" inputmode="decimal" value="@normHoursValue" placeholder="Например, 0,500" aria-describedby="NormHoursHelp" required />
+                <div class="form-text" id="NormHoursHelp">Введите норматив в нормо-часах, значение больше нуля.</div>
+                <span asp-validation-for="NormHours" class="text-danger"></span>
             </div>
             <div class="col-12 d-flex flex-column flex-md-row gap-3">
                 <button type="submit" class="btn btn-primary btn-lg" data-loading-label="Сохранение...">Сохранить</button>
