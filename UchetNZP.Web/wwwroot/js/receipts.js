@@ -53,8 +53,14 @@
     const labelHiddenInput = document.getElementById("receiptLabelId");
     const labelMessage = document.getElementById("receiptLabelMessage");
     const addButton = document.getElementById("receiptAddButton");
+    const bulkAddButton = document.getElementById("receiptBulkAddButton");
     const saveButton = document.getElementById("receiptSaveButton");
     const resetButton = document.getElementById("receiptResetButton");
+    const deleteByLabelInput = document.getElementById("receiptDeleteByLabelInput");
+    const deleteByLabelButton = document.getElementById("receiptDeleteByLabelButton");
+    const bulkModalElement = document.getElementById("receiptBulkModal");
+    const bulkLabelsInput = document.getElementById("receiptBulkLabelsInput");
+    const bulkConfirmButton = document.getElementById("receiptBulkConfirmButton");
 
     dateInput.value = new Date().toISOString().slice(0, 10);
 
@@ -84,6 +90,7 @@
     let isUpdatingLabels = false;
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
+    const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
 
     function getManualLabelNumber()
     {
@@ -208,9 +215,31 @@
         return true;
     }
 
+    function canOpenBulkAdd() {
+        const part = partLookup.getSelected();
+        const section = sectionLookup.getSelected();
+        if (!part || !part.id || !section || !section.id) {
+            return false;
+        }
+
+        if (!selectedOperation || selectedOperation.sectionId !== section.id) {
+            return false;
+        }
+
+        if (isLoadingOperations || isLoadingBalance) {
+            return false;
+        }
+
+        const quantity = Number(quantityInput.value);
+        return Boolean(quantity && quantity >= 1 && dateInput.value);
+    }
+
     function updateFormState() {
         const canAdd = canAddToCart();
         addButton.disabled = !canAdd;
+        if (bulkAddButton) {
+            bulkAddButton.disabled = !canOpenBulkAdd();
+        }
         saveButton.disabled = cart.length === 0;
         updateLabelControlsState();
         updateLabelAvailabilityMessage();
@@ -959,8 +988,11 @@
     }
 
     addButton.addEventListener("click", () => addToCart());
+    bulkAddButton?.addEventListener("click", () => openBulkModal());
     resetButton.addEventListener("click", () => resetForm());
     saveButton.addEventListener("click", () => saveCart());
+    bulkConfirmButton?.addEventListener("click", () => void addBulkToCart());
+    deleteByLabelButton?.addEventListener("click", () => void deleteSavedReceiptByLabel());
 
     quantityInput.addEventListener("input", () => updateFormState());
     dateInput.addEventListener("change", () => updateFormState());
@@ -983,51 +1015,16 @@
     }
 
     async function addToCart() {
-        const part = partLookup.getSelected();
-        const section = sectionLookup.getSelected();
-
-        if (!part || !part.id) {
-            alert("Выберите деталь.");
+        const state = await collectReceiptState();
+        if (!state) {
             return;
         }
 
-        if (!section || !section.id) {
-            alert("Выберите вид работ.");
-            return;
-        }
-
-        if (!selectedOperation) {
-            alert("Выберите операцию детали.");
-            return;
-        }
-
-        if (selectedOperation.sectionId !== section.id) {
-            alert("Выбранная операция относится к другому виду работ. Выберите корректный вид работ.");
-            return;
-        }
-
-        const quantity = Number(quantityInput.value);
-        if (!quantity || quantity < 1) {
-            alert("Количество прихода должно быть не меньше 1.");
-            return;
-        }
-
-        const date = dateInput.value;
-        if (!date) {
-            alert("Укажите дату прихода.");
-            return;
-        }
-
-        const key = getBalanceKey(part.id, section.id, selectedOperation.opNumber);
-        const base = await ensureBalanceLoaded(part.id, section.id, selectedOperation.opNumber);
-        const pending = pendingAdjustments.get(key) ?? 0;
+        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending } = state;
         const was = (base ?? 0) + pending;
         const become = was + quantity;
-
         pendingAdjustments.set(key, pending + quantity);
 
-        const partDisplay = formatNameWithCode(part.name, part.code);
-        const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
         const manualLabelNumber = getManualLabelNumber();
         const labelId = selectedLabel ? selectedLabel.id : null;
         const labelNumber = selectedLabel ? selectedLabel.number : (manualLabelNumber || null);
@@ -1065,6 +1062,177 @@
         editingIndex = null;
         renderCart();
         resetForm();
+    }
+
+    async function collectReceiptState() {
+        const part = partLookup.getSelected();
+        const section = sectionLookup.getSelected();
+
+        if (!part || !part.id) {
+            alert("Выберите деталь.");
+            return null;
+        }
+
+        if (!section || !section.id) {
+            alert("Выберите вид работ.");
+            return null;
+        }
+
+        if (!selectedOperation) {
+            alert("Выберите операцию детали.");
+            return null;
+        }
+
+        if (selectedOperation.sectionId !== section.id) {
+            alert("Выбранная операция относится к другому виду работ. Выберите корректный вид работ.");
+            return null;
+        }
+
+        const quantity = Number(quantityInput.value);
+        if (!quantity || quantity < 1) {
+            alert("Количество прихода должно быть не меньше 1.");
+            return null;
+        }
+
+        const date = dateInput.value;
+        if (!date) {
+            alert("Укажите дату прихода.");
+            return null;
+        }
+
+        const key = getBalanceKey(part.id, section.id, selectedOperation.opNumber);
+        const base = await ensureBalanceLoaded(part.id, section.id, selectedOperation.opNumber);
+        const pending = pendingAdjustments.get(key) ?? 0;
+        const partDisplay = formatNameWithCode(part.name, part.code);
+        const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
+
+        return { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending };
+    }
+
+    function openBulkModal() {
+        if (!bulkModal) {
+            return;
+        }
+
+        if (bulkLabelsInput) {
+            bulkLabelsInput.value = "";
+        }
+
+        bulkModal.show();
+    }
+
+    function parseBulkLabelNumbers(rawInput) {
+        if (typeof rawInput !== "string") {
+            return [];
+        }
+
+        const tokens = rawInput
+            .split(/[\s,;]+/)
+            .map(token => token.trim())
+            .filter(token => token.length > 0);
+
+        const unique = [];
+        const seen = new Set();
+        for (const token of tokens) {
+            if (!/^[0-9]{1,5}$/.test(token)) {
+                return null;
+            }
+
+            if (seen.has(token)) {
+                continue;
+            }
+
+            seen.add(token);
+            unique.push(token);
+        }
+
+        return unique;
+    }
+
+    async function addBulkToCart() {
+        const parsedLabels = parseBulkLabelNumbers(bulkLabelsInput?.value ?? "");
+        if (parsedLabels === null) {
+            alert("Укажите только номера ярлыков в формате 1–5 цифр.");
+            return;
+        }
+
+        if (!parsedLabels.length) {
+            alert("Добавьте хотя бы один номер ярлыка для множественного прихода.");
+            return;
+        }
+
+        const state = await collectReceiptState();
+        if (!state) {
+            return;
+        }
+
+        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending } = state;
+        let runningPending = pending;
+
+        parsedLabels.forEach(labelNumber => {
+            const was = (base ?? 0) + runningPending;
+            const become = was + quantity;
+            runningPending += quantity;
+            cart.push({
+                partId: part.id,
+                partName: part.name,
+                partCode: part.code ?? null,
+                sectionId: section.id,
+                sectionName: section.name,
+                opNumber: selectedOperation.opNumber,
+                operationName: selectedOperation.operationName,
+                partDisplay,
+                operationDisplay,
+                date,
+                quantity,
+                comment: commentInput.value || null,
+                was,
+                become,
+                wipLabelId: null,
+                labelNumber,
+                isAssigned: true,
+            });
+        });
+
+        pendingAdjustments.set(key, runningPending);
+        bulkModal?.hide();
+        renderCart();
+        resetForm();
+    }
+
+    async function deleteSavedReceiptByLabel() {
+        const labelNumber = typeof deleteByLabelInput?.value === "string" ? deleteByLabelInput.value.trim() : "";
+        if (!labelNumber) {
+            alert("Введите номер ярлыка для удаления прихода.");
+            return;
+        }
+
+        const matched = history.filter(item => item.labelNumber === labelNumber);
+        if (!matched.length) {
+            alert("В сохранённой истории нет прихода с таким номером ярлыка.");
+            return;
+        }
+
+        if (!window.confirm(`Будет отменено записей: ${matched.length}. Продолжить?`)) {
+            return;
+        }
+
+        if (deleteByLabelButton) {
+            deleteByLabelButton.disabled = true;
+        }
+        try {
+            for (const item of matched) {
+                await cancelSavedReceipt(item.receiptId, null, true);
+            }
+            if (deleteByLabelInput) {
+                deleteByLabelInput.value = "";
+            }
+        }
+        finally {
+            if (deleteByLabelButton) {
+                deleteByLabelButton.disabled = false;
+            }
+        }
     }
 
     async function saveCart() {
@@ -1194,7 +1362,7 @@
         renderHistory();
     }
 
-    async function cancelSavedReceipt(receiptId, button) {
+    async function cancelSavedReceipt(receiptId, button, skipPrompt = false) {
         const index = history.findIndex(entry => entry.receiptId === receiptId);
         if (index < 0) {
             if (button) {
@@ -1203,7 +1371,7 @@
             return;
         }
 
-        if (!window.confirm("Отменить выбранный приход?")) {
+        if (!skipPrompt && !window.confirm("Отменить выбранный приход?")) {
             if (button) {
                 button.disabled = false;
             }

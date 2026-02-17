@@ -452,29 +452,16 @@
 
     function formatOperation(operation) {
         const opNumber = operation.opNumber;
-        if (operation.isWarehouse) {
-            const balanceValue = Number(operation.balance ?? 0);
-            const name = operation.operationName || "Склад";
-            return `${opNumber} | ${name} | остаток на складе: ${balanceValue.toFixed(3)}`;
-        }
+        const name = operation.operationName || (operation.isWarehouse ? "Склад" : "");
+        const balanceValue = Number(operation.balance ?? 0);
+        const integerBalance = Number.isFinite(balanceValue) ? Math.trunc(balanceValue) : 0;
 
         const parts = [opNumber];
-        if (operation.operationName) {
-            parts.push(operation.operationName);
+        if (name) {
+            parts.push(name);
         }
-        const norm = Number(operation.normHours ?? 0);
-        parts.push(`${norm.toFixed(3)} н/ч`);
-        const labels = Array.isArray(operation.labelBalances) ? operation.labelBalances : [];
-        const labelTexts = labels
-            .map(formatLabelBalanceLabel)
-            .filter(text => text.length > 0);
-        if (labelTexts.length) {
-            parts.push(`ярлыки: ${labelTexts.join(", ")}`);
-        }
-        else {
-            const balanceValue = Number(operation.balance ?? 0);
-            parts.push(`остаток: ${balanceValue.toFixed(3)}`);
-        }
+
+        parts.push(`остаток: ${integerBalance}`);
         return parts.join(" | ");
     }
 
