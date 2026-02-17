@@ -27,8 +27,8 @@
                 </div>
                 <div class="mb-3 d-none" id="labelManualNumberRow">
                     <label class="form-label" for="labelNumberInput">Номер ярлыка</label>
-                    <input id="labelNumberInput" type="text" class="form-control" maxlength="5" placeholder="Например, 00012" autocomplete="off" />
-                    <div class="form-text">Доступны только цифры, номер будет дополнен нулями слева до пяти знаков.</div>
+                    <input id="labelNumberInput" type="text" class="form-control" maxlength="11" placeholder="Например, 00012 или 00345/1" autocomplete="off" />
+                    <div class="form-text">Допустимы форматы 00012 и 00345/1. Левая часть автоматически дополняется до 5 цифр.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="labelDateInput">Дата</label>
@@ -107,8 +107,8 @@
                 <div id="labelEditMessage" class="alert d-none" role="alert"></div>
                 <div class="mb-3">
                     <label class="form-label" for="editLabelNumberInput">Номер</label>
-                    <input id="editLabelNumberInput" type="text" class="form-control" maxlength="5" autocomplete="off" />
-                    <div class="form-text">Доступны только цифры, номер автоматически дополняется до пяти символов.</div>
+                    <input id="editLabelNumberInput" type="text" class="form-control" maxlength="11" autocomplete="off" />
+                    <div class="form-text">Допустимы форматы 00012 и 00345/1. Левая часть автоматически дополняется до 5 цифр.</div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label" for="editLabelDateInput">Дата</label>

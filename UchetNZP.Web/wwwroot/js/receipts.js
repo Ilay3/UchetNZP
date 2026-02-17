@@ -56,8 +56,6 @@
     const bulkAddButton = document.getElementById("receiptBulkAddButton");
     const saveButton = document.getElementById("receiptSaveButton");
     const resetButton = document.getElementById("receiptResetButton");
-    const deleteByLabelInput = document.getElementById("receiptDeleteByLabelInput");
-    const deleteByLabelButton = document.getElementById("receiptDeleteByLabelButton");
     const bulkModalElement = document.getElementById("receiptBulkModal");
     const bulkLabelsInput = document.getElementById("receiptBulkLabelsInput");
     const bulkConfirmButton = document.getElementById("receiptBulkConfirmButton");
@@ -92,6 +90,8 @@
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
 
+    const labelNumberPattern = /^\d{1,5}(?:\/\d{1,5})?$/;
+
     function getManualLabelNumber()
     {
         if (!labelSearchInput)
@@ -106,7 +106,7 @@
             return "";
         }
 
-        if (!/^[0-9]{1,5}$/.test(rawValue))
+        if (!labelNumberPattern.test(rawValue))
         {
             return "";
         }
@@ -306,9 +306,9 @@
             ? labelSearchInput.value.trim()
             : "";
 
-        if (rawInput && !manualLabelNumber && !/^[0-9]{1,5}$/.test(rawInput))
+        if (rawInput && !manualLabelNumber && !labelNumberPattern.test(rawInput))
         {
-            showLabelMessage("Номер ярлыка должен состоять из 1–5 цифр.", "danger");
+            showLabelMessage("Номер ярлыка должен быть в формате 12345 или 12345/1.", "danger");
             return;
         }
 
@@ -992,7 +992,6 @@
     resetButton.addEventListener("click", () => resetForm());
     saveButton.addEventListener("click", () => saveCart());
     bulkConfirmButton?.addEventListener("click", () => void addBulkToCart());
-    deleteByLabelButton?.addEventListener("click", () => void deleteSavedReceiptByLabel());
 
     quantityInput.addEventListener("input", () => updateFormState());
     dateInput.addEventListener("change", () => updateFormState());
@@ -1134,7 +1133,7 @@
         const unique = [];
         const seen = new Set();
         for (const token of tokens) {
-            if (!/^[0-9]{1,5}$/.test(token)) {
+            if (!labelNumberPattern.test(token)) {
                 return null;
             }
 
@@ -1152,7 +1151,7 @@
     async function addBulkToCart() {
         const parsedLabels = parseBulkLabelNumbers(bulkLabelsInput?.value ?? "");
         if (parsedLabels === null) {
-            alert("Укажите только номера ярлыков в формате 1–5 цифр.");
+            alert("Укажите номера ярлыков в формате 12345 или 12345/1.");
             return;
         }
 
@@ -1198,41 +1197,6 @@
         bulkModal?.hide();
         renderCart();
         resetForm();
-    }
-
-    async function deleteSavedReceiptByLabel() {
-        const labelNumber = typeof deleteByLabelInput?.value === "string" ? deleteByLabelInput.value.trim() : "";
-        if (!labelNumber) {
-            alert("Введите номер ярлыка для удаления прихода.");
-            return;
-        }
-
-        const matched = history.filter(item => item.labelNumber === labelNumber);
-        if (!matched.length) {
-            alert("В сохранённой истории нет прихода с таким номером ярлыка.");
-            return;
-        }
-
-        if (!window.confirm(`Будет отменено записей: ${matched.length}. Продолжить?`)) {
-            return;
-        }
-
-        if (deleteByLabelButton) {
-            deleteByLabelButton.disabled = true;
-        }
-        try {
-            for (const item of matched) {
-                await cancelSavedReceipt(item.receiptId, null, true);
-            }
-            if (deleteByLabelInput) {
-                deleteByLabelInput.value = "";
-            }
-        }
-        finally {
-            if (deleteByLabelButton) {
-                deleteByLabelButton.disabled = false;
-            }
-        }
     }
 
     async function saveCart() {

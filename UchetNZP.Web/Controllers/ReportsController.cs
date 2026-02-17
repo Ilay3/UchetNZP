@@ -290,6 +290,178 @@ public class ReportsController : Controller
         return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
+    [HttpGet("label-movement")]
+    public async Task<IActionResult> LabelMovementReport([FromQuery] LabelMovementReportQuery? query, CancellationToken cancellationToken)
+    {
+        var filter = new LabelMovementReportFilterViewModel
+        {
+            PartId = query?.PartId,
+            LabelId = query?.LabelId,
+        };
+
+        if (query?.PartId is null || query.LabelId is null)
+        {
+            return View("~/Views/Reports/LabelMovementReport.cshtml", new LabelMovementReportViewModel(filter, Array.Empty<LabelMovementReportEventViewModel>(), 0m, 0m));
+        }
+
+        var part = await _dbContext.Parts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == query!.PartId!.Value, cancellationToken)
+            .ConfigureAwait(false);
+
+        var label = await _dbContext.WipLabels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == query.LabelId!.Value && x.PartId == query.PartId!.Value, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (part == null || label == null)
+        {
+            return View("~/Views/Reports/LabelMovementReport.cshtml", new LabelMovementReportViewModel(filter, Array.Empty<LabelMovementReportEventViewModel>(), 0m, 0m));
+        }
+
+        filter = new LabelMovementReportFilterViewModel
+        {
+            PartId = part.Id,
+            PartName = part.Name,
+            PartCode = part.Code,
+            LabelId = label.Id,
+            LabelNumber = label.Number,
+        };
+
+        var receipts = await _dbContext.WipReceipts
+            .AsNoTracking()
+            .Where(x => x.WipLabelId == label.Id)
+            .Include(x => x.Section)
+            .OrderBy(x => x.ReceiptDate)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var transferAudits = await _dbContext.TransferAudits
+            .AsNoTracking()
+            .Where(x => x.WipLabelId == label.Id)
+            .OrderBy(x => x.TransferDate)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var sectionIds = transferAudits
+            .SelectMany(x => new[] { x.FromSectionId, x.ToSectionId })
+            .Distinct()
+            .ToList();
+
+        var sectionLookup = sectionIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.Sections
+                .AsNoTracking()
+                .Where(x => sectionIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+                .ConfigureAwait(false);
+
+        var items = new List<LabelMovementReportEventViewModel>();
+
+        items.AddRange(receipts.Select(receipt => new LabelMovementReportEventViewModel(
+            ConvertToLocal(receipt.ReceiptDate),
+            "Приход",
+            "—",
+            $"{receipt.Section?.Name ?? "Вид работ не задан"} • оп. {OperationNumber.Format(receipt.OpNumber)}",
+            receipt.Quantity,
+            null,
+            null,
+            receipt.Quantity,
+            receipt.Comment)));
+
+        items.AddRange(transferAudits.Select(audit =>
+        {
+            var fromSectionName = sectionLookup.TryGetValue(audit.FromSectionId, out var fromName)
+                ? fromName
+                : "Вид работ не задан";
+            var toSectionName = sectionLookup.TryGetValue(audit.ToSectionId, out var toName)
+                ? toName
+                : "Вид работ не задан";
+
+            return new LabelMovementReportEventViewModel(
+                ConvertToLocal(audit.TransferDate),
+                "Передача",
+                $"{fromSectionName} • оп. {OperationNumber.Format(audit.FromOpNumber)}",
+                $"{toSectionName} • оп. {OperationNumber.Format(audit.ToOpNumber)}",
+                audit.Quantity,
+                audit.ScrapQuantity > 0 ? audit.ScrapQuantity : null,
+                audit.LabelQuantityBefore,
+                audit.LabelQuantityAfter,
+                audit.Comment);
+        }));
+
+        var orderedItems = items
+            .OrderBy(x => x.Date)
+            .ThenBy(x => x.EventType)
+            .ToList();
+
+        var model = new LabelMovementReportViewModel(
+            filter,
+            orderedItems,
+            label.Quantity,
+            label.RemainingQuantity);
+
+        return View("~/Views/Reports/LabelMovementReport.cshtml", model);
+    }
+
+    [HttpGet("label-movement/parts")]
+    public async Task<IActionResult> LabelMovementParts([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Parts.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(x => x.Name.ToLower().Contains(term) || (x.Code != null && x.Code.ToLower().Contains(term)));
+        }
+
+        var items = await query
+            .OrderBy(x => x.Name)
+            .Take(25)
+            .Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items);
+    }
+
+    [HttpGet("label-movement/labels")]
+    public async Task<IActionResult> LabelMovementLabels([FromQuery] Guid partId, [FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        if (partId == Guid.Empty)
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        var query = _dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => x.PartId == partId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(x => x.Number.ToLower().Contains(term));
+        }
+
+        var items = await query
+            .OrderByDescending(x => x.LabelDate)
+            .ThenBy(x => x.Number)
+            .Take(100)
+            .Select(x => new
+            {
+                id = x.Id,
+                number = x.Number,
+                quantity = x.Quantity,
+                remainingQuantity = x.RemainingQuantity,
+                labelDate = x.LabelDate,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items);
+    }
+
     private async Task<WipBatchReportViewModel> LoadWipBatchReportAsync(
         WipBatchReportQuery? query,
         CancellationToken cancellationToken)
@@ -298,8 +470,6 @@ public class ReportsController : Controller
         var defaultFrom = now.AddDays(-6);
         var (fromDate, toDate) = NormalizePeriod(query?.From ?? defaultFrom, query?.To ?? now);
 
-        var fromUtc = ToUtcStartOfDay(fromDate);
-        var toUtcExclusive = ToUtcStartOfDay(toDate.AddDays(1));
 
         var filter = new WipBatchReportFilterViewModel
         {
@@ -334,8 +504,7 @@ public class ReportsController : Controller
                 g.Key.SectionId,
                 g.Key.OpNumber,
                 LastReceiptDate = g.Max(x => x.ReceiptDate)
-            })
-            .Where(x => x.LastReceiptDate >= fromUtc && x.LastReceiptDate < toUtcExclusive);
+            });
 
         if (parsedOpNumber.HasValue)
         {
@@ -704,6 +873,10 @@ public class ReportsController : Controller
         string? Section,
         string? Part,
         string? OpNumber);
+
+    public sealed record LabelMovementReportQuery(
+        Guid? PartId,
+        Guid? LabelId);
 
     private sealed record TransferPeriodCell(Guid PartId, string PartName, string? PartCode, DateTime Date, string Text);
 

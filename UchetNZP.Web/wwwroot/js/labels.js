@@ -117,8 +117,42 @@
             return "";
         }
 
-        const digitsOnly = value.replace(/\D+/g, "").slice(0, 5);
-        return digitsOnly;
+        const normalized = value.replace(/[^0-9/]+/g, "").trim();
+        const parts = normalized.split("/").slice(0, 2).map(part => part.replace(/\D+/g, "").slice(0, 5));
+
+        if (!parts[0]) {
+            return "";
+        }
+
+        if (normalized.includes("/")) {
+            return parts[1] ? `${parts[0]}/${parts[1]}` : `${parts[0]}/`;
+        }
+
+        return parts[0];
+    }
+
+    function normalizeLabelNumberForSave(value) {
+        const sanitized = sanitizeNumberValue(value);
+        if (!sanitized || sanitized.endsWith("/")) {
+            return "";
+        }
+
+        const parts = sanitized.split("/");
+        if (parts.length === 1) {
+            const numeric = Number(parts[0]);
+            return Number.isFinite(numeric) && numeric > 0
+                ? numeric.toString().padStart(5, "0")
+                : "";
+        }
+
+        const [basePart, suffixPart] = parts;
+        const base = Number(basePart);
+        const suffix = Number(suffixPart);
+        if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(suffix) || suffix <= 0) {
+            return "";
+        }
+
+        return `${base.toString().padStart(5, "0")}/${suffix.toString()}`;
     }
 
     function setMode(mode) {
@@ -389,13 +423,8 @@
         }
 
         if (getCurrentMode() === "manual") {
-            const numberValue = sanitizeNumberValue(manualNumberInput?.value ?? "");
+            const numberValue = normalizeLabelNumberForSave(manualNumberInput?.value ?? "");
             if (!numberValue) {
-                return false;
-            }
-
-            const numericValue = Number(numberValue);
-            if (!Number.isFinite(numericValue) || numericValue <= 0) {
                 return false;
             }
         }
@@ -526,7 +555,7 @@
         let endpoint = "/wip/labels/create";
 
         if (getCurrentMode() === "manual") {
-            const numberValue = sanitizeNumberValue(manualNumberInput?.value ?? "");
+            const numberValue = normalizeLabelNumberForSave(manualNumberInput?.value ?? "");
             payload.number = numberValue;
             if (manualNumberInput) {
                 manualNumberInput.value = numberValue;
@@ -580,7 +609,7 @@
             return;
         }
 
-        const numberValue = sanitizeNumberValue(editNumberInput?.value ?? "");
+        const numberValue = normalizeLabelNumberForSave(editNumberInput?.value ?? "");
         const dateValue = editDateInput?.value ?? "";
         const quantityValue = Number(editQuantityInput?.value ?? 0);
         const numericNumber = Number(numberValue);
@@ -628,7 +657,7 @@
             return;
         }
 
-        const numberValue = sanitizeNumberValue(editNumberInput?.value ?? "");
+        const numberValue = normalizeLabelNumberForSave(editNumberInput?.value ?? "");
         const dateValue = editDateInput?.value ?? "";
         const quantityValue = Number(editQuantityInput?.value ?? 0);
 
@@ -757,11 +786,7 @@
         });
 
         manualNumberInput.addEventListener("blur", () => {
-            const value = sanitizeNumberValue(manualNumberInput.value);
-            const numeric = Number(value);
-            manualNumberInput.value = value && Number.isFinite(numeric) && numeric > 0
-                ? numeric.toString().padStart(5, "0")
-                : "";
+            manualNumberInput.value = normalizeLabelNumberForSave(manualNumberInput.value);
             updateButtonState();
         });
     }
@@ -825,11 +850,7 @@
         });
 
         editNumberInput.addEventListener("blur", () => {
-            const value = sanitizeNumberValue(editNumberInput.value);
-            const numeric = Number(value);
-            editNumberInput.value = value && Number.isFinite(numeric) && numeric > 0
-                ? numeric.toString().padStart(5, "0")
-                : "";
+            editNumberInput.value = normalizeLabelNumberForSave(editNumberInput.value);
             updateEditSaveState();
         });
     }
