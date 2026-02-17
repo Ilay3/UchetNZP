@@ -1,0 +1,105 @@
+@model UchetNZP.Web.Models.LabelMovementReportViewModel
+@{
+    ViewData["Title"] = "Движение ярлыка";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Отчёт по движению ярлыка</h1>
+    <p class="lead mb-0">Выберите деталь и ярлык, чтобы увидеть полный маршрут: приход, передачи и текущий остаток.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end" autocomplete="off" id="labelMovementFilterForm">
+            <div class="col-lg-5">
+                <label class="form-label" for="labelMovementPartInput">Деталь</label>
+                <input id="labelMovementPartInput" class="form-control form-control-lg" type="text" list="labelMovementPartOptions" placeholder="Начните вводить деталь" autocomplete="off" value="@(Model.Filter.PartName ?? string.Empty)" />
+                <datalist id="labelMovementPartOptions"></datalist>
+                <input id="labelMovementPartId" type="hidden" name="partId" value="@(Model.Filter.PartId?.ToString() ?? string.Empty)" />
+            </div>
+            <div class="col-lg-5">
+                <label class="form-label" for="labelMovementLabelSelect">Ярлык</label>
+                <select id="labelMovementLabelSelect" class="form-select form-select-lg" name="labelId" disabled>
+                    <option value="">Выберите ярлык</option>
+                </select>
+                <div class="form-text" id="labelMovementLabelHint">Сначала выберите деталь.</div>
+            </div>
+            <div class="col-lg-2 d-grid">
+                <button type="submit" class="btn btn-primary btn-lg" id="labelMovementApplyButton" disabled>Показать</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@if (Model.HasLabelSelection)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light fw-semibold d-flex flex-column flex-md-row justify-content-between gap-2">
+            <span>Ярлык: @Model.Filter.LabelNumber</span>
+            <span class="text-muted small">Деталь: @Model.Filter.PartName @(string.IsNullOrWhiteSpace(Model.Filter.PartCode) ? string.Empty : $"({Model.Filter.PartCode})")</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-3">
+                <div class="col-md-6 col-lg-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small text-uppercase">Количество ярлыка</div>
+                        <div class="h4 mb-0">@Model.InitialQuantity.ToString("0.###") шт</div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small text-uppercase">Остаток сейчас</div>
+                        <div class="h4 mb-0">@Model.RemainingQuantity.ToString("0.###") шт</div>
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.HasData)
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle" aria-describedby="labelMovementCaption">
+                        <caption id="labelMovementCaption" class="visually-hidden">Маршрут движения выбранного ярлыка</caption>
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Дата</th>
+                                <th scope="col">Событие</th>
+                                <th scope="col">Откуда</th>
+                                <th scope="col">Куда</th>
+                                <th scope="col">Кол-во</th>
+                                <th scope="col">Списано в брак</th>
+                                <th scope="col">Остаток до</th>
+                                <th scope="col">Остаток после</th>
+                                <th scope="col">Комментарий</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in Model.Items)
+                            {
+                                <tr>
+                                    <td>@item.Date.ToString("dd.MM.yyyy")</td>
+                                    <td>@item.EventType</td>
+                                    <td>@item.From</td>
+                                    <td>@item.To</td>
+                                    <td>@item.Quantity.ToString("0.###")</td>
+                                    <td>@(item.ScrapQuantity.HasValue ? item.ScrapQuantity.Value.ToString("0.###") : "—")</td>
+                                    <td>@(item.LabelBalanceBefore.HasValue ? item.LabelBalanceBefore.Value.ToString("0.###") : "—")</td>
+                                    <td>@(item.LabelBalanceAfter.HasValue ? item.LabelBalanceAfter.Value.ToString("0.###") : "—")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(item.Comment) ? "—" : item.Comment)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-light border mb-0">Для выбранного ярлыка движения не найдены.</div>
+            }
+        </div>
+    </div>
+}
+
+@section Scripts
+{
+    <script src="~/js/label-movement-report.js" asp-append-version="true"></script>
+}

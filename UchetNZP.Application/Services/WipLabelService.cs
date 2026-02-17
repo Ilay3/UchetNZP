@@ -396,24 +396,42 @@ public class WipLabelService : IWipLabelService
         }
 
         var trimmed = in_number.Trim();
-
-        if (trimmed.Length > 5)
+        var parts = trimmed.Split('/');
+        if (parts.Length is < 1 or > 2)
         {
-            throw new InvalidOperationException("Номер ярлыка не может содержать более 5 символов.");
+            throw new InvalidOperationException("Номер ярлыка должен быть в формате 12345 или 12345/1.");
         }
 
-        if (!trimmed.All(char.IsDigit))
+        var basePart = parts[0].Trim();
+        if (basePart.Length is < 1 or > 5 || !basePart.All(char.IsDigit))
         {
-            throw new InvalidOperationException("Номер ярлыка должен содержать только цифры.");
+            throw new InvalidOperationException("Номер ярлыка должен быть в формате 12345 или 12345/1.");
         }
 
-        if (!int.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out var number) || number <= 0)
+        if (!int.TryParse(basePart, NumberStyles.None, CultureInfo.InvariantCulture, out var baseNumber) || baseNumber <= 0)
         {
             throw new InvalidOperationException("Номер ярлыка должен быть положительным числом.");
         }
 
-        var ret = number.ToString("D5", CultureInfo.InvariantCulture);
-        return ret;
+        var normalizedBase = baseNumber.ToString("D5", CultureInfo.InvariantCulture);
+        if (parts.Length == 1)
+        {
+            return normalizedBase;
+        }
+
+        var suffixPart = parts[1].Trim();
+        if (suffixPart.Length is < 1 or > 5 || !suffixPart.All(char.IsDigit))
+        {
+            throw new InvalidOperationException("Номер ярлыка должен быть в формате 12345 или 12345/1.");
+        }
+
+        if (!int.TryParse(suffixPart, NumberStyles.None, CultureInfo.InvariantCulture, out var suffixNumber) || suffixNumber <= 0)
+        {
+            throw new InvalidOperationException("Суффикс номера ярлыка должен быть положительным числом.");
+        }
+
+        var normalizedSuffix = suffixNumber.ToString(CultureInfo.InvariantCulture);
+        return $"{normalizedBase}/{normalizedSuffix}";
     }
 
     private async Task EnsureLabelCanBeModifiedAsync(Guid in_labelId, CancellationToken in_cancellationToken)

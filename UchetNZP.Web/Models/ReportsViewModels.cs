@@ -102,6 +102,41 @@ public record WipBatchReportViewModel(
     public bool HasData => Items.Count > 0;
 }
 
+public class LabelMovementReportFilterViewModel
+{
+    public Guid? PartId { get; init; }
+
+    public string? PartName { get; init; }
+
+    public string? PartCode { get; init; }
+
+    public Guid? LabelId { get; init; }
+
+    public string? LabelNumber { get; init; }
+}
+
+public record LabelMovementReportEventViewModel(
+    DateTime Date,
+    string EventType,
+    string From,
+    string To,
+    decimal Quantity,
+    decimal? ScrapQuantity,
+    decimal? LabelBalanceBefore,
+    decimal? LabelBalanceAfter,
+    string? Comment);
+
+public record LabelMovementReportViewModel(
+    LabelMovementReportFilterViewModel Filter,
+    IReadOnlyList<LabelMovementReportEventViewModel> Items,
+    decimal InitialQuantity,
+    decimal RemainingQuantity)
+{
+    public bool HasLabelSelection => Filter.LabelId.HasValue;
+
+    public bool HasData => Items.Count > 0;
+}
+
 public class TransferPeriodReportFilterViewModel
 {
     public DateTime From { get; init; }
