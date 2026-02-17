@@ -464,17 +464,19 @@
         }
         const norm = Number(operation.normHours ?? 0);
         parts.push(`${norm.toFixed(3)} н/ч`);
+        const balanceValue = Number(operation.balance ?? 0);
+        parts.push(`остаток: ${balanceValue.toFixed(3)}`);
+
         const labels = Array.isArray(operation.labelBalances) ? operation.labelBalances : [];
         const labelTexts = labels
             .map(formatLabelBalanceLabel)
-            .filter(text => text.length > 0);
+            .filter(text => text.length > 0)
+            .slice(0, 5);
         if (labelTexts.length) {
-            parts.push(`ярлыки: ${labelTexts.join(", ")}`);
+            const suffix = labels.length > labelTexts.length ? ` и ещё ${labels.length - labelTexts.length}` : "";
+            parts.push(`ярлыки: ${labelTexts.join(", ")}${suffix}`);
         }
-        else {
-            const balanceValue = Number(operation.balance ?? 0);
-            parts.push(`остаток: ${balanceValue.toFixed(3)}`);
-        }
+
         return parts.join(" | ");
     }
 
