@@ -90,6 +90,9 @@
             <button type="button" class="btn btn-primary btn-lg" id="receiptAddButton">
                 Добавить в корзину (Enter)
             </button>
+            <button type="button" class="btn btn-outline-primary btn-lg" id="receiptBulkAddButton">
+                Множественное добавление ярлыков
+            </button>
             <button type="button" class="btn btn-secondary btn-lg" id="receiptResetButton">
                 Очистить форму (Esc)
             </button>
@@ -138,6 +141,16 @@
         <div class="small text-muted">Вы можете отменить сохранённые записи при необходимости.</div>
     </div>
     <div class="card-body">
+        <div class="row g-3 mb-3">
+            <div class="col-md-6 col-lg-4">
+                <label class="form-label" for="receiptDeleteByLabelInput">Удалить приход по номеру ярлыка</label>
+                <input id="receiptDeleteByLabelInput" type="text" class="form-control" placeholder="Например, 12345" autocomplete="off" />
+                <div class="form-text">Будут отменены сохранённые приходы из списка ниже с указанным номером ярлыка.</div>
+            </div>
+            <div class="col-md-6 col-lg-3 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-danger w-100" id="receiptDeleteByLabelButton">Удалить по ярлыку</button>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table table-bordered align-middle" id="receiptHistoryTable" aria-describedby="receiptHistoryCaption">
                 <caption id="receiptHistoryCaption" class="visually-hidden">Список последних сохранённых приходов</caption>
@@ -159,6 +172,26 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="receiptBulkModal" tabindex="-1" aria-labelledby="receiptBulkModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h4" id="receiptBulkModalTitle">Множественное добавление приходов</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label" for="receiptBulkLabelsInput">Номера ярлыков (по одному в строке, через запятую или пробел)</label>
+                <textarea id="receiptBulkLabelsInput" class="form-control" rows="7" placeholder="101\n102\n103"></textarea>
+                <div class="form-text">Для каждого ярлыка будет создан отдельный приход с параметрами из текущей формы.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="receiptBulkConfirmButton">Добавить в корзину</button>
+            </div>
         </div>
     </div>
 </div>
