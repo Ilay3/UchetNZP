@@ -1,3 +1,4 @@
+@using System
 @using UchetNZP.Shared
 @model UchetNZP.Web.Models.WipBatchReportViewModel
 @{
@@ -6,7 +7,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Остатки партий НЗП</h1>
-    <p class="lead mb-0">Просматривайте текущие остатки по деталям и операциям с указанием даты последнего прихода партии.</p>
+    <p class="lead mb-0">Просматривайте текущие остатки по деталям, ярлыкам и операциям (без учёта склада).</p>
 </div>
 
 <div class="card shadow-sm mb-4">
@@ -85,7 +86,7 @@
                             <tr>
                                 <td>
                                     <div class="fw-semibold">@item.PartName</div>
-                                    @if (!string.IsNullOrWhiteSpace(item.PartCode))
+                                    @if (!string.IsNullOrWhiteSpace(item.PartCode) && !string.Equals(item.PartCode?.Trim(), item.PartName?.Trim(), StringComparison.OrdinalIgnoreCase))
                                     {
                                         <div class="text-muted small">@item.PartCode</div>
                                     }
