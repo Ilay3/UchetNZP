@@ -223,6 +223,10 @@
                                                             <div>
                                                                 <div class="small text-muted">Диапазон операций</div>
                                                                 <div class="fw-semibold">@entry.OperationRange</div>
+                                                                @if (!string.IsNullOrWhiteSpace(entry.FullOperationPath) && !string.Equals(entry.FullOperationPath, entry.OperationRange, StringComparison.Ordinal))
+                                                                {
+                                                                    <div class="small text-muted mt-1">Полный путь: @entry.FullOperationPath</div>
+                                                                }
                                                             </div>
                                                         </div>
                                                     }
@@ -374,21 +378,21 @@
                                                     <div class="d-flex flex-wrap gap-3">
                                                         @if (entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions && entry.AuditId.HasValue)
                                                         {
-                                                            <button type="button" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2 js-history-transfer-revert" data-type="@entryType" @(entry.IsCancelled ? "disabled" : string.Empty)>
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2 js-history-transfer-revert" data-type="@entryType" @(entry.IsCancelled ? "disabled" : string.Empty)>
                                                                 <i class="bi bi-arrow-counterclockwise fs-5" aria-hidden="true"></i>
                                                                 <span class="fw-semibold">Отменить передачу</span>
                                                             </button>
                                                         }
                                                         @if (entry.Type == WipHistoryEntryType.Receipt && entry.HasVersions)
                                                         {
-                                                            <button type="button" class="btn btn-secondary btn-sm d-inline-flex align-items-center gap-2 js-history-receipt-revert" data-type="@entryType">
+                                                            <button type="button" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2 js-history-receipt-revert" data-type="@entryType">
                                                                 <i class="bi bi-arrow-clockwise fs-5" aria-hidden="true"></i>
                                                                 <span class="fw-semibold">Восстановить приход</span>
                                                             </button>
                                                         }
                                                         @if (entry.Type == WipHistoryEntryType.Receipt && entry.CanDeleteReceipt)
                                                         {
-                                                            <button type="button" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2 js-history-receipt-delete" data-type="@entryType">
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2 js-history-receipt-delete" data-type="@entryType">
                                                                 <i class="bi bi-trash3 fs-5" aria-hidden="true"></i>
                                                                 <span class="fw-semibold">Удалить приход</span>
                                                             </button>

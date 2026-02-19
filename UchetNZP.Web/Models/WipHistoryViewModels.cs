@@ -243,6 +243,31 @@ public class WipHistoryEntryViewModel
         }
     }
 
+
+    public string? FullOperationPath
+    {
+        get
+        {
+            if (LabelTimeline.Count == 0)
+            {
+                return OperationRange;
+            }
+
+            var operations = LabelTimeline
+                .Where(x => !x.IsCancelled && !string.IsNullOrWhiteSpace(x.OperationRange))
+                .Select(x => x.OperationRange!.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (operations.Count == 0)
+            {
+                return OperationRange;
+            }
+
+            return string.Join(" → ", operations);
+        }
+    }
+
     public bool HasHours => Hours.HasValue && Hours.Value != 0m;
 
     public bool HasComment => !string.IsNullOrWhiteSpace(Comment);

@@ -287,6 +287,7 @@ public class TransferService : ITransferService
                 var labelUsage = await ResolveTransferLabelAsync(
                         item,
                         fromRoute,
+                        isWarehouseTransfer,
                         scrapQuantity,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -413,6 +414,7 @@ public class TransferService : ITransferService
     private async Task<TransferLabelUsage?> ResolveTransferLabelAsync(
         TransferItemDto item,
         PartRoute fromRoute,
+        bool isWarehouseTransfer,
         decimal scrapQuantity,
         CancellationToken cancellationToken)
     {
@@ -488,17 +490,72 @@ public class TransferService : ITransferService
             throw new InvalidOperationException($"Ярлык {label.Number} относится к другой операции и не может быть использован для операции {item.FromOpNumber}.");
         }
 
-        var remainingBefore = label.RemainingQuantity;
-        if (remainingBefore + 0.000001m < requiredQuantity)
+        var operationQuantity = await GetLabelQuantityAtOperationAsync(
+                label.Id,
+                item.PartId,
+                fromRoute.SectionId,
+                item.FromOpNumber,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (operationQuantity + 0.000001m < requiredQuantity)
         {
-            throw new InvalidOperationException($"Остаток ярлыка {label.Number} ({remainingBefore}) меньше требуемого количества ({requiredQuantity}).");
+            throw new InvalidOperationException($"Остаток ярлыка {label.Number} на операции {item.FromOpNumber} ({operationQuantity}) меньше требуемого количества ({requiredQuantity}).");
         }
 
-        var remainingAfter = remainingBefore - requiredQuantity;
+        var remainingBefore = label.RemainingQuantity;
+        var consumedQuantity = scrapQuantity + (isWarehouseTransfer ? item.Quantity : 0m);
+
+        if (remainingBefore + 0.000001m < consumedQuantity)
+        {
+            throw new InvalidOperationException($"Остаток ярлыка {label.Number} ({remainingBefore}) меньше списываемого количества ({consumedQuantity}).");
+        }
+
+        var remainingAfter = remainingBefore - consumedQuantity;
         label.RemainingQuantity = remainingAfter;
 
         var ret = new TransferLabelUsage(label, remainingBefore, remainingAfter);
         return ret;
+    }
+
+    private async Task<decimal> GetLabelQuantityAtOperationAsync(
+        Guid labelId,
+        Guid partId,
+        Guid sectionId,
+        int opNumber,
+        CancellationToken cancellationToken)
+    {
+        var receiptQuantity = await _dbContext.WipReceipts
+            .Where(x =>
+                x.WipLabelId == labelId &&
+                x.PartId == partId &&
+                x.SectionId == sectionId &&
+                x.OpNumber == opNumber)
+            .SumAsync(x => x.Quantity, cancellationToken)
+            .ConfigureAwait(false);
+
+        var incomingTransfers = await _dbContext.TransferAudits
+            .Where(x =>
+                !x.IsReverted &&
+                x.WipLabelId == labelId &&
+                x.PartId == partId &&
+                !x.IsWarehouseTransfer &&
+                x.ToSectionId == sectionId &&
+                x.ToOpNumber == opNumber)
+            .SumAsync(x => x.Quantity, cancellationToken)
+            .ConfigureAwait(false);
+
+        var outgoingTransfers = await _dbContext.TransferAudits
+            .Where(x =>
+                !x.IsReverted &&
+                x.WipLabelId == labelId &&
+                x.PartId == partId &&
+                x.FromSectionId == sectionId &&
+                x.FromOpNumber == opNumber)
+            .SumAsync(x => x.Quantity + x.ScrapQuantity, cancellationToken)
+            .ConfigureAwait(false);
+
+        return receiptQuantity + incomingTransfers - outgoingTransfers;
     }
 
     public async Task<TransferDeleteResultDto> DeleteTransferAsync(Guid transferId, CancellationToken cancellationToken = default)

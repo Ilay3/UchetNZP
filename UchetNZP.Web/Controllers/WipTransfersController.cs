@@ -290,18 +290,34 @@ public class WipTransfersController : Controller
             return BadRequest("Маршрут для указанной операции не найден.");
         }
 
-        var labels = await _dbContext.WipLabels
+        var availableLabels = await _dbContext.WipLabels
             .AsNoTracking()
-            .Where(x => x.PartId == partId && x.RemainingQuantity > 0m)
-            .Where(x => x.WipReceipt != null && x.WipReceipt.SectionId == route.SectionId && x.WipReceipt.OpNumber == parsedOpNumber)
-            .OrderBy(x => x.Number)
-            .Select(x => new TransferLabelOptionViewModel(
-                x.Id,
-                x.Number,
-                x.Quantity,
-                x.RemainingQuantity))
+            .Where(x => x.PartId == partId)
+            .Select(x => new { x.Id, x.Number, x.Quantity })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        var labelBalances = await LoadLabelBalancesAsync(
+                new[] { (partId, route.SectionId, parsedOpNumber) },
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var balancesForOperation = labelBalances.TryGetValue((partId, route.SectionId, parsedOpNumber), out var current)
+            ? current
+            : Array.Empty<TransferOperationLabelBalanceViewModel>();
+
+        var labels = balancesForOperation
+            .Join(
+                availableLabels,
+                balance => balance.Id,
+                label => label.Id,
+                (balance, label) => new TransferLabelOptionViewModel(
+                    label.Id,
+                    label.Number,
+                    label.Quantity,
+                    balance.RemainingQuantity))
+            .OrderBy(x => x.Number, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         return Ok(labels);
     }
@@ -550,34 +566,94 @@ public class WipTransfersController : Controller
         var sectionIds = in_keys.Select(x => x.SectionId).Distinct().ToList();
         var opNumbers = in_keys.Select(x => x.OpNumber).Distinct().ToList();
 
-        var labels = await _dbContext.WipLabels
+        var receiptLabels = await _dbContext.WipReceipts
             .AsNoTracking()
-            .Where(x => partIds.Contains(x.PartId) && x.RemainingQuantity > 0m)
-            .Where(x => x.WipReceipt != null && sectionIds.Contains(x.WipReceipt.SectionId) && opNumbers.Contains(x.WipReceipt.OpNumber))
-            .Select(x => new
+            .Where(x =>
+                x.WipLabelId != null &&
+                partIds.Contains(x.PartId) &&
+                sectionIds.Contains(x.SectionId) &&
+                opNumbers.Contains(x.OpNumber))
+            .GroupBy(x => new { x.PartId, x.SectionId, x.OpNumber, LabelId = x.WipLabelId!.Value })
+            .Select(g => new
             {
-                x.PartId,
-                SectionId = x.WipReceipt!.SectionId,
-                OpNumber = x.WipReceipt.OpNumber,
-                x.Id,
-                x.Number,
-                x.RemainingQuantity,
+                g.Key.PartId,
+                g.Key.SectionId,
+                g.Key.OpNumber,
+                LabelId = g.Key.LabelId,
+                Quantity = g.Sum(x => x.Quantity),
             })
             .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
 
-        var buffer = new Dictionary<(Guid, Guid, int), List<TransferOperationLabelBalanceViewModel>>();
-        foreach (var label in labels)
+        var transferLabels = await _dbContext.TransferAudits
+            .AsNoTracking()
+            .Where(x => !x.IsReverted && x.WipLabelId != null && partIds.Contains(x.PartId))
+            .Select(x => new
+            {
+                x.PartId,
+                x.FromSectionId,
+                x.FromOpNumber,
+                x.ToSectionId,
+                x.ToOpNumber,
+                x.Quantity,
+                x.ScrapQuantity,
+                x.IsWarehouseTransfer,
+                LabelId = x.WipLabelId!.Value,
+            })
+            .ToListAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        var labelIds = receiptLabels
+            .Select(x => x.LabelId)
+            .Concat(transferLabels.Select(x => x.LabelId))
+            .Distinct()
+            .ToList();
+
+        var labelLookup = labelIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.WipLabels
+                .AsNoTracking()
+                .Where(x => labelIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Number ?? string.Empty, in_cancellationToken)
+                .ConfigureAwait(false);
+
+        var byKey = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber, Guid LabelId), decimal>();
+
+        foreach (var item in receiptLabels)
         {
-            var key = (label.PartId, label.SectionId, label.OpNumber);
+            var key = (item.PartId, item.SectionId, item.OpNumber, item.LabelId);
+            byKey[key] = byKey.TryGetValue(key, out var existing) ? existing + item.Quantity : item.Quantity;
+        }
+
+        foreach (var transfer in transferLabels)
+        {
+            var fromKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.LabelId);
+            var fromDelta = transfer.Quantity + transfer.ScrapQuantity;
+            byKey[fromKey] = byKey.TryGetValue(fromKey, out var existingFrom) ? existingFrom - fromDelta : -fromDelta;
+
+            if (!transfer.IsWarehouseTransfer)
+            {
+                var toKey = (transfer.PartId, transfer.ToSectionId, transfer.ToOpNumber, transfer.LabelId);
+                byKey[toKey] = byKey.TryGetValue(toKey, out var existingTo) ? existingTo + transfer.Quantity : transfer.Quantity;
+            }
+        }
+
+        var buffer = new Dictionary<(Guid, Guid, int), List<TransferOperationLabelBalanceViewModel>>();
+
+        foreach (var pair in byKey.Where(x => x.Value > 0m))
+        {
+            var key = (pair.Key.PartId, pair.Key.SectionId, pair.Key.OpNumber);
             if (!buffer.TryGetValue(key, out var list))
             {
                 list = new List<TransferOperationLabelBalanceViewModel>();
                 buffer[key] = list;
             }
 
-            var number = string.IsNullOrWhiteSpace(label.Number) ? string.Empty : label.Number.Trim();
-            list.Add(new TransferOperationLabelBalanceViewModel(label.Id, number, label.RemainingQuantity));
+            var number = labelLookup.TryGetValue(pair.Key.LabelId, out var labelNumber) && !string.IsNullOrWhiteSpace(labelNumber)
+                ? labelNumber.Trim()
+                : string.Empty;
+
+            list.Add(new TransferOperationLabelBalanceViewModel(pair.Key.LabelId, number, pair.Value));
         }
 
         foreach (var pair in buffer.ToList())

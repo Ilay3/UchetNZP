@@ -495,113 +495,184 @@ public class ReportsController : Controller
             }
         }
 
-        var receiptInfoQuery = _dbContext.WipReceipts
+        var receiptLabels = await _dbContext.WipReceipts
             .AsNoTracking()
-            .GroupBy(x => new { x.PartId, x.SectionId, x.OpNumber })
+            .Where(x => x.WipLabelId != null)
+            .GroupBy(x => new
+            {
+                x.PartId,
+                x.SectionId,
+                x.OpNumber,
+                LabelId = x.WipLabelId!.Value,
+            })
             .Select(g => new
             {
                 g.Key.PartId,
                 g.Key.SectionId,
                 g.Key.OpNumber,
-                LastReceiptDate = g.Max(x => x.ReceiptDate)
-            });
+                LabelId = g.Key.LabelId,
+                Quantity = g.Sum(x => x.Quantity),
+                LastReceiptDate = g.Max(x => x.ReceiptDate),
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 
-        if (parsedOpNumber.HasValue)
+        var transferLabels = await _dbContext.TransferAudits
+            .AsNoTracking()
+            .Where(x => !x.IsReverted && x.WipLabelId != null)
+            .Select(x => new
+            {
+                x.PartId,
+                x.FromSectionId,
+                x.FromOpNumber,
+                x.ToSectionId,
+                x.ToOpNumber,
+                x.Quantity,
+                x.ScrapQuantity,
+                x.IsWarehouseTransfer,
+                x.TransferDate,
+                LabelId = x.WipLabelId!.Value,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var keyBalances = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber, Guid LabelId), (decimal Quantity, DateTime LastDate)>();
+
+        foreach (var item in receiptLabels)
         {
-            receiptInfoQuery = receiptInfoQuery.Where(x => x.OpNumber == parsedOpNumber.Value);
+            var key = (item.PartId, item.SectionId, item.OpNumber, item.LabelId);
+            if (keyBalances.TryGetValue(key, out var existing))
+            {
+                keyBalances[key] = (existing.Quantity + item.Quantity, existing.LastDate > item.LastReceiptDate ? existing.LastDate : item.LastReceiptDate);
+            }
+            else
+            {
+                keyBalances[key] = (item.Quantity, item.LastReceiptDate);
+            }
         }
 
-        var balancesQuery =
-            from balance in _dbContext.WipBalances.AsNoTracking()
-            join info in receiptInfoQuery
-                on new { balance.PartId, balance.SectionId, balance.OpNumber }
-                equals new { info.PartId, info.SectionId, info.OpNumber }
-            join part in _dbContext.Parts.AsNoTracking()
-                on balance.PartId equals part.Id
-            join section in _dbContext.Sections.AsNoTracking()
-                on balance.SectionId equals section.Id
-            where balance.Quantity > 0
-            select new
+        foreach (var transfer in transferLabels)
+        {
+            var fromKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.LabelId);
+            var fromDelta = transfer.Quantity + transfer.ScrapQuantity;
+            if (keyBalances.TryGetValue(fromKey, out var fromExisting))
             {
-                balance.PartId,
-                balance.SectionId,
-                PartName = part.Name,
-                PartCode = part.Code,
-                SectionName = section.Name,
-                SectionCode = section.Code,
-                balance.OpNumber,
-                balance.Quantity,
-                info.LastReceiptDate,
-            };
+                keyBalances[fromKey] = (fromExisting.Quantity - fromDelta, fromExisting.LastDate > transfer.TransferDate ? fromExisting.LastDate : transfer.TransferDate);
+            }
+            else
+            {
+                keyBalances[fromKey] = (-fromDelta, transfer.TransferDate);
+            }
+
+            if (!transfer.IsWarehouseTransfer)
+            {
+                var toKey = (transfer.PartId, transfer.ToSectionId, transfer.ToOpNumber, transfer.LabelId);
+                if (keyBalances.TryGetValue(toKey, out var toExisting))
+                {
+                    keyBalances[toKey] = (toExisting.Quantity + transfer.Quantity, toExisting.LastDate > transfer.TransferDate ? toExisting.LastDate : transfer.TransferDate);
+                }
+                else
+                {
+                    keyBalances[toKey] = (transfer.Quantity, transfer.TransferDate);
+                }
+            }
+        }
+
+        var positiveLabelBalances = keyBalances
+            .Where(x => x.Value.Quantity > 0m)
+            .Select(x => new
+            {
+                x.Key.PartId,
+                x.Key.SectionId,
+                x.Key.OpNumber,
+                x.Key.LabelId,
+                Quantity = x.Value.Quantity,
+                LastDate = x.Value.LastDate,
+            })
+            .ToList();
+
+        var partIds = positiveLabelBalances.Select(x => x.PartId).Distinct().ToList();
+        var sectionIds = positiveLabelBalances.Select(x => x.SectionId).Distinct().ToList();
+        var labelIds = positiveLabelBalances.Select(x => x.LabelId).Distinct().ToList();
+
+        var partLookup = partIds.Count == 0
+            ? new Dictionary<Guid, (string Name, string? Code)>()
+            : await _dbContext.Parts.AsNoTracking()
+                .Where(x => partIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => (x.Name, x.Code), cancellationToken)
+                .ConfigureAwait(false);
+
+        var sectionLookup = sectionIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.Sections.AsNoTracking()
+                .Where(x => sectionIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+                .ConfigureAwait(false);
+
+        var labelLookup = labelIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.WipLabels.AsNoTracking()
+                .Where(x => labelIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Number ?? string.Empty, cancellationToken)
+                .ConfigureAwait(false);
+
+        var groupedItems = positiveLabelBalances
+            .GroupBy(x => new { x.PartId, x.SectionId, x.OpNumber })
+            .Select(group =>
+            {
+                partLookup.TryGetValue(group.Key.PartId, out var part);
+                sectionLookup.TryGetValue(group.Key.SectionId, out var sectionName);
+
+                var labels = group
+                    .Select(x =>
+                    {
+                        var number = labelLookup.TryGetValue(x.LabelId, out var labelNumber) ? labelNumber : null;
+                        var normalized = string.IsNullOrWhiteSpace(number) ? "Без номера" : number!.Trim();
+                        return $"{normalized}: {x.Quantity:0.###}";
+                    })
+                    .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                return new WipBatchReportItemViewModel(
+                    part.Name,
+                    part.Code,
+                    sectionName ?? string.Empty,
+                    OperationNumber.Format(group.Key.OpNumber),
+                    group.Sum(x => x.Quantity),
+                    ConvertToLocal(group.Max(x => x.LastDate)),
+                    labels.Count == 0 ? null : string.Join(", ", labels));
+            })
+            .Where(x => x.Quantity > 0m)
+            .ToList();
 
         if (!string.IsNullOrWhiteSpace(query?.Part))
         {
             var term = query.Part.Trim().ToLowerInvariant();
-            balancesQuery = balancesQuery.Where(x =>
-                x.PartName.ToLower().Contains(term) ||
-                (x.PartCode != null && x.PartCode.ToLower().Contains(term)));
+            groupedItems = groupedItems
+                .Where(x =>
+                    x.PartName.ToLower().Contains(term) ||
+                    (!string.IsNullOrWhiteSpace(x.PartCode) && x.PartCode!.ToLower().Contains(term)))
+                .ToList();
         }
 
         if (!string.IsNullOrWhiteSpace(query?.Section))
         {
             var term = query.Section.Trim().ToLowerInvariant();
-            balancesQuery = balancesQuery.Where(x =>
-                x.SectionName.ToLower().Contains(term) ||
-                (x.SectionCode != null && x.SectionCode.ToLower().Contains(term)));
+            groupedItems = groupedItems
+                .Where(x => x.SectionName.ToLower().Contains(term))
+                .ToList();
         }
 
-        var rawBatchItems = await balancesQuery
-            .Where(x => x.Quantity > 0)
-            .OrderByDescending(x => x.LastReceiptDate)
+        if (parsedOpNumber.HasValue)
+        {
+            var formatted = OperationNumber.Format(parsedOpNumber.Value);
+            groupedItems = groupedItems.Where(x => string.Equals(x.OpNumber, formatted, StringComparison.Ordinal)).ToList();
+        }
+
+        var items = groupedItems
+            .OrderByDescending(x => x.BatchDate)
             .ThenBy(x => x.PartName)
             .ThenBy(x => x.OpNumber)
-            .Select(x => new
-            {
-                x.PartId,
-                x.SectionId,
-                x.PartName,
-                x.PartCode,
-                x.SectionName,
-                x.OpNumber,
-                x.Quantity,
-                x.LastReceiptDate,
-            })
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var batchLabelKeys = rawBatchItems
-            .Select(x => new LabelLookupKey(x.PartId, x.SectionId, x.OpNumber))
-            .ToList();
-
-        var maxBatchDateUtc = rawBatchItems.Count > 0
-            ? EnsureUtc(rawBatchItems.Max(x => x.LastReceiptDate)).AddDays(1)
-            : (DateTime?)null;
-
-        var batchLabelLookup = await _labelLookupService.LoadAsync(
-                batchLabelKeys,
-                cancellationToken,
-                null,
-                maxBatchDateUtc)
-            .ConfigureAwait(false);
-
-        var items = rawBatchItems
-            .Select(x =>
-            {
-                var labels = _labelLookupService.FindLabelsOnDate(
-                    batchLabelLookup,
-                    new LabelLookupKey(x.PartId, x.SectionId, x.OpNumber),
-                    x.LastReceiptDate);
-                var labelText = labels.Count > 0 ? string.Join(", ", labels) : null;
-
-                return new WipBatchReportItemViewModel(
-                    x.PartName,
-                    x.PartCode,
-                    x.SectionName,
-                    OperationNumber.Format(x.OpNumber),
-                    x.Quantity,
-                    ConvertToLocal(x.LastReceiptDate),
-                    labelText);
-            })
             .ToList();
 
         var model = new WipBatchReportViewModel(filter, items, items.Sum(x => x.Quantity));
