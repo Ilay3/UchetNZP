@@ -52,7 +52,7 @@ public class WarehouseControllerTests
         dbContext.Parts.Add(part);
         dbContext.WipLabels.AddRange(labelOne, labelTwo);
 
-        var baseDate = new DateTime(2024, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+        var baseDate = DateTime.UtcNow.Date;
 
         for (var index = 0; index < 5; index++)
         {
@@ -119,7 +119,7 @@ public class WarehouseControllerTests
         var part = new Part { Id = partId, Name = "Пластина" };
         dbContext.Parts.Add(part);
 
-        var baseDate = new DateTime(2024, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var baseDate = DateTime.UtcNow.Date;
         for (var index = 0; index < 3; index++)
         {
             dbContext.WarehouseItems.Add(new WarehouseItem

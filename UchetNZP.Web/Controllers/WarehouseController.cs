@@ -26,6 +26,8 @@ public class WarehouseController : Controller
     [HttpGet("")]
     public async Task<IActionResult> Index(Guid? partId, int page = 1, int pageSize = DefaultPageSize, CancellationToken cancellationToken = default)
     {
+        await _dbContext.CleanupWarehouseAsync(DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+
         var statusMessage = TempData["WarehouseMessage"] as string;
         var errorMessage = TempData["WarehouseError"] as string;
 
@@ -37,6 +39,8 @@ public class WarehouseController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Update(WarehouseItemEditModel model, CancellationToken cancellationToken)
     {
+        await _dbContext.CleanupWarehouseAsync(DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+
         if (!ModelState.IsValid)
         {
             TempData["WarehouseError"] = "Проверьте корректность введённых данных.";

@@ -225,6 +225,55 @@ public class TransferServiceTests
     }
 
     [Fact]
+    public async Task AddTransfersBatchAsync_ToWarehouse_CleansUpOldWarehouseEntries()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ" };
+        var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "010" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(fromSection, new Section { Id = WarehouseDefaults.SectionId, Name = WarehouseDefaults.SectionName });
+        dbContext.Operations.AddRange(fromOperation, new Operation { Id = WarehouseDefaults.OperationId, Name = WarehouseDefaults.OperationName });
+        dbContext.PartRoutes.Add(CreateRoute(part.Id, fromSection.Id, fromOperation.Id, 10));
+
+        dbContext.WipBalances.Add(new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = fromSection.Id,
+            OpNumber = 10,
+            Quantity = 120m,
+        });
+
+        dbContext.WarehouseItems.Add(new WarehouseItem
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            Quantity = 5m,
+            AddedAt = DateTime.UtcNow.Date.AddDays(-1),
+            CreatedAt = DateTime.UtcNow.Date.AddDays(-1),
+            UpdatedAt = DateTime.UtcNow.Date.AddDays(-1),
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+
+        var transferDate = DateTime.UtcNow;
+        var summary = await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 40m, "Склад", null, null),
+        });
+
+        var item = Assert.Single(summary.Items);
+        Assert.Equal(0m, item.ToBalanceBefore);
+        Assert.Equal(40m, item.ToBalanceAfter);
+        Assert.Equal(1, await dbContext.WarehouseItems.CountAsync());
+    }
+
+    [Fact]
     public async Task AddTransfersBatchAsync_WithLabel_ReducesRemainingQuantity()
     {
         await using var dbContext = CreateContext();

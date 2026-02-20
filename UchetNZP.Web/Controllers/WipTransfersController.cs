@@ -60,6 +60,8 @@ public class WipTransfersController : Controller
     [HttpGet("operations")]
     public async Task<IActionResult> GetOperations([FromQuery] Guid partId, CancellationToken cancellationToken)
     {
+        await _dbContext.CleanupWarehouseAsync(DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+
         if (partId == Guid.Empty)
         {
             return BadRequest("Не выбрана деталь.");
@@ -137,6 +139,8 @@ public class WipTransfersController : Controller
         [FromQuery] string? toOpNumber,
         CancellationToken cancellationToken)
     {
+        await _dbContext.CleanupWarehouseAsync(DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+
         if (partId == Guid.Empty || string.IsNullOrWhiteSpace(fromOpNumber) || string.IsNullOrWhiteSpace(toOpNumber))
         {
             return BadRequest("Недостаточно данных для определения остатков.");
