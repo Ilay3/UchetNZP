@@ -122,6 +122,7 @@ public class WipLabelService : IWipLabelService
 
         var normalizedNumber = NormalizeNumber(in_request.Number);
         var normalizedDate = NormalizeDate(in_request.LabelDate);
+        var labelYear = normalizedDate.Year;
 
         if (in_request.PartId == Guid.Empty)
         {
@@ -141,7 +142,7 @@ public class WipLabelService : IWipLabelService
         {
             var exists = await m_dbContext.WipLabels
                 .AsNoTracking()
-                .AnyAsync(x => x.Number == normalizedNumber, in_cancellationToken)
+                .AnyAsync(x => x.LabelYear == labelYear && x.Number == normalizedNumber, in_cancellationToken)
                 .ConfigureAwait(false);
 
             if (exists)
@@ -156,6 +157,7 @@ public class WipLabelService : IWipLabelService
                 Id = Guid.NewGuid(),
                 PartId = in_request.PartId,
                 LabelDate = normalizedDate,
+                LabelYear = labelYear,
                 Quantity = in_request.Quantity,
                 RemainingQuantity = in_request.Quantity,
                 Number = normalizedNumber,
@@ -221,7 +223,7 @@ public class WipLabelService : IWipLabelService
         {
             var exists = await m_dbContext.WipLabels
                 .AsNoTracking()
-                .AnyAsync(x => x.Number == normalizedNumber && x.Id != label.Id, in_cancellationToken)
+                .AnyAsync(x => x.LabelYear == normalizedDate.Year && x.Number == normalizedNumber && x.Id != label.Id, in_cancellationToken)
                 .ConfigureAwait(false);
 
             if (exists)
@@ -232,6 +234,7 @@ public class WipLabelService : IWipLabelService
 
         label.Number = normalizedNumber;
         label.LabelDate = normalizedDate;
+        label.LabelYear = normalizedDate.Year;
         label.Quantity = in_request.Quantity;
         label.RemainingQuantity = in_request.Quantity;
 
@@ -300,7 +303,8 @@ public class WipLabelService : IWipLabelService
         {
             var part = await GetPartAsync(in_partId, in_cancellationToken).ConfigureAwait(false);
             var normalizedDate = NormalizeDate(in_labelDate);
-            var numbers = await GenerateSequentialNumbersAsync(in_count, in_cancellationToken).ConfigureAwait(false);
+            var labelYear = normalizedDate.Year;
+            var numbers = await GenerateSequentialNumbersAsync(labelYear, in_count, in_cancellationToken).ConfigureAwait(false);
             var entities = new List<WipLabel>(numbers.Count);
 
             foreach (var number in numbers)
@@ -310,6 +314,7 @@ public class WipLabelService : IWipLabelService
                     Id = Guid.NewGuid(),
                     PartId = in_partId,
                     LabelDate = normalizedDate,
+                    LabelYear = labelYear,
                     Quantity = in_quantity,
                     RemainingQuantity = in_quantity,
                     Number = number,
@@ -352,10 +357,11 @@ public class WipLabelService : IWipLabelService
         return ret;
     }
 
-    private async Task<List<string>> GenerateSequentialNumbersAsync(int in_count, CancellationToken in_cancellationToken)
+    private async Task<List<string>> GenerateSequentialNumbersAsync(int in_year, int in_count, CancellationToken in_cancellationToken)
     {
         var lastNumber = await m_dbContext.WipLabels
             .AsNoTracking()
+            .Where(x => x.LabelYear == in_year)
             .OrderByDescending(x => x.Number)
             .Select(x => x.Number)
             .FirstOrDefaultAsync(in_cancellationToken)
@@ -365,7 +371,8 @@ public class WipLabelService : IWipLabelService
 
         if (!string.IsNullOrWhiteSpace(lastNumber))
         {
-            if (!int.TryParse(lastNumber, NumberStyles.None, CultureInfo.InvariantCulture, out start))
+            var basePart = lastNumber.Split('/')[0];
+            if (!int.TryParse(basePart, NumberStyles.None, CultureInfo.InvariantCulture, out start))
             {
                 throw new InvalidOperationException($"Не удалось разобрать номер ярлыка {lastNumber}.");
             }

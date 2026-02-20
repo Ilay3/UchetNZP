@@ -14,6 +14,8 @@ public class WipLabel
 
     public decimal RemainingQuantity { get; set; }
 
+    public int LabelYear { get; set; }
+
     public string Number { get; set; } = string.Empty;
 
     public bool IsAssigned { get; set; }
