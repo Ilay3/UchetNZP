@@ -38,6 +38,8 @@ public class TransferService : ITransferService
 
         try
         {
+            await _dbContext.CleanupWarehouseAsync(DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+
             var userId = _currentUserService.UserId;
             var now = DateTime.UtcNow;
             var routeCache = new Dictionary<Guid, List<PartRoute>>();
@@ -606,6 +608,8 @@ public class TransferService : ITransferService
 
         try
         {
+            await _dbContext.CleanupWarehouseAsync(DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+
             var transfer = await _dbContext.WipTransfers
                 .Include(x => x.Operations)
                 .Include(x => x.Scrap)
@@ -802,6 +806,8 @@ public class TransferService : ITransferService
 
         try
         {
+            await _dbContext.CleanupWarehouseAsync(DateTime.UtcNow, cancellationToken).ConfigureAwait(false);
+
             var audit = await _dbContext.TransferAudits
                 .Include(x => x.Operations)
                 .FirstOrDefaultAsync(x => x.Id == transferAuditId, cancellationToken)
