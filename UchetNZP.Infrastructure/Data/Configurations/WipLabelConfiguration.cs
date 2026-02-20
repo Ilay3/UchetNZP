@@ -21,11 +21,14 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.Property(x => x.RemainingQuantity)
             .HasPrecision(12, 3);
 
+        builder.Property(x => x.LabelYear)
+            .IsRequired();
+
         builder.Property(x => x.Number)
             .HasMaxLength(5)
             .IsRequired();
 
-        builder.HasIndex(x => x.Number)
+        builder.HasIndex(x => new { x.LabelYear, x.Number })
             .IsUnique();
 
         builder.HasOne(x => x.Part)
