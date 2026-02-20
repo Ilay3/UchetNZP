@@ -44,6 +44,53 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Массовая выборочная очистка</div>
+    <div class="card-body">
+        <p class="text-muted mb-3">Сначала выполните dry-run по текущему фильтру, затем подтвердите обнуление.</p>
+        <form asp-action="PreviewCleanup" method="post" class="row g-3 align-items-end mb-3" data-loading-submit>
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="FilterPartId" value="@Model.BulkCleanup.FilterPartId" />
+            <input type="hidden" name="FilterSectionId" value="@Model.BulkCleanup.FilterSectionId" />
+            <input type="hidden" name="FilterOpNumber" value="@Model.BulkCleanup.FilterOpNumber" />
+            <div class="col-lg-3">
+                <label class="form-label" for="bulkMinQuantity">Минимальное количество</label>
+                <input id="bulkMinQuantity" class="form-control" type="number" name="MinQuantity" value='@Model.BulkCleanup.MinQuantity.ToString("0.###", CultureInfo.InvariantCulture)' min="0" step="1" />
+            </div>
+            <div class="col-lg-6">
+                <label class="form-label" for="bulkComment">Комментарий</label>
+                <input id="bulkComment" class="form-control" type="text" name="Comment" maxlength="512" placeholder="Причина массовой очистки" />
+            </div>
+            <div class="col-lg-3 d-grid">
+                <button type="submit" class="btn btn-outline-primary" data-loading-label="Расчёт...">Dry-run</button>
+            </div>
+        </form>
+
+        @if (Model.PendingCleanup is not null)
+        {
+            <div class="alert alert-warning d-flex justify-content-between align-items-center flex-wrap gap-2" role="alert">
+                <div>
+                    <div class="fw-semibold">Готово к выполнению</div>
+                    <div>JobId: <code>@Model.PendingCleanup.JobId</code></div>
+                    <div>Строк: <strong>@Model.PendingCleanup.AffectedCount</strong>, количество: <strong>@Model.PendingCleanup.AffectedQuantity.ToString("0.###", CultureInfo.CurrentCulture)</strong></div>
+                </div>
+                <form asp-action="ExecuteCleanup" method="post" class="d-flex align-items-center gap-2" data-loading-submit>
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="JobId" value="@Model.PendingCleanup.JobId" />
+                    <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
+                    <input type="hidden" name="FilterSectionId" value="@Model.SelectedSectionId" />
+                    <input type="hidden" name="FilterOpNumber" value="@Model.SelectedOpNumber" />
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" value="true" name="Confirmed" id="bulkConfirmed" required />
+                        <label class="form-check-label" for="bulkConfirmed">Подтверждаю выполнение</label>
+                    </div>
+                    <button type="submit" class="btn btn-danger" data-loading-label="Выполнение...">Выполнить</button>
+                </form>
+            </div>
+        }
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
         <span>Остатки НЗП</span>

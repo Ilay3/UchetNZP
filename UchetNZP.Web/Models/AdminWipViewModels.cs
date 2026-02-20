@@ -20,6 +20,10 @@ public class AdminWipIndexViewModel
     public string? StatusMessage { get; init; }
 
     public string? ErrorMessage { get; init; }
+
+    public AdminWipBulkCleanupInputModel BulkCleanup { get; init; } = new();
+
+    public AdminWipBulkCleanupPreviewViewModel? PendingCleanup { get; init; }
 }
 
 public class AdminWipBalanceRowViewModel
@@ -57,4 +61,42 @@ public class AdminWipAdjustmentInputModel
     public Guid? FilterSectionId { get; set; }
 
     public string? FilterOpNumber { get; set; }
+}
+
+public class AdminWipBulkCleanupInputModel
+{
+    public Guid? FilterPartId { get; set; }
+
+    public Guid? FilterSectionId { get; set; }
+
+    public string? FilterOpNumber { get; set; }
+
+    [Range(0, 999_999_999)]
+    public decimal MinQuantity { get; set; } = 0m;
+
+    [MaxLength(512)]
+    public string? Comment { get; set; }
+}
+
+public class AdminWipBulkCleanupExecuteInputModel
+{
+    [Required]
+    public Guid JobId { get; set; }
+
+    public bool Confirmed { get; set; }
+
+    public Guid? FilterPartId { get; set; }
+
+    public Guid? FilterSectionId { get; set; }
+
+    public string? FilterOpNumber { get; set; }
+}
+
+public class AdminWipBulkCleanupPreviewViewModel
+{
+    public Guid JobId { get; init; }
+
+    public int AffectedCount { get; init; }
+
+    public decimal AffectedQuantity { get; init; }
 }

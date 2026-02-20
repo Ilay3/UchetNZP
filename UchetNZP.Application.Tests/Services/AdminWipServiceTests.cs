@@ -86,6 +86,58 @@ public class AdminWipServiceTests
             service.AdjustBalanceAsync(new AdminWipAdjustmentRequestDto(Guid.NewGuid(), -1m, null)));
     }
 
+    [Fact]
+    public async Task BulkCleanup_PreviewAndExecute_ZeroesOnlyFilteredBalancesAndWritesAudit()
+    {
+        await using var dbContext = CreateContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+
+        var targetBalance = new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OpNumber = 65,
+            Quantity = 120m,
+        };
+
+        var untouchedBalance = new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OpNumber = 70,
+            Quantity = 80m,
+        };
+
+        dbContext.WipBalances.AddRange(targetBalance, untouchedBalance);
+        await dbContext.SaveChangesAsync();
+
+        var service = new AdminWipService(dbContext, new TestCurrentUserService());
+
+        var preview = await service.PreviewBulkCleanupAsync(new AdminWipBulkCleanupRequestDto(partId, sectionId, 65, 1m, "годовая выборочная очистка"));
+
+        Assert.Equal(1, preview.AffectedCount);
+        Assert.Equal(120m, preview.AffectedQuantity);
+
+        var result = await service.ExecuteBulkCleanupAsync(new AdminWipBulkCleanupExecuteDto(preview.JobId, true));
+
+        Assert.Equal(1, result.UpdatedCount);
+        Assert.Equal(120m, result.UpdatedQuantity);
+
+        var refreshedTarget = await dbContext.WipBalances.SingleAsync(x => x.Id == targetBalance.Id);
+        var refreshedUntouched = await dbContext.WipBalances.SingleAsync(x => x.Id == untouchedBalance.Id);
+        Assert.Equal(0m, refreshedTarget.Quantity);
+        Assert.Equal(80m, refreshedUntouched.Quantity);
+
+        var cleanupJob = await dbContext.WipBalanceCleanupJobs.SingleAsync(x => x.Id == preview.JobId);
+        Assert.True(cleanupJob.IsExecuted);
+
+        var adjustment = await dbContext.WipBalanceAdjustments.SingleAsync(x => x.WipBalanceId == targetBalance.Id);
+        Assert.StartsWith("BULK-CLEANUP:", adjustment.Comment);
+    }
+
     private static AppDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
