@@ -439,7 +439,6 @@ public class TransferService : ITransferService
         if (item.WipLabelId.HasValue)
         {
             label = await _dbContext.WipLabels
-                .Include(x => x.WipReceipt)
                 .FirstOrDefaultAsync(x => x.Id == item.WipLabelId.Value, cancellationToken)
                 .ConfigureAwait(false);
 
@@ -451,18 +450,28 @@ public class TransferService : ITransferService
         else
         {
             var candidates = await _dbContext.WipLabels
-                .Include(x => x.WipReceipt)
-                .Where(x =>
-                    x.PartId == item.PartId &&
-                    x.WipReceipt != null &&
-                    x.WipReceipt.SectionId == fromRoute.SectionId &&
-                    x.WipReceipt.OpNumber == item.FromOpNumber &&
-                    x.RemainingQuantity > 0m)
+                .Where(x => x.PartId == item.PartId && x.RemainingQuantity > 0m)
                 .OrderBy(x => x.Number)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            label = candidates.FirstOrDefault(x => x.RemainingQuantity >= requiredQuantity);
+            label = null;
+            foreach (var candidate in candidates)
+            {
+                var candidateQuantity = await GetLabelQuantityAtOperationAsync(
+                        candidate.Id,
+                        item.PartId,
+                        fromRoute.SectionId,
+                        item.FromOpNumber,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (candidateQuantity + 0.000001m >= requiredQuantity)
+                {
+                    label = candidate;
+                    break;
+                }
+            }
 
             if (label is null)
             {
@@ -470,24 +479,9 @@ public class TransferService : ITransferService
             }
         }
 
-        if (label is null)
-        {
-            return null;
-        }
-
         if (label.PartId != item.PartId)
         {
             throw new InvalidOperationException($"Ярлык {label.Number} относится к другой детали и не может быть использован для передачи детали {item.PartId}.");
-        }
-
-        if (label.WipReceipt is null)
-        {
-            throw new InvalidOperationException($"Ярлык {label.Number} не связан с приходом и не может быть использован.");
-        }
-
-        if (label.WipReceipt.SectionId != fromRoute.SectionId || label.WipReceipt.OpNumber != item.FromOpNumber)
-        {
-            throw new InvalidOperationException($"Ярлык {label.Number} относится к другой операции и не может быть использован для операции {item.FromOpNumber}.");
         }
 
         var operationQuantity = await GetLabelQuantityAtOperationAsync(

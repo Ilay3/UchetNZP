@@ -352,7 +352,19 @@ public class WipTransfersController : Controller
             return BadRequest(ex.Message);
         }
 
-        var summary = await _transferService.AddTransfersBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
+        TransferBatchSummaryDto summary;
+        try
+        {
+            summary = await _transferService.AddTransfersBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
 
         List<TransferSummaryItemViewModel> summaryItems;
         if (summary.Items.Count == 0)
