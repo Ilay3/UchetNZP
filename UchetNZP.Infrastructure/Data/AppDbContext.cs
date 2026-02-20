@@ -34,6 +34,10 @@ public class AppDbContext : DbContext
 
     public DbSet<WipBalanceAdjustment> WipBalanceAdjustments => Set<WipBalanceAdjustment>();
 
+    public DbSet<WipBalanceCleanupJob> WipBalanceCleanupJobs => Set<WipBalanceCleanupJob>();
+
+    public DbSet<WipBalanceCleanupStageItem> WipBalanceCleanupStageItems => Set<WipBalanceCleanupStageItem>();
+
     public DbSet<ReceiptAudit> ReceiptAudits => Set<ReceiptAudit>();
 
     public DbSet<WarehouseItem> WarehouseItems => Set<WarehouseItem>();

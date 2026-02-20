@@ -365,7 +365,8 @@ public class WipLabelService : IWipLabelService
 
         if (!string.IsNullOrWhiteSpace(lastNumber))
         {
-            if (!int.TryParse(lastNumber, NumberStyles.None, CultureInfo.InvariantCulture, out start))
+            var basePart = lastNumber.Split('/')[0];
+            if (!int.TryParse(basePart, NumberStyles.None, CultureInfo.InvariantCulture, out start))
             {
                 throw new InvalidOperationException($"Не удалось разобрать номер ярлыка {lastNumber}.");
             }

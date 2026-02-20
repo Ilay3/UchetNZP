@@ -394,6 +394,110 @@ public class TransferServiceTests
     }
 
     [Fact]
+    public async Task AddTransfersBatchAsync_LabelCanBeReusedOnNextOperation()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var section = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var operation10 = new Operation { Id = Guid.NewGuid(), Name = "010" };
+        var operation20 = new Operation { Id = Guid.NewGuid(), Name = "020" };
+        var operation30 = new Operation { Id = Guid.NewGuid(), Name = "030" };
+        var labelId = Guid.NewGuid();
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.Add(section);
+        dbContext.Operations.AddRange(operation10, operation20, operation30);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, section.Id, operation10.Id, 10),
+            CreateRoute(part.Id, section.Id, operation20.Id, 20),
+            CreateRoute(part.Id, section.Id, operation30.Id, 30));
+
+        dbContext.WipBalances.AddRange(
+            new WipBalance
+            {
+                Id = Guid.NewGuid(),
+                PartId = part.Id,
+                SectionId = section.Id,
+                OpNumber = 10,
+                Quantity = 100m,
+            },
+            new WipBalance
+            {
+                Id = Guid.NewGuid(),
+                PartId = part.Id,
+                SectionId = section.Id,
+                OpNumber = 20,
+                Quantity = 0m,
+            },
+            new WipBalance
+            {
+                Id = Guid.NewGuid(),
+                PartId = part.Id,
+                SectionId = section.Id,
+                OpNumber = 30,
+                Quantity = 0m,
+            });
+
+        var label = new WipLabel
+        {
+            Id = labelId,
+            PartId = part.Id,
+            LabelDate = DateTime.SpecifyKind(new DateTime(2025, 1, 15), DateTimeKind.Unspecified),
+            Quantity = 100m,
+            RemainingQuantity = 100m,
+            Number = "00403",
+            IsAssigned = true,
+        };
+
+        var receipt = new WipReceipt
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = section.Id,
+            OpNumber = 10,
+            ReceiptDate = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+            Quantity = 100m,
+            UserId = Guid.NewGuid(),
+            WipLabelId = labelId,
+        };
+
+        label.WipReceipt = receipt;
+
+        dbContext.WipLabels.Add(label);
+        dbContext.WipReceipts.Add(receipt);
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var transferDate = new DateTime(2025, 3, 3, 0, 0, 0, DateTimeKind.Utc);
+
+        await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labelId, null),
+        });
+
+        var secondSummary = await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 20, 30, transferDate, 30m, null, labelId, null),
+        });
+
+        Assert.Equal(1, secondSummary.Saved);
+
+        var storedLabel = await dbContext.WipLabels.SingleAsync(x => x.Id == labelId);
+        Assert.Equal(100m, storedLabel.RemainingQuantity);
+
+        var audits = await dbContext.TransferAudits
+            .Where(x => x.WipLabelId == labelId)
+            .OrderBy(x => x.CreatedAt)
+            .ToListAsync();
+
+        Assert.Equal(2, audits.Count);
+        Assert.All(audits, audit => Assert.Equal(labelId, audit.WipLabelId));
+    }
+
+    [Fact]
     public async Task AddTransfersBatchAsync_TwoLabelsOnSameOperation_Succeeds()
     {
         await using var dbContext = CreateContext();
