@@ -295,7 +295,7 @@ public class TransferService : ITransferService
                 if (labelUsage is not null)
                 {
                     transferLabelId = labelUsage.Label.Id;
-                    transferLabelNumber = labelUsage.Label.Number;
+                    transferLabelNumber = labelUsage.LabelNumber;
                     labelQuantityBefore = labelUsage.RemainingBefore;
                     labelQuantityAfter = labelUsage.RemainingAfter;
                     transfer.WipLabelId = transferLabelId;
@@ -508,8 +508,51 @@ public class TransferService : ITransferService
         var remainingAfter = remainingBefore - consumedQuantity;
         label.RemainingQuantity = remainingAfter;
 
-        var ret = new TransferLabelUsage(label, remainingBefore, remainingAfter);
+        var labelNumber = label.Number;
+        if (!isWarehouseTransfer && scrapQuantity <= 0m)
+        {
+            var remainingAtOperation = operationQuantity - item.Quantity;
+            if (remainingAtOperation > 0.000001m)
+            {
+                labelNumber = await BuildSplitTransferLabelNumberAsync(label, item.PartId, fromRoute.OpNumber, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+
+        var ret = new TransferLabelUsage(label, labelNumber, remainingBefore, remainingAfter);
         return ret;
+    }
+
+    private async Task<string> BuildSplitTransferLabelNumberAsync(
+        WipLabel sourceLabel,
+        Guid partId,
+        int fromOpNumber,
+        CancellationToken cancellationToken)
+    {
+        if (sourceLabel is null)
+        {
+            throw new ArgumentNullException(nameof(sourceLabel));
+        }
+
+        var baseNumber = sourceLabel.Number.Split('/')[0];
+        var existingNumbers = await _dbContext.TransferAudits
+            .Where(x =>
+                !x.IsReverted &&
+                x.PartId == partId &&
+                x.FromOpNumber == fromOpNumber &&
+                x.WipLabelId == sourceLabel.Id &&
+                x.LabelNumber != null)
+            .Select(x => x.LabelNumber!)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var suffix = 1;
+        while (existingNumbers.Any(x => string.Equals(x, $"{baseNumber}/{suffix}", StringComparison.Ordinal)))
+        {
+            suffix++;
+        }
+
+        return $"{baseNumber}/{suffix}";
     }
 
     private async Task<decimal> GetLabelQuantityAtOperationAsync(
@@ -951,5 +994,5 @@ public class TransferService : ITransferService
         };
     }
 
-    private sealed record TransferLabelUsage(WipLabel Label, decimal RemainingBefore, decimal RemainingAfter);
+    private sealed record TransferLabelUsage(WipLabel Label, string LabelNumber, decimal RemainingBefore, decimal RemainingAfter);
 }
