@@ -141,18 +141,56 @@
     });
 
     fromOperationInput.addEventListener("input", () => {
-        selectedFromOperation = null;
-        fromOperationNumberInput.value = "";
-        resetLabels();
+        const value = fromOperationInput.value.trim();
+        const operation = operations.find(x => formatOperation(x) === value) ?? null;
+        const previousFromNumber = selectedFromOperation?.opNumber ?? null;
+        const nextFromNumber = operation?.opNumber ?? null;
+        const changed = previousFromNumber !== nextFromNumber;
+
+        selectedFromOperation = operation;
+        fromOperationNumberInput.value = operation?.opNumber ?? "";
+
+        if (selectedToOperation && selectedFromOperation && !selectedToOperation.isWarehouse && parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
+            selectedToOperation = null;
+            toOperationInput.value = "";
+            toOperationNumberInput.value = "";
+        }
+
+        if (changed) {
+            resetLabels();
+            const part = partLookup.getSelected();
+            if (part && part.id && selectedFromOperation) {
+                void loadLabels(part.id, selectedFromOperation.opNumber);
+            }
+            void refreshBalances();
+        }
+
         updateToOperationsDatalist();
         updateFromOperationHelper();
+        updateToOperationHelper();
         updateBalanceLabels();
         updateFormState();
     });
 
     toOperationInput.addEventListener("input", () => {
-        selectedToOperation = null;
-        toOperationNumberInput.value = "";
+        const value = toOperationInput.value.trim();
+        const operation = operations.find(x => formatOperation(x) === value) ?? null;
+        const previousToNumber = selectedToOperation?.opNumber ?? null;
+
+        if (operation && selectedFromOperation && !operation.isWarehouse && parseOpNumber(operation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
+            selectedToOperation = null;
+            toOperationNumberInput.value = "";
+        }
+        else {
+            selectedToOperation = operation;
+            toOperationNumberInput.value = operation?.opNumber ?? "";
+        }
+
+        const nextToNumber = selectedToOperation?.opNumber ?? null;
+        if (previousToNumber !== nextToNumber) {
+            void refreshBalances();
+        }
+
         updateToOperationHelper();
         updateBalanceLabels();
         updateFormState();
