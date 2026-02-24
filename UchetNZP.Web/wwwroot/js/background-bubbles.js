@@ -10,6 +10,9 @@
             "rgba(56, 189, 248, 0.4)",
             "rgba(167, 139, 250, 0.4)",
         ],
+        labelsApiUrl: "/api/background-bubbles/labels?in_limit=50",
+        labelsRefreshIntervalMs: 180000,
+        maxLabelLength: 42,
     };
 
     class BackgroundBubbles {
@@ -19,14 +22,18 @@
                 ...defaultConfig,
                 ...config,
             };
+            this.labelPool = [];
+            this.refreshTimerId = null;
         }
 
-        init() {
+        async init() {
             if (!(this.rootElement instanceof HTMLElement)) {
                 return;
             }
 
+            await this.refreshLabelPool();
             this.renderBubbles();
+            this.startLabelPoolRefresh();
         }
 
         renderBubbles() {
@@ -52,11 +59,78 @@
                 bubble.style.setProperty("--bubble-drift", `${driftPx}px`);
                 bubble.style.setProperty("--bubble-delay", `${delaySeconds}s`);
                 bubble.style.setProperty("--bubble-color", color);
+                bubble.textContent = this.pickRandomLabel();
 
                 fragment.appendChild(bubble);
             }
 
             this.rootElement.replaceChildren(fragment);
+        }
+
+        async refreshLabelPool() {
+            try {
+                const response = await fetch(this.config.labelsApiUrl, {
+                    method: "GET",
+                    headers: {
+                        Accept: "application/json",
+                    },
+                    cache: "no-store",
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = await response.json();
+                const items = Array.isArray(payload?.items) ? payload.items : [];
+                const normalized = items
+                    .map((item) => this.normalizeLabel(item))
+                    .filter((item) => item.length > 0);
+
+                if (normalized.length > 0) {
+                    this.labelPool = normalized;
+                    this.renderBubbles();
+                }
+            } catch {
+                // Ignore network errors, keep existing pool.
+            }
+        }
+
+        startLabelPoolRefresh() {
+            const interval = Number(this.config.labelsRefreshIntervalMs);
+            if (!Number.isFinite(interval) || interval < 60_000) {
+                return;
+            }
+
+            this.refreshTimerId = window.setInterval(() => {
+                this.refreshLabelPool();
+            }, interval);
+        }
+
+        pickRandomLabel() {
+            if (!Array.isArray(this.labelPool) || this.labelPool.length === 0) {
+                return "";
+            }
+
+            const index = Math.floor(Math.random() * this.labelPool.length);
+            return this.labelPool[index] ?? "";
+        }
+
+        normalizeLabel(value) {
+            if (typeof value !== "string") {
+                return "";
+            }
+
+            const trimmed = value.trim();
+            if (!trimmed) {
+                return "";
+            }
+
+            if (trimmed.length <= this.config.maxLabelLength) {
+                return trimmed;
+            }
+
+            return `${trimmed.slice(0, this.config.maxLabelLength - 1)}…`;
         }
 
         getPaletteColor(index) {
