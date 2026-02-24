@@ -5,25 +5,33 @@
     ViewData["Title"] = "Администрирование";
 }
 
-<div class="row g-4 admin-compact">
-    <div class="col-lg-3">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h2 class="h6 text-uppercase text-muted mb-3">Разделы</h2>
-                <div class="nav flex-column nav-pills gap-2" id="adminTabs" role="tablist" aria-orientation="vertical">
+<div class="admin-compact admin-page-layout">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
+        <h1 class="mb-0">@ViewData["Title"]</h1>
+        <span class="text-muted small" id="adminActiveEntityLabel"></span>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-2 justify-content-between mb-3">
+                <h2 class="h6 text-uppercase text-muted mb-0">Разделы и действия</h2>
+                <span class="text-muted small" id="adminSelectionHint"></span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                <div class="nav nav-pills admin-tabs-horizontal" id="adminTabs" role="tablist" aria-orientation="horizontal">
                     <button class="nav-link active" id="parts-tab" data-bs-toggle="tab" data-bs-target="#partsTab" type="button" role="tab" aria-controls="partsTab" aria-selected="true" data-entity="parts">Детали</button>
                     <button class="nav-link" id="operations-tab" data-bs-toggle="tab" data-bs-target="#operationsTab" type="button" role="tab" aria-controls="operationsTab" aria-selected="false" data-entity="operations">Операции</button>
                     <button class="nav-link" id="sections-tab" data-bs-toggle="tab" data-bs-target="#sectionsTab" type="button" role="tab" aria-controls="sectionsTab" aria-selected="false" data-entity="sections">Участки</button>
                     <button class="nav-link" id="balances-tab" data-bs-toggle="tab" data-bs-target="#balancesTab" type="button" role="tab" aria-controls="balancesTab" aria-selected="false" data-entity="balances">Остатки</button>
                 </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <button type="button" class="btn btn-primary admin-quick-create">Добавить</button>
+                    <button type="button" class="btn btn-outline-danger admin-quick-delete">Удалить</button>
+                    <button type="button" class="btn btn-secondary admin-quick-export">Экспорт</button>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-lg-9">
-        <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
-            <h1 class="mb-0">@ViewData["Title"]</h1>
-            <span class="text-muted small" id="adminActiveEntityLabel"></span>
-        </div>
 
         @if (!string.IsNullOrEmpty(Model.StatusMessage))
         {
@@ -41,18 +49,8 @@
 
         <div id="adminOptions" data-part-options='@Html.Raw(JsonSerializer.Serialize(Model.PartOptions))' data-operation-options='@Html.Raw(JsonSerializer.Serialize(Model.OperationOptions))' data-section-options='@Html.Raw(JsonSerializer.Serialize(Model.SectionOptions))'></div>
 
-        <div class="card mb-4">
-            <div class="card-body d-flex flex-wrap align-items-center gap-2">
-                <span class="text-muted text-uppercase small">Быстрые действия</span>
-                <button type="button" class="btn btn-primary admin-quick-create">Добавить</button>
-                <button type="button" class="btn btn-outline-danger admin-quick-delete">Удалить</button>
-                <button type="button" class="btn btn-secondary admin-quick-export">Экспорт</button>
-                <span class="text-muted small ms-auto" id="adminSelectionHint"></span>
-            </div>
-        </div>
-
         <div class="row g-4">
-            <div class="col-xl-8">
+            <div class="col-xl-9">
                 <div class="tab-content" id="adminTabsContent">
                     <div class="tab-pane fade show active" id="partsTab" role="tabpanel" aria-labelledby="parts-tab">
                         @await Html.PartialAsync("_AdminFilterPanel", new AdminFilterPanelViewModel
@@ -82,7 +80,7 @@
                                                data-unique-id="id"
                                                data-pagination="true"
                                                data-side-pagination="server"
-                                               data-page-size="10"
+                                               data-page-size="15"
                                                data-click-to-select="true"
                                                data-url="@Url.Action("GetPartsData", "Admin")"
                                                data-sort-name="name"
@@ -132,7 +130,7 @@
                                                data-unique-id="id"
                                                data-pagination="true"
                                                data-side-pagination="server"
-                                               data-page-size="10"
+                                               data-page-size="15"
                                                data-click-to-select="true"
                                                data-url="@Url.Action("GetOperationsData", "Admin")"
                                                data-sort-name="name"
@@ -182,7 +180,7 @@
                                                data-unique-id="id"
                                                data-pagination="true"
                                                data-side-pagination="server"
-                                               data-page-size="10"
+                                               data-page-size="15"
                                                data-click-to-select="true"
                                                data-url="@Url.Action("GetSectionsData", "Admin")"
                                                data-sort-name="name"
@@ -234,7 +232,7 @@
                                                data-unique-id="id"
                                                data-pagination="true"
                                                data-side-pagination="server"
-                                               data-page-size="10"
+                                               data-page-size="15"
                                                data-click-to-select="true"
                                                data-url="@Url.Action("GetBalancesData", "Admin")"
                                                data-sort-name="partName"
@@ -261,7 +259,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-4">
+            <div class="col-xl-3">
                 <div class="card admin-detail-panel" id="adminEntityPanel">
                     <div class="card-header d-flex flex-column gap-1">
                         <h2 class="h5 mb-0" id="adminEntityPanelTitle">Форма</h2>
@@ -278,7 +276,6 @@
                 </div>
             </div>
         </div>
-    </div>
 </div>
 
 <script type="text/template" id="partFormTemplate">
