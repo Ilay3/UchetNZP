@@ -8,53 +8,81 @@
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Шаг 1. Заполните параметры запуска</div>
+    <div class="card-header bg-light">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <div>
+                <div class="fw-semibold" id="launchStepProgress">Шаг 1 из 4</div>
+                <div class="text-muted small" id="launchStepHint">Сначала выберите деталь для запуска.</div>
+            </div>
+            <span class="badge text-bg-light border" id="launchStepBadge">Выбор детали</span>
+        </div>
+    </div>
     <div class="card-body">
         <form id="launchForm" class="row g-4" autocomplete="off">
-            <div class="col-lg-4">
+            <div class="col-12" data-launch-step="1">
+                <div class="row g-4">
+                    <div class="col-lg-6">
                 <label class="form-label" for="launchPartInput">Деталь</label>
                 <input id="launchPartInput" class="form-control form-control-lg" type="text" list="launchPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
                 <datalist id="launchPartOptions"></datalist>
                 <input type="hidden" id="launchPartId" />
                 <div class="form-text">Выберите деталь для запуска.</div>
             </div>
-            <div class="col-lg-5 col-xl-6">
+                </div>
+            </div>
+
+            <div class="col-12 d-none" data-launch-step="2">
+                <div class="row g-4">
+                    <div class="col-lg-6 col-xl-6">
                 <label class="form-label" for="launchOperationInput">Операция (№ | Наименование | Норматив | Остаток)</label>
                 <input id="launchOperationInput" class="form-control form-control-lg" type="text" list="launchOperationOptions" placeholder="Выберите операцию" autocomplete="off" />
                 <datalist id="launchOperationOptions"></datalist>
                 <input type="hidden" id="launchOperationNumber" />
                 <div class="form-text">Поиск доступен по номеру и названию операции.</div>
             </div>
-            <div class="col-lg-3 col-xl-2">
-                <label class="form-label" for="launchDateInput">Дата запуска</label>
-                <input id="launchDateInput" class="form-control form-control-lg" type="date" />
-                <div class="form-text">Дата устанавливается на сегодня и может быть скорректирована.</div>
-            </div>
-            <div class="col-lg-4">
-                <label class="form-label" for="launchQuantityInput">Запустить (шт)</label>
-                <input id="launchQuantityInput" class="form-control form-control-lg" type="number" min="0" step="1" />
-                <div class="form-text">Количество не должно превышать остаток по операции.</div>
-            </div>
-            <div class="col-lg-5">
-                <label class="form-label" for="launchCommentInput">Комментарий</label>
-                <input id="launchCommentInput" class="form-control form-control-lg" type="text" maxlength="256" />
-                <div class="form-text">Добавьте пояснение к запуску при необходимости.</div>
-            </div>
-            <div class="col-lg-4 d-flex align-items-end">
+                    <div class="col-lg-4 d-flex align-items-end">
                 <div>
                     <div class="fw-semibold text-uppercase small text-muted">Доступно на операции</div>
                     <div class="display-6" id="launchRemainderLabel">0 шт</div>
                     <div class="form-text">Остаток обновляется при выборе операции.</div>
                 </div>
             </div>
-        </form>
-    </div>
-</div>
+                </div>
+            </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Шаг 2. Расчёт до конца маршрута</div>
-    <div class="card-body">
-        <div class="row g-4">
+            <div class="col-12 d-none" data-launch-step="3">
+                <div class="row g-4">
+                    <div class="col-lg-3 col-xl-3">
+                        <label class="form-label" for="launchDateInput">Дата запуска</label>
+                        <input id="launchDateInput" class="form-control form-control-lg" type="date" />
+                        <div class="form-text">Дата устанавливается на сегодня и может быть скорректирована.</div>
+                    </div>
+                    <div class="col-lg-4">
+                        <label class="form-label" for="launchQuantityInput">Запустить (шт)</label>
+                        <input id="launchQuantityInput" class="form-control form-control-lg" type="number" min="0" step="1" />
+                        <div class="form-text">Количество не должно превышать остаток по операции.</div>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-link px-0 text-decoration-none text-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#launchAdditionalFields" aria-expanded="false" aria-controls="launchAdditionalFields">
+                            Дополнительно
+                        </button>
+                        <div class="collapse" id="launchAdditionalFields">
+                            <label class="form-label" for="launchCommentInput">Комментарий</label>
+                            <input id="launchCommentInput" class="form-control form-control-lg" type="text" maxlength="256" />
+                            <div class="form-text">Добавьте пояснение к запуску при необходимости.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 d-none" data-launch-step="4">
+                <div class="border rounded-3 p-3 bg-light">
+                    <div class="fw-semibold mb-2">Проверьте данные перед добавлением в корзину</div>
+                    <div id="launchConfirmSummary" class="small text-muted">Сводка появится после выбора детали, операции и количества.</div>
+                </div>
+            </div>
+        </form>
+        <div class="row g-4 mt-1" id="launchTailBlock">
             <div class="col-12 col-xl-6">
                 <div class="table-responsive">
                     <table class="table table-hover align-middle" id="launchTailTable" aria-describedby="launchTailCaption">
@@ -87,18 +115,21 @@
                 </div>
             </div>
         </div>
-        <div class="d-flex flex-column flex-md-row gap-3 mt-4">
-            <button type="button" class="btn btn-primary btn-lg" id="launchAddButton">Добавить в корзину (Enter)</button>
-            <button type="button" class="btn btn-secondary btn-lg" id="launchResetButton">Очистить форму (Esc)</button>
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mt-4">
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="launchBackButton">Назад</button>
+                <button type="button" class="btn btn-outline-secondary" id="launchResetButton">Очистить форму (Esc)</button>
+            </div>
+            <button type="button" class="btn btn-primary btn-lg" id="launchAddButton">Далее</button>
         </div>
     </div>
 </div>
 
 <div class="card shadow-sm mb-5">
     <div class="card-header bg-light fw-semibold d-flex flex-column flex-xl-row align-items-xl-center justify-content-between gap-3">
-        <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
             <span class="fs-4">Корзина запусков</span>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 collapse" id="launchExportFilters">
                 <div>
                     <label class="form-label mb-1" for="launchExportFrom">Период с</label>
                     <input id="launchExportFrom" class="form-control form-control-lg" type="date" />
@@ -110,7 +141,8 @@
             </div>
         </div>
         <div class="d-flex flex-column flex-md-row gap-3">
-            <button type="button" class="btn btn-secondary btn-lg" id="launchExportButton">Экспорт в Excel</button>
+            <button class="btn btn-link text-decoration-none text-secondary p-0 align-self-center" type="button" data-bs-toggle="collapse" data-bs-target="#launchExportFilters" aria-expanded="false" aria-controls="launchExportFilters">Дополнительно</button>
+            <button type="button" class="btn btn-outline-secondary" id="launchExportButton">Экспорт в Excel</button>
             <button type="button" class="btn btn-success btn-lg" id="launchSaveButton">Сохранить все запуски (Ctrl+S)</button>
         </div>
     </div>

@@ -40,8 +40,15 @@
     const commentInput = document.getElementById("launchCommentInput");
     const dateInput = document.getElementById("launchDateInput");
     const addButton = document.getElementById("launchAddButton");
+    const backButton = document.getElementById("launchBackButton");
     const saveButton = document.getElementById("launchSaveButton");
     const resetButton = document.getElementById("launchResetButton");
+    const stepBlocks = Array.from(document.querySelectorAll("[data-launch-step]"));
+    const stepProgress = document.getElementById("launchStepProgress");
+    const stepHint = document.getElementById("launchStepHint");
+    const stepBadge = document.getElementById("launchStepBadge");
+    const confirmSummary = document.getElementById("launchConfirmSummary");
+    const tailBlock = document.getElementById("launchTailBlock");
     const exportButton = document.getElementById("launchExportButton");
     const exportFromInput = document.getElementById("launchExportFrom");
     const exportToInput = document.getElementById("launchExportTo");
@@ -75,7 +82,7 @@
     let tailAbortController = null;
     let operationsRequestId = 0;
     let tailRequestId = 0;
-    const addButtonLabel = addButton ? addButton.textContent : "";
+    let currentStep = 1;
 
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
@@ -85,6 +92,7 @@
     });
 
     partLookup.inputElement?.addEventListener("input", () => {
+        currentStep = 1;
         operations = [];
         selectedOperation = null;
         tailSummary = null;
@@ -102,6 +110,7 @@
         renderTail();
         updateRemainderLabel();
         updateHours();
+        currentStep = 1;
         updateStepState();
     });
 
@@ -134,7 +143,23 @@
     dateInput.addEventListener("change", () => updateStepState());
     dateInput.addEventListener("input", () => updateStepState());
 
-    addButton.addEventListener("click", () => addToCart());
+    addButton.addEventListener("click", () => {
+        if (currentStep < 4) {
+            if (currentStep < getMaxAvailableStep()) {
+                currentStep += 1;
+                updateStepState();
+            }
+            return;
+        }
+
+        addToCart();
+    });
+    backButton?.addEventListener("click", () => {
+        if (currentStep > 1) {
+            currentStep -= 1;
+            updateStepState();
+        }
+    });
     resetButton.addEventListener("click", () => resetForm());
     saveButton.addEventListener("click", () => saveCart());
     exportButton.addEventListener("click", () => exportLaunches());
@@ -182,6 +207,110 @@
         return baseline - pending;
     }
 
+    function isStep1Valid() {
+        return !!(partLookup.getSelected()?.id);
+    }
+
+    function isStep2Valid() {
+        if (!isStep1Valid()) {
+            return false;
+        }
+
+        return !!selectedOperation && !isLoadingOperations && !!tailSummary && !isLoadingTail;
+    }
+
+    function isStep3Valid() {
+        if (!isStep2Valid()) {
+            return false;
+        }
+
+        const quantity = Number(quantityInput.value);
+        if (!quantity || quantity <= 0 || !dateInput.value) {
+            return false;
+        }
+
+        const part = partLookup.getSelected();
+        const available = getAvailableQuantity(part.id, selectedOperation.opNumber, selectedOperation.balance ?? 0);
+        return quantity <= available + 1e-9;
+    }
+
+    function getMaxAvailableStep() {
+        if (!isStep1Valid()) {
+            return 1;
+        }
+
+        if (!isStep2Valid()) {
+            return 2;
+        }
+
+        if (!isStep3Valid()) {
+            return 3;
+        }
+
+        return 4;
+    }
+
+    function updateConfirmSummary() {
+        if (!confirmSummary) {
+            return;
+        }
+
+        const part = partLookup.getSelected();
+        if (!part || !selectedOperation) {
+            confirmSummary.textContent = "Сводка появится после выбора детали, операции и количества.";
+            return;
+        }
+
+        confirmSummary.innerHTML = `
+            <div><strong>Деталь:</strong> ${formatNameWithCode(part.name, part.code)}</div>
+            <div><strong>Операция:</strong> ${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}</div>
+            <div><strong>Количество:</strong> ${Number(quantityInput.value || 0).toFixed(3)} шт, <strong>дата:</strong> ${dateInput.value || "—"}</div>`;
+    }
+
+    function updateWizardState() {
+        const maxStep = getMaxAvailableStep();
+        if (currentStep > maxStep) {
+            currentStep = maxStep;
+        }
+
+        const descriptors = {
+            1: { title: "Выбор детали", hint: "Сначала выберите деталь для запуска." },
+            2: { title: "Выбор операции", hint: "Выберите операцию и дождитесь расчёта хвоста маршрута." },
+            3: { title: "Количество и дата", hint: "Введите объём запуска и дату. При необходимости добавьте комментарий." },
+            4: { title: "Подтверждение", hint: "Проверьте сводку и добавьте запуск в корзину." },
+        };
+
+        stepBlocks.forEach(block => {
+            const step = Number(block.dataset.launchStep);
+            block.classList.toggle("d-none", step !== currentStep);
+        });
+
+        if (tailBlock) {
+            tailBlock.classList.toggle("d-none", currentStep < 2);
+        }
+
+        const descriptor = descriptors[currentStep];
+        if (stepProgress) {
+            stepProgress.textContent = `Шаг ${currentStep} из 4`;
+        }
+        if (stepHint) {
+            stepHint.textContent = descriptor.hint;
+        }
+        if (stepBadge) {
+            stepBadge.textContent = descriptor.title;
+        }
+
+        if (backButton) {
+            backButton.disabled = currentStep === 1;
+            backButton.classList.toggle("opacity-50", currentStep === 1);
+        }
+
+        addButton.textContent = currentStep < 4 ? "Далее" : "Сохранить в корзину";
+        addButton.disabled = currentStep < 4 ? currentStep >= maxStep : !canAddToCart();
+
+        updateConfirmSummary();
+    }
+
     function canAddToCart() {
         const part = partLookup.getSelected();
         if (!part || !part.id || !selectedOperation) {
@@ -217,19 +346,12 @@
         quantityInput.disabled = !hasOperation || isLoadingTail;
         commentInput.disabled = !hasOperation;
 
-        const loadingMessage = "Подождите…";
-        if (isLoadingTail) {
-            addButton.textContent = loadingMessage;
-        }
-        else if (addButtonLabel) {
-            addButton.textContent = addButtonLabel;
-        }
-
-        addButton.disabled = !canAddToCart();
         saveButton.disabled = cart.length === 0;
         if (exportButton) {
             exportButton.disabled = cart.length === 0;
         }
+
+        updateWizardState();
     }
 
     async function loadOperations(partId) {
@@ -411,6 +533,7 @@
         updateOperationsDatalist();
         updateRemainderLabel();
         updateHours();
+        currentStep = 1;
         updateStepState();
     }
 
@@ -798,7 +921,7 @@
     updateStepState();
 
     namespace.bindHotkeys({
-        onEnter: () => addToCart(),
+        onEnter: () => addButton?.click(),
         onSave: () => saveCart(),
         onCancel: () => resetForm(),
     });

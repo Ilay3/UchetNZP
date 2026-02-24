@@ -8,73 +8,109 @@
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Шаг 1. Заполните данные передачи</div>
+    <div class="card-header bg-light">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <div>
+                <div class="fw-semibold" id="transferStepProgress">Шаг 1 из 4</div>
+                <div class="text-muted small" id="transferStepHint">Выберите деталь, с которой будете работать.</div>
+            </div>
+            <span class="badge text-bg-light border" id="transferStepBadge">Выбор детали</span>
+        </div>
+    </div>
     <div class="card-body">
         <form id="transferForm" class="row g-4" autocomplete="off">
-            <div class="col-12 col-xl-4">
+            <div class="col-12" data-transfer-step="1">
+                <div class="row g-4">
+                    <div class="col-12 col-xl-6">
                 <label class="form-label" for="transferPartInput">Деталь</label>
                 <input id="transferPartInput" class="form-control form-control-lg" type="text" list="transferPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
                 <datalist id="transferPartOptions"></datalist>
                 <input type="hidden" id="transferPartId" />
                 <div class="form-text">Введите минимум 2 символа наименования или обозначения.</div>
             </div>
-            <div class="col-12 d-none d-xl-block"></div>
-            <div class="col-12 col-lg-6 col-xl-6">
+                </div>
+            </div>
+
+            <div class="col-12 d-none" data-transfer-step="2">
+                <div class="row g-4">
+                    <div class="col-12 col-lg-6 col-xl-6">
                 <label class="form-label" for="transferFromOperationInput">Операция до</label>
                 <input id="transferFromOperationInput" class="form-control form-control-lg" type="text" list="transferFromOperationOptions" placeholder="Выберите операцию, откуда снимается НЗП" autocomplete="off" />
                 <datalist id="transferFromOperationOptions"></datalist>
                 <input type="hidden" id="transferFromOperationNumber" />
                 <div class="form-text">Доступен поиск по номеру и названию операции.</div>
             </div>
-            <div class="col-12 col-lg-6 col-xl-6">
+                    <div class="col-12 col-lg-6 col-xl-6">
                 <label class="form-label" for="transferToOperationInput">Операция после</label>
                 <input id="transferToOperationInput" class="form-control form-control-lg" type="text" list="transferToOperationOptions" placeholder="Выберите следующую операцию" autocomplete="off" />
                 <datalist id="transferToOperationOptions"></datalist>
                 <input type="hidden" id="transferToOperationNumber" />
                 <div class="form-text">Выберите операцию, на которую передаётся НЗП.</div>
             </div>
-            <div class="col-12 col-xl-6">
+                    <div class="col-12 col-xl-6">
                 <label class="form-label" for="transferLabelSelect">Ярлык</label>
                 <select id="transferLabelSelect" class="form-select form-select-lg w-100">
                     <option value="">— Свободные ярлыки будут загружены —</option>
                 </select>
                 <div class="form-text" id="transferLabelHint">Выберите операцию до, чтобы увидеть свободные ярлыки.</div>
             </div>
-            <div class="col-sm-6 col-lg-4 col-xl-3">
+                    <div class="col-md-6 col-lg-4">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="fw-semibold text-uppercase small text-muted">На операции до</div>
+                            <div class="display-6" id="transferFromBalanceLabel">0 шт</div>
+                            <div class="form-text">Остаток учитывает выбранные записи в корзине.</div>
+                            <div class="small text-muted mt-2">Ярлыки: <span id="transferFromLabels">—</span></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-lg-4">
+                        <div class="border rounded-3 p-3 h-100 bg-light">
+                            <div class="fw-semibold text-uppercase small text-muted">На операции после</div>
+                            <div class="display-6" id="transferToBalanceLabel">0 шт</div>
+                            <div class="form-text">Остаток увеличивается с учётом готовых к передаче позиций.</div>
+                            <div class="small text-muted mt-2">Ярлыки: <span id="transferToLabels">—</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 d-none" data-transfer-step="3">
+                <div class="row g-4">
+                    <div class="col-sm-6 col-lg-4 col-xl-3">
                 <label class="form-label" for="transferDateInput">Дата передачи</label>
                 <input id="transferDateInput" class="form-control form-control-lg" type="date" />
                 <div class="form-text">По умолчанию устанавливается сегодняшняя дата, её можно изменить.</div>
             </div>
-            <div class="col-sm-6 col-lg-4 col-xl-3">
+                    <div class="col-sm-6 col-lg-4 col-xl-3">
                 <label class="form-label" for="transferQuantityInput">Количество (шт)</label>
                 <input id="transferQuantityInput" class="form-control form-control-lg" type="number" min="0" step="0.001" />
                 <div class="form-text">Количество не может превышать остаток на выбранной операции до.</div>
             </div>
-            <div class="col-lg-12">
-                <label class="form-label" for="transferCommentInput">Комментарий</label>
-                <input id="transferCommentInput" class="form-control form-control-lg" type="text" maxlength="256" />
-                <div class="form-text">Добавьте пояснение для коллег, если нужно.</div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="border rounded-3 p-3 h-100 bg-light">
-                    <div class="fw-semibold text-uppercase small text-muted">На операции до</div>
-                    <div class="display-6" id="transferFromBalanceLabel">0 шт</div>
-                    <div class="form-text">Остаток учитывает выбранные записи в корзине.</div>
-                    <div class="small text-muted mt-2">Ярлыки: <span id="transferFromLabels">—</span></div>
+                    <div class="col-12">
+                        <button class="btn btn-link px-0 text-decoration-none text-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#transferAdditionalFields" aria-expanded="false" aria-controls="transferAdditionalFields">
+                            Дополнительно
+                        </button>
+                        <div class="collapse" id="transferAdditionalFields">
+                            <label class="form-label" for="transferCommentInput">Комментарий</label>
+                            <input id="transferCommentInput" class="form-control form-control-lg" type="text" maxlength="256" />
+                            <div class="form-text">Добавьте пояснение для коллег, если нужно.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="border rounded-3 p-3 h-100 bg-light">
-                    <div class="fw-semibold text-uppercase small text-muted">На операции после</div>
-                    <div class="display-6" id="transferToBalanceLabel">0 шт</div>
-                    <div class="form-text">Остаток увеличивается с учётом готовых к передаче позиций.</div>
-                    <div class="small text-muted mt-2">Ярлыки: <span id="transferToLabels">—</span></div>
+
+            <div class="col-12 d-none" data-transfer-step="4">
+                <div class="border rounded-3 p-3 bg-light">
+                    <div class="fw-semibold mb-2">Проверьте данные перед сохранением</div>
+                    <div id="transferConfirmSummary" class="small text-muted">Выберите деталь, операции и количество, чтобы увидеть сводку.</div>
                 </div>
             </div>
         </form>
-        <div class="d-flex flex-column flex-md-row gap-3 mt-4">
-            <button type="button" class="btn btn-primary btn-lg" id="transferAddButton">Добавить в корзину (Enter)</button>
-            <button type="button" class="btn btn-secondary btn-lg" id="transferResetButton">Очистить форму (Esc)</button>
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mt-4">
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="transferBackButton">Назад</button>
+                <button type="button" class="btn btn-outline-secondary" id="transferResetButton">Очистить форму (Esc)</button>
+            </div>
+            <button type="button" class="btn btn-primary btn-lg" id="transferAddButton">Далее</button>
         </div>
     </div>
 </div>
@@ -114,8 +150,12 @@
 </div>
 
 <div class="card shadow-sm mb-5" id="transferRecentContainer">
-    <div class="card-header bg-light fw-semibold">Последние передачи</div>
+    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+        <span>Последние передачи</span>
+        <button class="btn btn-link text-decoration-none text-secondary p-0" type="button" data-bs-toggle="collapse" data-bs-target="#transferRecentCollapse" aria-expanded="false" aria-controls="transferRecentCollapse">Дополнительно</button>
+    </div>
     <div class="card-body">
+        <div class="collapse" id="transferRecentCollapse">
         <p class="text-muted mb-0" id="transferRecentEmpty">Сохранённых передач пока нет. После сохранения они появятся здесь, и каждую можно будет отменить.</p>
         <div class="table-responsive d-none" id="transferRecentTableWrapper">
             <table class="table table-hover align-middle" id="transferRecentTable" aria-describedby="transferRecentCaption">
@@ -137,6 +177,7 @@
                 </thead>
                 <tbody></tbody>
             </table>
+        </div>
         </div>
     </div>
 </div>

@@ -47,8 +47,14 @@
     const labelSelect = document.getElementById("transferLabelSelect");
     const labelHintElement = document.getElementById("transferLabelHint");
     const addButton = document.getElementById("transferAddButton");
+    const backButton = document.getElementById("transferBackButton");
     const resetButton = document.getElementById("transferResetButton");
     const saveButton = document.getElementById("transferSaveButton");
+    const stepBlocks = Array.from(document.querySelectorAll("[data-transfer-step]"));
+    const stepProgress = document.getElementById("transferStepProgress");
+    const stepHint = document.getElementById("transferStepHint");
+    const stepBadge = document.getElementById("transferStepBadge");
+    const confirmSummary = document.getElementById("transferConfirmSummary");
     const cartTableBody = document.querySelector("#transferCartTable tbody");
     const summaryModalElement = document.getElementById("transferSummaryModal");
     const summaryTableBody = document.querySelector("#transferSummaryTable tbody");
@@ -114,6 +120,7 @@
     let selectedLabelOption = null;
     let labelsAbortController = null;
     let labelsRequestId = 0;
+    let currentStep = 1;
 
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
@@ -137,6 +144,7 @@
         updateFromOperationsDatalist();
         updateToOperationsDatalist();
         updateBalanceLabels();
+        currentStep = 1;
         updateFormState();
     });
 
@@ -229,7 +237,23 @@
         updateLabelHint();
     });
 
-    addButton.addEventListener("click", () => void addToCart());
+    addButton.addEventListener("click", () => {
+        if (currentStep < 4) {
+            if (currentStep < getMaxAvailableStep()) {
+                currentStep += 1;
+                updateFormState();
+            }
+            return;
+        }
+
+        void addToCart();
+    });
+    backButton?.addEventListener("click", () => {
+        if (currentStep > 1) {
+            currentStep -= 1;
+            updateFormState();
+        }
+    });
     resetButton.addEventListener("click", () => resetForm());
     saveButton.addEventListener("click", () => void saveCart());
     quantityInput.addEventListener("input", () => updateFormState());
@@ -596,6 +620,119 @@
         updateLabelSelect();
     }
 
+    function isStep1Valid() {
+        return !!(partLookup.getSelected()?.id);
+    }
+
+    function isStep2Valid() {
+        if (!isStep1Valid()) {
+            return false;
+        }
+
+        if (!selectedFromOperation || !selectedToOperation) {
+            return false;
+        }
+
+        if (!selectedToOperation.isWarehouse && parseOpNumber(selectedToOperation.opNumber) <= parseOpNumber(selectedFromOperation.opNumber)) {
+            return false;
+        }
+
+        if (isLoadingOperations || isLoadingBalances) {
+            return false;
+        }
+
+        return !(labelOptions.length > 0 && !selectedLabelOption);
+    }
+
+    function isStep3Valid() {
+        if (!isStep2Valid()) {
+            return false;
+        }
+
+        const quantity = Number(quantityInput.value);
+        if (!quantity || quantity <= 0 || !dateInput.value) {
+            return false;
+        }
+
+        const part = partLookup.getSelected();
+        const labelId = selectedLabelOption?.id ?? null;
+        const availableFrom = getAvailableBalance(part.id, selectedFromOperation.opNumber, labelId);
+        return quantity <= availableFrom + 1e-9;
+    }
+
+    function getMaxAvailableStep() {
+        if (!isStep1Valid()) {
+            return 1;
+        }
+
+        if (!isStep2Valid()) {
+            return 2;
+        }
+
+        if (!isStep3Valid()) {
+            return 3;
+        }
+
+        return 4;
+    }
+
+    function updateConfirmSummary() {
+        if (!confirmSummary) {
+            return;
+        }
+
+        const part = partLookup.getSelected();
+        if (!part || !selectedFromOperation || !selectedToOperation || !quantityInput.value) {
+            confirmSummary.textContent = "Выберите деталь, операции и количество, чтобы увидеть сводку.";
+            return;
+        }
+
+        confirmSummary.innerHTML = `
+            <div><strong>Деталь:</strong> ${formatNameWithCode(part.name, part.code)}</div>
+            <div><strong>Маршрут:</strong> ${selectedFromOperation.opNumber} → ${selectedToOperation.opNumber}</div>
+            <div><strong>Количество:</strong> ${Number(quantityInput.value || 0).toFixed(3)} шт, <strong>дата:</strong> ${dateInput.value || "—"}</div>`;
+    }
+
+    function updateWizardState() {
+        const maxStep = getMaxAvailableStep();
+        if (currentStep > maxStep) {
+            currentStep = maxStep;
+        }
+
+        const descriptors = {
+            1: { title: "Выбор детали", hint: "Выберите деталь, с которой будете работать." },
+            2: { title: "Выбор операций", hint: "Укажите операции «до» и «после», проверьте доступные остатки." },
+            3: { title: "Количество и дата", hint: "Введите количество и дату передачи. Дополнительно можно добавить комментарий." },
+            4: { title: "Подтверждение", hint: "Проверьте введённые данные и сохраните запись в корзину." },
+        };
+
+        stepBlocks.forEach(block => {
+            const step = Number(block.dataset.transferStep);
+            block.classList.toggle("d-none", step !== currentStep);
+        });
+
+        const descriptor = descriptors[currentStep];
+        if (stepProgress) {
+            stepProgress.textContent = `Шаг ${currentStep} из 4`;
+        }
+        if (stepHint) {
+            stepHint.textContent = descriptor.hint;
+        }
+        if (stepBadge) {
+            stepBadge.textContent = descriptor.title;
+        }
+
+        if (backButton) {
+            backButton.disabled = currentStep === 1;
+            backButton.classList.toggle("opacity-50", currentStep === 1);
+        }
+
+        addButton.textContent = currentStep < 4 ? "Далее" : "Сохранить в корзину";
+        addButton.disabled = currentStep < 4 ? currentStep >= maxStep : !canAddToCart();
+
+        updateConfirmSummary();
+    }
+
     function canAddToCart() {
         const part = partLookup.getSelected();
         if (!part || !part.id) {
@@ -648,8 +785,8 @@
             labelSelect.disabled = !selectedFromOperation || isLoadingOperations || isLoadingLabels;
         }
 
-        addButton.disabled = !canAddToCart();
         saveButton.disabled = cart.length === 0;
+        updateWizardState();
     }
 
     async function loadOperations(partId) {
@@ -1092,6 +1229,7 @@
         toOperationNumberInput.value = "";
         updateToOperationsDatalist();
         updateBalanceLabels();
+        currentStep = 1;
         updateFormState();
     }
 
@@ -2045,7 +2183,7 @@
     updateFormState();
 
     namespace.bindHotkeys({
-        onEnter: () => void addToCart(),
+        onEnter: () => addButton?.click(),
         onSave: () => void saveCart(),
         onCancel: () => resetForm(),
     });
