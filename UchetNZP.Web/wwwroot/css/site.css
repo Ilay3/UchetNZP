@@ -65,6 +65,7 @@ body {
   animation-duration: var(--bubble-duration);
   animation-delay: var(--bubble-delay);
   filter: blur(0.5px);
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.28);
   color: rgba(255, 255, 255, 0.96);
   text-align: center;
   font-size: clamp(0.58rem, 0.45rem + 0.35vw, 0.78rem);
@@ -74,6 +75,26 @@ body {
   text-overflow: ellipsis;
 }
 
+
+.background-bubbles[data-performance-mode="reduced"] .background-bubbles__item {
+  filter: none;
+  box-shadow: none;
+}
+
+@media (max-width: 767.98px) {
+  .background-bubbles__item {
+    filter: none;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background-bubbles__item {
+    animation-duration: calc(var(--bubble-duration) * 1.8);
+    filter: none;
+    box-shadow: none;
+  }
+}
 .app-content-layer {
   position: relative;
   z-index: 1;

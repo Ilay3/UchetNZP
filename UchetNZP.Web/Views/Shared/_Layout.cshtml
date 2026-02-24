@@ -1,4 +1,8 @@
-﻿<!DOCTYPE html>
+@using Microsoft.Extensions.Options
+@using System.Text.Json
+@using UchetNZP.Web.Configuration
+@inject IOptions<BackgroundBubblesOptions> BackgroundBubblesOptions
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -144,6 +148,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.3/dist/bootstrap-table.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap-table@1.22.3/dist/locale/bootstrap-table-ru-RU.min.js"></script>
     <script src="~/js/common-ui.js" asp-append-version="true"></script>
+    <script>
+        window.backgroundBubblesConfig = @Html.Raw(JsonSerializer.Serialize(new
+        {
+            enabled = BackgroundBubblesOptions.Value.Enabled
+        }));
+    </script>
     <script src="~/js/background-bubbles.js" asp-append-version="true"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
