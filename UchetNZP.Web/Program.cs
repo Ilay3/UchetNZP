@@ -13,6 +13,7 @@ builder.Services.AddControllersWithViews();
 builder.Host.UseWindowsService();
 
 builder.Services.Configure<MaintenanceOptions>(builder.Configuration.GetSection("Maintenance"));
+builder.Services.Configure<BackgroundBubblesOptions>(builder.Configuration.GetSection("BackgroundBubbles"));
 
 builder.Services
     .AddAuthentication(options =>
