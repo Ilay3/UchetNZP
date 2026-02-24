@@ -50,6 +50,10 @@ body {
 
 .background-bubbles__item {
   position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
   left: var(--bubble-left);
   bottom: calc(-1 * var(--bubble-size));
   width: var(--bubble-size);
@@ -61,6 +65,13 @@ body {
   animation-duration: var(--bubble-duration);
   animation-delay: var(--bubble-delay);
   filter: blur(0.5px);
+  color: rgba(255, 255, 255, 0.96);
+  text-align: center;
+  font-size: clamp(0.58rem, 0.45rem + 0.35vw, 0.78rem);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-content-layer {
