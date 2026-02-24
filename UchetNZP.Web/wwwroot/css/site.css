@@ -238,11 +238,29 @@ table {
      z-index: 2;
  }
 
+
+.admin-page-layout {
+    max-width: 100%;
+}
+
+.admin-tabs-horizontal {
+    gap: 0.5rem;
+}
+
+.admin-tabs-horizontal .nav-link {
+    white-space: nowrap;
+}
 .admin-detail-panel {
      border: 1px solid var(--color-border);
      position: sticky;
      top: 1rem;
  }
+
+@media (min-width: 1200px) {
+    .admin-detail-panel {
+        min-width: 18rem;
+    }
+}
 
 .admin-compact {
     font-size: 0.9rem;
@@ -268,5 +286,17 @@ table {
 @media (max-width: 1199.98px) {
     .admin-detail-panel {
         position: static;
+    }
+}
+
+
+@media (max-width: 991.98px) {
+    .admin-tabs-horizontal {
+        width: 100%;
+    }
+
+    .admin-tabs-horizontal .nav-link {
+        flex: 1 1 calc(50% - 0.5rem);
+        text-align: center;
     }
 }
