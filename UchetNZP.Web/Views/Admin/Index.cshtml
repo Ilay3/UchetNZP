@@ -242,7 +242,7 @@
                                                 <tr>
                                                     <th data-checkbox="true"></th>
                                                     <th data-field="partName" data-sortable="true">Деталь</th>
-                                                    <th data-field="sectionName" data-sortable="true">Участок</th>
+                                                  @*   <th data-field="sectionName" data-sortable="true">Участок</th> *@
                                                     <th data-field="operationName" data-sortable="true">Операция</th>
                                                     <th data-field="operationLabel" data-sortable="true">Ярлык</th>
                                                     <th data-field="opNumberFormatted" data-sortable="true" data-sort-name="opNumber">№ операции</th>
@@ -293,15 +293,15 @@
 
 <script type="text/template" id="balanceFormTemplate">
     <div class="row g-3">
-        <div class="col-12 col-md-6 col-lg-4">
+        <div class="col-12 col-md-6 col-lg-12">
             <label class="form-label">Деталь</label>
             <select name="partId" class="form-select">{{partOptions}}</select>
         </div>
-        <div class="col-12 col-md-6 col-lg-4">
+        <div class="col-12 col-md-6 col-lg-12">
             <label class="form-label">Участок</label>
             <select name="sectionId" class="form-select">{{sectionOptions}}</select>
         </div>
-        <div class="col-12 col-md-6 col-lg-4">
+        <div class="col-12 col-md-6 col-lg-12">
             <label class="form-label">Операция</label>
             <select name="operationId" class="form-select">{{operationOptions}}</select>
         </div>
@@ -310,11 +310,11 @@
             <input type="text" name="operationLabel" class="form-control" value="{{operationLabel}}" placeholder="Код операции" />
             <div class="form-text">Если указан новый ярлык, он будет создан и связан с записью.</div>
         </div>
-        <div class="col-12 col-sm-6 col-lg-3">
+        <div class="col-12 col-sm-6 col-lg-6">
             <label class="form-label">№ операции</label>
             <input type="text" name="opNumber" class="form-control" value="{{opNumber}}" inputmode="text" pattern="@OperationNumber.AllowedPattern" maxlength="16" required />
         </div>
-        <div class="col-12 col-sm-6 col-lg-3">
+        <div class="col-12 col-sm-6 col-lg-5">
             <label class="form-label">Количество</label>
             <input type="number" name="quantity" class="form-control" step="0.01" value="{{quantity}}" min="0" required />
         </div>
