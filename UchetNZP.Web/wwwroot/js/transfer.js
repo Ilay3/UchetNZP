@@ -1911,7 +1911,8 @@
             });
 
             if (!response.ok) {
-                throw new Error("Не удалось сохранить передачи.");
+                const errorMessage = await readErrorMessage(response);
+                throw new Error(errorMessage || "Не удалось сохранить передачи.");
             }
 
             const summary = await response.json();
@@ -1926,10 +1927,51 @@
         }
         catch (error) {
             console.error(error);
-            alert("Во время сохранения произошла ошибка. Попробуйте ещё раз.");
+            const message = error instanceof Error && error.message
+                ? error.message
+                : "Во время сохранения произошла ошибка. Попробуйте ещё раз.";
+            alert(message);
         }
         finally {
             saveButton.disabled = false;
+        }
+    }
+
+    async function readErrorMessage(response) {
+        if (!response) {
+            return "";
+        }
+
+        const contentType = response.headers?.get("content-type") ?? "";
+        if (contentType.includes("application/json")) {
+            try {
+                const data = await response.json();
+                if (typeof data === "string") {
+                    return data;
+                }
+
+                if (data && typeof data === "object") {
+                    if (typeof data.message === "string") {
+                        return data.message;
+                    }
+
+                    if (typeof data.title === "string") {
+                        return data.title;
+                    }
+                }
+            }
+            catch (error) {
+                console.warn("Не удалось прочитать JSON ошибки.", error);
+            }
+        }
+
+        try {
+            const text = await response.text();
+            return typeof text === "string" ? text.trim() : "";
+        }
+        catch (error) {
+            console.warn("Не удалось прочитать текст ошибки.", error);
+            return "";
         }
     }
 
