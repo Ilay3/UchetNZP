@@ -510,11 +510,6 @@ public class TransferService : ITransferService
                     continue;
                 }
 
-                if (candidate.RemainingQuantity + 0.000001m < consumedFromLabel)
-                {
-                    continue;
-                }
-
                 label = candidate;
                 break;
             }
@@ -554,12 +549,6 @@ public class TransferService : ITransferService
         }
 
         var remainingBefore = label.RemainingQuantity;
-
-        if (remainingBefore + 0.000001m < consumedFromLabel)
-        {
-            throw new InvalidOperationException($"Остаток ярлыка {label.Number} ({remainingBefore}) меньше списываемого количества ({consumedFromLabel}).");
-        }
-
         var remainingAfter = remainingBefore - consumedFromLabel;
         label.RemainingQuantity = remainingAfter;
 
