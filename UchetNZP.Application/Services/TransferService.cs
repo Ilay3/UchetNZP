@@ -485,11 +485,6 @@ public class TransferService : ITransferService
             throw new InvalidOperationException($"Ярлык {label.Number} не связан с приходом и не может быть использован.");
         }
 
-        if (label.WipReceipt.SectionId != fromRoute.SectionId || label.WipReceipt.OpNumber != item.FromOpNumber)
-        {
-            throw new InvalidOperationException($"Ярлык {label.Number} относится к другой операции и не может быть использован для операции {item.FromOpNumber}.");
-        }
-
         var operationQuantity = await GetLabelQuantityAtOperationAsync(
                 label.Id,
                 item.PartId,
@@ -504,7 +499,7 @@ public class TransferService : ITransferService
         }
 
         var remainingBefore = label.RemainingQuantity;
-        var consumedQuantity = scrapQuantity + (isWarehouseTransfer ? item.Quantity : 0m);
+        var consumedQuantity = scrapQuantity + item.Quantity;
 
         if (remainingBefore + 0.000001m < consumedQuantity)
         {
