@@ -558,6 +558,54 @@ public class TransferServiceTests
     }
 
     [Fact]
+    public async Task AddTransfersBatchAsync_CreatesSingleToBalance_WhenMissingAndUsedTwiceInBatch()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 70" };
+        var toSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 75" };
+        var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "070" };
+        var toOperation = new Operation { Id = Guid.NewGuid(), Name = "075" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(fromSection, toSection);
+        dbContext.Operations.AddRange(fromOperation, toOperation);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, fromSection.Id, fromOperation.Id, 70),
+            CreateRoute(part.Id, toSection.Id, toOperation.Id, 75));
+
+        dbContext.WipBalances.Add(new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = fromSection.Id,
+            OpNumber = 70,
+            Quantity = 240m,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var transferDate = new DateTime(2026, 2, 25, 0, 0, 0, DateTimeKind.Utc);
+
+        var summary = await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, null),
+            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, null),
+        });
+
+        Assert.Equal(2, summary.Saved);
+
+        var toBalances = await dbContext.WipBalances
+            .Where(x => x.PartId == part.Id && x.SectionId == toSection.Id && x.OpNumber == 75)
+            .ToListAsync();
+
+        var toBalance = Assert.Single(toBalances);
+        Assert.Equal(240m, toBalance.Quantity);
+    }
+
+    [Fact]
     public async Task RevertTransferAsync_RestoresBalancesAndMarksAudit()
     {
         await using var dbContext = CreateContext();
