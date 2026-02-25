@@ -66,7 +66,7 @@
     const recentTableWrapper = document.getElementById("transferRecentTableWrapper");
     const recentEmptyPlaceholder = document.getElementById("transferRecentEmpty");
 
-    const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
+    const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement, { backdrop: false }) : null;
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
 
     fromOperationInput.disabled = true;
@@ -1351,18 +1351,6 @@
     function formatQuantityText(value) {
         return normalizeQuantityForDisplay(value)
             .toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-    }
-
-    function cleanupStaleBackdrops() {
-        const hasVisibleModal = !!document.querySelector(".modal.show");
-        if (hasVisibleModal) {
-            return;
-        }
-
-        document.querySelectorAll(".modal-backdrop").forEach(backdrop => backdrop.remove());
-        document.body.classList.remove("modal-open");
-        document.body.style.removeProperty("overflow");
-        document.body.style.removeProperty("padding-right");
     }
 
     function escapeHtml(value) {
