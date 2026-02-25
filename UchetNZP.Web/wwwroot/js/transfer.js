@@ -66,7 +66,7 @@
     const recentTableWrapper = document.getElementById("transferRecentTableWrapper");
     const recentEmptyPlaceholder = document.getElementById("transferRecentEmpty");
 
-    const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
+    const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement, { backdrop: false }) : null;
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
 
     fromOperationInput.disabled = true;
@@ -1329,9 +1329,23 @@
     }
 
     function formatBalanceChange(before, after) {
-        const beforeText = Number(before).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-        const afterText = Number(after).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        const beforeText = formatQuantityText(before);
+        const afterText = formatQuantityText(after);
         return `${beforeText} → ${afterText}`;
+    }
+
+    function normalizeQuantityForDisplay(value) {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) {
+            return 0;
+        }
+
+        return Math.max(0, numeric);
+    }
+
+    function formatQuantityText(value) {
+        return normalizeQuantityForDisplay(value)
+            .toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
     }
 
     function escapeHtml(value) {
@@ -1432,8 +1446,8 @@
         let detail = "";
 
         if (before !== undefined && before !== null && after !== undefined && after !== null) {
-            const beforeText = Number(before).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-            const afterText = Number(after).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+            const beforeText = formatQuantityText(before);
+            const afterText = formatQuantityText(after);
             detail = `<div class="small text-muted">остаток: ${beforeText} → ${afterText}</div>`;
         }
 
@@ -2098,8 +2112,8 @@
             const row = document.createElement("tr");
             const cartItem = cart[index];
             const partDisplay = cartItem?.partDisplay ?? item.partDisplay ?? item.partName ?? item.partId;
-            const fromText = `${item.fromOpNumber}: ${Number(item.fromBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.fromBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
-            const toText = `${item.toOpNumber}: ${Number(item.toBalanceBefore).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} → ${Number(item.toBalanceAfter).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}`;
+            const fromText = `${item.fromOpNumber}: ${formatQuantityText(item.fromBalanceBefore)} → ${formatQuantityText(item.fromBalanceAfter)}`;
+            const toText = `${item.toOpNumber}: ${formatQuantityText(item.toBalanceBefore)} → ${formatQuantityText(item.toBalanceAfter)}`;
             const scrapSource = extractScrapSource(item) ?? extractScrapSource(cartItem);
             const scrapInfo = normalizeScrapInfo(scrapSource);
             const scrapCell = formatScrapCell(scrapInfo ?? {});
