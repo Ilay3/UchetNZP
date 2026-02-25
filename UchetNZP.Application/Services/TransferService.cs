@@ -43,6 +43,59 @@ public class TransferService : ITransferService
             var routeCache = new Dictionary<Guid, List<PartRoute>>();
             var results = new List<TransferItemSummaryDto>(materialized.Count);
             var transactionId = Guid.NewGuid();
+            var balanceCache = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber), WipBalance>();
+
+            async Task<WipBalance?> GetExistingBalanceAsync(Guid partId, Guid sectionId, int opNumber)
+            {
+                var key = (partId, sectionId, opNumber);
+                if (balanceCache.TryGetValue(key, out var cachedBalance))
+                {
+                    return cachedBalance;
+                }
+
+                var trackedBalance = _dbContext.WipBalances.Local
+                    .FirstOrDefault(x => x.PartId == partId && x.SectionId == sectionId && x.OpNumber == opNumber);
+                if (trackedBalance is not null)
+                {
+                    balanceCache[key] = trackedBalance;
+                    return trackedBalance;
+                }
+
+                var balance = await _dbContext.WipBalances
+                    .FirstOrDefaultAsync(
+                        x => x.PartId == partId && x.OpNumber == opNumber && x.SectionId == sectionId,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (balance is not null)
+                {
+                    balanceCache[key] = balance;
+                }
+
+                return balance;
+            }
+
+            async Task<WipBalance> GetOrCreateBalanceAsync(Guid partId, Guid sectionId, int opNumber)
+            {
+                var existing = await GetExistingBalanceAsync(partId, sectionId, opNumber).ConfigureAwait(false);
+                if (existing is not null)
+                {
+                    return existing;
+                }
+
+                var created = new WipBalance
+                {
+                    Id = Guid.NewGuid(),
+                    PartId = partId,
+                    SectionId = sectionId,
+                    OpNumber = opNumber,
+                    Quantity = 0m,
+                };
+
+                await _dbContext.WipBalances.AddAsync(created, cancellationToken).ConfigureAwait(false);
+                balanceCache[(partId, sectionId, opNumber)] = created;
+                return created;
+            }
 
             foreach (var item in materialized)
             {
@@ -96,10 +149,7 @@ public class TransferService : ITransferService
                     }
                 }
 
-                var fromBalance = await _dbContext.WipBalances
-                    .FirstOrDefaultAsync(
-                        x => x.PartId == item.PartId && x.OpNumber == item.FromOpNumber && x.SectionId == fromRoute.SectionId,
-                        cancellationToken)
+                var fromBalance = await GetExistingBalanceAsync(item.PartId, fromRoute.SectionId, item.FromOpNumber)
                     .ConfigureAwait(false);
 
                 if (fromBalance is null)
@@ -133,30 +183,10 @@ public class TransferService : ITransferService
                 }
                 else
                 {
-                    toBalance = await _dbContext.WipBalances
-                        .FirstOrDefaultAsync(
-                            x => x.PartId == item.PartId && x.OpNumber == item.ToOpNumber && x.SectionId == toRoute!.SectionId,
-                            cancellationToken)
+                    toBalance = await GetOrCreateBalanceAsync(item.PartId, toRoute!.SectionId, item.ToOpNumber)
                         .ConfigureAwait(false);
 
-                    if (toBalance is null)
-                    {
-                        toBalanceBefore = 0m;
-                        toBalance = new WipBalance
-                        {
-                            Id = Guid.NewGuid(),
-                            PartId = item.PartId,
-                            SectionId = toRoute!.SectionId,
-                            OpNumber = item.ToOpNumber,
-                            Quantity = 0m,
-                        };
-
-                        await _dbContext.WipBalances.AddAsync(toBalance, cancellationToken).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        toBalanceBefore = toBalance.Quantity;
-                    }
+                    toBalanceBefore = toBalance.Quantity;
 
                     toBalance.Quantity = toBalance.Quantity + item.Quantity;
                     toBalanceAfter = toBalance.Quantity;
@@ -483,11 +513,6 @@ public class TransferService : ITransferService
         if (label.WipReceipt is null)
         {
             throw new InvalidOperationException($"Ярлык {label.Number} не связан с приходом и не может быть использован.");
-        }
-
-        if (label.WipReceipt.SectionId != fromRoute.SectionId || label.WipReceipt.OpNumber != item.FromOpNumber)
-        {
-            throw new InvalidOperationException($"Ярлык {label.Number} относится к другой операции и не может быть использован для операции {item.FromOpNumber}.");
         }
 
         var operationQuantity = await GetLabelQuantityAtOperationAsync(
