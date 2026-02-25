@@ -375,6 +375,11 @@
         resolveScrapModal({ confirmed: false }, true);
         scrapSelectedTypeKey = null;
         updateScrapTypeButtons();
+        cleanupStaleBackdrops();
+    });
+
+    summaryModalElement?.addEventListener("hidden.bs.modal", () => {
+        cleanupStaleBackdrops();
     });
 
     function updateScrapTypeButtons() {
@@ -2131,6 +2136,7 @@
         });
 
         if (bootstrapModal) {
+            cleanupStaleBackdrops();
             bootstrapModal.show();
         }
     }
