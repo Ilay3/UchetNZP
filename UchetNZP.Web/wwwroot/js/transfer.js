@@ -382,6 +382,13 @@
         cleanupStaleBackdrops();
     });
 
+    function cleanupStaleBackdrops() {
+        document.querySelectorAll(".modal-backdrop").forEach(backdrop => backdrop.remove());
+        document.body.classList.remove("modal-open");
+        document.body.style.removeProperty("padding-right");
+        document.body.style.removeProperty("overflow");
+    }
+
     function updateScrapTypeButtons() {
         scrapTypeButtons.forEach(button => {
             const isSelected = button.dataset.scrapType === scrapSelectedTypeKey;

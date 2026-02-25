@@ -464,6 +464,8 @@ public class TransferService : ITransferService
             return null;
         }
 
+        var consumedFromLabel = scrapQuantity + (isWarehouseTransfer ? item.Quantity : 0m);
+
         WipLabel? label;
 
         if (item.WipLabelId.HasValue)
@@ -486,13 +488,31 @@ public class TransferService : ITransferService
                     x.PartId == item.PartId &&
                     x.WipReceipt != null &&
                     x.WipReceipt.SectionId == fromRoute.SectionId &&
-                    x.WipReceipt.OpNumber == item.FromOpNumber &&
-                    x.RemainingQuantity > 0m)
+                    x.WipReceipt.OpNumber == item.FromOpNumber)
                 .OrderBy(x => x.Number)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
-            label = candidates.FirstOrDefault(x => x.RemainingQuantity >= requiredQuantity);
+            label = null;
+
+            foreach (var candidate in candidates)
+            {
+                var candidateOperationQuantity = await GetLabelQuantityAtOperationAsync(
+                        candidate.Id,
+                        item.PartId,
+                        fromRoute.SectionId,
+                        item.FromOpNumber,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (candidateOperationQuantity + 0.000001m < requiredQuantity)
+                {
+                    continue;
+                }
+
+                label = candidate;
+                break;
+            }
 
             if (label is null)
             {
@@ -529,14 +549,7 @@ public class TransferService : ITransferService
         }
 
         var remainingBefore = label.RemainingQuantity;
-        var consumedQuantity = scrapQuantity + item.Quantity;
-
-        if (remainingBefore + 0.000001m < consumedQuantity)
-        {
-            throw new InvalidOperationException($"Остаток ярлыка {label.Number} ({remainingBefore}) меньше списываемого количества ({consumedQuantity}).");
-        }
-
-        var remainingAfter = remainingBefore - consumedQuantity;
+        var remainingAfter = remainingBefore - consumedFromLabel;
         label.RemainingQuantity = remainingAfter;
 
         var ret = new TransferLabelUsage(label, remainingBefore, remainingAfter);
@@ -729,7 +742,7 @@ public class TransferService : ITransferService
                 }
 
                 labelQuantityBefore = label.RemainingQuantity;
-                var restoreQuantity = transfer.Quantity + scrapQuantity;
+                var restoreQuantity = scrapQuantity + (isWarehouseTransfer ? transfer.Quantity : 0m);
                 var updatedQuantity = label.RemainingQuantity + restoreQuantity;
                 if (updatedQuantity > label.Quantity)
                 {
