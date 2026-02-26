@@ -77,6 +77,46 @@
 
     globalNamespace.showToast = showToast;
 
+    function cleanupModalBackdrops() {
+        document.querySelectorAll(".modal-backdrop").forEach(backdrop => backdrop.remove());
+
+        if (!document.querySelector(".modal.show")) {
+            document.body.classList.remove("modal-open");
+            document.body.style.removeProperty("padding-right");
+            document.body.style.removeProperty("overflow");
+        }
+    }
+
+    function disableModalBackdrops() {
+        document.querySelectorAll(".modal").forEach(modalElement => {
+            modalElement.setAttribute("data-bs-backdrop", "false");
+        });
+    }
+
+    function watchModalBackdrops() {
+        const observer = new MutationObserver(mutations => {
+            let shouldCleanup = false;
+
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (!(node instanceof HTMLElement)) {
+                        return;
+                    }
+
+                    if (node.classList.contains("modal-backdrop") || node.querySelector(".modal-backdrop")) {
+                        shouldCleanup = true;
+                    }
+                });
+            });
+
+            if (shouldCleanup) {
+                cleanupModalBackdrops();
+            }
+        });
+
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
     function setButtonLoading(in_button, in_isLoading, in_label) {
         if (!in_button) {
             return;
@@ -181,6 +221,10 @@
     });
 
     document.addEventListener("DOMContentLoaded", () => {
+        disableModalBackdrops();
+        cleanupModalBackdrops();
+        watchModalBackdrops();
+
         document.querySelectorAll("[data-toast-message]").forEach(element => {
             const message = element.dataset.toastMessage;
             const variant = element.dataset.toastVariant || "success";
