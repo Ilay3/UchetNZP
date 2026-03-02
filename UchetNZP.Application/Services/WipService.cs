@@ -528,9 +528,35 @@ public class WipService : IWipService
                 : null;
 
             var previousLabelAssigned = label?.IsAssigned ?? false;
+            var deleteLabel = false;
             if (label is not null)
             {
-                label.IsAssigned = false;
+                var hasOtherReceipts = await _dbContext.WipReceipts
+                    .AsNoTracking()
+                    .AnyAsync(x => x.WipLabelId == label.Id && x.Id != receipt.Id, cancellationToken)
+                    .ConfigureAwait(false);
+
+                var hasTransfers = await _dbContext.WipTransfers
+                    .AsNoTracking()
+                    .AnyAsync(x => x.WipLabelId == label.Id, cancellationToken)
+                    .ConfigureAwait(false);
+
+                var hasTransferAudits = await _dbContext.TransferAudits
+                    .AsNoTracking()
+                    .AnyAsync(x => x.WipLabelId == label.Id && !x.IsReverted, cancellationToken)
+                    .ConfigureAwait(false);
+
+                var hasWarehouseLinks = await _dbContext.WarehouseLabelItems
+                    .AsNoTracking()
+                    .AnyAsync(x => x.WipLabelId == label.Id, cancellationToken)
+                    .ConfigureAwait(false);
+
+                deleteLabel = !hasOtherReceipts && !hasTransfers && !hasTransferAudits && !hasWarehouseLinks;
+
+                if (!deleteLabel)
+                {
+                    label.IsAssigned = false;
+                }
             }
 
             var versionId = Guid.NewGuid();
@@ -567,16 +593,41 @@ public class WipService : IWipService
                     Comment = receipt.Comment,
                     PreviousBalance = previousQuantity,
                     NewBalance = restoredQuantity,
-                    PreviousLabelId = label?.Id,
-                    NewLabelId = label?.Id,
-                    PreviousLabelAssigned = previousLabelAssigned,
-                    NewLabelAssigned = label?.IsAssigned ?? false,
+                    PreviousLabelId = deleteLabel ? null : label?.Id,
+                    NewLabelId = deleteLabel ? null : label?.Id,
+                    PreviousLabelAssigned = deleteLabel ? false : previousLabelAssigned,
+                    NewLabelAssigned = deleteLabel ? false : label?.IsAssigned ?? false,
                     Action = "Deleted",
                     UserId = _currentUserService.UserId,
                     CreatedAt = now,
                 },
                 cancellationToken).ConfigureAwait(false);
             _dbContext.WipReceipts.Remove(receipt);
+
+            if (deleteLabel && label is not null)
+            {
+                var labelAudits = await _dbContext.ReceiptAudits
+                    .Where(x => x.ReceiptId == receipt.Id && (x.PreviousLabelId == label.Id || x.NewLabelId == label.Id))
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var audit in labelAudits)
+                {
+                    if (audit.PreviousLabelId == label.Id)
+                    {
+                        audit.PreviousLabelId = null;
+                        audit.PreviousLabelAssigned = false;
+                    }
+
+                    if (audit.NewLabelId == label.Id)
+                    {
+                        audit.NewLabelId = null;
+                        audit.NewLabelAssigned = false;
+                    }
+                }
+
+                _dbContext.WipLabels.Remove(label);
+            }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);

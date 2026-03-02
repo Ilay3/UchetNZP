@@ -26,9 +26,7 @@ public class WipLabelsController : Controller
     [HttpGet("")]
     public IActionResult Index()
     {
-        var model = new WipLabelsPageViewModel(DateTime.Today);
-        var ret = View("~/Views/Wip/Labels.cshtml", model);
-        return ret;
+        return RedirectToAction("Index", "WipReceipts");
     }
 
     [HttpGet("parts")]

@@ -570,6 +570,7 @@ public class WipTransfersController : Controller
             return ret;
         }
 
+        var requestedKeys = in_keys.ToHashSet();
         var partIds = in_keys.Select(x => x.PartId).Distinct().ToList();
         var sectionIds = in_keys.Select(x => x.SectionId).Distinct().ToList();
         var opNumbers = in_keys.Select(x => x.OpNumber).Distinct().ToList();
@@ -611,6 +612,12 @@ public class WipTransfersController : Controller
             .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
 
+        transferLabels = transferLabels
+            .Where(x =>
+                requestedKeys.Contains((x.PartId, x.FromSectionId, x.FromOpNumber)) ||
+                (!x.IsWarehouseTransfer && requestedKeys.Contains((x.PartId, x.ToSectionId, x.ToOpNumber))))
+            .ToList();
+
         var labelIds = receiptLabels
             .Select(x => x.LabelId)
             .Concat(transferLabels.Select(x => x.LabelId))
@@ -635,11 +642,16 @@ public class WipTransfersController : Controller
 
         foreach (var transfer in transferLabels)
         {
-            var fromKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.LabelId);
-            var fromDelta = transfer.Quantity + transfer.ScrapQuantity;
-            byKey[fromKey] = byKey.TryGetValue(fromKey, out var existingFrom) ? existingFrom - fromDelta : -fromDelta;
+            var fromOperationKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber);
+            if (requestedKeys.Contains(fromOperationKey))
+            {
+                var fromKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.LabelId);
+                var fromDelta = transfer.Quantity + transfer.ScrapQuantity;
+                byKey[fromKey] = byKey.TryGetValue(fromKey, out var existingFrom) ? existingFrom - fromDelta : -fromDelta;
+            }
 
-            if (!transfer.IsWarehouseTransfer)
+            var toOperationKey = (transfer.PartId, transfer.ToSectionId, transfer.ToOpNumber);
+            if (!transfer.IsWarehouseTransfer && requestedKeys.Contains(toOperationKey))
             {
                 var toKey = (transfer.PartId, transfer.ToSectionId, transfer.ToOpNumber, transfer.LabelId);
                 byKey[toKey] = byKey.TryGetValue(toKey, out var existingTo) ? existingTo + transfer.Quantity : transfer.Quantity;
