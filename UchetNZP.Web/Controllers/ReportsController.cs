@@ -540,6 +540,8 @@ public class ReportsController : Controller
                 x.IsWarehouseTransfer,
                 x.TransferDate,
                 LabelId = x.WipLabelId!.Value,
+                x.ResidualWipLabelId,
+                x.ResidualLabelQuantity,
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -582,6 +584,24 @@ public class ReportsController : Controller
                 else
                 {
                     keyBalances[toKey] = (transfer.Quantity, transfer.TransferDate);
+                }
+            }
+
+            if (transfer.ResidualWipLabelId.HasValue && transfer.ResidualLabelQuantity.GetValueOrDefault() > 0m)
+            {
+                var residualKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.ResidualWipLabelId.Value);
+                var residualDelta = transfer.ResidualLabelQuantity.GetValueOrDefault();
+                if (keyBalances.TryGetValue(residualKey, out var residualExisting))
+                {
+                    keyBalances[residualKey] =
+                    (
+                        residualExisting.Quantity + residualDelta,
+                        residualExisting.LastDate > transfer.TransferDate ? residualExisting.LastDate : transfer.TransferDate
+                    );
+                }
+                else
+                {
+                    keyBalances[residualKey] = (residualDelta, transfer.TransferDate);
                 }
             }
         }
