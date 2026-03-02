@@ -22,7 +22,7 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
             .HasPrecision(12, 3);
 
         builder.Property(x => x.Number)
-            .HasMaxLength(5)
+            .HasMaxLength(11)
             .IsRequired();
 
         builder.HasIndex(x => x.Number)
