@@ -14,6 +14,7 @@ builder.Host.UseWindowsService();
 
 builder.Services.Configure<MaintenanceOptions>(builder.Configuration.GetSection("Maintenance"));
 builder.Services.Configure<BackgroundBubblesOptions>(builder.Configuration.GetSection("BackgroundBubbles"));
+builder.Services.Configure<WarehouseDailyResetOptions>(builder.Configuration.GetSection("WarehouseDailyReset"));
 
 builder.Services
     .AddAuthentication(options =>
@@ -43,6 +44,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IScrapReportExcelExporter, ScrapReportExcelExporter>();
 builder.Services.AddSingleton<ITransferPeriodReportExcelExporter, TransferPeriodReportExcelExporter>();
 builder.Services.AddSingleton<IWipBatchReportExcelExporter, WipBatchReportExcelExporter>();
+builder.Services.AddHostedService<WarehouseDailyResetService>();
 
 var app = builder.Build();
 
