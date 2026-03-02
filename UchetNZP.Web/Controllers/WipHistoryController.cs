@@ -355,7 +355,6 @@ public class WipHistoryController : Controller
             var transferAuditsQuery = _dbContext.TransferAudits
                 .AsNoTracking()
                 .Where(x => x.TransferDate >= fromUtc && x.TransferDate < toUtcExclusive)
-                .Include(x => x.Operations)
                 .AsQueryable();
 
             if (hasPartFilter)
@@ -391,8 +390,38 @@ public class WipHistoryController : Controller
 
             var transferAudits = await transferAuditsQuery
                 .OrderBy(x => x.TransferDate)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.TransferId,
+                    x.PartId,
+                    x.FromSectionId,
+                    x.ToSectionId,
+                    x.FromOpNumber,
+                    x.ToOpNumber,
+                    x.Quantity,
+                    x.Comment,
+                    x.TransferDate,
+                    x.LabelNumber,
+                    x.ScrapType,
+                    x.ScrapQuantity,
+                    x.ScrapComment,
+                    x.IsReverted
+                })
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
+
+            var transferAuditIds = transferAudits.Select(x => x.Id).ToList();
+            var transferAuditOperationsLookup = transferAuditIds.Count == 0
+                ? new Dictionary<Guid, List<TransferAuditOperation>>()
+                : (await _dbContext.TransferAuditOperations
+                    .AsNoTracking()
+                    .Where(x => transferAuditIds.Contains(x.TransferAuditId))
+                    .OrderBy(x => x.OpNumber)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false))
+                .GroupBy(x => x.TransferAuditId)
+                .ToDictionary(x => x.Key, x => x.ToList());
 
             var wipTransfers = await wipTransfersQuery
                 .OrderBy(x => x.TransferDate)
@@ -400,7 +429,10 @@ public class WipHistoryController : Controller
                 .ConfigureAwait(false);
 
             var transferSectionIds = transferAudits
-                .SelectMany(x => new[] { x.FromSectionId, x.ToSectionId }.Concat(x.Operations.Select(o => o.SectionId)))
+                .SelectMany(x => new[] { x.FromSectionId, x.ToSectionId }
+                    .Concat(transferAuditOperationsLookup.TryGetValue(x.Id, out var operations)
+                        ? operations.Select(o => o.SectionId)
+                        : Enumerable.Empty<Guid>()))
                 .Concat(wipTransfers.SelectMany(x => new[] { x.FromSectionId, x.ToSectionId }.Concat(x.Operations.Select(o => o.SectionId))))
                 .Where(id => id != Guid.Empty)
                 .Distinct()
@@ -429,7 +461,9 @@ public class WipHistoryController : Controller
                     .ConfigureAwait(false);
 
             var operationIds = transferAudits
-                .SelectMany(x => x.Operations)
+                .SelectMany(x => transferAuditOperationsLookup.TryGetValue(x.Id, out var operations)
+                    ? operations
+                    : Enumerable.Empty<TransferAuditOperation>())
                 .Select(x => x.OperationId)
                 .Where(x => x.HasValue)
                 .Select(x => x!.Value)
@@ -448,7 +482,9 @@ public class WipHistoryController : Controller
 
             foreach (var transfer in transferAudits)
             {
-                var orderedOperations = transfer.Operations
+                var orderedOperations = (transferAuditOperationsLookup.TryGetValue(transfer.Id, out var transferOperations)
+                        ? transferOperations
+                        : Enumerable.Empty<TransferAuditOperation>())
                     .OrderBy(op => op.OpNumber)
                     .Select(op =>
                     {
@@ -497,7 +533,7 @@ public class WipHistoryController : Controller
                     transfer.IsReverted,
                     null,
                     transfer.Id,
-                    BuildSplitEventText(transfer.LabelNumber, transfer.ResidualLabelNumber));
+                    null);
 
                 entries.Add(entry);
             }
