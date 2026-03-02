@@ -4,7 +4,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Приход НЗП</h1>
-    <p class="lead">Заполните поля ниже, чтобы добавить приход НЗП и сохранить его одной партией.</p>
+    <p class="lead">Заполните поля по порядку: вид работ, деталь, операция, ярлык и количество.</p>
 </div>
 
 <div class="card shadow-sm mb-4">
@@ -26,13 +26,10 @@
                 <div class="form-text">Ищите по наименованию или обозначению.</div>
             </div>
             <div class="col-lg-4">
-                <label class="form-label" for="receiptLabelSelect">Ярлык детали</label>
-                <input id="receiptLabelSearchInput" class="form-control form-control-lg mb-2" type="search" placeholder="Поиск по номеру ярлыка" autocomplete="off" disabled />
-                <select id="receiptLabelSelect" class="form-select form-select-lg" aria-describedby="receiptLabelHelp" disabled>
-                    <option value="">Автоматический выбор</option>
-                </select>
+                <label class="form-label" for="receiptLabelSearchInput">Ярлык детали</label>
+                <input id="receiptLabelSearchInput" class="form-control form-control-lg" type="text" inputmode="numeric" placeholder="Введите номер ярлыка вручную (например, 12345 или 12345/1)" autocomplete="off" aria-describedby="receiptLabelHelp" />
                 <input type="hidden" id="receiptLabelId" />
-                <div class="form-text" id="receiptLabelHelp">Выберите свободный ярлык, оставьте поле пустым для автоматического подбора или введите номер ярлыка — он будет создан автоматически с указанными датой и количеством. Количество ярлыка должно совпадать с количеством прихода.</div>
+                <div class="form-text" id="receiptLabelHelp">Ярлык выбирается только вручную. Автоматический подбор отключён для упрощения работы.</div>
                 <div id="receiptLabelMessage" class="alert alert-warning d-none mt-3" role="alert"></div>
             </div>
             <div class="col-lg-4">

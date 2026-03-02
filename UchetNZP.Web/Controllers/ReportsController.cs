@@ -580,16 +580,74 @@ public class ReportsController : Controller
 
         var positiveLabelBalances = keyBalances
             .Where(x => x.Value.Quantity > 0m)
-            .Select(x => new
-            {
-                x.Key.PartId,
-                x.Key.SectionId,
-                x.Key.OpNumber,
-                x.Key.LabelId,
-                Quantity = x.Value.Quantity,
-                LastDate = x.Value.LastDate,
-            })
+            .Select(x => (
+                PartId: x.Key.PartId,
+                SectionId: x.Key.SectionId,
+                OpNumber: x.Key.OpNumber,
+                LabelId: x.Key.LabelId,
+                Quantity: x.Value.Quantity,
+                LastDate: x.Value.LastDate))
             .ToList();
+
+        if (positiveLabelBalances.Count > 0)
+        {
+            var groupedKeys = positiveLabelBalances
+                .Select(x => new { x.PartId, x.SectionId, x.OpNumber })
+                .Distinct()
+                .ToList();
+
+            var groupedPartIds = groupedKeys.Select(x => x.PartId).Distinct().ToList();
+            var groupedSectionIds = groupedKeys.Select(x => x.SectionId).Distinct().ToList();
+            var groupedOpNumbers = groupedKeys.Select(x => x.OpNumber).Distinct().ToList();
+
+            var currentBalances = await _dbContext.WipBalances
+                .AsNoTracking()
+                .Where(x =>
+                    groupedPartIds.Contains(x.PartId) &&
+                    groupedSectionIds.Contains(x.SectionId) &&
+                    groupedOpNumbers.Contains(x.OpNumber))
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            var currentBalanceLookup = currentBalances
+                .ToDictionary(x => (x.PartId, x.SectionId, x.OpNumber), x => x.Quantity);
+
+            var reconciled = new List<(Guid PartId, Guid SectionId, int OpNumber, Guid LabelId, decimal Quantity, DateTime LastDate)>();
+
+            foreach (var group in positiveLabelBalances.GroupBy(x => new { x.PartId, x.SectionId, x.OpNumber }))
+            {
+                var operationKey = (group.Key.PartId, group.Key.SectionId, group.Key.OpNumber);
+                if (!currentBalanceLookup.TryGetValue(operationKey, out var actualQuantity) || actualQuantity <= 0m)
+                {
+                    continue;
+                }
+
+                var sortedLabels = group
+                    .OrderBy(x => x.LastDate)
+                    .ThenBy(x => x.LabelId)
+                    .ToList();
+
+                var remainingToTake = actualQuantity;
+                foreach (var label in sortedLabels)
+                {
+                    if (remainingToTake <= 0m)
+                    {
+                        break;
+                    }
+
+                    var taken = Math.Min(label.Quantity, remainingToTake);
+                    if (taken <= 0m)
+                    {
+                        continue;
+                    }
+
+                    reconciled.Add((label.PartId, label.SectionId, label.OpNumber, label.LabelId, taken, label.LastDate));
+                    remainingToTake -= taken;
+                }
+            }
+
+            positiveLabelBalances = reconciled;
+        }
 
         var partIds = positiveLabelBalances.Select(x => x.PartId).Distinct().ToList();
         var sectionIds = positiveLabelBalances.Select(x => x.SectionId).Distinct().ToList();

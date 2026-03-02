@@ -4,7 +4,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Передача НЗП</h1>
-    <p class="lead">Выберите деталь, укажите операции и количество, чтобы передать НЗП между видами работ.</p>
+    <p class="lead">Заполняйте сверху вниз: деталь → операция откуда → операция куда → ярлык → количество.</p>
 </div>
 
 <div class="card shadow-sm mb-4">
@@ -16,18 +16,18 @@
                 <input id="transferPartInput" class="form-control form-control-lg" type="text" list="transferPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
                 <datalist id="transferPartOptions"></datalist>
                 <input type="hidden" id="transferPartId" />
-                <div class="form-text">Введите минимум 2 символа наименования или обозначения.</div>
+                <div class="form-text">Введите минимум 2 символа.</div>
             </div>
             <div class="col-12 d-none d-xl-block"></div>
             <div class="col-12 col-lg-6 col-xl-6">
-                <label class="form-label" for="transferFromOperationInput">Операция до</label>
+                <label class="form-label" for="transferFromOperationInput">Операция откуда</label>
                 <input id="transferFromOperationInput" class="form-control form-control-lg" type="text" list="transferFromOperationOptions" placeholder="Выберите операцию, откуда снимается НЗП" autocomplete="off" />
                 <datalist id="transferFromOperationOptions"></datalist>
                 <input type="hidden" id="transferFromOperationNumber" />
                 <div class="form-text">Доступен поиск по номеру и названию операции.</div>
             </div>
             <div class="col-12 col-lg-6 col-xl-6">
-                <label class="form-label" for="transferToOperationInput">Операция после</label>
+                <label class="form-label" for="transferToOperationInput">Операция куда</label>
                 <input id="transferToOperationInput" class="form-control form-control-lg" type="text" list="transferToOperationOptions" placeholder="Выберите следующую операцию" autocomplete="off" />
                 <datalist id="transferToOperationOptions"></datalist>
                 <input type="hidden" id="transferToOperationNumber" />
@@ -38,7 +38,7 @@
                 <select id="transferLabelSelect" class="form-select form-select-lg w-100">
                     <option value="">— Свободные ярлыки будут загружены —</option>
                 </select>
-                <div class="form-text" id="transferLabelHint">Выберите операцию до, чтобы увидеть свободные ярлыки.</div>
+                <div class="form-text" id="transferLabelHint">Сначала выберите операцию «откуда», затем ярлык.</div>
             </div>
             <div class="col-sm-6 col-lg-4 col-xl-3">
                 <label class="form-label" for="transferDateInput">Дата передачи</label>
@@ -59,7 +59,7 @@
                 <div class="border rounded-3 p-3 h-100 bg-light">
                     <div class="fw-semibold text-uppercase small text-muted">На операции до</div>
                     <div class="display-6" id="transferFromBalanceLabel">0 шт</div>
-                    <div class="form-text">Остаток учитывает выбранные записи в корзине.</div>
+                    <div class="form-text">Остаток с учётом текущей корзины.</div>
                     <div class="small text-muted mt-2">Ярлыки: <span id="transferFromLabels">—</span></div>
                 </div>
             </div>
@@ -67,7 +67,7 @@
                 <div class="border rounded-3 p-3 h-100 bg-light">
                     <div class="fw-semibold text-uppercase small text-muted">На операции после</div>
                     <div class="display-6" id="transferToBalanceLabel">0 шт</div>
-                    <div class="form-text">Остаток увеличивается с учётом готовых к передаче позиций.</div>
+                    <div class="form-text">Остаток после передачи.</div>
                     <div class="small text-muted mt-2">Ярлыки: <span id="transferToLabels">—</span></div>
                 </div>
             </div>
