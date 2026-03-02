@@ -14,14 +14,14 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: 14px;
   position: relative;
   min-height: 100%;
 }
 
 @media (min-width: 768px) {
   html {
-    font-size: 18px;
+    font-size: 15px;
   }
 }
 
@@ -119,9 +119,9 @@ body {
 }
 
 .btn {
-  min-height: 48px;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
+  min-height: 40px;
+  padding: 0.55rem 1.15rem;
+  font-size: 0.95rem;
   border-radius: 999px;
   font-weight: 600;
 }
@@ -168,8 +168,8 @@ body {
 
 .form-control,
 .form-select {
-  min-height: 48px;
-  font-size: 1rem;
+  min-height: 40px;
+  font-size: 0.95rem;
   border-radius: var(--radius-md);
 }
 
@@ -190,7 +190,7 @@ body {
 }
 
 table {
-  font-size: 1rem;
+  font-size: 0.92rem;
 }
 
 .page-header {
@@ -207,7 +207,7 @@ table {
 
 .page-header h1,
 .page-header h2 {
-  font-size: 1.75rem;
+  font-size: 1.5rem;
   margin: 0;
 }
 
@@ -236,7 +236,7 @@ table {
 }
 
 .stat-card__value {
-  font-size: 2rem;
+  font-size: 1.7rem;
   font-weight: 600;
 }
 
