@@ -92,6 +92,9 @@ static async Task EnsureTransferAuditResidualColumnsAsync(AppDbContext in_db, Ca
 
         ALTER TABLE "TransferAudits"
             ADD COLUMN IF NOT EXISTS "ResidualLabelQuantity" numeric;
+
+        ALTER TABLE "TransferAudits"
+            ADD COLUMN IF NOT EXISTS "ResidualLabelNumber" character varying(64);
         """,
         in_cancellationToken);
 }
