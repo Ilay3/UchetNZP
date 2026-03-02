@@ -113,6 +113,8 @@ public class LabelMovementReportFilterViewModel
     public Guid? LabelId { get; init; }
 
     public string? LabelNumber { get; init; }
+
+    public bool SplitOnly { get; init; }
 }
 
 public record LabelMovementReportEventViewModel(
@@ -124,7 +126,8 @@ public record LabelMovementReportEventViewModel(
     decimal? ScrapQuantity,
     decimal? LabelBalanceBefore,
     decimal? LabelBalanceAfter,
-    string? Comment);
+    string? Comment,
+    bool IsSplit);
 
 public record LabelMovementReportViewModel(
     LabelMovementReportFilterViewModel Filter,

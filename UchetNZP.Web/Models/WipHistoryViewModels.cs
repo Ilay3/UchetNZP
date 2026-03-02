@@ -145,7 +145,8 @@ public class WipHistoryEntryViewModel
         bool hasVersions,
         bool isReverted,
         Guid? versionId,
-        Guid? auditId)
+        Guid? auditId,
+        string? splitEventText)
     {
         Id = id;
         Type = type;
@@ -166,6 +167,7 @@ public class WipHistoryEntryViewModel
         IsReverted = isReverted;
         VersionId = versionId;
         AuditId = auditId;
+        SplitEventText = splitEventText;
     }
 
     public Guid Id { get; }
@@ -205,6 +207,8 @@ public class WipHistoryEntryViewModel
     public Guid? VersionId { get; }
 
     public Guid? AuditId { get; }
+
+    public string? SplitEventText { get; }
 
     public bool CanDeleteReceipt { get; set; } = true;
 
@@ -277,6 +281,8 @@ public class WipHistoryEntryViewModel
     public bool HasScrap => Scrap is not null;
 
     public bool HasLabel => !string.IsNullOrWhiteSpace(LabelNumber);
+
+    public bool HasSplitEventText => !string.IsNullOrWhiteSpace(SplitEventText);
 
     public bool HasTargetSection => !string.IsNullOrWhiteSpace(TargetSectionName);
 

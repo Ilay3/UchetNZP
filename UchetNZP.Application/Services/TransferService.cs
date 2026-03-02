@@ -620,6 +620,10 @@ public class TransferService : ITransferService
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        existingNumbers.AddRange(_dbContext.WipLabels.Local
+            .Where(x => x.PartId == item.PartId && !string.IsNullOrWhiteSpace(x.Number) && (x.Number == baseNumber || x.Number.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            .Select(x => x.Number!));
+
         while (existingNumbers.Contains($"{baseNumber}/{nextIndex}", StringComparer.OrdinalIgnoreCase))
         {
             nextIndex++;
@@ -630,7 +634,10 @@ public class TransferService : ITransferService
             .AnyAsync(x => x.PartId == item.PartId && x.Number == residualNumber, cancellationToken)
             .ConfigureAwait(false);
 
-        if (duplicateExists)
+        var duplicateInMemory = _dbContext.WipLabels.Local
+            .Any(x => x.PartId == item.PartId && string.Equals(x.Number, residualNumber, StringComparison.OrdinalIgnoreCase));
+
+        if (duplicateExists || duplicateInMemory)
         {
             throw new InvalidOperationException($"Ярлык с номером {residualNumber} уже существует.");
         }

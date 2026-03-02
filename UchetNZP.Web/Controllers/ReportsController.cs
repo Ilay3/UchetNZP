@@ -297,6 +297,7 @@ public class ReportsController : Controller
         {
             PartId = query?.PartId,
             LabelId = query?.LabelId,
+            SplitOnly = query?.SplitOnly ?? false,
         };
 
         if (query?.PartId is null || query.LabelId is null)
@@ -326,6 +327,7 @@ public class ReportsController : Controller
             PartCode = part.Code,
             LabelId = label.Id,
             LabelNumber = label.Number,
+            SplitOnly = query?.SplitOnly ?? false,
         };
 
         var receipts = await _dbContext.WipReceipts
@@ -337,9 +339,12 @@ public class ReportsController : Controller
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var splitOnly = query?.SplitOnly ?? false;
+
         var transferAudits = await _dbContext.TransferAudits
             .AsNoTracking()
             .Where(x => x.WipLabelId == label.Id)
+            .Where(x => !splitOnly || x.ResidualWipLabelId != null || !string.IsNullOrWhiteSpace(x.ResidualLabelNumber))
             .OrderBy(x => x.TransferDate)
             .ThenBy(x => x.CreatedAt)
             .ToListAsync(cancellationToken)
@@ -369,7 +374,8 @@ public class ReportsController : Controller
             null,
             null,
             receipt.Quantity,
-            receipt.Comment)));
+            receipt.Comment,
+            false)));
 
         items.AddRange(transferAudits.Select(audit =>
         {
@@ -389,7 +395,8 @@ public class ReportsController : Controller
                 audit.ScrapQuantity > 0 ? audit.ScrapQuantity : null,
                 audit.LabelQuantityBefore,
                 audit.LabelQuantityAfter,
-                audit.Comment);
+                audit.Comment,
+                audit.ResidualWipLabelId != null || !string.IsNullOrWhiteSpace(audit.ResidualLabelNumber));
         }));
 
         var orderedItems = items
@@ -1005,7 +1012,8 @@ public class ReportsController : Controller
 
     public sealed record LabelMovementReportQuery(
         Guid? PartId,
-        Guid? LabelId);
+        Guid? LabelId,
+        bool SplitOnly = false);
 
     private sealed record TransferPeriodCell(Guid PartId, string PartName, string? PartCode, DateTime Date, string Text);
 

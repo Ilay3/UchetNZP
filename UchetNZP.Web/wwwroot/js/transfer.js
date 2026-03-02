@@ -60,8 +60,8 @@
     const scrapIntro = document.getElementById("transferScrapIntro");
     const scrapPrimaryActions = document.getElementById("transferScrapPrimaryActions");
     const scrapDetails = document.getElementById("transferScrapDetails");
+    const scrapSplitButton = document.getElementById("transferScrapSplitButton");
     const scrapMarkButton = document.getElementById("transferScrapMarkButton");
-    const scrapKeepButton = document.getElementById("transferScrapKeepButton");
     const scrapConfirmButton = document.getElementById("transferScrapConfirmButton");
     const scrapCommentInput = document.getElementById("transferScrapComment");
     const scrapTypeButtons = Array.from(scrapDetails?.querySelectorAll("[data-scrap-type]") ?? []);
@@ -342,8 +342,13 @@
         }
     });
 
-    scrapKeepButton?.addEventListener("click", () => {
-        resolveScrapModal({ confirmed: false });
+    scrapSplitButton?.addEventListener("click", () => {
+        const confirmed = confirm("Подтвердить отрыв ярлыка для остатка?");
+        if (!confirmed) {
+            return;
+        }
+
+        resolveScrapModal({ confirmed: true, action: "split" });
         scrapModal?.hide();
     });
 
@@ -355,6 +360,7 @@
         const option = scrapTypeOptions[scrapSelectedTypeKey];
         resolveScrapModal({
             confirmed: true,
+            action: "scrap",
             typeKey: scrapSelectedTypeKey,
             typeValue: option?.value ?? scrapSelectedTypeKey,
             typeLabel: option?.label ?? scrapSelectedTypeKey,
@@ -1299,7 +1305,14 @@
                 fromOperation: `${selectedFromOperation.opNumber} ${selectedFromOperation.operationName ?? ""}`.trim(),
             });
 
-            if (decision?.confirmed) {
+            if (!decision?.confirmed) {
+                return;
+            }
+
+            if (decision.action === "split") {
+                item.createResidualLabel = true;
+            }
+            else {
                 item.scrapType = decision.typeValue;
                 item.scrapTypeLabel = decision.typeLabel;
                 item.scrapQuantity = leftover;
