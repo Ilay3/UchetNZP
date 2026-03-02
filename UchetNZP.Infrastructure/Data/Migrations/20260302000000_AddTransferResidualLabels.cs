@@ -1,9 +1,12 @@
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace UchetNZP.Infrastructure.Data.Migrations;
 
+[DbContext(typeof(AppDbContext))]
+[Migration("20260302000000_AddTransferResidualLabels")]
 public partial class AddTransferResidualLabels : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
