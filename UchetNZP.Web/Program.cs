@@ -54,6 +54,7 @@ using (var scope = app.Services.CreateScope())
     if (db.Database.IsRelational())
     {
         db.Database.Migrate();
+        await EnsureTransferAuditResidualColumnsAsync(db, CancellationToken.None);
         await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
     }
     else
@@ -81,6 +82,19 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+static async Task EnsureTransferAuditResidualColumnsAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    await in_db.Database.ExecuteSqlRawAsync(
+        """
+        ALTER TABLE "TransferAudits"
+            ADD COLUMN IF NOT EXISTS "ResidualWipLabelId" uuid;
+
+        ALTER TABLE "TransferAudits"
+            ADD COLUMN IF NOT EXISTS "ResidualLabelQuantity" numeric;
+        """,
+        in_cancellationToken);
+}
 
 public partial class Program
 {
