@@ -8,5 +8,7 @@ public record TransferItemDto(
     decimal Quantity,
     string? Comment,
     Guid? WipLabelId,
+    bool CreateResidualLabel,
+    int? ResidualLabelNumber,
     TransferScrapDto? Scrap
 );

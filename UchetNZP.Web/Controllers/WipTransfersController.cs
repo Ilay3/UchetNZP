@@ -342,6 +342,8 @@ public class WipTransfersController : Controller
                     x.Quantity,
                     x.Comment,
                     x.WipLabelId,
+                    x.CreateResidualLabel,
+                    x.ResidualLabelNumber,
                     x.Scrap is null
                         ? null
                         : new TransferScrapDto(x.Scrap.ScrapType, x.Scrap.Quantity, x.Scrap.Comment)))
@@ -548,6 +550,8 @@ public class WipTransfersController : Controller
         decimal Quantity,
         string? Comment,
         Guid? WipLabelId,
+        bool CreateResidualLabel,
+        int? ResidualLabelNumber,
         TransferScrapSaveItem? Scrap);
 
     public record TransferScrapSaveItem(
@@ -608,6 +612,8 @@ public class WipTransfersController : Controller
                 x.ScrapQuantity,
                 x.IsWarehouseTransfer,
                 LabelId = x.WipLabelId!.Value,
+                x.ResidualWipLabelId,
+                x.ResidualLabelQuantity,
             })
             .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
@@ -621,6 +627,7 @@ public class WipTransfersController : Controller
         var labelIds = receiptLabels
             .Select(x => x.LabelId)
             .Concat(transferLabels.Select(x => x.LabelId))
+            .Concat(transferLabels.Where(x => x.ResidualWipLabelId.HasValue).Select(x => x.ResidualWipLabelId!.Value))
             .Distinct()
             .ToList();
 
@@ -646,8 +653,16 @@ public class WipTransfersController : Controller
             if (requestedKeys.Contains(fromOperationKey))
             {
                 var fromKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.LabelId);
-                var fromDelta = transfer.Quantity + transfer.ScrapQuantity;
+                var fromDelta = transfer.Quantity + transfer.ScrapQuantity + (transfer.ResidualLabelQuantity ?? 0m);
                 byKey[fromKey] = byKey.TryGetValue(fromKey, out var existingFrom) ? existingFrom - fromDelta : -fromDelta;
+
+                if (transfer.ResidualWipLabelId.HasValue && transfer.ResidualLabelQuantity.HasValue && transfer.ResidualLabelQuantity.Value > 0m)
+                {
+                    var residualKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.ResidualWipLabelId.Value);
+                    byKey[residualKey] = byKey.TryGetValue(residualKey, out var existingResidual)
+                        ? existingResidual + transfer.ResidualLabelQuantity.Value
+                        : transfer.ResidualLabelQuantity.Value;
+                }
             }
 
             var toOperationKey = (transfer.PartId, transfer.ToSectionId, transfer.ToOpNumber);

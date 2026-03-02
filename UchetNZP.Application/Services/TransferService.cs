@@ -1,3 +1,4 @@
+using System.Data;
 using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -34,7 +35,7 @@ public class TransferService : ITransferService
             return new TransferBatchSummaryDto(0, Array.Empty<TransferItemSummaryDto>());
         }
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -322,6 +323,15 @@ public class TransferService : ITransferService
                         cancellationToken)
                     .ConfigureAwait(false);
 
+                if (item.CreateResidualLabel && labelUsage is null)
+                {
+                    throw new InvalidOperationException("Для отрыва остатка требуется исходный ярлык на операции передачи.");
+                }
+
+                Guid? residualLabelId = null;
+                string? residualLabelNumber = null;
+                decimal? residualLabelQuantity = null;
+
                 if (labelUsage is not null)
                 {
                     transferLabelId = labelUsage.Label.Id;
@@ -345,6 +355,21 @@ public class TransferService : ITransferService
                         await _dbContext.WarehouseLabelItems
                             .AddAsync(warehouseLabelItem, cancellationToken)
                             .ConfigureAwait(false);
+                    }
+
+                    var residualLabel = await CreateResidualLabelAsync(
+                            item,
+                            labelUsage.Label,
+                            remainingAfterTransfer,
+                            transferDate,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    if (residualLabel is not null)
+                    {
+                        residualLabelId = residualLabel.Id;
+                        residualLabelNumber = residualLabel.Number;
+                        residualLabelQuantity = residualLabel.Quantity;
                     }
                 }
 
@@ -372,6 +397,9 @@ public class TransferService : ITransferService
                     LabelNumber = transferLabelNumber,
                     LabelQuantityBefore = labelQuantityBefore,
                     LabelQuantityAfter = labelQuantityAfter,
+                    ResidualWipLabelId = residualLabelId,
+                    ResidualLabelNumber = residualLabelNumber,
+                    ResidualLabelQuantity = residualLabelQuantity,
                     ScrapQuantity = scrapQuantity,
                     ScrapType = item.Scrap?.ScrapType,
                     ScrapComment = item.Scrap?.Comment,
@@ -556,6 +584,83 @@ public class TransferService : ITransferService
         return ret;
     }
 
+    private async Task<WipLabel?> CreateResidualLabelAsync(
+        TransferItemDto item,
+        WipLabel transferLabel,
+        decimal remainingAfterTransfer,
+        DateTime transferDate,
+        CancellationToken cancellationToken)
+    {
+        if (!item.CreateResidualLabel)
+        {
+            return null;
+        }
+
+        if (remainingAfterTransfer <= 0m)
+        {
+            throw new InvalidOperationException("Нельзя выполнять отрыв ярлыка, если остаток на исходной операции равен 0.");
+        }
+
+        var baseNumber = item.ResidualLabelNumber.HasValue
+            ? item.ResidualLabelNumber.Value.ToString()
+            : GetResidualLabelBaseNumber(transferLabel.Number);
+
+        if (string.IsNullOrWhiteSpace(baseNumber))
+        {
+            throw new InvalidOperationException("Не удалось определить базовый номер для отрыва ярлыка.");
+        }
+
+        var nextIndex = 1;
+        var prefix = $"{baseNumber}/";
+
+        var existingNumbers = await _dbContext.WipLabels
+            .Where(x => x.PartId == item.PartId && (x.Number == baseNumber || x.Number.StartsWith(prefix)))
+            .Select(x => x.Number)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        while (existingNumbers.Contains($"{baseNumber}/{nextIndex}", StringComparer.OrdinalIgnoreCase))
+        {
+            nextIndex++;
+        }
+
+        var residualNumber = $"{baseNumber}/{nextIndex}";
+        var duplicateExists = await _dbContext.WipLabels
+            .AnyAsync(x => x.PartId == item.PartId && x.Number == residualNumber, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (duplicateExists)
+        {
+            throw new InvalidOperationException($"Ярлык с номером {residualNumber} уже существует.");
+        }
+
+        var residualLabel = new WipLabel
+        {
+            Id = Guid.NewGuid(),
+            PartId = item.PartId,
+            LabelDate = transferDate,
+            Quantity = remainingAfterTransfer,
+            RemainingQuantity = remainingAfterTransfer,
+            Number = residualNumber,
+            IsAssigned = true,
+        };
+
+        await _dbContext.WipLabels.AddAsync(residualLabel, cancellationToken).ConfigureAwait(false);
+
+        return residualLabel;
+    }
+
+    private static string GetResidualLabelBaseNumber(string labelNumber)
+    {
+        if (string.IsNullOrWhiteSpace(labelNumber))
+        {
+            return string.Empty;
+        }
+
+        var slashIndex = labelNumber.IndexOf('/');
+        return slashIndex > 0 ? labelNumber[..slashIndex] : labelNumber;
+    }
+
     private async Task<decimal> GetLabelQuantityAtOperationAsync(
         Guid labelId,
         Guid partId,
@@ -590,10 +695,20 @@ public class TransferService : ITransferService
                 x.PartId == partId &&
                 x.FromSectionId == sectionId &&
                 x.FromOpNumber == opNumber)
-            .SumAsync(x => x.Quantity + x.ScrapQuantity, cancellationToken)
+            .SumAsync(x => x.Quantity + x.ScrapQuantity + (x.ResidualLabelQuantity ?? 0m), cancellationToken)
             .ConfigureAwait(false);
 
-        return receiptQuantity + incomingTransfers - outgoingTransfers;
+        var residualIncoming = await _dbContext.TransferAudits
+            .Where(x =>
+                !x.IsReverted &&
+                x.ResidualWipLabelId == labelId &&
+                x.PartId == partId &&
+                x.FromSectionId == sectionId &&
+                x.FromOpNumber == opNumber)
+            .SumAsync(x => x.ResidualLabelQuantity ?? 0m, cancellationToken)
+            .ConfigureAwait(false);
+
+        return receiptQuantity + incomingTransfers + residualIncoming - outgoingTransfers;
     }
 
     public async Task<TransferDeleteResultDto> DeleteTransferAsync(Guid transferId, CancellationToken cancellationToken = default)
@@ -603,7 +718,7 @@ public class TransferService : ITransferService
             throw new ArgumentException("Идентификатор передачи не может быть пустым.", nameof(transferId));
         }
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
 
         try
         {
@@ -799,7 +914,7 @@ public class TransferService : ITransferService
             throw new ArgumentException("Идентификатор аудита передачи не может быть пустым.", nameof(transferAuditId));
         }
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
 
         try
         {

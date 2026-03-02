@@ -48,6 +48,12 @@ public class TransferAudit
 
     public decimal? LabelQuantityAfter { get; set; }
 
+    public Guid? ResidualWipLabelId { get; set; }
+
+    public string? ResidualLabelNumber { get; set; }
+
+    public decimal? ResidualLabelQuantity { get; set; }
+
     public decimal ScrapQuantity { get; set; }
 
     public ScrapType? ScrapType { get; set; }

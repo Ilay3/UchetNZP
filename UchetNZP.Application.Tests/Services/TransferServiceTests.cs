@@ -61,7 +61,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, "", null, null)
+            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, "", null, false, null, null)
         });
 
         Assert.Equal(1, summary.Saved);
@@ -129,6 +129,8 @@ public class TransferServiceTests
                 transferDate,
                 80m,
                 null,
+                null,
+                false,
                 null,
                 new TransferScrapDto(ScrapType.Technological, 40m, comment))
         });
@@ -201,7 +203,7 @@ public class TransferServiceTests
         var transferDate = new DateTime(2025, 2, 2, 0, 0, 0, DateTimeKind.Utc);
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 40m, "Склад", null, null),
+            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 40m, "Склад", null, false, null, null),
         });
 
         var item = Assert.Single(summary.Items);
@@ -299,7 +301,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labelId, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labelId, false, null, null),
         });
 
         Assert.Equal(1, summary.Saved);
@@ -376,7 +378,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 30m, null, labelId, null),
+            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 30m, null, labelId, false, null, null),
         });
 
         var item = Assert.Single(summary.Items);
@@ -475,12 +477,12 @@ public class TransferServiceTests
 
         await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, false, null, null),
         });
 
         var secondSummary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 40m, null, labelId, null),
+            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 40m, null, labelId, false, null, null),
         });
 
         Assert.Equal(1, secondSummary.Saved);
@@ -559,7 +561,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 120m, null, labelId, null),
+            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 120m, null, labelId, false, null, null),
         });
 
         Assert.Equal(1, summary.Saved);
@@ -624,8 +626,8 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 50m, null, labels[0].Label.Id, null),
-            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labels[1].Label.Id, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 50m, null, labels[0].Label.Id, false, null, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labels[1].Label.Id, false, null, null),
         });
 
         Assert.Equal(2, summary.Saved);
@@ -673,8 +675,8 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, null),
-            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, null),
+            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, false, null, null),
+            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, false, null, null),
         });
 
         Assert.Equal(2, summary.Saved);
@@ -735,7 +737,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 30m, null, null, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 30m, null, null, false, null, null),
         });
 
         var audit = await dbContext.TransferAudits.SingleAsync();

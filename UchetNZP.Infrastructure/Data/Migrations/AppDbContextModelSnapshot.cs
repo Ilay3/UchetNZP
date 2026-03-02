@@ -704,6 +704,17 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Property<Guid>("PartId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ResidualLabelNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<decimal?>("ResidualLabelQuantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<Guid?>("ResidualWipLabelId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("RevertedAt")
                         .HasColumnType("timestamp with time zone");
 
