@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using UchetNZP.Application.Abstractions;
@@ -189,6 +190,74 @@ public class WipServiceTests
         Assert.NotEqual(Guid.Empty, revertResult.VersionId);
     }
 
+
+    [Fact]
+    public async Task DeleteReceiptAsync_RemovesLabelWhenItIsNoLongerUsed()
+    {
+        await using var dbContext = createContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        const int opNumber = 12;
+        const decimal receiptQuantity = 5m;
+
+        dbContext.Parts.Add(new Part
+        {
+            Id = partId,
+            Name = "Деталь",
+            Code = "DTL-3",
+        });
+
+        dbContext.Sections.Add(new Section
+        {
+            Id = sectionId,
+            Name = "Секция",
+        });
+
+        dbContext.Operations.Add(new Operation
+        {
+            Id = operationId,
+            Name = "Операция",
+        });
+
+        dbContext.PartRoutes.Add(new PartRoute
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OperationId = operationId,
+            OpNumber = opNumber,
+            NormHours = 1m,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new WipService(dbContext, new TestCurrentUserService());
+        var receiptDate = DateTime.SpecifyKind(new DateTime(2024, 7, 1), DateTimeKind.Unspecified);
+
+        var saveResult = await service.AddReceiptsBatchAsync(
+            new[]
+            {
+                new ReceiptItemDto(partId, opNumber, sectionId, receiptDate, receiptQuantity, null, null, "00003", true),
+            });
+
+        var receiptId = Assert.Single(saveResult.Items).ReceiptId;
+        await service.DeleteReceiptAsync(receiptId);
+
+        Assert.Empty(dbContext.WipReceipts);
+        Assert.Empty(dbContext.WipLabels);
+
+        var audits = await dbContext.ReceiptAudits
+            .Where(x => x.ReceiptId == receiptId)
+            .ToListAsync();
+
+        Assert.All(audits, audit =>
+        {
+            Assert.Null(audit.PreviousLabelId);
+            Assert.Null(audit.NewLabelId);
+        });
+    }
+
     [Fact]
     public async Task DeleteReceiptAsync_BlocksWhenTransfersWithoutAuditExist()
     {
@@ -238,7 +307,7 @@ public class WipServiceTests
         var result = await service.AddReceiptsBatchAsync(
             new[]
             {
-                new ReceiptItemDto(partId, opNumber, sectionId, receiptDate, receiptQuantity, null, null, null, false),
+                new ReceiptItemDto(partId, opNumber, sectionId, receiptDate, receiptQuantity, null, null, "00004", true),
             });
 
         var receiptId = Assert.Single(result.Items).ReceiptId;
