@@ -201,6 +201,32 @@ public class ReportsController : Controller
             .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
 
+        var transferIds = transfers
+            .Select(x => x.Id)
+            .Distinct()
+            .ToList();
+
+        var residualLabelByTransferId = transferIds.Count == 0
+            ? new Dictionary<Guid, string?>(0)
+            : await _dbContext.TransferAudits
+                .AsNoTracking()
+                .Where(x => transferIds.Contains(x.TransferId) && !x.IsReverted)
+                .GroupBy(x => x.TransferId)
+                .Select(group => group
+                    .OrderByDescending(x => x.CreatedAt)
+                    .ThenByDescending(x => x.TransferDate)
+                    .ThenByDescending(x => x.Id)
+                    .Select(x => new
+                    {
+                        x.TransferId,
+                        ResidualLabelNumber = !string.IsNullOrWhiteSpace(x.ResidualLabelNumber)
+                            ? x.ResidualLabelNumber
+                            : null,
+                    })
+                    .First())
+                .ToDictionaryAsync(x => x.TransferId, x => x.ResidualLabelNumber, in_cancellationToken)
+                .ConfigureAwait(false);
+
         var transferLabelKeys = transfers
             .Select(x => new LabelLookupKey(x.PartId, x.FromSectionId, x.FromOpNumber))
             .ToList();
@@ -234,7 +260,10 @@ public class ReportsController : Controller
                     x.Part != null ? x.Part.Name : "Деталь не указана",
                     x.Part?.Code,
                     ConvertToLocal(x.TransferDate).Date,
-                    BuildTransferCellText(x, labelNumbers));
+                    BuildTransferCellText(
+                        x,
+                        labelNumbers,
+                        residualLabelByTransferId.TryGetValue(x.Id, out var residualLabelNumber) ? residualLabelNumber : null));
             })
             .ToList();
 
@@ -942,7 +971,10 @@ public class ReportsController : Controller
         };
     }
 
-    private static string BuildTransferCellText(WipTransfer in_transfer, IReadOnlyList<string> in_labelNumbers)
+    private static string BuildTransferCellText(
+        WipTransfer in_transfer,
+        IReadOnlyList<string> in_labelNumbers,
+        string? in_residualLabelNumber)
     {
         var fromQuantity = in_transfer.Operations
             .Where(x => x.QuantityChange < 0m)
@@ -987,6 +1019,15 @@ public class ReportsController : Controller
         else if (in_labelNumbers is not null && in_labelNumbers.Count > 0)
         {
             actualLabelNumbers.AddRange(in_labelNumbers);
+        }
+
+        if (!string.IsNullOrWhiteSpace(in_residualLabelNumber))
+        {
+            var normalizedResidual = in_residualLabelNumber.Trim();
+            if (!actualLabelNumbers.Contains(normalizedResidual, StringComparer.OrdinalIgnoreCase))
+            {
+                actualLabelNumbers.Add(normalizedResidual);
+            }
         }
 
         if (actualLabelNumbers.Count > 0)

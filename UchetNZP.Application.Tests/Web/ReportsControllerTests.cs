@@ -108,6 +108,91 @@ public class ReportsControllerTests
         Assert.Contains("00001/1: 10", row.LabelNumbers!, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task TransferPeriodReport_IncludesResidualSlashLabelInCellText()
+    {
+        await using var dbContext = CreateContext();
+
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var originalLabelId = Guid.NewGuid();
+
+        dbContext.Parts.Add(new Part { Id = partId, Name = "Втулка", Code = "4ЭТК.02.01.111-7" });
+        dbContext.Sections.Add(new Section { Id = sectionId, Name = "Заготовительная" });
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = originalLabelId,
+            PartId = partId,
+            LabelDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified),
+            Quantity = 25m,
+            RemainingQuantity = 0m,
+            Number = "00001",
+            IsAssigned = true,
+        });
+
+        var transferId = Guid.NewGuid();
+        var transferDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2, 8, 0, 0), DateTimeKind.Utc);
+
+        dbContext.WipTransfers.Add(new WipTransfer
+        {
+            Id = transferId,
+            UserId = Guid.NewGuid(),
+            PartId = partId,
+            FromSectionId = sectionId,
+            FromOpNumber = 5,
+            ToSectionId = sectionId,
+            ToOpNumber = 10,
+            TransferDate = transferDate,
+            CreatedAt = transferDate,
+            Quantity = 15m,
+            WipLabelId = originalLabelId,
+        });
+
+        dbContext.TransferAudits.Add(new TransferAudit
+        {
+            Id = Guid.NewGuid(),
+            TransactionId = Guid.NewGuid(),
+            TransferId = transferId,
+            TransferDate = transferDate,
+            CreatedAt = transferDate,
+            UserId = Guid.NewGuid(),
+            PartId = partId,
+            FromSectionId = sectionId,
+            FromOpNumber = 5,
+            ToSectionId = sectionId,
+            ToOpNumber = 10,
+            Quantity = 15m,
+            ScrapQuantity = 0m,
+            IsWarehouseTransfer = false,
+            WipLabelId = originalLabelId,
+            ResidualLabelNumber = "00001/1",
+            ResidualLabelQuantity = 10m,
+            IsReverted = false,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var controller = new ReportsController(
+            dbContext,
+            new StubScrapExporter(),
+            new StubTransferExporter(),
+            new StubWipBatchExporter(),
+            new WipLabelLookupService(dbContext));
+
+        var queryDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified);
+        var result = await controller.TransferPeriodReport(
+            new ReportsController.TransferPeriodReportQuery(queryDate, queryDate, null, null),
+            CancellationToken.None);
+
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<TransferPeriodReportViewModel>(viewResult.Model);
+        var row = Assert.Single(model.Items);
+        var day = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified);
+        var cellText = Assert.Single(row.Cells[day]);
+
+        Assert.Contains("00001/1", cellText, StringComparison.Ordinal);
+    }
+
     private static AppDbContext CreateContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
