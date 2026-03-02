@@ -244,53 +244,25 @@ table {
   color: var(--color-text-muted) !important;
 }
 
-@media (min-width: 1200px) {
-  #transferLabelSelect {
-    min-width: 28rem;
-  }
+#transferLabelSelect,
+.transfer-operation-input,
+.transfer-operation-helper {
+    width: 100%;
+    min-width: 0;
 }
 
-.transfer-operation-input {
-    width: min(100%, 78ch);
-    min-width: 64ch;
-}
-.transfer-operation-input {
-    width: min(100%, 88ch);
-    min-width: 72ch;
+#transferLabelSelect {
+    border-radius: var(--radius-md);
 }
 
 .transfer-operation-helper {
-    width: min(100%, 88ch);
-    min-width: 72ch;
-    overflow-x: auto;
+    max-height: 16rem;
+    overflow-y: auto;
 }
 
 .transfer-operation-helper__item {
-    white-space: nowrap;
-}
-
-@media (min-width: 992px) {
-    .transfer-operation-input {
-        width: min(100%, 120ch);
-        min-width: 104ch;
-    }
-
-    .transfer-operation-helper {
-        width: min(100%, 120ch);
-        min-width: 104ch;
-    }
-}
-
-@media (min-width: 1400px) {
-    .transfer-operation-input {
-        width: min(100%, 144ch);
-        min-width: 120ch;
-    }
-
-    .transfer-operation-helper {
-        width: min(100%, 144ch);
-        min-width: 120ch;
-    }
+    white-space: normal;
+    text-align: left;
 }
 .admin-table-wrapper {
      min-height: 240px;
