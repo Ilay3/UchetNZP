@@ -454,6 +454,7 @@ public class TransferService : ITransferService
                     transferLabelNumber,
                     labelQuantityBefore,
                     labelQuantityAfter,
+                    residualLabelNumber,
                     false));
             }
 

@@ -19,5 +19,6 @@ public record TransferItemSummaryDto(
     string? LabelNumber,
     decimal? LabelQuantityBefore,
     decimal? LabelQuantityAfter,
+    string? ResidualLabelNumber,
     bool IsReverted
 );

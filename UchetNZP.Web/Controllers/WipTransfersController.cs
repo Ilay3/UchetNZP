@@ -412,6 +412,7 @@ public class WipTransfersController : Controller
                                 item.LabelNumber,
                                 item.LabelQuantityBefore,
                                 item.LabelQuantityAfter,
+                                item.ResidualLabelNumber,
                                 item.IsReverted);
                         })
                         .ToList();
