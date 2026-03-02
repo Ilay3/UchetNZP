@@ -1,6 +1,16 @@
 @model UchetNZP.Web.Models.LabelMovementReportViewModel
 @{
     ViewData["Title"] = "Движение ярлыка";
+
+    var movedQuantity = Model.Items
+        .Where(x => x.EventType == "Передача")
+        .Sum(x => x.Quantity);
+    var scrapQuantity = Model.Items
+        .Where(x => x.ScrapQuantity.HasValue)
+        .Sum(x => x.ScrapQuantity ?? 0m);
+    var remainingPercent = Model.InitialQuantity > 0m
+        ? Math.Clamp(Model.RemainingQuantity / Model.InitialQuantity * 100m, 0m, 100m)
+        : 0m;
 }
 
 <div class="page-header mb-4">
@@ -58,16 +68,63 @@
                         <div class="h4 mb-0">@Model.RemainingQuantity.ToString("0.###") шт</div>
                     </div>
                 </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small text-uppercase">Передано по маршруту</div>
+                        <div class="h4 mb-0">@movedQuantity.ToString("0.###") шт</div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small text-uppercase">Списано в брак</div>
+                        <div class="h4 mb-0">@scrapQuantity.ToString("0.###") шт</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border rounded p-3 mb-3 bg-light-subtle">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small text-uppercase text-muted">Остаток ярлыка</span>
+                    <span class="fw-semibold">@remainingPercent.ToString("0.#")%</span>
+                </div>
+                <div class="progress" role="progressbar" aria-label="Текущий остаток ярлыка" aria-valuenow="@remainingPercent" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar" style="width: @remainingPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%">
+                        @Model.RemainingQuantity.ToString("0.###") шт
+                    </div>
+                </div>
             </div>
 
             @if (Model.HasData)
             {
+                <div class="mb-3">
+                    <h2 class="h6 text-uppercase text-muted">Маршрут по шагам</h2>
+                    <div class="list-group">
+                        @foreach (var item in Model.Items)
+                        {
+                            <div class="list-group-item d-flex flex-column flex-lg-row justify-content-between gap-2">
+                                <div>
+                                    <div class="fw-semibold">@item.Date.ToString("dd.MM.yyyy HH:mm") • @item.EventType</div>
+                                    <div class="small text-muted">@item.From → @item.To</div>
+                                    @if (item.IsSplit)
+                                    {
+                                        <span class="badge text-bg-info mt-1">split</span>
+                                    }
+                                </div>
+                                <div class="text-lg-end small">
+                                    <div>Кол-во: <span class="fw-semibold">@item.Quantity.ToString("0.###")</span></div>
+                                    <div>Остаток: @(item.LabelBalanceBefore.HasValue ? item.LabelBalanceBefore.Value.ToString("0.###") : "—") → @(item.LabelBalanceAfter.HasValue ? item.LabelBalanceAfter.Value.ToString("0.###") : "—")</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
                 <div class="table-responsive">
                     <table class="table table-striped align-middle" aria-describedby="labelMovementCaption">
                         <caption id="labelMovementCaption" class="visually-hidden">Маршрут движения выбранного ярлыка</caption>
                         <thead class="table-light">
                             <tr>
-                                <th scope="col">Дата</th>
+                                <th scope="col">Дата/время</th>
                                 <th scope="col">Событие</th>
                                 <th scope="col">Откуда</th>
                                 <th scope="col">Куда</th>
@@ -82,7 +139,7 @@
                             @foreach (var item in Model.Items)
                             {
                                 <tr>
-                                    <td>@item.Date.ToString("dd.MM.yyyy")</td>
+                                    <td>@item.Date.ToString("dd.MM.yyyy HH:mm")</td>
                                     <td>
                                         @item.EventType
                                         @if (item.IsSplit)
