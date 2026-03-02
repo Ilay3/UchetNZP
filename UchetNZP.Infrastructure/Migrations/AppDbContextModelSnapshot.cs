@@ -2,21 +2,18 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UchetNZP.Infrastructure.Data;
 
 #nullable disable
 
-namespace UchetNZP.Infrastructure.Data.Migrations
+namespace UchetNZP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251021060000_AddWarehouseStorage")]
-    partial class AddWarehouseStorage
+    partial class AppDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -169,6 +166,78 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.ToTable("PartRoutes", (string)null);
                 });
 
+            modelBuilder.Entity("UchetNZP.Domain.Entities.ReceiptAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("NewBalance")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<bool>("NewLabelAssigned")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("NewLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("NewQuantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<int>("OpNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PartId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("PreviousBalance")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<bool>("PreviousLabelAssigned")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("PreviousLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PreviousQuantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<DateTime>("ReceiptDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ReceiptAudits", (string)null);
+                });
+
             modelBuilder.Entity("UchetNZP.Domain.Entities.Section", b =>
                 {
                     b.Property<Guid>("Id")
@@ -190,6 +259,214 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Sections", (string)null);
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.TransferAudit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("FromBalanceAfter")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("FromBalanceBefore")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("FromOpNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("FromSectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsReverted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsWarehouseTransfer")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LabelNumber")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("LabelQuantityAfter")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("LabelQuantityBefore")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("PartId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("ResidualLabelNumber")
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("ResidualLabelQuantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("ResidualWipLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevertedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ScrapComment")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("ScrapQuantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("ScrapType")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("ToBalanceAfter")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("ToBalanceBefore")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("ToOpNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ToSectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("TransferDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TransferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("WipLabelId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TransferAudits");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.TransferAuditOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("BalanceBefore")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("IsWarehouse")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("OpNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("OperationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PartRouteId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("QuantityChange")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("SectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TransferAuditId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransferAuditId");
+
+                    b.ToTable("TransferAuditOperations");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PartId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<Guid?>("TransferId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PartId");
+
+                    b.HasIndex("TransferId")
+                        .IsUnique();
+
+                    b.ToTable("WarehouseItems", (string)null);
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseLabelItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("WarehouseItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WipLabelId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WarehouseItemId");
+
+                    b.HasIndex("WipLabelId");
+
+                    b.ToTable("WarehouseLabelItems", (string)null);
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipBalance", b =>
@@ -270,6 +547,44 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.HasIndex("WipBalanceId");
 
                     b.ToTable("WipBalanceAdjustments", (string)null);
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WipLabel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsAssigned")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LabelDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<Guid>("PartId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<decimal>("RemainingQuantity")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("PartId");
+
+                    b.ToTable("WipLabels", (string)null);
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipLaunch", b =>
@@ -396,9 +711,15 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("WipLabelId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("SectionId");
+
+                    b.HasIndex("WipLabelId")
+                        .IsUnique();
 
                     b.HasIndex("PartId", "SectionId", "OpNumber", "ReceiptDate");
 
@@ -487,9 +808,14 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("WipLabelId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PartId");
+
+                    b.HasIndex("WipLabelId");
 
                     b.ToTable("WipTransfers");
                 });
@@ -531,45 +857,6 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.ToTable("WipTransferOperations");
                 });
 
-            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AddedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Comment")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid>("PartId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<Guid?>("TransferId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PartId");
-
-                    b.HasIndex("TransferId")
-                        .IsUnique();
-
-                    b.ToTable("WarehouseItems", (string)null);
-                });
-
             modelBuilder.Entity("UchetNZP.Domain.Entities.ImportJobItem", b =>
                 {
                     b.HasOne("UchetNZP.Domain.Entities.ImportJob", "ImportJob")
@@ -606,6 +893,54 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Navigation("Part");
 
                     b.Navigation("Section");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.TransferAuditOperation", b =>
+                {
+                    b.HasOne("UchetNZP.Domain.Entities.TransferAudit", "TransferAudit")
+                        .WithMany("Operations")
+                        .HasForeignKey("TransferAuditId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TransferAudit");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
+                {
+                    b.HasOne("UchetNZP.Domain.Entities.Part", "Part")
+                        .WithMany("WarehouseItems")
+                        .HasForeignKey("PartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UchetNZP.Domain.Entities.WipTransfer", "Transfer")
+                        .WithOne("WarehouseItem")
+                        .HasForeignKey("UchetNZP.Domain.Entities.WarehouseItem", "TransferId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Part");
+
+                    b.Navigation("Transfer");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseLabelItem", b =>
+                {
+                    b.HasOne("UchetNZP.Domain.Entities.WarehouseItem", "WarehouseItem")
+                        .WithMany("WarehouseLabelItems")
+                        .HasForeignKey("WarehouseItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "WipLabel")
+                        .WithMany("WarehouseLabelItems")
+                        .HasForeignKey("WipLabelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WarehouseItem");
+
+                    b.Navigation("WipLabel");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipBalance", b =>
@@ -652,6 +987,17 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Navigation("Part");
 
                     b.Navigation("Section");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WipLabel", b =>
+                {
+                    b.HasOne("UchetNZP.Domain.Entities.Part", "Part")
+                        .WithMany("WipLabels")
+                        .HasForeignKey("PartId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Part");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipLaunch", b =>
@@ -721,9 +1067,16 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "WipLabel")
+                        .WithOne("WipReceipt")
+                        .HasForeignKey("UchetNZP.Domain.Entities.WipReceipt", "WipLabelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Part");
 
                     b.Navigation("Section");
+
+                    b.Navigation("WipLabel");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipScrap", b =>
@@ -760,7 +1113,14 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "WipLabel")
+                        .WithMany("Transfers")
+                        .HasForeignKey("WipLabelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Part");
+
+                    b.Navigation("WipLabel");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipTransferOperation", b =>
@@ -796,24 +1156,6 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Navigation("WipTransfer");
                 });
 
-            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
-                {
-                    b.HasOne("UchetNZP.Domain.Entities.Part", "Part")
-                        .WithMany("WarehouseItems")
-                        .HasForeignKey("PartId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("UchetNZP.Domain.Entities.WipTransfer", "Transfer")
-                        .WithOne("WarehouseItem")
-                        .HasForeignKey("UchetNZP.Domain.Entities.WarehouseItem", "TransferId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Part");
-
-                    b.Navigation("Transfer");
-                });
-
             modelBuilder.Entity("UchetNZP.Domain.Entities.ImportJob", b =>
                 {
                     b.Navigation("Items");
@@ -830,15 +1172,17 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                 {
                     b.Navigation("Routes");
 
+                    b.Navigation("WarehouseItems");
+
                     b.Navigation("WipBalances");
+
+                    b.Navigation("WipLabels");
 
                     b.Navigation("WipLaunches");
 
                     b.Navigation("WipReceipts");
 
                     b.Navigation("WipScraps");
-
-                    b.Navigation("WarehouseItems");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.PartRoute", b =>
@@ -859,6 +1203,25 @@ namespace UchetNZP.Infrastructure.Data.Migrations
                     b.Navigation("WipReceipts");
 
                     b.Navigation("WipScraps");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.TransferAudit", b =>
+                {
+                    b.Navigation("Operations");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
+                {
+                    b.Navigation("WarehouseLabelItems");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WipLabel", b =>
+                {
+                    b.Navigation("Transfers");
+
+                    b.Navigation("WarehouseLabelItems");
+
+                    b.Navigation("WipReceipt");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipLaunch", b =>
