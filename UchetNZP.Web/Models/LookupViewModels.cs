@@ -146,6 +146,7 @@ public record TransferSummaryItemViewModel(
     string? LabelNumber,
     decimal? LabelQuantityBefore,
     decimal? LabelQuantityAfter,
+    string? ResidualLabelNumber,
     bool IsReverted);
 
 public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);

@@ -46,6 +46,9 @@
     const toLabelsElement = document.getElementById("transferToLabels");
     const labelSelect = document.getElementById("transferLabelSelect");
     const labelHintElement = document.getElementById("transferLabelHint");
+    const createResidualLabelCheckbox = document.getElementById("transferCreateResidualLabelCheckbox");
+    const residualLabelNumberInput = document.getElementById("transferResidualLabelNumberInput");
+    const residualLabelHintElement = document.getElementById("transferResidualLabelHint");
     const addButton = document.getElementById("transferAddButton");
     const resetButton = document.getElementById("transferResetButton");
     const saveButton = document.getElementById("transferSaveButton");
@@ -265,7 +268,21 @@
         }
 
         updateLabelHint();
+        updateResidualLabelHint();
     });
+
+    createResidualLabelCheckbox?.addEventListener("change", () => {
+        if (residualLabelNumberInput) {
+            residualLabelNumberInput.disabled = !createResidualLabelCheckbox.checked;
+            if (!createResidualLabelCheckbox.checked) {
+                residualLabelNumberInput.value = "";
+            }
+        }
+
+        updateResidualLabelHint();
+    });
+
+    residualLabelNumberInput?.addEventListener("input", () => updateResidualLabelHint());
 
     addButton.addEventListener("click", () => void addToCart());
     resetButton.addEventListener("click", () => resetForm());
@@ -1127,11 +1144,36 @@
         labelHintElement.textContent = `${numberText}: остаток ${remainingText} из ${totalText} шт.`;
     }
 
+    function updateResidualLabelHint() {
+        if (!residualLabelHintElement) {
+            return;
+        }
+
+        if (!createResidualLabelCheckbox?.checked) {
+            residualLabelHintElement.textContent = "Опция отключена: текущая логика передачи без отрыва ярлыка.";
+            return;
+        }
+
+        if (!residualLabelNumberInput?.value?.trim()) {
+            residualLabelHintElement.textContent = "Если номер не указан, будет создан автоматически: 103/1.";
+            return;
+        }
+
+        residualLabelHintElement.textContent = "Будет использован указанный базовый номер для отрыва ярлыка.";
+    }
+
     function resetForm() {
         quantityInput.value = "";
         commentInput.value = "";
         if (dateInput) {
             dateInput.value = today;
+        }
+        if (createResidualLabelCheckbox) {
+            createResidualLabelCheckbox.checked = false;
+        }
+        if (residualLabelNumberInput) {
+            residualLabelNumberInput.value = "";
+            residualLabelNumberInput.disabled = true;
         }
 
         selectedFromOperation = null;
@@ -1142,6 +1184,7 @@
         toOperationNumberInput.value = "";
         updateToOperationsDatalist();
         updateBalanceLabels();
+        updateResidualLabelHint();
         updateFormState();
     }
 
@@ -1177,6 +1220,19 @@
         if (!date) {
             alert("Укажите дату передачи.");
             return;
+        }
+
+        const createResidualLabel = Boolean(createResidualLabelCheckbox?.checked);
+        const residualLabelNumberRaw = residualLabelNumberInput?.value?.trim() ?? "";
+        let residualLabelNumber = null;
+        if (createResidualLabel && residualLabelNumberRaw.length > 0) {
+            const parsedResidual = Number(residualLabelNumberRaw);
+            if (!Number.isInteger(parsedResidual) || parsedResidual <= 0) {
+                alert("Номер ярлыка остатка должен быть целым числом больше 0.");
+                return;
+            }
+
+            residualLabelNumber = parsedResidual;
         }
 
         const label = selectedLabelOption;
@@ -1229,6 +1285,8 @@
             labelQuantityBefore: labelQuantityBeforeValue,
             labelQuantityAfter: labelQuantityBeforeValue,
             labelQuantityTotal: labelQuantityTotalValue,
+            createResidualLabel,
+            residualLabelNumber,
         };
 
         const leftover = item.fromBalanceAfter;
@@ -1449,10 +1507,6 @@
             ? item.labelNumber
             : (Array.isArray(item.labelNumbers) && item.labelNumbers.length ? item.labelNumbers[0] : "");
 
-        if (!number) {
-            return formatLabelList(item.labelNumbers);
-        }
-
         const before = item.labelQuantityBefore;
         const after = item.labelQuantityAfter;
         let detail = "";
@@ -1463,7 +1517,17 @@
             detail = `<div class="small text-muted">остаток: ${beforeText} → ${afterText}</div>`;
         }
 
-        return `<div>${escapeHtml(number)}${detail}</div>`;
+        const residual = typeof item.residualLabelNumber === "string" ? item.residualLabelNumber.trim() : "";
+        const residualDetail = residual.length > 0
+            ? `<div class="small text-success">Отрыв остатка: ${escapeHtml(residual)}</div>`
+            : "";
+
+        if (!number) {
+            const base = formatLabelList(item.labelNumbers);
+            return `${base}${residualDetail}`;
+        }
+
+        return `<div>${escapeHtml(number)}${detail}${residualDetail}</div>`;
     }
 
     function updateLabelElement(element, labels) {
@@ -1605,6 +1669,7 @@
                 labelNumber: item.labelNumber ?? cartItem?.labelNumber ?? null,
                 labelQuantityBefore: item.labelQuantityBefore ?? cartItem?.labelQuantityBefore ?? null,
                 labelQuantityAfter: item.labelQuantityAfter ?? cartItem?.labelQuantityAfter ?? null,
+                residualLabelNumber: item.residualLabelNumber ?? cartItem?.residualLabelNumber ?? null,
                 quantity: Number(item.quantity) || 0,
                 fromBalanceBefore: Number(item.fromBalanceBefore) || 0,
                 fromBalanceAfter: Number(item.fromBalanceAfter) || 0,
@@ -1874,6 +1939,13 @@
         }
         commentInput.value = item.comment ?? "";
         quantityInput.value = item.quantity;
+        if (createResidualLabelCheckbox) {
+            createResidualLabelCheckbox.checked = Boolean(item.createResidualLabel);
+        }
+        if (residualLabelNumberInput) {
+            residualLabelNumberInput.disabled = !createResidualLabelCheckbox?.checked;
+            residualLabelNumberInput.value = item.residualLabelNumber ?? "";
+        }
         if (dateInput) {
             dateInput.value = item.date;
         }
@@ -1898,6 +1970,7 @@
         }
 
         updateBalanceLabels();
+        updateResidualLabelHint();
         updateFormState();
     }
 
@@ -1920,6 +1993,8 @@
                 quantity: item.quantity,
                 comment: item.comment,
                 wipLabelId: item.labelId,
+                createResidualLabel: Boolean(item.createResidualLabel),
+                residualLabelNumber: item.residualLabelNumber,
                 scrap: buildScrapPayload(item),
             })),
         };
@@ -2149,6 +2224,7 @@
     }
 
     renderRecentTransfers();
+    updateResidualLabelHint();
     updateFormState();
 
     namespace.bindHotkeys({
