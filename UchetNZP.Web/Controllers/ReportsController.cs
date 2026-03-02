@@ -401,6 +401,7 @@ public class ReportsController : Controller
 
         var orderedItems = items
             .OrderBy(x => x.Date)
+            .ThenBy(x => x.LabelBalanceBefore.HasValue ? 1 : 0)
             .ThenBy(x => x.EventType)
             .ToList();
 
