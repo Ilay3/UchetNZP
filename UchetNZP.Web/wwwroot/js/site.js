@@ -118,7 +118,7 @@
             return;
         }
 
-        if (event.key.length !== 1) {
+        if (typeof event.key !== "string" || event.key.length !== 1) {
             return;
         }
 

@@ -143,6 +143,8 @@
         updateFormState();
     });
 
+    fromOperationInput.addEventListener("focus", () => updateFromOperationHelper());
+    fromOperationInput.addEventListener("click", () => updateFromOperationHelper());
     fromOperationInput.addEventListener("input", () => {
         const value = fromOperationInput.value.trim();
         const operation = operations.find(x => formatOperation(x) === value) ?? null;
@@ -175,6 +177,8 @@
         updateFormState();
     });
 
+    toOperationInput.addEventListener("focus", () => updateToOperationHelper());
+    toOperationInput.addEventListener("click", () => updateToOperationHelper());
     toOperationInput.addEventListener("input", () => {
         const value = toOperationInput.value.trim();
         const operation = operations.find(x => formatOperation(x) === value) ?? null;
@@ -752,7 +756,11 @@
         try {
             const response = await fetch(`/wip/transfer/operations?partId=${encodeURIComponent(partId)}`, { signal });
             if (!response.ok) {
-                throw new Error("Не удалось загрузить операции.");
+                const details = await response.text();
+                const reason = typeof details === "string" && details.trim().length > 0
+                    ? details.trim()
+                    : "Не удалось загрузить операции.";
+                throw new Error(reason);
             }
 
             const items = await response.json();

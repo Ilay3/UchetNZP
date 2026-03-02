@@ -93,7 +93,17 @@ public class WipTransfersController : Controller
             .Distinct()
             .ToList();
 
-        var labelLookup = await LoadLabelBalancesAsync(labelKeys, cancellationToken).ConfigureAwait(false);
+        Dictionary<(Guid PartId, Guid SectionId, int OpNumber), IReadOnlyList<TransferOperationLabelBalanceViewModel>> labelLookup;
+        try
+        {
+            labelLookup = await LoadLabelBalancesAsync(labelKeys, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            labelLookup = labelKeys.ToDictionary(
+                key => key,
+                _ => (IReadOnlyList<TransferOperationLabelBalanceViewModel>)Array.Empty<TransferOperationLabelBalanceViewModel>());
+        }
 
         var operations = operationItems
             .Select(item =>
