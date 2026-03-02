@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -609,25 +610,49 @@ public class WipTransfersController : Controller
             .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
 
-        var transferLabels = await _dbContext.TransferAudits
-            .AsNoTracking()
-            .Where(x => !x.IsReverted && x.WipLabelId != null && partIds.Contains(x.PartId))
-            .Select(x => new
-            {
-                x.PartId,
-                x.FromSectionId,
-                x.FromOpNumber,
-                x.ToSectionId,
-                x.ToOpNumber,
-                x.Quantity,
-                x.ScrapQuantity,
-                x.IsWarehouseTransfer,
-                LabelId = x.WipLabelId!.Value,
-                x.ResidualWipLabelId,
-                x.ResidualLabelQuantity,
-            })
-            .ToListAsync(in_cancellationToken)
-            .ConfigureAwait(false);
+        var hasResidualColumns = await HasTransferAuditResidualColumnsAsync(in_cancellationToken).ConfigureAwait(false);
+
+        List<TransferLabelAuditRow> transferLabels;
+        if (hasResidualColumns)
+        {
+            transferLabels = await _dbContext.TransferAudits
+                .AsNoTracking()
+                .Where(x => !x.IsReverted && x.WipLabelId != null && partIds.Contains(x.PartId))
+                .Select(x => new TransferLabelAuditRow(
+                    x.PartId,
+                    x.FromSectionId,
+                    x.FromOpNumber,
+                    x.ToSectionId,
+                    x.ToOpNumber,
+                    x.Quantity,
+                    x.ScrapQuantity,
+                    x.IsWarehouseTransfer,
+                    x.WipLabelId!.Value,
+                    x.ResidualWipLabelId,
+                    x.ResidualLabelQuantity))
+                .ToListAsync(in_cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            transferLabels = await _dbContext.TransferAudits
+                .AsNoTracking()
+                .Where(x => !x.IsReverted && x.WipLabelId != null && partIds.Contains(x.PartId))
+                .Select(x => new TransferLabelAuditRow(
+                    x.PartId,
+                    x.FromSectionId,
+                    x.FromOpNumber,
+                    x.ToSectionId,
+                    x.ToOpNumber,
+                    x.Quantity,
+                    x.ScrapQuantity,
+                    x.IsWarehouseTransfer,
+                    x.WipLabelId!.Value,
+                    null,
+                    null))
+                .ToListAsync(in_cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         transferLabels = transferLabels
             .Where(x =>
@@ -727,6 +752,59 @@ public class WipTransfersController : Controller
 
         return ret;
     }
+
+    private async Task<bool> HasTransferAuditResidualColumnsAsync(CancellationToken in_cancellationToken)
+    {
+        var connection = _dbContext.Database.GetDbConnection();
+        var shouldClose = connection.State != ConnectionState.Open;
+
+        if (shouldClose)
+        {
+            await connection.OpenAsync(in_cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'TransferAudits'
+      AND column_name = 'ResidualWipLabelId'
+) AND EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'TransferAudits'
+      AND column_name = 'ResidualLabelQuantity'
+);";
+
+            var scalar = await command.ExecuteScalarAsync(in_cancellationToken).ConfigureAwait(false);
+            return scalar is true || (scalar is bool value && value);
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                await connection.CloseAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    private sealed record TransferLabelAuditRow(
+        Guid PartId,
+        Guid FromSectionId,
+        int FromOpNumber,
+        Guid ToSectionId,
+        int ToOpNumber,
+        decimal Quantity,
+        decimal ScrapQuantity,
+        bool IsWarehouseTransfer,
+        Guid LabelId,
+        Guid? ResidualWipLabelId,
+        decimal? ResidualLabelQuantity);
 
     private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), IReadOnlyList<string>>> LoadLabelNumbersAsync(
         IReadOnlyCollection<(Guid PartId, Guid SectionId, int OpNumber)> in_keys,
