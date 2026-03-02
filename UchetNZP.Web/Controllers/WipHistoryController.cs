@@ -162,6 +162,7 @@ public class WipHistoryController : Controller
                     false,
                     false,
                     null,
+                    null,
                     null);
 
                 entries.Add(entry);
@@ -338,6 +339,7 @@ public class WipHistoryController : Controller
                     hasVersions,
                     false,
                     latestVersionId,
+                    null,
                     null);
 
                 entry.CanDeleteReceipt = canDeleteReceipt;
@@ -494,7 +496,8 @@ public class WipHistoryController : Controller
                     true,
                     transfer.IsReverted,
                     null,
-                    transfer.Id);
+                    transfer.Id,
+                    BuildSplitEventText(transfer.LabelNumber, transfer.ResidualLabelNumber));
 
                 entries.Add(entry);
             }
@@ -552,6 +555,7 @@ public class WipHistoryController : Controller
                     scrap,
                     false,
                     false,
+                    null,
                     null,
                     null);
 
@@ -810,6 +814,19 @@ public class WipHistoryController : Controller
         return DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
     }
 
+
+    private static string? BuildSplitEventText(string? labelNumber, string? residualLabelNumber)
+    {
+        if (string.IsNullOrWhiteSpace(labelNumber) || string.IsNullOrWhiteSpace(residualLabelNumber))
+        {
+            return null;
+        }
+
+        var source = labelNumber.Trim();
+        var residual = residualLabelNumber.Trim();
+        var baseNumber = source.Split('/')[0];
+        return $"Отрыв ярлыка: {source} -> {baseNumber} + {residual}";
+    }
     private static string GetScrapDisplayName(ScrapType type)
     {
         return type switch

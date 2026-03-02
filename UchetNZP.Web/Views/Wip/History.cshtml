@@ -281,6 +281,10 @@
                                                 <span>@entry.Comment</span>
                                             </div>
                                         }
+                                        @if (entry.HasSplitEventText)
+                                        {
+                                            <div class="alert alert-info mt-3 mb-0" role="alert">@entry.SplitEventText</div>
+                                        }
                                         @if (entry.HasScrap && entry.Scrap is not null)
                                         {
                                             <div class="alert alert-warning mt-3 mb-0" role="alert">
