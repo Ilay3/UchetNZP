@@ -41,7 +41,9 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
             .IsRequired();
 
         builder.Property(x => x.RowVersion)
-            .IsRowVersion();
+            .IsConcurrencyToken()
+            .HasDefaultValueSql("'\\x'::bytea")
+            .IsRequired(false);
 
         builder.HasCheckConstraint("CK_WipLabels_Quantity_Positive", "\"Quantity\" > 0");
         builder.HasCheckConstraint("CK_WipLabels_Remaining_NonNegative", "\"RemainingQuantity\" >= 0");
