@@ -434,10 +434,7 @@ public class ReportsController : Controller
             .ThenBy(x => x.EventType)
             .ToList();
 
-        var remainingLookup = await LoadActualLabelRemainingQuantitiesAsync(new[] { label.Id }, cancellationToken).ConfigureAwait(false);
-        var actualRemaining = remainingLookup.TryGetValue(label.Id, out var computedRemaining)
-            ? computedRemaining
-            : label.RemainingQuantity;
+        var actualRemaining = label.RemainingQuantity;
 
         var model = new LabelMovementReportViewModel(
             filter,
@@ -501,18 +498,13 @@ public class ReportsController : Controller
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var remainingLookup = await LoadActualLabelRemainingQuantitiesAsync(labels.Select(x => x.Id).ToArray(), cancellationToken)
-            .ConfigureAwait(false);
-
         var items = labels
             .Select(x => new
             {
                 id = x.Id,
                 number = x.Number,
                 quantity = x.Quantity,
-                remainingQuantity = remainingLookup.TryGetValue(x.Id, out var computedRemaining)
-                    ? computedRemaining
-                    : x.RemainingQuantity,
+                remainingQuantity = x.RemainingQuantity,
                 labelDate = x.LabelDate,
             })
             .ToList();

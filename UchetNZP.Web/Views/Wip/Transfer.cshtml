@@ -34,17 +34,14 @@
                 <div class="form-text">Выберите операцию, на которую передаётся НЗП.</div>
             </div>
             <div class="col-12 col-xl-6">
-                <label class="form-label" for="transferLabelNumberInput">Ярлык-источник</label>
-                <div class="input-group input-group-lg mb-2">
-                    <input id="transferLabelNumberInput" class="form-control" type="text" maxlength="11" placeholder="Номер ярлыка" />
-                    <button class="btn btn-outline-secondary" type="button" id="transferLabelChooseButton">Выбрать</button>
-                </div>
-                <select id="transferLabelSelect" class="form-select d-none" aria-hidden="true">
-                    <option value="">— Свободные ярлыки будут загружены —</option>
+                <label class="form-label" for="transferLabelSelect">Ярлык-источник</label>
+                <select id="transferLabelSelect" class="form-select form-select-lg mb-2">
+                    <option value="">— Сначала выберите операцию «откуда» —</option>
                 </select>
+                <input id="transferLabelNumberInput" class="form-control" type="text" maxlength="11" placeholder="Или введите номер ярлыка вручную (например, 00001/1)" />
                 <div class="small text-muted border rounded p-2 bg-light" id="transferLabelMeta">Ярлык не выбран.</div>
                 <div class="invalid-feedback d-block" id="transferLabelError"></div>
-                <div class="form-text" id="transferLabelHint">Сначала выберите операцию «откуда», затем ярлык.</div>
+                <div class="form-text" id="transferLabelHint">Показываются только ярлыки выбранной операции «откуда».</div>
             </div>
             <div class="col-12 col-xl-6">
                 <label class="form-label" for="transferScenarioSelect">Сценарий операции</label>
@@ -53,7 +50,7 @@
                     <option value="TransferFromLabel">TransferFromLabel — передача количества с ярлыка</option>
                     <option value="SplitAndTransfer" selected>SplitAndTransfer — отрыв и передача</option>
                 </select>
-                <div class="form-text mb-2" id="transferScenarioHint">Выберите явный тип операции: Move / Transfer / Split+Transfer.</div>
+                <div class="form-text mb-2" id="transferScenarioHint">Подсказка: MoveLabel — перенос ярлыка целиком; TransferFromLabel — передать часть и создать новый ярлык; SplitAndTransfer — передать количество, остаток оформить отдельным ярлыком.</div>
                 <div class="form-check form-switch mb-2">
                     <input class="form-check-input" type="checkbox" id="transferCreateResidualLabel" checked>
                     <label class="form-check-label" for="transferCreateResidualLabel">Отрыв остатка</label>
@@ -232,23 +229,6 @@
     </div>
 </div>
 
-
-<div class="modal fade" id="labelChooserModal" tabindex="-1" aria-labelledby="labelChooserTitle" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title h5" id="labelChooserTitle">Выбрать ярлык</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-            </div>
-            <div class="modal-body">
-                <input class="form-control mb-3" id="labelChooserSearch" placeholder="Поиск по номеру ярлыка" />
-                <div class="table-responsive">
-                    <table class="table table-sm" id="labelChooserTable"><thead><tr><th>Номер</th><th>Остаток</th><th>Место</th><th>Дата</th><th></th></tr></thead><tbody></tbody></table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="modal fade" id="labelCardModal" tabindex="-1" aria-labelledby="labelCardTitle" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">

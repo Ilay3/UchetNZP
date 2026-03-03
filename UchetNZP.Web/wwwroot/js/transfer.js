@@ -45,7 +45,6 @@
     const labelSelect = document.getElementById("transferLabelSelect");
     const labelHintElement = document.getElementById("transferLabelHint");
     const labelNumberInput = document.getElementById("transferLabelNumberInput");
-    const labelChooseButton = document.getElementById("transferLabelChooseButton");
     const labelMetaElement = document.getElementById("transferLabelMeta");
     const labelErrorElement = document.getElementById("transferLabelError");
     const createResidualCheckbox = document.getElementById("transferCreateResidualLabel");
@@ -53,9 +52,6 @@
     const previewScrapElement = document.getElementById("transferPreviewScrap");
     const previewRemainingElement = document.getElementById("transferPreviewRemaining");
     const previewResidualElement = document.getElementById("transferPreviewResidual");
-    const labelChooserModalElement = document.getElementById("labelChooserModal");
-    const labelChooserSearchInput = document.getElementById("labelChooserSearch");
-    const labelChooserTableBody = document.querySelector("#labelChooserTable tbody");
     const labelCardModalElement = document.getElementById("labelCardModal");
     const labelCardHeader = document.getElementById("labelCardHeader");
     const labelCardHistoryBody = document.querySelector("#labelCardHistory tbody");
@@ -84,7 +80,6 @@
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement, { backdrop: false }) : null;
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
-    const labelChooserModal = labelChooserModalElement ? new bootstrap.Modal(labelChooserModalElement) : null;
     const labelCardModal = labelCardModalElement ? new bootstrap.Modal(labelCardModalElement) : null;
 
     fromOperationInput.disabled = true;
@@ -302,26 +297,6 @@
     residualLabelNumberInput?.addEventListener("input", () => { updateResidualLabelHint(); void refreshPreview(); });
 
     labelNumberInput?.addEventListener("change", () => void lookupLabelByNumber());
-    labelChooseButton?.addEventListener("click", () => { void loadLabelChooser(); labelChooserModal?.show(); });
-    labelChooserSearchInput?.addEventListener("input", () => void loadLabelChooser());
-    labelChooserTableBody?.addEventListener("click", event => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement) || target.dataset.action !== "pick") {
-            return;
-        }
-
-        const labelId = target.dataset.labelId;
-        if (!labelId) {
-            return;
-        }
-
-        selectedLabelOption = labelOptions.find(x => String(x.id) === labelId) ?? selectedLabelOption;
-        labelSelect.value = labelId;
-        updateLabelHint();
-        syncSelectedLabelMeta();
-        labelChooserModal?.hide();
-        void refreshPreview();
-    });
     createResidualCheckbox?.addEventListener("change", () => {
         if (scenarioSelect) {
             scenarioSelect.value = createResidualCheckbox.checked ? "SplitAndTransfer" : "MoveLabel";
@@ -717,10 +692,6 @@
             return false;
         }
 
-        if (previewState && Array.isArray(previewState.errors) && previewState.errors.length > 0) {
-            return false;
-        }
-
         const labelId = selectedLabelOption?.id ?? null;
         const availableFrom = getAvailableBalance(part.id, selectedFromOperation.opNumber, labelId);
         if (quantity > availableFrom + 1e-9) {
@@ -744,10 +715,6 @@
 
         if (labelNumberInput) {
             labelNumberInput.disabled = !selectedFromOperation;
-        }
-
-        if (labelChooseButton) {
-            labelChooseButton.disabled = !selectedFromOperation;
         }
 
         syncSelectedLabelMeta();
@@ -1166,8 +1133,13 @@
             return;
         }
 
+        if (!selectedFromOperation) {
+            labelHintElement.textContent = "Сначала выберите операцию «откуда», затем выберите ярлык.";
+            return;
+        }
+
         if (!labelOptions.length) {
-            labelHintElement.textContent = "Свободных ярлыков на выбранной операции нет.";
+            labelHintElement.textContent = "На выбранной операции нет доступных ярлыков.";
             return;
         }
 
@@ -1191,16 +1163,16 @@
 
         const selectedScenario = scenarioSelect?.value ?? "SplitAndTransfer";
         if (selectedScenario === "MoveLabel") {
-            residualLabelHintElement.textContent = "MoveLabel: новый ярлык не создаётся.";
+            residualLabelHintElement.textContent = "MoveLabel: перемещается весь ярлык, новый не создаётся.";
             return;
         }
 
         if (!residualLabelNumberInput?.value?.trim()) {
-            residualLabelHintElement.textContent = "Если номер не указан, будет создан автоматически: 103/1.";
+            residualLabelHintElement.textContent = "Если базовый номер не указан, система создаст ярлык автоматически (например, 103/1).";
             return;
         }
 
-        residualLabelHintElement.textContent = "Будет использован указанный базовый номер нового ярлыка.";
+        residualLabelHintElement.textContent = "Будет использован указанный базовый номер, а суффикс (/1, /2...) подберётся автоматически.";
     }
 
     function setFieldError(element, message) {
@@ -1259,27 +1231,6 @@
         setFieldError(labelErrorElement, "");
         void refreshPreview();
         updateFormState();
-    }
-
-    async function loadLabelChooser() {
-        const part = partLookup.getSelected();
-        if (!part?.id || !labelChooserTableBody) {
-            return;
-        }
-
-        const q = labelChooserSearchInput?.value?.trim() ?? "";
-        const response = await fetch(`/api/wip/labels/search?partId=${encodeURIComponent(part.id)}&q=${encodeURIComponent(q)}&onlyWithRemaining=true`);
-        if (!response.ok) {
-            return;
-        }
-
-        const rows = await response.json();
-        labelChooserTableBody.innerHTML = "";
-        rows.forEach(item => {
-            const row = document.createElement("tr");
-            row.innerHTML = `<td>${escapeHtml(item.number ?? "")}</td><td>${formatQuantityText(item.remainingQuantity ?? 0)}</td><td>${escapeHtml(String(item.currentSectionId ?? "—"))}/${escapeHtml(String(item.currentOp ?? "—"))}</td><td>${escapeHtml(String(item.labelDate ?? "").slice(0,10))}</td><td><button type="button" class="btn btn-sm btn-primary" data-action="pick" data-label-id="${item.id}">Выбрать</button></td>`;
-            labelChooserTableBody.appendChild(row);
-        });
     }
 
     async function refreshPreview() {
@@ -1401,11 +1352,6 @@
         const quantity = Number(quantityInput.value);
         if (!quantity || quantity <= 0) {
             alert("Количество должно быть больше нуля.");
-            return;
-        }
-
-        if (previewState && Array.isArray(previewState.errors) && previewState.errors.length > 0) {
-            alert(previewState.errors[0]);
             return;
         }
 

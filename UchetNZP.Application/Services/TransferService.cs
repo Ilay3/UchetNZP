@@ -697,7 +697,7 @@ public class TransferService : ITransferService
 
         if (label.WipReceipt is null)
         {
-            throw new InvalidOperationException($"Ярлык {label.Number} не связан с приходом и не может быть использован.");
+            throw new InvalidOperationException($"Невозможно выполнить передачу: ярлык {label.Number} не связан с приходом. Используйте сценарий операции с ярлыком, созданным через приход, или выберите другой ярлык.");
         }
 
         var operationQuantity = await GetLabelQuantityAtOperationAsync(
