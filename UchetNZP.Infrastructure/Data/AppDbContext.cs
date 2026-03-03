@@ -50,6 +50,8 @@ public class AppDbContext : DbContext
 
     public DbSet<WipLabel> WipLabels => Set<WipLabel>();
 
+    public DbSet<WipLabelLedger> WipLabelLedger => Set<WipLabelLedger>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

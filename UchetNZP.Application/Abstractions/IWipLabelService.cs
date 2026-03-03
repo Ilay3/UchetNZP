@@ -19,4 +19,8 @@ public interface IWipLabelService
     Task<WipLabelDto> UpdateLabelAsync(WipLabelUpdateDto in_request, CancellationToken in_cancellationToken = default);
 
     Task DeleteLabelAsync(Guid in_id, CancellationToken in_cancellationToken = default);
+
+    Task<WipLabelStateDto> GetLabelStateAsync(Guid in_id, CancellationToken in_cancellationToken = default);
+
+    Task<IReadOnlyCollection<WipLabelLedgerEventDto>> GetLabelLedgerAsync(Guid in_id, CancellationToken in_cancellationToken = default);
 }

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UchetNZP.Infrastructure.Data;
@@ -11,9 +12,11 @@ using UchetNZP.Infrastructure.Data;
 namespace UchetNZP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260303085414_AddWipLabelStateAndLocation")]
+    partial class AddWipLabelStateAndLocation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -614,73 +617,6 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.HasIndex("Status", "CurrentSectionId", "CurrentOpNumber");
 
                     b.ToTable("WipLabels", (string)null);
-                });
-
-            modelBuilder.Entity("UchetNZP.Domain.Entities.WipLabelLedger", b =>
-                {
-                    b.Property<Guid>("EventId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("EventTime")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid?>("FromLabelId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("FromOpNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("FromSectionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Qty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<Guid?>("RefEntityId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("RefEntityType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
-                    b.Property<decimal>("ScrapQty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<Guid?>("ToLabelId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("ToOpNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("ToSectionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TransactionId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("EventId");
-
-                    b.HasIndex("EventTime");
-
-                    b.HasIndex("FromLabelId");
-
-                    b.HasIndex("ToLabelId");
-
-                    b.HasIndex("TransactionId");
-
-                    b.ToTable("WipLabelLedger", (string)null);
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipLaunch", b =>

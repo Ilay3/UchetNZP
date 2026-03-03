@@ -272,6 +272,80 @@ public class WipLabelsController : Controller
         return ret;
     }
 
+    [HttpGet("{id:guid}/state")]
+    public async Task<IActionResult> GetLabelState(Guid id, CancellationToken in_cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор ярлыка.");
+        }
+
+        try
+        {
+            var state = await m_wipLabelService
+                .GetLabelStateAsync(id, in_cancellationToken)
+                .ConfigureAwait(false);
+
+            return Ok(new WipLabelStateViewModel(
+                state.Id,
+                state.Number,
+                state.Status,
+                state.CurrentSectionId,
+                state.CurrentOpNumber,
+                state.RootLabelId,
+                state.ParentLabelId,
+                state.RootNumber,
+                state.Suffix,
+                state.Quantity,
+                state.RemainingQuantity));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    [HttpGet("{id:guid}/ledger")]
+    public async Task<IActionResult> GetLabelLedger(Guid id, CancellationToken in_cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор ярлыка.");
+        }
+
+        try
+        {
+            var events = await m_wipLabelService
+                .GetLabelLedgerAsync(id, in_cancellationToken)
+                .ConfigureAwait(false);
+
+            var ret = events
+                .Select(x => new WipLabelLedgerEventViewModel(
+                    x.EventId,
+                    x.EventTime,
+                    x.UserId,
+                    x.TransactionId,
+                    x.EventType,
+                    x.FromLabelId,
+                    x.ToLabelId,
+                    x.FromSectionId,
+                    x.FromOpNumber,
+                    x.ToSectionId,
+                    x.ToOpNumber,
+                    x.Qty,
+                    x.ScrapQty,
+                    x.RefEntityType,
+                    x.RefEntityId))
+                .ToList();
+
+            return Ok(ret);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> DeleteLabel(Guid id, CancellationToken in_cancellationToken)
     {
