@@ -14,12 +14,14 @@ public class TransferService : ITransferService
     private readonly AppDbContext _dbContext;
     private readonly IRouteService _routeService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ILabelNumberingService _labelNumberingService;
 
-    public TransferService(AppDbContext dbContext, IRouteService routeService, ICurrentUserService currentUserService)
+    public TransferService(AppDbContext dbContext, IRouteService routeService, ICurrentUserService currentUserService, ILabelNumberingService labelNumberingService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _routeService = routeService ?? throw new ArgumentNullException(nameof(routeService));
         _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+        _labelNumberingService = labelNumberingService ?? throw new ArgumentNullException(nameof(labelNumberingService));
     }
 
     public async Task<TransferBatchSummaryDto> AddTransfersBatchAsync(IEnumerable<TransferItemDto> items, CancellationToken cancellationToken = default)
@@ -35,6 +37,27 @@ public class TransferService : ITransferService
             return new TransferBatchSummaryDto(0, Array.Empty<TransferItemSummaryDto>());
         }
 
+        const int maxRetries = 3;
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                return await AddTransfersBatchCoreAsync(materialized, cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateException ex) when (attempt < maxRetries && IsLabelNumberUniqueConflict(ex))
+            {
+                foreach (var entry in ex.Entries)
+                {
+                    entry.State = EntityState.Detached;
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Не удалось выполнить пакет перемещений из-за конфликта уникальности номера ярлыка.");
+    }
+
+    private async Task<TransferBatchSummaryDto> AddTransfersBatchCoreAsync(List<TransferItemDto> materialized, CancellationToken cancellationToken)
+    {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken).ConfigureAwait(false);
 
         try
@@ -547,6 +570,14 @@ public class TransferService : ITransferService
         }
     }
 
+    private static bool IsLabelNumberUniqueConflict(DbUpdateException in_exception)
+    {
+        var message = in_exception.InnerException?.Message ?? in_exception.Message;
+        return message.Contains("IX_WipLabels_Number", StringComparison.Ordinal)
+            || message.Contains("IX_WipLabels_RootNumber_Suffix", StringComparison.Ordinal);
+    }
+
+
     private async Task<TransferLabelUsage?> ResolveTransferLabelAsync(
         TransferItemDto item,
         PartRoute fromRoute,
@@ -688,14 +719,19 @@ public class TransferService : ITransferService
             transferLabel.RootLabelId = transferLabel.Id;
         }
 
+        var parsedTransferNumber = WipLabelInvariants.ParseNumber(currentTransferNumber);
         if (string.IsNullOrWhiteSpace(transferLabel.RootNumber))
         {
-            transferLabel.RootNumber = WipLabelInvariants.SplitNumber(currentTransferNumber).RootNumber;
+            transferLabel.RootNumber = parsedTransferNumber.RootNumber;
         }
-        var slashIndex = currentTransferNumber.IndexOf('/');
-        if (!item.ResidualLabelNumber.HasValue && slashIndex > 0)
+
+        if (transferLabel.Suffix == 0 && parsedTransferNumber.Suffix > 0)
         {
-            var transferBaseNumber = currentTransferNumber[..slashIndex];
+            transferLabel.Suffix = parsedTransferNumber.Suffix;
+        }
+        if (!item.ResidualLabelNumber.HasValue && transferLabel.Suffix > 0)
+        {
+            var transferBaseNumber = WipLabelInvariants.FormatNumber(transferLabel.RootNumber, 0);
             var duplicateBaseExists = await _dbContext.WipLabels
                 .AnyAsync(x => x.PartId == item.PartId && x.Id != transferLabel.Id && x.Number == transferBaseNumber, cancellationToken)
                 .ConfigureAwait(false);
@@ -708,7 +744,9 @@ public class TransferService : ITransferService
                 throw new InvalidOperationException($"Ярлык с номером {transferBaseNumber} уже существует.");
             }
 
+            var residualSuffix = transferLabel.Suffix;
             transferLabel.Number = transferBaseNumber;
+            transferLabel.Suffix = 0;
 
             var residualFromSlashLabel = new WipLabel
             {
@@ -725,7 +763,7 @@ public class TransferService : ITransferService
                 RootLabelId = transferLabel.RootLabelId == Guid.Empty ? transferLabel.Id : transferLabel.RootLabelId,
                 ParentLabelId = transferLabel.Id,
                 RootNumber = transferLabel.RootNumber,
-                Suffix = WipLabelInvariants.SplitNumber(currentTransferNumber).Suffix,
+                Suffix = residualSuffix,
             };
 
             await _dbContext.WipLabels.AddAsync(residualFromSlashLabel, cancellationToken).ConfigureAwait(false);
@@ -734,45 +772,29 @@ public class TransferService : ITransferService
 
         var baseNumber = item.ResidualLabelNumber.HasValue
             ? item.ResidualLabelNumber.Value.ToString()
-            : GetResidualLabelBaseNumber(currentTransferNumber);
+            : transferLabel.RootNumber;
 
         if (string.IsNullOrWhiteSpace(baseNumber))
         {
             throw new InvalidOperationException("Не удалось определить базовый номер для отрыва ярлыка.");
         }
 
-        var nextIndex = 1;
-        var prefix = $"{baseNumber}/";
-
-        var existingNumbers = await _dbContext.WipLabels
-            .Where(x => x.PartId == item.PartId && (x.Number == baseNumber || x.Number.StartsWith(prefix)))
-            .Select(x => x.Number)
-            .ToListAsync(cancellationToken)
+        var nextIndex = await _labelNumberingService
+            .GetNextSuffixAsync(baseNumber, cancellationToken)
             .ConfigureAwait(false);
 
-        existingNumbers.AddRange(_dbContext.WipLabels.Local
-            .Where(x => x.PartId == item.PartId && !string.IsNullOrWhiteSpace(x.Number) && (x.Number == baseNumber || x.Number.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
-            .Select(x => x.Number!));
-
-        while (existingNumbers.Contains($"{baseNumber}/{nextIndex}", StringComparer.OrdinalIgnoreCase))
-        {
-            nextIndex++;
-        }
-
-        var residualNumber = $"{baseNumber}/{nextIndex}";
+        var residualNumber = WipLabelInvariants.FormatNumber(baseNumber, nextIndex);
         var duplicateExists = await _dbContext.WipLabels
-            .AnyAsync(x => x.PartId == item.PartId && x.Number == residualNumber, cancellationToken)
+            .AnyAsync(x => x.RootNumber == baseNumber && x.Suffix == nextIndex, cancellationToken)
             .ConfigureAwait(false);
 
         var duplicateInMemory = _dbContext.WipLabels.Local
-            .Any(x => x.PartId == item.PartId && string.Equals(x.Number, residualNumber, StringComparison.OrdinalIgnoreCase));
+            .Any(x => string.Equals(x.RootNumber, baseNumber, StringComparison.Ordinal) && x.Suffix == nextIndex);
 
         if (duplicateExists || duplicateInMemory)
         {
             throw new InvalidOperationException($"Ярлык с номером {residualNumber} уже существует.");
         }
-
-        var parsedResidualNumber = WipLabelInvariants.SplitNumber(residualNumber);
 
         var residualLabel = new WipLabel
         {
@@ -788,24 +810,13 @@ public class TransferService : ITransferService
             CurrentOpNumber = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.OperationNumber : item.FromOpNumber,
             RootLabelId = transferLabel.RootLabelId == Guid.Empty ? transferLabel.Id : transferLabel.RootLabelId,
             ParentLabelId = transferLabel.Id,
-            RootNumber = transferLabel.RootNumber,
-            Suffix = parsedResidualNumber.Suffix,
+            RootNumber = baseNumber,
+            Suffix = nextIndex,
         };
 
         await _dbContext.WipLabels.AddAsync(residualLabel, cancellationToken).ConfigureAwait(false);
 
         return residualLabel;
-    }
-
-    private static string GetResidualLabelBaseNumber(string labelNumber)
-    {
-        if (string.IsNullOrWhiteSpace(labelNumber))
-        {
-            return string.Empty;
-        }
-
-        var slashIndex = labelNumber.IndexOf('/');
-        return slashIndex > 0 ? labelNumber[..slashIndex] : labelNumber;
     }
 
     private async Task<decimal> GetLabelQuantityAtOperationAsync(

@@ -55,7 +55,7 @@ public class TransferServiceTests
 
         var routeService = new RouteService(dbContext);
         var currentUser = new TestCurrentUserService();
-        var service = new TransferService(dbContext, routeService, currentUser);
+        var service = new TransferService(dbContext, routeService, currentUser, new LabelNumberingService(dbContext));
 
         var transferDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -115,7 +115,7 @@ public class TransferServiceTests
 
         var routeService = new RouteService(dbContext);
         var currentUser = new TestCurrentUserService();
-        var service = new TransferService(dbContext, routeService, currentUser);
+        var service = new TransferService(dbContext, routeService, currentUser, new LabelNumberingService(dbContext));
 
         var transferDate = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var comment = "Сломалось";
@@ -198,7 +198,7 @@ public class TransferServiceTests
 
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
 
         var transferDate = new DateTime(2025, 2, 2, 0, 0, 0, DateTimeKind.Utc);
         var summary = await service.AddTransfersBatchAsync(new[]
@@ -296,7 +296,7 @@ public class TransferServiceTests
 
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         var transferDate = new DateTime(2025, 3, 3, 0, 0, 0, DateTimeKind.Utc);
 
         var summary = await service.AddTransfersBatchAsync(new[]
@@ -342,7 +342,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.Add(receipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
             new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, true, null, null),
@@ -385,7 +385,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.Add(receipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
             new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, true, null, null),
@@ -425,7 +425,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.Add(receipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         var summary = await service.AddTransfersBatchAsync(new[]
         {
             new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, true, null, null),
@@ -478,7 +478,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.AddRange(firstReceipt, secondReceipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
             new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, firstLabelId, true, 103, null),
@@ -556,7 +556,7 @@ public class TransferServiceTests
 
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         var transferDate = new DateTime(2025, 5, 5, 0, 0, 0, DateTimeKind.Utc);
 
         var summary = await service.AddTransfersBatchAsync(new[]
@@ -656,7 +656,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.Add(receipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
 
         await service.AddTransfersBatchAsync(new[]
         {
@@ -740,7 +740,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.Add(receipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
@@ -804,7 +804,7 @@ public class TransferServiceTests
 
         var routeService = new RouteService(dbContext);
         var currentUser = new TestCurrentUserService();
-        var service = new TransferService(dbContext, routeService, currentUser);
+        var service = new TransferService(dbContext, routeService, currentUser, new LabelNumberingService(dbContext));
         var transferDate = new DateTime(2025, 4, 1, 0, 0, 0, DateTimeKind.Utc);
 
         var summary = await service.AddTransfersBatchAsync(new[]
@@ -853,7 +853,7 @@ public class TransferServiceTests
 
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         var transferDate = new DateTime(2026, 2, 25, 0, 0, 0, DateTimeKind.Utc);
 
         var summary = await service.AddTransfersBatchAsync(new[]
@@ -915,7 +915,7 @@ public class TransferServiceTests
 
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         var transferDate = new DateTime(2025, 6, 6, 0, 0, 0, DateTimeKind.Utc);
 
         var summary = await service.AddTransfersBatchAsync(new[]
@@ -970,7 +970,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.Add(setup.Receipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
             new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, false, null, null),
@@ -1009,7 +1009,7 @@ public class TransferServiceTests
         dbContext.WipReceipts.Add(setup.Receipt);
         await dbContext.SaveChangesAsync();
 
-        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService());
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
             new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, true, null, null),
@@ -1044,8 +1044,8 @@ public class TransferServiceTests
             CurrentOpNumber = opNumber,
             RootLabelId = labelId,
             ParentLabelId = null,
-            RootNumber = number.Contains('/') ? number.Split('/')[0] : number,
-            Suffix = number.Contains('/') && int.TryParse(number.Split('/')[1], out var parsedSuffix) ? parsedSuffix : 0,
+            RootNumber = WipLabelInvariants.ParseNumber(number).RootNumber,
+            Suffix = WipLabelInvariants.ParseNumber(number).Suffix,
         };
 
         var receipt = new WipReceipt

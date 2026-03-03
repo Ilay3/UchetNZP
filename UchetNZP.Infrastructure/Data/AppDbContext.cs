@@ -52,6 +52,8 @@ public class AppDbContext : DbContext
 
     public DbSet<WipLabelLedger> WipLabelLedger => Set<WipLabelLedger>();
 
+    public DbSet<LabelNumberCounter> LabelNumberCounters => Set<LabelNumberCounter>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
