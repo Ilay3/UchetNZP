@@ -71,31 +71,31 @@ namespace UchetNZP.Infrastructure.Migrations
 
             migrationBuilder.Sql(
                 """
-                UPDATE \"WipLabels\" AS l
-                SET \"RootLabelId\" = l.\"Id\",
-                    \"RootNumber\" = CASE
-                        WHEN POSITION('/' IN l.\"Number\") > 0 THEN SPLIT_PART(l.\"Number\", '/', 1)
-                        ELSE l.\"Number\"
+                UPDATE "WipLabels" AS l
+                SET "RootLabelId" = l."Id",
+                    "RootNumber" = CASE
+                        WHEN POSITION('/' IN l."Number") > 0 THEN SPLIT_PART(l."Number", '/', 1)
+                        ELSE l."Number"
                     END,
-                    \"Suffix\" = CASE
-                        WHEN POSITION('/' IN l.\"Number\") > 0
-                            AND SPLIT_PART(l.\"Number\", '/', 2) ~ '^[0-9]+$'
-                        THEN SPLIT_PART(l.\"Number\", '/', 2)::integer
+                    "Suffix" = CASE
+                        WHEN POSITION('/' IN l."Number") > 0
+                            AND SPLIT_PART(l."Number", '/', 2) ~ '^[0-9]+$'
+                        THEN SPLIT_PART(l."Number", '/', 2)::integer
                         ELSE 0
                     END,
-                    \"Status\" = CASE
-                        WHEN l.\"RemainingQuantity\" <= 0 THEN 'Consumed'
+                    "Status" = CASE
+                        WHEN l."RemainingQuantity" <= 0 THEN 'Consumed'
                         ELSE 'Active'
                     END;
                 """);
 
             migrationBuilder.Sql(
                 """
-                UPDATE \"WipLabels\" AS l
-                SET \"CurrentSectionId\" = r.\"SectionId\",
-                    \"CurrentOpNumber\" = r.\"OpNumber\"
-                FROM \"WipReceipts\" AS r
-                WHERE r.\"WipLabelId\" = l.\"Id\";
+                UPDATE "WipLabels" AS l
+                SET "CurrentSectionId" = r."SectionId",
+                    "CurrentOpNumber" = r."OpNumber"
+                FROM "WipReceipts" AS r
+                WHERE r."WipLabelId" = l."Id";
                 """);
         }
 
