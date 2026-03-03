@@ -69,6 +69,7 @@ public class TransferService : ITransferService
             var transactionId = Guid.NewGuid();
             var balanceCache = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber), WipBalance>();
             var ledgerEvents = new List<WipLabelLedger>();
+            var transferLabelUsages = new List<TransferLabelUsage>();
 
             async Task<WipBalance?> GetExistingBalanceAsync(Guid partId, Guid sectionId, int opNumber)
             {
@@ -125,6 +126,11 @@ public class TransferService : ITransferService
             foreach (var item in materialized)
             {
                 WipLabelInvariants.EnsurePositiveTransferQuantity(item.Quantity);
+
+                var scenario = item.Scenario;
+                var isMoveLabel = scenario == TransferScenario.MoveLabel;
+                var isSplitAndTransfer = scenario == TransferScenario.SplitAndTransfer;
+                var createsTransferChildLabel = scenario == TransferScenario.TransferFromLabel || isSplitAndTransfer;
 
                 if (!routeCache.TryGetValue(item.PartId, out var orderedRoute))
                 {
@@ -335,13 +341,14 @@ public class TransferService : ITransferService
                         item,
                         fromRoute,
                         isWarehouseTransfer,
+                        isMoveLabel,
                         scrapQuantity,
                         cancellationToken)
                     .ConfigureAwait(false);
 
-                if (item.CreateResidualLabel && labelUsage is null)
+                if (createsTransferChildLabel && labelUsage is null)
                 {
-                    throw new InvalidOperationException("Для отрыва остатка требуется исходный ярлык на операции передачи.");
+                    throw new InvalidOperationException("Для выбранного сценария требуется исходный ярлык на операции передачи.");
                 }
 
                 Guid? residualLabelId = null;
@@ -350,8 +357,30 @@ public class TransferService : ITransferService
 
                 if (labelUsage is not null)
                 {
-                    transferLabelId = labelUsage.Label.Id;
+                    var residualLabel = await CreateResidualLabelAsync(
+                            item,
+                            labelUsage.Label,
+                            createsTransferChildLabel ? item.Quantity : 0m,
+                            isWarehouseTransfer ? WarehouseDefaults.SectionId : toSectionId,
+                            item.ToOpNumber,
+                            transferDate,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                    var transferLabel = residualLabel ?? labelUsage.Label;
+                    transferLabelId = transferLabel.Id;
                     transfer.WipLabelId = transferLabelId;
+
+                    if (residualLabel is not null)
+                    {
+                        residualLabelId = residualLabel.Id;
+                        residualLabelNumber = residualLabel.Number;
+                        residualLabelQuantity = residualLabel.Quantity;
+                    }
+
+                    transferLabelNumber = transferLabel.Number;
+                    labelQuantityBefore = labelUsage.RemainingBefore;
+                    labelQuantityAfter = labelUsage.RemainingAfter;
 
                     if (isWarehouseTransfer && warehouseItem is not null)
                     {
@@ -359,7 +388,7 @@ public class TransferService : ITransferService
                         {
                             Id = Guid.NewGuid(),
                             WarehouseItemId = warehouseItem.Id,
-                            WipLabelId = labelUsage.Label.Id,
+                            WipLabelId = transferLabel.Id,
                             Quantity = item.Quantity,
                             AddedAt = transferDate,
                             UpdatedAt = now,
@@ -370,38 +399,19 @@ public class TransferService : ITransferService
                             .ConfigureAwait(false);
                     }
 
-                    var residualLabel = await CreateResidualLabelAsync(
-                            item,
-                            labelUsage.Label,
-                            remainingAfterTransfer,
-                            transferDate,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (residualLabel is not null)
-                    {
-                        residualLabelId = residualLabel.Id;
-                        residualLabelNumber = residualLabel.Number;
-                        residualLabelQuantity = residualLabel.Quantity;
-                    }
-
-                    transferLabelNumber = labelUsage.Label.Number;
-                    labelQuantityBefore = labelUsage.RemainingBefore;
-                    labelQuantityAfter = labelUsage.RemainingAfter;
-
                     if (!isWarehouseTransfer)
                     {
-                        labelUsage.Label.CurrentSectionId = toSectionId;
-                        labelUsage.Label.CurrentOpNumber = item.ToOpNumber;
-                        if (labelUsage.Label.Status == WipLabelStatus.Consumed)
+                        transferLabel.CurrentSectionId = toSectionId;
+                        transferLabel.CurrentOpNumber = item.ToOpNumber;
+                        if (transferLabel.Status == WipLabelStatus.Consumed)
                         {
-                            labelUsage.Label.Status = WipLabelStatus.Closed;
+                            transferLabel.Status = WipLabelStatus.Closed;
                         }
                     }
                     else
                     {
-                        labelUsage.Label.CurrentSectionId = WarehouseDefaults.SectionId;
-                        labelUsage.Label.CurrentOpNumber = WarehouseDefaults.OperationNumber;
+                        transferLabel.CurrentSectionId = WarehouseDefaults.SectionId;
+                        transferLabel.CurrentOpNumber = WarehouseDefaults.OperationNumber;
                     }
 
                     ledgerEvents.Add(new WipLabelLedger
@@ -410,9 +420,9 @@ public class TransferService : ITransferService
                         EventTime = now,
                         UserId = userId,
                         TransactionId = transactionId,
-                        EventType = WipLabelEventType.Transfer,
+                        EventType = isMoveLabel ? WipLabelEventType.Move : WipLabelEventType.Transfer,
                         FromLabelId = labelUsage.Label.Id,
-                        ToLabelId = labelUsage.Label.Id,
+                        ToLabelId = transferLabel.Id,
                         FromSectionId = fromRoute.SectionId,
                         FromOpNumber = item.FromOpNumber,
                         ToSectionId = isWarehouseTransfer ? WarehouseDefaults.SectionId : toSectionId,
@@ -445,7 +455,7 @@ public class TransferService : ITransferService
                         });
                     }
 
-                    if (residualLabelId.HasValue)
+                    if (residualLabelId.HasValue && isSplitAndTransfer)
                     {
                         ledgerEvents.Add(new WipLabelLedger
                         {
@@ -466,6 +476,17 @@ public class TransferService : ITransferService
                             RefEntityId = transfer.Id,
                         });
                     }
+
+                    transferLabelUsages.Add(new TransferLabelUsage
+                    {
+                        Id = Guid.NewGuid(),
+                        TransferId = transfer.Id,
+                        FromLabelId = labelUsage.Label.Id,
+                        Qty = item.Quantity,
+                        ScrapQty = scrapQuantity,
+                        RemainingBefore = labelUsage.RemainingBefore,
+                        CreatedToLabelId = transferLabel.Id != labelUsage.Label.Id ? transferLabel.Id : null,
+                    });
                 }
 
                 var audit = new TransferAudit
@@ -558,6 +579,11 @@ public class TransferService : ITransferService
                 await _dbContext.WipLabelLedger.AddRangeAsync(ledgerEvents, cancellationToken).ConfigureAwait(false);
             }
 
+            if (transferLabelUsages.Count > 0)
+            {
+                await _dbContext.TransferLabelUsages.AddRangeAsync(transferLabelUsages, cancellationToken).ConfigureAwait(false);
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
@@ -578,10 +604,11 @@ public class TransferService : ITransferService
     }
 
 
-    private async Task<TransferLabelUsage?> ResolveTransferLabelAsync(
+    private async Task<ResolvedTransferLabelUsage?> ResolveTransferLabelAsync(
         TransferItemDto item,
         PartRoute fromRoute,
         bool isWarehouseTransfer,
+        bool isMoveLabel,
         decimal scrapQuantity,
         CancellationToken cancellationToken)
     {
@@ -601,7 +628,8 @@ public class TransferService : ITransferService
             return null;
         }
 
-        var consumedFromLabel = scrapQuantity + (isWarehouseTransfer ? item.Quantity : 0m);
+        var consumesTransferQuantity = !isMoveLabel;
+        var consumedFromLabel = scrapQuantity + (consumesTransferQuantity ? item.Quantity : 0m);
 
         WipLabel? label;
 
@@ -695,23 +723,25 @@ public class TransferService : ITransferService
         label.RemainingQuantity = remainingAfter;
         label.Status = WipLabelInvariants.GetStatusAfterConsume(remainingAfter);
 
-        var ret = new TransferLabelUsage(label, remainingBefore, remainingAfter);
+        var ret = new ResolvedTransferLabelUsage(label, remainingBefore, remainingAfter);
         return ret;
     }
 
     private async Task<WipLabel?> CreateResidualLabelAsync(
         TransferItemDto item,
         WipLabel transferLabel,
-        decimal remainingAfterTransfer,
+        decimal transferQuantity,
+        Guid toSectionId,
+        int toOpNumber,
         DateTime transferDate,
         CancellationToken cancellationToken)
     {
-        if (!item.CreateResidualLabel)
+        if (transferQuantity <= 0m)
         {
             return null;
         }
 
-        WipLabelInvariants.EnsureCanTearOff(remainingAfterTransfer);
+        WipLabelInvariants.EnsureCanTearOff(transferQuantity);
 
         var currentTransferNumber = transferLabel.Number?.Trim() ?? string.Empty;
         if (transferLabel.RootLabelId == Guid.Empty)
@@ -729,47 +759,6 @@ public class TransferService : ITransferService
         {
             transferLabel.Suffix = parsedTransferNumber.Suffix;
         }
-        if (!item.ResidualLabelNumber.HasValue && transferLabel.Suffix > 0)
-        {
-            var transferBaseNumber = WipLabelInvariants.FormatNumber(transferLabel.RootNumber, 0);
-            var duplicateBaseExists = await _dbContext.WipLabels
-                .AnyAsync(x => x.PartId == item.PartId && x.Id != transferLabel.Id && x.Number == transferBaseNumber, cancellationToken)
-                .ConfigureAwait(false);
-
-            var duplicateBaseInMemory = _dbContext.WipLabels.Local
-                .Any(x => x.PartId == item.PartId && x.Id != transferLabel.Id && string.Equals(x.Number, transferBaseNumber, StringComparison.OrdinalIgnoreCase));
-
-            if (duplicateBaseExists || duplicateBaseInMemory)
-            {
-                throw new InvalidOperationException($"Ярлык с номером {transferBaseNumber} уже существует.");
-            }
-
-            var residualSuffix = transferLabel.Suffix;
-            transferLabel.Number = transferBaseNumber;
-            transferLabel.Suffix = 0;
-
-            var residualFromSlashLabel = new WipLabel
-            {
-                Id = Guid.NewGuid(),
-                PartId = item.PartId,
-                LabelDate = transferDate,
-                Quantity = remainingAfterTransfer,
-                RemainingQuantity = remainingAfterTransfer,
-                Number = currentTransferNumber,
-                IsAssigned = true,
-                Status = WipLabelStatus.Active,
-                CurrentSectionId = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.SectionId : transferLabel.CurrentSectionId ?? WarehouseDefaults.SectionId,
-                CurrentOpNumber = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.OperationNumber : item.FromOpNumber,
-                RootLabelId = transferLabel.RootLabelId == Guid.Empty ? transferLabel.Id : transferLabel.RootLabelId,
-                ParentLabelId = transferLabel.Id,
-                RootNumber = transferLabel.RootNumber,
-                Suffix = residualSuffix,
-            };
-
-            await _dbContext.WipLabels.AddAsync(residualFromSlashLabel, cancellationToken).ConfigureAwait(false);
-            return residualFromSlashLabel;
-        }
-
         var baseNumber = item.ResidualLabelNumber.HasValue
             ? item.ResidualLabelNumber.Value.ToString()
             : transferLabel.RootNumber;
@@ -801,13 +790,13 @@ public class TransferService : ITransferService
             Id = Guid.NewGuid(),
             PartId = item.PartId,
             LabelDate = transferDate,
-            Quantity = remainingAfterTransfer,
-            RemainingQuantity = remainingAfterTransfer,
+            Quantity = transferQuantity,
+            RemainingQuantity = transferQuantity,
             Number = residualNumber,
             IsAssigned = true,
             Status = WipLabelStatus.Active,
-            CurrentSectionId = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.SectionId : transferLabel.CurrentSectionId ?? WarehouseDefaults.SectionId,
-            CurrentOpNumber = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.OperationNumber : item.FromOpNumber,
+            CurrentSectionId = toSectionId,
+            CurrentOpNumber = toOpNumber,
             RootLabelId = transferLabel.RootLabelId == Guid.Empty ? transferLabel.Id : transferLabel.RootLabelId,
             ParentLabelId = transferLabel.Id,
             RootNumber = baseNumber,
@@ -1321,5 +1310,5 @@ public class TransferService : ITransferService
         };
     }
 
-    private sealed record TransferLabelUsage(WipLabel Label, decimal RemainingBefore, decimal RemainingAfter);
+    private sealed record ResolvedTransferLabelUsage(WipLabel Label, decimal RemainingBefore, decimal RemainingAfter);
 }

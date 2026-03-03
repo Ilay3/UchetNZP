@@ -23,4 +23,8 @@ public interface IWipLabelService
     Task<WipLabelStateDto> GetLabelStateAsync(Guid in_id, CancellationToken in_cancellationToken = default);
 
     Task<IReadOnlyCollection<WipLabelLedgerEventDto>> GetLabelLedgerAsync(Guid in_id, CancellationToken in_cancellationToken = default);
+
+    Task<WipLabelMergeResultDto> MergeLabelsAsync(WipLabelMergeRequestDto in_request, CancellationToken in_cancellationToken = default);
+
+    Task<WipLabelMergeTraceDto> GetMergeTraceAsync(Guid in_labelId, CancellationToken in_cancellationToken = default);
 }
