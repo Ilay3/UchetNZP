@@ -233,7 +233,7 @@ public class WipLabelService : IWipLabelService
 
         label.Number = normalizedNumber;
         label.LabelDate = normalizedDate;
-        var parsedNumber = WipLabelInvariants.SplitNumber(normalizedNumber);
+        var parsedNumber = WipLabelInvariants.ParseNumber(normalizedNumber);
         label.RootNumber = parsedNumber.RootNumber;
         label.Suffix = parsedNumber.Suffix;
         label.Quantity = in_request.Quantity;
@@ -422,7 +422,7 @@ public class WipLabelService : IWipLabelService
 
     private static void InitializeIdentity(WipLabel label, string number)
     {
-        var parsedNumber = WipLabelInvariants.SplitNumber(number);
+        var parsedNumber = WipLabelInvariants.ParseNumber(number);
         label.RootLabelId = label.Id;
         label.ParentLabelId = null;
         label.RootNumber = parsedNumber.RootNumber;
@@ -450,20 +450,19 @@ public class WipLabelService : IWipLabelService
 
     private async Task<List<string>> GenerateSequentialNumbersAsync(int in_count, CancellationToken in_cancellationToken)
     {
-        var lastNumber = await m_dbContext.WipLabels
+        var existingRoots = await m_dbContext.WipLabels
             .AsNoTracking()
-            .OrderByDescending(x => x.Number)
-            .Select(x => x.Number)
-            .FirstOrDefaultAsync(in_cancellationToken)
+            .Where(x => x.Suffix == 0 && !string.IsNullOrWhiteSpace(x.RootNumber))
+            .Select(x => x.RootNumber)
+            .ToListAsync(in_cancellationToken)
             .ConfigureAwait(false);
 
         var start = 0;
-
-        if (!string.IsNullOrWhiteSpace(lastNumber))
+        foreach (var rootNumber in existingRoots)
         {
-            if (!int.TryParse(lastNumber, NumberStyles.None, CultureInfo.InvariantCulture, out start))
+            if (int.TryParse(rootNumber, NumberStyles.None, CultureInfo.InvariantCulture, out var parsedRoot) && parsedRoot > start)
             {
-                throw new InvalidOperationException($"Не удалось разобрать номер ярлыка {lastNumber}.");
+                start = parsedRoot;
             }
         }
 
@@ -472,7 +471,8 @@ public class WipLabelService : IWipLabelService
         for (var index = 1; index <= in_count; index++)
         {
             var next = start + index;
-            ret.Add(next.ToString("D5", CultureInfo.InvariantCulture));
+            var rootNumber = next.ToString("D5", CultureInfo.InvariantCulture);
+            ret.Add(WipLabelInvariants.FormatNumber(rootNumber, 0));
         }
 
         return ret;
@@ -491,43 +491,30 @@ public class WipLabelService : IWipLabelService
             throw new InvalidOperationException("Номер ярлыка не может быть пустым.");
         }
 
-        var trimmed = in_number.Trim();
-        var parts = trimmed.Split('/');
-        if (parts.Length is < 1 or > 2)
+        var parsed = WipLabelInvariants.ParseNumber(in_number);
+
+        if (parsed.RootNumber.Length is < 1 or > 32 || !parsed.RootNumber.All(char.IsDigit))
         {
             throw new InvalidOperationException("Номер ярлыка должен быть в формате 12345 или 12345/1.");
         }
 
-        var basePart = parts[0].Trim();
-        if (basePart.Length is < 1 or > 5 || !basePart.All(char.IsDigit))
-        {
-            throw new InvalidOperationException("Номер ярлыка должен быть в формате 12345 или 12345/1.");
-        }
-
-        if (!int.TryParse(basePart, NumberStyles.None, CultureInfo.InvariantCulture, out var baseNumber) || baseNumber <= 0)
+        if (!int.TryParse(parsed.RootNumber, NumberStyles.None, CultureInfo.InvariantCulture, out var baseNumber) || baseNumber <= 0)
         {
             throw new InvalidOperationException("Номер ярлыка должен быть положительным числом.");
         }
 
         var normalizedBase = baseNumber.ToString("D5", CultureInfo.InvariantCulture);
-        if (parts.Length == 1)
+        if (parsed.Suffix == 0)
         {
-            return normalizedBase;
+            return WipLabelInvariants.FormatNumber(normalizedBase, 0);
         }
 
-        var suffixPart = parts[1].Trim();
-        if (suffixPart.Length is < 1 or > 5 || !suffixPart.All(char.IsDigit))
+        if (parsed.Suffix < 0)
         {
-            throw new InvalidOperationException("Номер ярлыка должен быть в формате 12345 или 12345/1.");
+            throw new InvalidOperationException("Суффикс номера ярлыка должен быть неотрицательным целым числом.");
         }
 
-        if (!int.TryParse(suffixPart, NumberStyles.None, CultureInfo.InvariantCulture, out var suffixNumber) || suffixNumber <= 0)
-        {
-            throw new InvalidOperationException("Суффикс номера ярлыка должен быть положительным числом.");
-        }
-
-        var normalizedSuffix = suffixNumber.ToString(CultureInfo.InvariantCulture);
-        return $"{normalizedBase}/{normalizedSuffix}";
+        return WipLabelInvariants.FormatNumber(normalizedBase, parsed.Suffix);
     }
 
     private async Task EnsureLabelCanBeModifiedAsync(Guid in_labelId, CancellationToken in_cancellationToken)

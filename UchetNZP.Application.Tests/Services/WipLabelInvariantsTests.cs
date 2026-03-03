@@ -83,11 +83,19 @@ public class WipLabelInvariantsTests
 
 
     [Fact]
-    public void SplitNumber_WithSuffix_ReturnsRootAndSuffix()
+    public void ParseNumber_WithSuffix_ReturnsRootAndSuffix()
     {
-        var parsed = WipLabelInvariants.SplitNumber("100/3");
+        var parsed = WipLabelInvariants.ParseNumber("100/3");
         Assert.Equal("100", parsed.RootNumber);
         Assert.Equal(3, parsed.Suffix);
+    }
+
+
+    [Fact]
+    public void FormatNumber_WithSuffix_ReturnsText()
+    {
+        var number = WipLabelInvariants.FormatNumber("100", 2);
+        Assert.Equal("100/2", number);
     }
 
     [Fact]

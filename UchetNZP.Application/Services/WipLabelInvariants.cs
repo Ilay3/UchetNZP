@@ -81,7 +81,7 @@ public static class WipLabelInvariants
         return remainingAfter <= Epsilon ? 0m : remainingAfter;
     }
 
-    public static (string RootNumber, int Suffix) SplitNumber(string labelNumber)
+    public static (string RootNumber, int Suffix) ParseNumber(string labelNumber)
     {
         if (string.IsNullOrWhiteSpace(labelNumber))
         {
@@ -108,6 +108,24 @@ public static class WipLabelInvariants
         }
 
         return (root, suffix);
+    }
+
+    public static string FormatNumber(string rootNumber, int suffix)
+    {
+        if (string.IsNullOrWhiteSpace(rootNumber))
+        {
+            throw new InvalidOperationException("Базовый номер ярлыка не может быть пустым.");
+        }
+
+        if (suffix < 0)
+        {
+            throw new InvalidOperationException("Суффикс номера ярлыка не может быть отрицательным.");
+        }
+
+        var trimmedRoot = rootNumber.Trim();
+        return suffix == 0
+            ? trimmedRoot
+            : $"{trimmedRoot}/{suffix}";
     }
 
     public static WipLabelStatus GetStatusAfterConsume(decimal remainingQuantityAfterConsume)

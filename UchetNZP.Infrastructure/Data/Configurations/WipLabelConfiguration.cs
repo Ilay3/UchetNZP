@@ -22,7 +22,7 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
             .HasPrecision(12, 3);
 
         builder.Property(x => x.Number)
-            .HasMaxLength(11)
+            .HasMaxLength(32)
             .IsRequired();
 
         builder.Property(x => x.Status)
@@ -34,7 +34,7 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
             .IsRequired();
 
         builder.Property(x => x.RootNumber)
-            .HasMaxLength(11)
+            .HasMaxLength(32)
             .IsRequired();
 
         builder.Property(x => x.Suffix)
@@ -43,6 +43,10 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.HasIndex(x => new { x.Status, x.CurrentSectionId, x.CurrentOpNumber });
 
         builder.HasIndex(x => x.RootLabelId);
+
+
+        builder.HasIndex(x => new { x.RootNumber, x.Suffix })
+            .IsUnique();
 
         builder.HasIndex(x => x.Number)
             .IsUnique();
