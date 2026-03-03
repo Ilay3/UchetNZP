@@ -335,9 +335,6 @@ public class TransferService : ITransferService
                 if (labelUsage is not null)
                 {
                     transferLabelId = labelUsage.Label.Id;
-                    transferLabelNumber = labelUsage.Label.Number;
-                    labelQuantityBefore = labelUsage.RemainingBefore;
-                    labelQuantityAfter = labelUsage.RemainingAfter;
                     transfer.WipLabelId = transferLabelId;
 
                     if (isWarehouseTransfer && warehouseItem is not null)
@@ -371,6 +368,10 @@ public class TransferService : ITransferService
                         residualLabelNumber = residualLabel.Number;
                         residualLabelQuantity = residualLabel.Quantity;
                     }
+
+                    transferLabelNumber = labelUsage.Label.Number;
+                    labelQuantityBefore = labelUsage.RemainingBefore;
+                    labelQuantityAfter = labelUsage.RemainingAfter;
                 }
 
                 var audit = new TransferAudit
@@ -602,9 +603,43 @@ public class TransferService : ITransferService
             throw new InvalidOperationException("Нельзя выполнять отрыв ярлыка, если остаток на исходной операции равен 0.");
         }
 
+        var currentTransferNumber = transferLabel.Number?.Trim() ?? string.Empty;
+        var slashIndex = currentTransferNumber.IndexOf('/');
+        if (!item.ResidualLabelNumber.HasValue && slashIndex > 0)
+        {
+            var transferBaseNumber = currentTransferNumber[..slashIndex];
+            var duplicateBaseExists = await _dbContext.WipLabels
+                .AnyAsync(x => x.PartId == item.PartId && x.Id != transferLabel.Id && x.Number == transferBaseNumber, cancellationToken)
+                .ConfigureAwait(false);
+
+            var duplicateBaseInMemory = _dbContext.WipLabels.Local
+                .Any(x => x.PartId == item.PartId && x.Id != transferLabel.Id && string.Equals(x.Number, transferBaseNumber, StringComparison.OrdinalIgnoreCase));
+
+            if (duplicateBaseExists || duplicateBaseInMemory)
+            {
+                throw new InvalidOperationException($"Ярлык с номером {transferBaseNumber} уже существует.");
+            }
+
+            transferLabel.Number = transferBaseNumber;
+
+            var residualFromSlashLabel = new WipLabel
+            {
+                Id = Guid.NewGuid(),
+                PartId = item.PartId,
+                LabelDate = transferDate,
+                Quantity = remainingAfterTransfer,
+                RemainingQuantity = remainingAfterTransfer,
+                Number = currentTransferNumber,
+                IsAssigned = true,
+            };
+
+            await _dbContext.WipLabels.AddAsync(residualFromSlashLabel, cancellationToken).ConfigureAwait(false);
+            return residualFromSlashLabel;
+        }
+
         var baseNumber = item.ResidualLabelNumber.HasValue
             ? item.ResidualLabelNumber.Value.ToString()
-            : GetResidualLabelBaseNumber(transferLabel.Number);
+            : GetResidualLabelBaseNumber(currentTransferNumber);
 
         if (string.IsNullOrWhiteSpace(baseNumber))
         {
