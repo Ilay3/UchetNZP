@@ -18,6 +18,20 @@ public class WipLabel
 
     public bool IsAssigned { get; set; }
 
+    public WipLabelStatus Status { get; set; } = WipLabelStatus.Active;
+
+    public Guid? CurrentSectionId { get; set; }
+
+    public int? CurrentOpNumber { get; set; }
+
+    public Guid RootLabelId { get; set; }
+
+    public Guid? ParentLabelId { get; set; }
+
+    public string RootNumber { get; set; } = string.Empty;
+
+    public int Suffix { get; set; }
+
     public virtual Part? Part { get; set; }
 
     public virtual WipReceipt? WipReceipt { get; set; }

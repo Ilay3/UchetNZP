@@ -128,10 +128,7 @@ public class WipLabelService : IWipLabelService
             throw new InvalidOperationException("Не выбрана деталь для создания ярлыка.");
         }
 
-        if (in_request.Quantity <= 0)
-        {
-            throw new InvalidOperationException("Количество должно быть больше нуля.");
-        }
+        WipLabelInvariants.EnsurePositiveLabelQuantity(in_request.Quantity);
 
         await using var transaction = await m_dbContext.Database
             .BeginTransactionAsync(IsolationLevel.Serializable, in_cancellationToken)
@@ -160,7 +157,14 @@ public class WipLabelService : IWipLabelService
                 RemainingQuantity = in_request.Quantity,
                 Number = normalizedNumber,
                 IsAssigned = false,
+                Status = WipLabelStatus.Active,
+                RootLabelId = Guid.Empty,
+                ParentLabelId = null,
+                RootNumber = string.Empty,
+                Suffix = 0,
             };
+
+            InitializeIdentity(entity, normalizedNumber);
 
             await m_dbContext.WipLabels.AddAsync(entity, in_cancellationToken).ConfigureAwait(false);
             await m_dbContext.SaveChangesAsync(in_cancellationToken).ConfigureAwait(false);
@@ -197,10 +201,7 @@ public class WipLabelService : IWipLabelService
             throw new InvalidOperationException("Не указан идентификатор ярлыка.");
         }
 
-        if (in_request.Quantity <= 0)
-        {
-            throw new InvalidOperationException("Количество должно быть больше нуля.");
-        }
+        WipLabelInvariants.EnsurePositiveLabelQuantity(in_request.Quantity);
 
         var normalizedNumber = NormalizeNumber(in_request.Number);
         var normalizedDate = NormalizeDate(in_request.LabelDate);
@@ -232,6 +233,9 @@ public class WipLabelService : IWipLabelService
 
         label.Number = normalizedNumber;
         label.LabelDate = normalizedDate;
+        var parsedNumber = WipLabelInvariants.SplitNumber(normalizedNumber);
+        label.RootNumber = parsedNumber.RootNumber;
+        label.Suffix = parsedNumber.Suffix;
         label.Quantity = in_request.Quantity;
         label.RemainingQuantity = in_request.Quantity;
 
@@ -251,6 +255,83 @@ public class WipLabelService : IWipLabelService
             label.IsAssigned);
 
         return ret;
+    }
+
+    public async Task<WipLabelStateDto> GetLabelStateAsync(Guid in_id, CancellationToken in_cancellationToken = default)
+    {
+        if (in_id == Guid.Empty)
+        {
+            throw new InvalidOperationException("Не указан идентификатор ярлыка.");
+        }
+
+        var state = await m_dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => x.Id == in_id)
+            .Select(x => new WipLabelStateDto(
+                x.Id,
+                x.Number,
+                x.Status.ToString(),
+                x.CurrentSectionId,
+                x.CurrentOpNumber,
+                x.RootLabelId,
+                x.ParentLabelId,
+                x.RootNumber,
+                x.Suffix,
+                x.Quantity,
+                x.RemainingQuantity))
+            .FirstOrDefaultAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (state is null)
+        {
+            throw new InvalidOperationException("Ярлык не найден.");
+        }
+
+        return state;
+    }
+
+    public async Task<IReadOnlyCollection<WipLabelLedgerEventDto>> GetLabelLedgerAsync(Guid in_id, CancellationToken in_cancellationToken = default)
+    {
+        if (in_id == Guid.Empty)
+        {
+            throw new InvalidOperationException("Не указан идентификатор ярлыка.");
+        }
+
+        var exists = await m_dbContext.WipLabels
+            .AsNoTracking()
+            .AnyAsync(x => x.Id == in_id, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!exists)
+        {
+            throw new InvalidOperationException("Ярлык не найден.");
+        }
+
+        var events = await m_dbContext.WipLabelLedger
+            .AsNoTracking()
+            .Where(x => x.FromLabelId == in_id || x.ToLabelId == in_id)
+            .OrderBy(x => x.EventTime)
+            .ThenBy(x => x.EventId)
+            .Select(x => new WipLabelLedgerEventDto(
+                x.EventId,
+                x.EventTime,
+                x.UserId,
+                x.TransactionId,
+                x.EventType.ToString(),
+                x.FromLabelId,
+                x.ToLabelId,
+                x.FromSectionId,
+                x.FromOpNumber,
+                x.ToSectionId,
+                x.ToOpNumber,
+                x.Qty,
+                x.ScrapQty,
+                x.RefEntityType,
+                x.RefEntityId))
+            .ToListAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        return events;
     }
 
     public async Task DeleteLabelAsync(Guid in_id, CancellationToken in_cancellationToken = default)
@@ -282,10 +363,7 @@ public class WipLabelService : IWipLabelService
             throw new InvalidOperationException("Не выбрана деталь для создания ярлыка.");
         }
 
-        if (in_quantity <= 0)
-        {
-            throw new InvalidOperationException("Количество должно быть больше нуля.");
-        }
+        WipLabelInvariants.EnsurePositiveLabelQuantity(in_quantity);
 
         if (in_count <= 0)
         {
@@ -314,8 +392,14 @@ public class WipLabelService : IWipLabelService
                     RemainingQuantity = in_quantity,
                     Number = number,
                     IsAssigned = false,
+                Status = WipLabelStatus.Active,
+                RootLabelId = Guid.Empty,
+                ParentLabelId = null,
+                RootNumber = string.Empty,
+                Suffix = 0,
                 };
 
+                InitializeIdentity(label, number);
                 entities.Add(label);
             }
 
@@ -334,6 +418,18 @@ public class WipLabelService : IWipLabelService
             await transaction.RollbackAsync(in_cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private static void InitializeIdentity(WipLabel label, string number)
+    {
+        var parsedNumber = WipLabelInvariants.SplitNumber(number);
+        label.RootLabelId = label.Id;
+        label.ParentLabelId = null;
+        label.RootNumber = parsedNumber.RootNumber;
+        label.Suffix = parsedNumber.Suffix;
+        label.Status = WipLabelStatus.Active;
+        label.CurrentSectionId = null;
+        label.CurrentOpNumber = null;
     }
 
     private async Task<Part> GetPartAsync(Guid in_partId, CancellationToken in_cancellationToken)

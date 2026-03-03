@@ -132,3 +132,36 @@ public class WipLabelUpdateDto
 
     public string Number { get; }
 }
+
+public record WipLabelStateDto(
+    Guid Id,
+    string Number,
+    string Status,
+    Guid? CurrentSectionId,
+    int? CurrentOpNumber,
+    Guid RootLabelId,
+    Guid? ParentLabelId,
+    string RootNumber,
+    int Suffix,
+    decimal Quantity,
+    decimal RemainingQuantity
+);
+
+
+public record WipLabelLedgerEventDto(
+    Guid EventId,
+    DateTime EventTime,
+    Guid UserId,
+    Guid TransactionId,
+    string EventType,
+    Guid? FromLabelId,
+    Guid? ToLabelId,
+    Guid? FromSectionId,
+    int? FromOpNumber,
+    Guid? ToSectionId,
+    int? ToOpNumber,
+    decimal Qty,
+    decimal ScrapQty,
+    string RefEntityType,
+    Guid? RefEntityId
+);

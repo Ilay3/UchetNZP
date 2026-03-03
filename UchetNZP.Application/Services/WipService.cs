@@ -41,6 +41,8 @@ public class WipService : IWipService
             var results = new List<ReceiptItemSummaryDto>(materialized.Count);
             var reservedLabelIds = new HashSet<Guid>();
             var balancesCache = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber), WipBalance>();
+            var transactionId = Guid.NewGuid();
+            var ledgerEvents = new List<WipLabelLedger>();
 
             foreach (var item in materialized)
             {
@@ -104,6 +106,21 @@ public class WipService : IWipService
                 var label = await ResolveLabelAsync(item, reservedLabelIds, cancellationToken).ConfigureAwait(false);
                 var previousLabelAssigned = label.IsAssigned;
                 label.IsAssigned = true;
+                label.Status = WipLabelStatus.Active;
+                label.CurrentSectionId = item.SectionId;
+                label.CurrentOpNumber = item.OpNumber;
+                if (label.RootLabelId == Guid.Empty)
+                {
+                    label.RootLabelId = label.Id;
+                }
+
+                if (string.IsNullOrWhiteSpace(label.RootNumber))
+                {
+                    var parsedNumber = WipLabelInvariants.SplitNumber(label.Number);
+                    label.RootNumber = parsedNumber.RootNumber;
+                    label.Suffix = parsedNumber.Suffix;
+                }
+
                 reservedLabelIds.Add(label.Id);
 
                 var versionId = Guid.NewGuid();
@@ -149,6 +166,25 @@ public class WipService : IWipService
                     },
                     cancellationToken).ConfigureAwait(false);
 
+                ledgerEvents.Add(new WipLabelLedger
+                {
+                    EventId = Guid.NewGuid(),
+                    EventTime = now,
+                    UserId = userId,
+                    TransactionId = transactionId,
+                    EventType = WipLabelEventType.Receipt,
+                    FromLabelId = label.Id,
+                    ToLabelId = label.Id,
+                    FromSectionId = item.SectionId,
+                    FromOpNumber = item.OpNumber,
+                    ToSectionId = item.SectionId,
+                    ToOpNumber = item.OpNumber,
+                    Qty = item.Quantity,
+                    ScrapQty = 0m,
+                    RefEntityType = nameof(WipReceipt),
+                    RefEntityId = receipt.Id,
+                });
+
                 results.Add(new ReceiptItemSummaryDto(
                     item.PartId,
                     item.OpNumber,
@@ -162,6 +198,11 @@ public class WipService : IWipService
                     label.Number,
                     label.IsAssigned,
                     versionId));
+            }
+
+            if (ledgerEvents.Count > 0)
+            {
+                await _dbContext.WipLabelLedger.AddRangeAsync(ledgerEvents, cancellationToken).ConfigureAwait(false);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -225,7 +266,19 @@ public class WipService : IWipService
                     RemainingQuantity = in_item.Quantity,
                     Number = normalizedLabelNumber,
                     IsAssigned = true,
+                    Status = WipLabelStatus.Active,
+                    CurrentSectionId = in_item.SectionId,
+                    CurrentOpNumber = in_item.OpNumber,
+                    RootLabelId = Guid.Empty,
+                    ParentLabelId = null,
+                    RootNumber = string.Empty,
+                    Suffix = 0,
                 };
+
+                var parsedNumber = WipLabelInvariants.SplitNumber(ret.Number);
+                ret.RootLabelId = ret.Id;
+                ret.RootNumber = parsedNumber.RootNumber;
+                ret.Suffix = parsedNumber.Suffix;
 
                 await _dbContext.WipLabels.AddAsync(ret, cancellationToken).ConfigureAwait(false);
             }
@@ -289,6 +342,8 @@ public class WipService : IWipService
 
         try
         {
+            var revertTransactionId = Guid.NewGuid();
+
             var audit = await _dbContext.ReceiptAudits
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.ReceiptId == in_receiptId && x.VersionId == in_versionId, cancellationToken)
@@ -380,6 +435,7 @@ public class WipService : IWipService
                 if (label is not null)
                 {
                     label.IsAssigned = audit.NewLabelAssigned;
+                    label.Status = audit.NewLabelAssigned ? WipLabelStatus.Active : WipLabelStatus.Reverted;
                 }
 
                 balance.Quantity = audit.NewBalance;
@@ -394,6 +450,7 @@ public class WipService : IWipService
                 if (label is not null)
                 {
                     label.IsAssigned = audit.NewLabelAssigned;
+                    label.Status = audit.NewLabelAssigned ? WipLabelStatus.Active : WipLabelStatus.Reverted;
                 }
 
                 balance.Quantity = audit.NewBalance;
@@ -423,6 +480,28 @@ public class WipService : IWipService
                     CreatedAt = now,
                 },
                 cancellationToken).ConfigureAwait(false);
+
+            if (label is not null)
+            {
+                await _dbContext.WipLabelLedger.AddAsync(new WipLabelLedger
+                {
+                    EventId = Guid.NewGuid(),
+                    EventTime = now,
+                    UserId = _currentUserService.UserId,
+                    TransactionId = revertTransactionId,
+                    EventType = WipLabelEventType.Revert,
+                    FromLabelId = label.Id,
+                    ToLabelId = label.Id,
+                    FromSectionId = audit.SectionId,
+                    FromOpNumber = audit.OpNumber,
+                    ToSectionId = audit.SectionId,
+                    ToOpNumber = audit.OpNumber,
+                    Qty = audit.NewQuantity ?? 0m,
+                    ScrapQty = 0m,
+                    RefEntityType = nameof(WipReceipt),
+                    RefEntityId = audit.ReceiptId,
+                }, cancellationToken).ConfigureAwait(false);
+            }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
@@ -556,6 +635,9 @@ public class WipService : IWipService
                 if (!deleteLabel)
                 {
                     label.IsAssigned = false;
+                    label.Status = WipLabelStatus.Reverted;
+                    label.CurrentSectionId = null;
+                    label.CurrentOpNumber = null;
                 }
             }
 
@@ -604,6 +686,8 @@ public class WipService : IWipService
                 cancellationToken).ConfigureAwait(false);
             _dbContext.WipReceipts.Remove(receipt);
 
+            var deleteTransactionId = Guid.NewGuid();
+
             if (deleteLabel && label is not null)
             {
                 var labelAudits = await _dbContext.ReceiptAudits
@@ -627,6 +711,28 @@ public class WipService : IWipService
                 }
 
                 _dbContext.WipLabels.Remove(label);
+            }
+
+            if (label is not null)
+            {
+                await _dbContext.WipLabelLedger.AddAsync(new WipLabelLedger
+                {
+                    EventId = Guid.NewGuid(),
+                    EventTime = now,
+                    UserId = _currentUserService.UserId,
+                    TransactionId = deleteTransactionId,
+                    EventType = WipLabelEventType.Revert,
+                    FromLabelId = label.Id,
+                    ToLabelId = label.Id,
+                    FromSectionId = receipt.SectionId,
+                    FromOpNumber = receipt.OpNumber,
+                    ToSectionId = null,
+                    ToOpNumber = null,
+                    Qty = receipt.Quantity,
+                    ScrapQty = 0m,
+                    RefEntityType = nameof(WipReceipt),
+                    RefEntityId = receipt.Id,
+                }, cancellationToken).ConfigureAwait(false);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

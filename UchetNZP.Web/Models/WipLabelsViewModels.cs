@@ -112,3 +112,36 @@ public class WipLabelListResponseModel
     [JsonPropertyName("totalCount")]
     public int TotalCount { get; }
 }
+
+public record WipLabelStateViewModel(
+    Guid Id,
+    string Number,
+    string Status,
+    Guid? CurrentSectionId,
+    int? CurrentOpNumber,
+    Guid RootLabelId,
+    Guid? ParentLabelId,
+    string RootNumber,
+    int Suffix,
+    decimal Quantity,
+    decimal RemainingQuantity
+);
+
+
+public record WipLabelLedgerEventViewModel(
+    Guid EventId,
+    DateTime EventTime,
+    Guid UserId,
+    Guid TransactionId,
+    string EventType,
+    Guid? FromLabelId,
+    Guid? ToLabelId,
+    Guid? FromSectionId,
+    int? FromOpNumber,
+    Guid? ToSectionId,
+    int? ToOpNumber,
+    decimal Qty,
+    decimal ScrapQty,
+    string RefEntityType,
+    Guid? RefEntityId
+);

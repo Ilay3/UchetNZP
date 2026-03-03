@@ -45,6 +45,7 @@ public class TransferService : ITransferService
             var results = new List<TransferItemSummaryDto>(materialized.Count);
             var transactionId = Guid.NewGuid();
             var balanceCache = new Dictionary<(Guid PartId, Guid SectionId, int OpNumber), WipBalance>();
+            var ledgerEvents = new List<WipLabelLedger>();
 
             async Task<WipBalance?> GetExistingBalanceAsync(Guid partId, Guid sectionId, int opNumber)
             {
@@ -100,10 +101,7 @@ public class TransferService : ITransferService
 
             foreach (var item in materialized)
             {
-                if (item.Quantity <= 0)
-                {
-                    throw new InvalidOperationException($"Количество для перехода детали {item.PartId} должно быть больше нуля.");
-                }
+                WipLabelInvariants.EnsurePositiveTransferQuantity(item.Quantity);
 
                 if (!routeCache.TryGetValue(item.PartId, out var orderedRoute))
                 {
@@ -158,10 +156,10 @@ public class TransferService : ITransferService
                     throw new InvalidOperationException($"Остаток НЗП для операции {item.FromOpNumber} детали {item.PartId} отсутствует.");
                 }
 
-                if (item.Quantity > fromBalance.Quantity)
-                {
-                    throw new InvalidOperationException($"Недостаточно остатка НЗП на операции {item.FromOpNumber} детали {item.PartId}. Доступно {fromBalance.Quantity}, требуется {item.Quantity}.");
-                }
+                WipLabelInvariants.EnsureCanTransferFromBalance(
+                    fromBalance.Quantity,
+                    item.Quantity,
+                    $"операции {item.FromOpNumber} детали {item.PartId}");
 
                 decimal toBalanceBefore;
                 decimal toBalanceAfter;
@@ -198,11 +196,6 @@ public class TransferService : ITransferService
 
                 var fromBalanceBefore = fromBalance.Quantity;
                 var remainingAfterTransfer = fromBalanceBefore - item.Quantity;
-                if (remainingAfterTransfer < 0)
-                {
-                    throw new InvalidOperationException(
-                        $"Остаток НЗП для операции {item.FromOpNumber} детали {item.PartId} не может стать отрицательным.");
-                }
 
                 var transferDate = NormalizeToUtc(item.TransferDate);
                 var trimmedComment = string.IsNullOrWhiteSpace(item.Comment) ? null : item.Comment.Trim();
@@ -372,6 +365,84 @@ public class TransferService : ITransferService
                     transferLabelNumber = labelUsage.Label.Number;
                     labelQuantityBefore = labelUsage.RemainingBefore;
                     labelQuantityAfter = labelUsage.RemainingAfter;
+
+                    if (!isWarehouseTransfer)
+                    {
+                        labelUsage.Label.CurrentSectionId = toSectionId;
+                        labelUsage.Label.CurrentOpNumber = item.ToOpNumber;
+                        if (labelUsage.Label.Status == WipLabelStatus.Consumed)
+                        {
+                            labelUsage.Label.Status = WipLabelStatus.Closed;
+                        }
+                    }
+                    else
+                    {
+                        labelUsage.Label.CurrentSectionId = WarehouseDefaults.SectionId;
+                        labelUsage.Label.CurrentOpNumber = WarehouseDefaults.OperationNumber;
+                    }
+
+                    ledgerEvents.Add(new WipLabelLedger
+                    {
+                        EventId = Guid.NewGuid(),
+                        EventTime = now,
+                        UserId = userId,
+                        TransactionId = transactionId,
+                        EventType = WipLabelEventType.Transfer,
+                        FromLabelId = labelUsage.Label.Id,
+                        ToLabelId = labelUsage.Label.Id,
+                        FromSectionId = fromRoute.SectionId,
+                        FromOpNumber = item.FromOpNumber,
+                        ToSectionId = isWarehouseTransfer ? WarehouseDefaults.SectionId : toSectionId,
+                        ToOpNumber = item.ToOpNumber,
+                        Qty = item.Quantity,
+                        ScrapQty = scrapQuantity,
+                        RefEntityType = nameof(WipTransfer),
+                        RefEntityId = transfer.Id,
+                    });
+
+                    if (scrapQuantity > 0m)
+                    {
+                        ledgerEvents.Add(new WipLabelLedger
+                        {
+                            EventId = Guid.NewGuid(),
+                            EventTime = now,
+                            UserId = userId,
+                            TransactionId = transactionId,
+                            EventType = WipLabelEventType.Scrap,
+                            FromLabelId = labelUsage.Label.Id,
+                            ToLabelId = labelUsage.Label.Id,
+                            FromSectionId = fromRoute.SectionId,
+                            FromOpNumber = item.FromOpNumber,
+                            ToSectionId = fromRoute.SectionId,
+                            ToOpNumber = item.FromOpNumber,
+                            Qty = 0m,
+                            ScrapQty = scrapQuantity,
+                            RefEntityType = nameof(WipTransfer),
+                            RefEntityId = transfer.Id,
+                        });
+                    }
+
+                    if (residualLabelId.HasValue)
+                    {
+                        ledgerEvents.Add(new WipLabelLedger
+                        {
+                            EventId = Guid.NewGuid(),
+                            EventTime = now,
+                            UserId = userId,
+                            TransactionId = transactionId,
+                            EventType = WipLabelEventType.Split,
+                            FromLabelId = labelUsage.Label.Id,
+                            ToLabelId = residualLabelId,
+                            FromSectionId = fromRoute.SectionId,
+                            FromOpNumber = item.FromOpNumber,
+                            ToSectionId = fromRoute.SectionId,
+                            ToOpNumber = item.FromOpNumber,
+                            Qty = residualLabelQuantity ?? 0m,
+                            ScrapQty = 0m,
+                            RefEntityType = nameof(WipTransfer),
+                            RefEntityId = transfer.Id,
+                        });
+                    }
                 }
 
                 var audit = new TransferAudit
@@ -457,6 +528,11 @@ public class TransferService : ITransferService
                     labelQuantityAfter,
                     residualLabelNumber,
                     false));
+            }
+
+            if (ledgerEvents.Count > 0)
+            {
+                await _dbContext.WipLabelLedger.AddRangeAsync(ledgerEvents, cancellationToken).ConfigureAwait(false);
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -579,8 +655,14 @@ public class TransferService : ITransferService
         }
 
         var remainingBefore = label.RemainingQuantity;
-        var remainingAfter = remainingBefore - consumedFromLabel;
+        var remainingAfter = WipLabelInvariants.ConsumeLabelQuantity(
+            label.Quantity,
+            remainingBefore,
+            consumedFromLabel,
+            label.Number);
+
         label.RemainingQuantity = remainingAfter;
+        label.Status = WipLabelInvariants.GetStatusAfterConsume(remainingAfter);
 
         var ret = new TransferLabelUsage(label, remainingBefore, remainingAfter);
         return ret;
@@ -598,12 +680,18 @@ public class TransferService : ITransferService
             return null;
         }
 
-        if (remainingAfterTransfer <= 0m)
-        {
-            throw new InvalidOperationException("Нельзя выполнять отрыв ярлыка, если остаток на исходной операции равен 0.");
-        }
+        WipLabelInvariants.EnsureCanTearOff(remainingAfterTransfer);
 
         var currentTransferNumber = transferLabel.Number?.Trim() ?? string.Empty;
+        if (transferLabel.RootLabelId == Guid.Empty)
+        {
+            transferLabel.RootLabelId = transferLabel.Id;
+        }
+
+        if (string.IsNullOrWhiteSpace(transferLabel.RootNumber))
+        {
+            transferLabel.RootNumber = WipLabelInvariants.SplitNumber(currentTransferNumber).RootNumber;
+        }
         var slashIndex = currentTransferNumber.IndexOf('/');
         if (!item.ResidualLabelNumber.HasValue && slashIndex > 0)
         {
@@ -631,6 +719,13 @@ public class TransferService : ITransferService
                 RemainingQuantity = remainingAfterTransfer,
                 Number = currentTransferNumber,
                 IsAssigned = true,
+                Status = WipLabelStatus.Active,
+                CurrentSectionId = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.SectionId : transferLabel.CurrentSectionId ?? WarehouseDefaults.SectionId,
+                CurrentOpNumber = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.OperationNumber : item.FromOpNumber,
+                RootLabelId = transferLabel.RootLabelId == Guid.Empty ? transferLabel.Id : transferLabel.RootLabelId,
+                ParentLabelId = transferLabel.Id,
+                RootNumber = transferLabel.RootNumber,
+                Suffix = WipLabelInvariants.SplitNumber(currentTransferNumber).Suffix,
             };
 
             await _dbContext.WipLabels.AddAsync(residualFromSlashLabel, cancellationToken).ConfigureAwait(false);
@@ -677,6 +772,8 @@ public class TransferService : ITransferService
             throw new InvalidOperationException($"Ярлык с номером {residualNumber} уже существует.");
         }
 
+        var parsedResidualNumber = WipLabelInvariants.SplitNumber(residualNumber);
+
         var residualLabel = new WipLabel
         {
             Id = Guid.NewGuid(),
@@ -686,6 +783,13 @@ public class TransferService : ITransferService
             RemainingQuantity = remainingAfterTransfer,
             Number = residualNumber,
             IsAssigned = true,
+            Status = WipLabelStatus.Active,
+            CurrentSectionId = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.SectionId : transferLabel.CurrentSectionId ?? WarehouseDefaults.SectionId,
+            CurrentOpNumber = item.ToOpNumber == WarehouseDefaults.OperationNumber ? WarehouseDefaults.OperationNumber : item.FromOpNumber,
+            RootLabelId = transferLabel.RootLabelId == Guid.Empty ? transferLabel.Id : transferLabel.RootLabelId,
+            ParentLabelId = transferLabel.Id,
+            RootNumber = transferLabel.RootNumber,
+            Suffix = parsedResidualNumber.Suffix,
         };
 
         await _dbContext.WipLabels.AddAsync(residualLabel, cancellationToken).ConfigureAwait(false);
@@ -765,6 +869,10 @@ public class TransferService : ITransferService
 
         try
         {
+            var now = DateTime.UtcNow;
+            var userId = _currentUserService.UserId;
+            var deleteTransactionId = Guid.NewGuid();
+
             var transfer = await _dbContext.WipTransfers
                 .Include(x => x.Operations)
                 .Include(x => x.Scrap)
@@ -908,6 +1016,28 @@ public class TransferService : ITransferService
                 }
 
                 label.RemainingQuantity = updatedQuantity;
+                label.Status = WipLabelInvariants.GetStatusAfterConsume(updatedQuantity);
+                label.CurrentSectionId = transfer.FromSectionId;
+                label.CurrentOpNumber = transfer.FromOpNumber;
+
+                await _dbContext.WipLabelLedger.AddAsync(new WipLabelLedger
+                {
+                    EventId = Guid.NewGuid(),
+                    EventTime = now,
+                    UserId = userId,
+                    TransactionId = deleteTransactionId,
+                    EventType = WipLabelEventType.Revert,
+                    FromLabelId = label.Id,
+                    ToLabelId = label.Id,
+                    FromSectionId = transfer.ToSectionId,
+                    FromOpNumber = transfer.ToOpNumber,
+                    ToSectionId = transfer.FromSectionId,
+                    ToOpNumber = transfer.FromOpNumber,
+                    Qty = transfer.Quantity,
+                    ScrapQty = scrapQuantity,
+                    RefEntityType = nameof(WipTransfer),
+                    RefEntityId = transfer.Id,
+                }, cancellationToken).ConfigureAwait(false);
                 labelQuantityAfter = updatedQuantity;
                 transferLabelNumber = label.Number;
             }
@@ -961,6 +1091,10 @@ public class TransferService : ITransferService
 
         try
         {
+            var now = DateTime.UtcNow;
+            var userId = _currentUserService.UserId;
+            var revertTransactionId = Guid.NewGuid();
+
             var audit = await _dbContext.TransferAudits
                 .Include(x => x.Operations)
                 .FirstOrDefaultAsync(x => x.Id == transferAuditId, cancellationToken)
@@ -1098,8 +1232,31 @@ public class TransferService : ITransferService
                     throw new InvalidOperationException($"Для передачи {transfer.Id} не найден ярлык {transferLabelId.Value}.");
                 }
 
-                label.RemainingQuantity = audit.LabelQuantityBefore ?? label.RemainingQuantity;
+                var restoredRemaining = audit.LabelQuantityBefore ?? label.RemainingQuantity;
+                label.RemainingQuantity = restoredRemaining;
+                label.Status = WipLabelInvariants.GetStatusAfterConsume(restoredRemaining);
+                label.CurrentSectionId = audit.ToSectionId;
+                label.CurrentOpNumber = audit.ToOpNumber;
                 transferLabelNumber = label.Number;
+
+                await _dbContext.WipLabelLedger.AddAsync(new WipLabelLedger
+                {
+                    EventId = Guid.NewGuid(),
+                    EventTime = now,
+                    UserId = userId,
+                    TransactionId = revertTransactionId,
+                    EventType = WipLabelEventType.Revert,
+                    FromLabelId = label.Id,
+                    ToLabelId = label.Id,
+                    FromSectionId = audit.FromSectionId,
+                    FromOpNumber = audit.FromOpNumber,
+                    ToSectionId = audit.ToSectionId,
+                    ToOpNumber = audit.ToOpNumber,
+                    Qty = audit.Quantity,
+                    ScrapQty = audit.ScrapQuantity,
+                    RefEntityType = nameof(TransferAudit),
+                    RefEntityId = audit.Id,
+                }, cancellationToken).ConfigureAwait(false);
             }
 
             if (operations.Count > 0)

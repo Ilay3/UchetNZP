@@ -25,6 +25,25 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
             .HasMaxLength(11)
             .IsRequired();
 
+        builder.Property(x => x.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsRequired();
+
+        builder.Property(x => x.RootLabelId)
+            .IsRequired();
+
+        builder.Property(x => x.RootNumber)
+            .HasMaxLength(11)
+            .IsRequired();
+
+        builder.Property(x => x.Suffix)
+            .IsRequired();
+
+        builder.HasIndex(x => new { x.Status, x.CurrentSectionId, x.CurrentOpNumber });
+
+        builder.HasIndex(x => x.RootLabelId);
+
         builder.HasIndex(x => x.Number)
             .IsUnique();
 
