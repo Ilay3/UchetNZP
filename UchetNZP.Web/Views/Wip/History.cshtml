@@ -382,23 +382,16 @@
                                                     <div class="d-flex flex-wrap gap-3">
                                                         @if (entry.Type == WipHistoryEntryType.Transfer && entry.HasVersions && entry.AuditId.HasValue)
                                                         {
-                                                            <button type="button" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2 js-history-transfer-revert" data-type="@entryType" @(entry.IsCancelled ? "disabled" : string.Empty)>
-                                                                <i class="bi bi-arrow-counterclockwise fs-5" aria-hidden="true"></i>
-                                                                <span class="fw-semibold">Отменить передачу</span>
-                                                            </button>
-                                                        }
-                                                        @if (entry.Type == WipHistoryEntryType.Receipt && entry.HasVersions)
-                                                        {
-                                                            <button type="button" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2 js-history-receipt-revert" data-type="@entryType">
-                                                                <i class="bi bi-arrow-clockwise fs-5" aria-hidden="true"></i>
-                                                                <span class="fw-semibold">Восстановить приход</span>
+                                                            <button type="button" class="btn btn-outline-secondary btn-sm px-2 py-1 d-inline-flex align-items-center gap-1 js-history-transfer-revert" data-type="@entryType" @(entry.IsCancelled ? "disabled" : string.Empty)>
+                                                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+                                                                <span>Отменить передачу</span>
                                                             </button>
                                                         }
                                                         @if (entry.Type == WipHistoryEntryType.Receipt && entry.CanDeleteReceipt)
                                                         {
-                                                            <button type="button" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-2 js-history-receipt-delete" data-type="@entryType">
-                                                                <i class="bi bi-trash3 fs-5" aria-hidden="true"></i>
-                                                                <span class="fw-semibold">Удалить приход</span>
+                                                            <button type="button" class="btn btn-outline-danger btn-sm px-2 py-1 d-inline-flex align-items-center gap-1 js-history-receipt-delete" data-type="@entryType">
+                                                                <i class="bi bi-trash3" aria-hidden="true"></i>
+                                                                <span>Удалить приход</span>
                                                             </button>
                                                         }
                                                     </div>
@@ -409,7 +402,6 @@
                                                         }
                                                         @if (entry.Type == WipHistoryEntryType.Receipt)
                                                         {
-                                                            <div>Восстановление использует сохранённые версии прихода.</div>
                                                             @if (entry.CanDeleteReceipt)
                                                             {
                                                                 <div class="text-danger fw-semibold">Удаление окончательное: аудит сохранится, ярлыки будут отвязаны.</div>
@@ -443,27 +435,6 @@ else
         <p class="mb-0">Попробуйте расширить диапазон дат или изменить типы операций.</p>
     </div>
 }
-
-<div class="modal fade" id="historyRevertModal" tabindex="-1" aria-labelledby="historyRevertModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="historyRevertModalLabel">Восстановление прихода</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-warning" role="alert">
-                    Выберите нужную версию, чтобы вернуть приход к сохранённому состоянию. Перед подтверждением убедитесь, что количество не станет отрицательным.
-                </div>
-                <div id="historyRevertVersions" class="list-group small"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" id="historyRevertConfirm" disabled>Восстановить</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <div class="d-flex justify-content-end mt-4">
     <a class="btn btn-link" asp-controller="Home" asp-action="Index">← На главную</a>

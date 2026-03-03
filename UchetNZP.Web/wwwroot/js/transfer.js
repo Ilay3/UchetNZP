@@ -1098,7 +1098,7 @@
         const totalText = Number(selectedLabelOption.quantity ?? 0)
             .toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
         const numberText = selectedLabelOption.number ? `№ ${selectedLabelOption.number}` : String(selectedLabelOption.id);
-        labelHintElement.textContent = `${numberText}: остаток ${remainingText} из ${totalText} шт.`;
+        labelHintElement.textContent = `${numberText}: на выбранной операции доступно ${remainingText} шт, общий объём ярлыка ${totalText} шт.`;
     }
 
     function updateResidualLabelHint() {
@@ -1456,10 +1456,7 @@
             : String(option.id ?? "");
         const remaining = Number(option.remainingQuantity ?? option.remainingquantity ?? 0)
             .toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-        const total = Number(option.quantity ?? 0)
-            .toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-
-        return `${number} — осталось ${remaining} из ${total}`;
+        return `${number} — доступно на операции ${remaining} шт`;
     }
 
     function formatSelectedLabel(item) {

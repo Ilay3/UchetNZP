@@ -188,7 +188,7 @@ public class HistoryPageUiTests : IClassFixture<WebApplicationFactory<Program>>
 
         var html = await response.Content.ReadAsStringAsync();
 
-        Assert.Contains("js-history-receipt-revert", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("js-history-receipt-revert", html, StringComparison.Ordinal);
         Assert.Contains("js-history-transfer-revert", html, StringComparison.Ordinal);
     }
 }
