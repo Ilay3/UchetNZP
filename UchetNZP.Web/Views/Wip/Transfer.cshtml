@@ -41,13 +41,16 @@
                 <div class="form-text" id="transferLabelHint">Сначала выберите операцию «откуда», затем ярлык.</div>
             </div>
             <div class="col-12 col-xl-6">
-                <div class="form-check form-switch mt-2 mb-3">
-                    <input class="form-check-input" type="checkbox" role="switch" id="transferCreateResidualLabelCheckbox" />
-                    <label class="form-check-label" for="transferCreateResidualLabelCheckbox">Отрыв ярлыка для остатка</label>
-                </div>
-                <label class="form-label" for="transferResidualLabelNumberInput">Номер ярлыка остатка (базовый)</label>
+                <label class="form-label" for="transferScenarioSelect">Сценарий операции</label>
+                <select id="transferScenarioSelect" class="form-select form-select-lg mb-3">
+                    <option value="MoveLabel">MoveLabel — перемещение ярлыка целиком</option>
+                    <option value="TransferFromLabel">TransferFromLabel — передача количества с ярлыка</option>
+                    <option value="SplitAndTransfer" selected>SplitAndTransfer — отрыв и передача</option>
+                </select>
+                <div class="form-text mb-2" id="transferScenarioHint">Выберите явный тип операции: Move / Transfer / Split+Transfer.</div>
+                <label class="form-label" for="transferResidualLabelNumberInput">Базовый номер нового ярлыка (при создании)</label>
                 <input id="transferResidualLabelNumberInput" class="form-control form-control-lg" type="number" min="1" step="1" placeholder="Например, 103" disabled />
-                <div class="form-text" id="transferResidualLabelHint">Если номер не указан, будет создан автоматически: 103/1.</div>
+                <div class="form-text" id="transferResidualLabelHint">Для сценариев с созданием ярлыка номер можно не указывать — будет выбран следующий суффикс автоматически.</div>
             </div>
             <div class="col-sm-6 col-lg-4 col-xl-3">
                 <label class="form-label" for="transferDateInput">Дата передачи</label>

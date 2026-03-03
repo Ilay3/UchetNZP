@@ -15,6 +15,7 @@ builder.Host.UseWindowsService();
 builder.Services.Configure<MaintenanceOptions>(builder.Configuration.GetSection("Maintenance"));
 builder.Services.Configure<BackgroundBubblesOptions>(builder.Configuration.GetSection("BackgroundBubbles"));
 builder.Services.Configure<WarehouseDailyResetOptions>(builder.Configuration.GetSection("WarehouseDailyReset"));
+builder.Services.Configure<TransferOptions>(builder.Configuration.GetSection("Transfer"));
 
 builder.Services
     .AddAuthentication(options =>

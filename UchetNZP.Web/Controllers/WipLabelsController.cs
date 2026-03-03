@@ -368,6 +368,59 @@ public class WipLabelsController : Controller
         }
     }
 
+    [HttpPost("merge")]
+    public async Task<IActionResult> MergeLabels([FromBody] WipLabelMergeInputModel? in_request, CancellationToken in_cancellationToken)
+    {
+        if (in_request is null)
+        {
+            return BadRequest("Запрос не может быть пустым.");
+        }
+
+        try
+        {
+            var result = await m_wipLabelService
+                .MergeLabelsAsync(new WipLabelMergeRequestDto(in_request.InputLabelIds, in_request.MergeDate, in_request.NumberBase), in_cancellationToken)
+                .ConfigureAwait(false);
+
+            return Ok(new WipLabelMergeResultViewModel(result.OutputLabelId, result.OutputLabelNumber, result.Quantity, result.InputLabelIds));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            return Conflict($"Конфликт параллельного изменения: {ex.Message}");
+        }
+        catch (DbUpdateException ex)
+        {
+            return BadRequest($"Операция merge отклонена ограничениями БД: {ex.InnerException?.Message ?? ex.Message}");
+        }
+    }
+
+    [HttpGet("{id:guid}/merge-trace")]
+    public async Task<IActionResult> GetMergeTrace(Guid id, CancellationToken in_cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор ярлыка.");
+        }
+
+        try
+        {
+            var trace = await m_wipLabelService.GetMergeTraceAsync(id, in_cancellationToken).ConfigureAwait(false);
+            return Ok(new WipLabelMergeTraceViewModel(
+                trace.LabelId,
+                trace.LabelNumber,
+                trace.FromLabels.Select(x => new WipLabelMergeLinkViewModel(x.InputLabelId, x.InputLabelNumber, x.OutputLabelId, x.OutputLabelNumber, x.CreatedAt)).ToList(),
+                trace.ToLabels.Select(x => new WipLabelMergeLinkViewModel(x.InputLabelId, x.InputLabelNumber, x.OutputLabelId, x.OutputLabelNumber, x.CreatedAt)).ToList()));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
     private static WipLabelListItemViewModel MapToViewModel(WipLabelDto in_label)
     {
         if (in_label is null)

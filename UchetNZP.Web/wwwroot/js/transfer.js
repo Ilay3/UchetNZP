@@ -44,7 +44,7 @@
     const toLabelsElement = document.getElementById("transferToLabels");
     const labelSelect = document.getElementById("transferLabelSelect");
     const labelHintElement = document.getElementById("transferLabelHint");
-    const createResidualLabelCheckbox = document.getElementById("transferCreateResidualLabelCheckbox");
+    const scenarioSelect = document.getElementById("transferScenarioSelect");
     const residualLabelNumberInput = document.getElementById("transferResidualLabelNumberInput");
     const residualLabelHintElement = document.getElementById("transferResidualLabelHint");
     const addButton = document.getElementById("transferAddButton");
@@ -262,10 +262,12 @@
         updateResidualLabelHint();
     });
 
-    createResidualLabelCheckbox?.addEventListener("change", () => {
+    scenarioSelect?.addEventListener("change", () => {
         if (residualLabelNumberInput) {
-            residualLabelNumberInput.disabled = !createResidualLabelCheckbox.checked;
-            if (!createResidualLabelCheckbox.checked) {
+            const selectedScenario = scenarioSelect?.value ?? "SplitAndTransfer";
+            const createsChildLabel = selectedScenario === "TransferFromLabel" || selectedScenario === "SplitAndTransfer";
+            residualLabelNumberInput.disabled = !createsChildLabel;
+            if (!createsChildLabel) {
                 residualLabelNumberInput.value = "";
             }
         }
@@ -1106,8 +1108,9 @@
             return;
         }
 
-        if (!createResidualLabelCheckbox?.checked) {
-            residualLabelHintElement.textContent = "Опция отключена: текущая логика передачи без отрыва ярлыка.";
+        const selectedScenario = scenarioSelect?.value ?? "SplitAndTransfer";
+        if (selectedScenario === "MoveLabel") {
+            residualLabelHintElement.textContent = "MoveLabel: новый ярлык не создаётся.";
             return;
         }
 
@@ -1116,7 +1119,7 @@
             return;
         }
 
-        residualLabelHintElement.textContent = "Будет использован указанный базовый номер для отрыва ярлыка.";
+        residualLabelHintElement.textContent = "Будет использован указанный базовый номер нового ярлыка.";
     }
 
     function resetForm() {
@@ -1125,12 +1128,12 @@
         if (dateInput) {
             dateInput.value = today;
         }
-        if (createResidualLabelCheckbox) {
-            createResidualLabelCheckbox.checked = false;
+        if (scenarioSelect) {
+            scenarioSelect.value = "SplitAndTransfer";
         }
         if (residualLabelNumberInput) {
             residualLabelNumberInput.value = "";
-            residualLabelNumberInput.disabled = true;
+            residualLabelNumberInput.disabled = false;
         }
 
         selectedFromOperation = null;
@@ -1179,10 +1182,11 @@
             return;
         }
 
-        const createResidualLabel = Boolean(createResidualLabelCheckbox?.checked);
+        const scenario = scenarioSelect?.value ?? "SplitAndTransfer";
+        const createResidualLabel = scenario === "SplitAndTransfer";
         const residualLabelNumberRaw = residualLabelNumberInput?.value?.trim() ?? "";
         let residualLabelNumber = null;
-        if (createResidualLabel && residualLabelNumberRaw.length > 0) {
+        if ((scenario === "TransferFromLabel" || scenario === "SplitAndTransfer") && residualLabelNumberRaw.length > 0) {
             const parsedResidual = Number(residualLabelNumberRaw);
             if (!Number.isInteger(parsedResidual) || parsedResidual <= 0) {
                 alert("Номер ярлыка остатка должен быть целым числом больше 0.");
@@ -1242,6 +1246,7 @@
             labelQuantityBefore: labelQuantityBeforeValue,
             labelQuantityAfter: labelQuantityBeforeValue,
             labelQuantityTotal: labelQuantityTotalValue,
+            scenario,
             createResidualLabel,
             residualLabelNumber,
         };
@@ -1261,6 +1266,7 @@
             }
 
             if (decision.action === "split") {
+                item.scenario = "SplitAndTransfer";
                 item.createResidualLabel = true;
             }
             else {
@@ -1900,11 +1906,12 @@
         }
         commentInput.value = item.comment ?? "";
         quantityInput.value = item.quantity;
-        if (createResidualLabelCheckbox) {
-            createResidualLabelCheckbox.checked = Boolean(item.createResidualLabel);
+        if (scenarioSelect) {
+            scenarioSelect.value = item.scenario ?? (item.createResidualLabel ? "SplitAndTransfer" : "MoveLabel");
         }
         if (residualLabelNumberInput) {
-            residualLabelNumberInput.disabled = !createResidualLabelCheckbox?.checked;
+            const selectedScenario = scenarioSelect?.value ?? "SplitAndTransfer";
+            residualLabelNumberInput.disabled = !(selectedScenario === "TransferFromLabel" || selectedScenario === "SplitAndTransfer");
             residualLabelNumberInput.value = item.residualLabelNumber ?? "";
         }
         if (dateInput) {
@@ -1954,6 +1961,7 @@
                 quantity: item.quantity,
                 comment: item.comment,
                 wipLabelId: item.labelId,
+                scenario: getScenarioCode(item.scenario ?? (item.createResidualLabel ? "SplitAndTransfer" : "MoveLabel")),
                 createResidualLabel: Boolean(item.createResidualLabel),
                 residualLabelNumber: item.residualLabelNumber,
                 scrap: buildScrapPayload(item),
@@ -2146,6 +2154,18 @@
         }
     }
 
+    function getScenarioCode(in_scenario) {
+        switch (in_scenario) {
+            case "MoveLabel":
+                return 1;
+            case "TransferFromLabel":
+                return 2;
+            case "SplitAndTransfer":
+            default:
+                return 3;
+        }
+    }
+
     function showSummary(summary) {
         if (!summaryTableBody || !summaryIntro) {
             return;
@@ -2183,6 +2203,10 @@
     }
 
     renderRecentTransfers();
+    if (residualLabelNumberInput) {
+        const selectedScenario = scenarioSelect?.value ?? "SplitAndTransfer";
+        residualLabelNumberInput.disabled = !(selectedScenario === "TransferFromLabel" || selectedScenario === "SplitAndTransfer");
+    }
     updateResidualLabelHint();
     updateFormState();
 

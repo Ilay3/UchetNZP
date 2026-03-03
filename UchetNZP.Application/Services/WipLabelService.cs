@@ -356,6 +356,167 @@ public class WipLabelService : IWipLabelService
         await m_dbContext.SaveChangesAsync(in_cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<WipLabelMergeResultDto> MergeLabelsAsync(WipLabelMergeRequestDto in_request, CancellationToken in_cancellationToken = default)
+    {
+        if (in_request is null)
+        {
+            throw new ArgumentNullException(nameof(in_request));
+        }
+
+        var inputIds = in_request.InputLabelIds?
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToList() ?? new List<Guid>();
+
+        if (inputIds.Count < 2)
+        {
+            throw new InvalidOperationException("Для merge требуется минимум два входных ярлыка.");
+        }
+
+        await using var transaction = await m_dbContext.Database
+            .BeginTransactionAsync(IsolationLevel.Serializable, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            var labels = await m_dbContext.WipLabels
+                .Where(x => inputIds.Contains(x.Id))
+                .ToListAsync(in_cancellationToken)
+                .ConfigureAwait(false);
+
+            if (labels.Count != inputIds.Count)
+            {
+                throw new InvalidOperationException("Не все входные ярлыки найдены.");
+            }
+
+            var distinctPartIds = labels.Select(x => x.PartId).Distinct().ToList();
+            if (distinctPartIds.Count != 1)
+            {
+                throw new InvalidOperationException("Объединять можно только ярлыки одной детали.");
+            }
+
+            foreach (var label in labels)
+            {
+                if (label.Status == WipLabelStatus.Merged)
+                {
+                    throw new InvalidOperationException($"Ярлык {label.Number} уже объединён.");
+                }
+
+                if (label.RemainingQuantity <= 0m)
+                {
+                    throw new InvalidOperationException($"Ярлык {label.Number} не имеет остатка для объединения.");
+                }
+            }
+
+            var mergeDate = NormalizeDate(in_request.MergeDate);
+            var mergeRoot = await ResolveMergeRootNumberAsync(in_request.NumberBase, labels, in_cancellationToken).ConfigureAwait(false);
+            var nextSuffix = await ResolveNextSuffixAsync(mergeRoot, in_cancellationToken).ConfigureAwait(false);
+            var outputNumber = WipLabelInvariants.FormatNumber(mergeRoot, nextSuffix);
+            var outputQuantity = labels.Sum(x => x.RemainingQuantity);
+            var now = DateTime.UtcNow;
+
+            var outputLabel = new WipLabel
+            {
+                Id = Guid.NewGuid(),
+                PartId = distinctPartIds[0],
+                LabelDate = mergeDate,
+                Quantity = outputQuantity,
+                RemainingQuantity = outputQuantity,
+                Number = outputNumber,
+                IsAssigned = true,
+                Status = WipLabelStatus.Active,
+                RootLabelId = Guid.Empty,
+                ParentLabelId = null,
+                RootNumber = mergeRoot,
+                Suffix = nextSuffix,
+            };
+            InitializeIdentity(outputLabel, outputNumber);
+
+            await m_dbContext.WipLabels.AddAsync(outputLabel, in_cancellationToken).ConfigureAwait(false);
+
+            var mergeLinks = new List<LabelMerge>(labels.Count);
+            var mergeLedger = new List<WipLabelLedger>(labels.Count);
+            var transactionId = Guid.NewGuid();
+            foreach (var inputLabel in labels)
+            {
+                var consumed = inputLabel.RemainingQuantity;
+                inputLabel.RemainingQuantity = 0m;
+                inputLabel.Status = WipLabelStatus.Merged;
+
+                mergeLinks.Add(new LabelMerge
+                {
+                    Id = Guid.NewGuid(),
+                    InputLabelId = inputLabel.Id,
+                    OutputLabelId = outputLabel.Id,
+                    CreatedAt = now,
+                });
+
+                mergeLedger.Add(new WipLabelLedger
+                {
+                    EventId = Guid.NewGuid(),
+                    EventTime = now,
+                    UserId = Guid.Empty,
+                    TransactionId = transactionId,
+                    EventType = WipLabelEventType.Merge,
+                    FromLabelId = inputLabel.Id,
+                    ToLabelId = outputLabel.Id,
+                    Qty = consumed,
+                    ScrapQty = 0m,
+                    RefEntityType = nameof(LabelMerge),
+                    RefEntityId = outputLabel.Id,
+                });
+            }
+
+            await m_dbContext.LabelMerges.AddRangeAsync(mergeLinks, in_cancellationToken).ConfigureAwait(false);
+            await m_dbContext.WipLabelLedger.AddRangeAsync(mergeLedger, in_cancellationToken).ConfigureAwait(false);
+            await m_dbContext.SaveChangesAsync(in_cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(in_cancellationToken).ConfigureAwait(false);
+
+            return new WipLabelMergeResultDto(outputLabel.Id, outputLabel.Number, outputLabel.Quantity, labels.Select(x => x.Id).ToList());
+        }
+        catch
+        {
+            await transaction.RollbackAsync(in_cancellationToken).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task<WipLabelMergeTraceDto> GetMergeTraceAsync(Guid in_labelId, CancellationToken in_cancellationToken = default)
+    {
+        if (in_labelId == Guid.Empty)
+        {
+            throw new InvalidOperationException("Не указан идентификатор ярлыка.");
+        }
+
+        var label = await m_dbContext.WipLabels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == in_labelId, in_cancellationToken)
+            .ConfigureAwait(false);
+
+        if (label is null)
+        {
+            throw new InvalidOperationException("Ярлык не найден.");
+        }
+
+        var from = await m_dbContext.LabelMerges
+            .AsNoTracking()
+            .Where(x => x.OutputLabelId == in_labelId)
+            .Join(m_dbContext.WipLabels.AsNoTracking(), x => x.InputLabelId, l => l.Id,
+                (x, inLabel) => new WipLabelMergeLinkDto(x.InputLabelId, inLabel.Number, x.OutputLabelId, label.Number, x.CreatedAt))
+            .ToListAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        var to = await m_dbContext.LabelMerges
+            .AsNoTracking()
+            .Where(x => x.InputLabelId == in_labelId)
+            .Join(m_dbContext.WipLabels.AsNoTracking(), x => x.OutputLabelId, l => l.Id,
+                (x, outLabel) => new WipLabelMergeLinkDto(x.InputLabelId, label.Number, x.OutputLabelId, outLabel.Number, x.CreatedAt))
+            .ToListAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        return new WipLabelMergeTraceDto(label.Id, label.Number, from, to);
+    }
+
     private async Task<List<WipLabelDto>> CreateLabelsAsync(Guid in_partId, DateTime in_labelDate, decimal in_quantity, int in_count, CancellationToken in_cancellationToken)
     {
         if (in_partId == Guid.Empty)
@@ -515,6 +676,41 @@ public class WipLabelService : IWipLabelService
         }
 
         return WipLabelInvariants.FormatNumber(normalizedBase, parsed.Suffix);
+    }
+
+    private async Task<string> ResolveMergeRootNumberAsync(string? in_numberBase, IReadOnlyCollection<WipLabel> in_labels, CancellationToken in_cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(in_numberBase))
+        {
+            var normalized = NormalizeNumber(in_numberBase);
+            var parsed = WipLabelInvariants.ParseNumber(normalized);
+            return parsed.RootNumber;
+        }
+
+        var commonRoots = in_labels
+            .Select(x => string.IsNullOrWhiteSpace(x.RootNumber) ? WipLabelInvariants.ParseNumber(x.Number).RootNumber : x.RootNumber)
+            .Distinct()
+            .ToList();
+
+        if (commonRoots.Count == 1)
+        {
+            return commonRoots[0];
+        }
+
+        var generated = await GenerateSequentialNumbersAsync(1, in_cancellationToken).ConfigureAwait(false);
+        return WipLabelInvariants.ParseNumber(generated[0]).RootNumber;
+    }
+
+    private async Task<int> ResolveNextSuffixAsync(string in_rootNumber, CancellationToken in_cancellationToken)
+    {
+        var maxSuffix = await m_dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => x.RootNumber == in_rootNumber)
+            .Select(x => (int?)x.Suffix)
+            .MaxAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        return (maxSuffix ?? -1) + 1;
     }
 
     private async Task EnsureLabelCanBeModifiedAsync(Guid in_labelId, CancellationToken in_cancellationToken)

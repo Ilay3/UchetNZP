@@ -145,3 +145,34 @@ public record WipLabelLedgerEventViewModel(
     string RefEntityType,
     Guid? RefEntityId
 );
+
+public class WipLabelMergeInputModel
+{
+    public IReadOnlyCollection<Guid> InputLabelIds { get; set; } = Array.Empty<Guid>();
+
+    public DateTime MergeDate { get; set; }
+
+    public string? NumberBase { get; set; }
+}
+
+public record WipLabelMergeResultViewModel(
+    Guid OutputLabelId,
+    string OutputLabelNumber,
+    decimal Quantity,
+    IReadOnlyCollection<Guid> InputLabelIds
+);
+
+public record WipLabelMergeLinkViewModel(
+    Guid InputLabelId,
+    string InputLabelNumber,
+    Guid OutputLabelId,
+    string OutputLabelNumber,
+    DateTime CreatedAt
+);
+
+public record WipLabelMergeTraceViewModel(
+    Guid LabelId,
+    string LabelNumber,
+    IReadOnlyCollection<WipLabelMergeLinkViewModel> FromLabels,
+    IReadOnlyCollection<WipLabelMergeLinkViewModel> ToLabels
+);

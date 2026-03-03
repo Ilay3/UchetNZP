@@ -37,4 +37,6 @@ public class WipTransfer
     public virtual WarehouseItem? WarehouseItem { get; set; }
 
     public virtual WipLabel? WipLabel { get; set; }
+
+    public virtual ICollection<TransferLabelUsage> LabelUsages { get; set; } = new List<TransferLabelUsage>();
 }
