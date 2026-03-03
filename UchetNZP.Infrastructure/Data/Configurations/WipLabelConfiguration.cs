@@ -40,6 +40,13 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.Property(x => x.Suffix)
             .IsRequired();
 
+        builder.Property(x => x.RowVersion)
+            .IsRowVersion();
+
+        builder.HasCheckConstraint("CK_WipLabels_Quantity_Positive", "\"Quantity\" > 0");
+        builder.HasCheckConstraint("CK_WipLabels_Remaining_NonNegative", "\"RemainingQuantity\" >= 0");
+        builder.HasCheckConstraint("CK_WipLabels_Remaining_NotGreaterThanQuantity", "\"RemainingQuantity\" <= \"Quantity\"");
+
         builder.HasIndex(x => new { x.Status, x.CurrentSectionId, x.CurrentOpNumber });
 
         builder.HasIndex(x => x.RootLabelId);

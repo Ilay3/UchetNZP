@@ -44,6 +44,10 @@ public class AppDbContext : DbContext
 
     public DbSet<TransferAuditOperation> TransferAuditOperations => Set<TransferAuditOperation>();
 
+    public DbSet<TransferLabelUsage> TransferLabelUsages => Set<TransferLabelUsage>();
+
+    public DbSet<LabelMerge> LabelMerges => Set<LabelMerge>();
+
     public DbSet<ImportJob> ImportJobs => Set<ImportJob>();
 
     public DbSet<ImportJobItem> ImportJobItems => Set<ImportJobItem>();

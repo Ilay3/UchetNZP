@@ -61,7 +61,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, "", null, false, null, null)
+            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, "", null, TransferScenario.MoveLabel, false, null, null)
         });
 
         Assert.Equal(1, summary.Saved);
@@ -130,6 +130,7 @@ public class TransferServiceTests
                 80m,
                 null,
                 null,
+                TransferScenario.MoveLabel,
                 false,
                 null,
                 new TransferScrapDto(ScrapType.Technological, 40m, comment))
@@ -203,7 +204,7 @@ public class TransferServiceTests
         var transferDate = new DateTime(2025, 2, 2, 0, 0, 0, DateTimeKind.Utc);
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 40m, "Склад", null, false, null, null),
+            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 40m, "Склад", null, TransferScenario.MoveLabel, false, null, null),
         });
 
         var item = Assert.Single(summary.Items);
@@ -301,7 +302,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labelId, false, null, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labelId, TransferScenario.MoveLabel, false, null, null),
         });
 
         Assert.Equal(1, summary.Saved);
@@ -313,7 +314,7 @@ public class TransferServiceTests
     }
 
     [Fact]
-    public async Task AddTransfersBatchAsync_WithResidualLabelSplit_CreatesSlashOneLabel()
+    public async Task AddTransfersBatchAsync_WithResidualLabelSplit_CreatesChildLabelAndKeepsSourceIdentity()
     {
         await using var dbContext = CreateContext();
 
@@ -345,12 +346,15 @@ public class TransferServiceTests
         var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, true, null, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, TransferScenario.SplitAndTransfer, true, null, null),
         });
 
-        var residual = await dbContext.WipLabels.SingleAsync(x => x.PartId == part.Id && x.Id != labelId);
-        Assert.Equal("103/1", residual.Number);
-        Assert.Equal(60m, residual.Quantity);
+        var source = await dbContext.WipLabels.SingleAsync(x => x.Id == labelId);
+        var child = await dbContext.WipLabels.SingleAsync(x => x.PartId == part.Id && x.Id != labelId);
+        Assert.Equal("103", source.Number);
+        Assert.Equal(60m, source.RemainingQuantity);
+        Assert.Equal("103/1", child.Number);
+        Assert.Equal(40m, child.Quantity);
         var audit = await dbContext.TransferAudits.SingleAsync();
         Assert.Equal("103/1", audit.ResidualLabelNumber);
     }
@@ -388,15 +392,15 @@ public class TransferServiceTests
         var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, true, null, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, TransferScenario.SplitAndTransfer, true, null, null),
         });
 
         var residual = await dbContext.WipLabels.SingleAsync(x => x.PartId == part.Id && x.Number == "103/2");
-        Assert.Equal(60m, residual.Quantity);
+        Assert.Equal(40m, residual.Quantity);
     }
 
     [Fact]
-    public async Task AddTransfersBatchAsync_WithSlashLabelSplit_LeavesSlashAsResidualAndBaseMovesForward()
+    public async Task AddTransfersBatchAsync_WithSlashLabelSplit_UsesNextSuffixForTransferredChild()
     {
         await using var dbContext = CreateContext();
 
@@ -428,20 +432,20 @@ public class TransferServiceTests
         var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, true, null, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, TransferScenario.SplitAndTransfer, true, null, null),
         });
 
         var transfer = await dbContext.WipTransfers.Include(x => x.WipLabel).SingleAsync();
-        Assert.Equal("103", transfer.WipLabel!.Number);
+        Assert.Equal("103/4", transfer.WipLabel!.Number);
 
-        var residual = await dbContext.WipLabels
+        var source = await dbContext.WipLabels
             .SingleAsync(x => x.PartId == part.Id && x.Id != transfer.WipLabelId);
-        Assert.Equal("103/3", residual.Number);
-        Assert.Equal(60m, residual.Quantity);
+        Assert.Equal("103/3", source.Number);
+        Assert.Equal(60m, source.RemainingQuantity);
 
         var item = Assert.Single(summary.Items);
-        Assert.Equal("103", item.LabelNumber);
-        Assert.Equal("103/3", item.ResidualLabelNumber);
+        Assert.Equal("103/4", item.LabelNumber);
+        Assert.Equal("103/4", item.ResidualLabelNumber);
     }
 
     [Fact]
@@ -481,8 +485,8 @@ public class TransferServiceTests
         var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, firstLabelId, true, 103, null),
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 30m, null, secondLabelId, true, 103, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, firstLabelId, TransferScenario.SplitAndTransfer, true, 103, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 30m, null, secondLabelId, TransferScenario.SplitAndTransfer, true, 103, null),
         });
 
         var generated = await dbContext.WipLabels
@@ -561,7 +565,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 30m, null, labelId, false, null, null),
+            new TransferItemDto(part.Id, 10, WarehouseDefaults.OperationNumber, transferDate, 30m, null, labelId, TransferScenario.MoveLabel, false, null, null),
         });
 
         var item = Assert.Single(summary.Items);
@@ -660,12 +664,12 @@ public class TransferServiceTests
 
         await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, false, null, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, labelId, TransferScenario.MoveLabel, false, null, null),
         });
 
         var secondSummary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 40m, null, labelId, false, null, null),
+            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 40m, null, labelId, TransferScenario.MoveLabel, false, null, null),
         });
 
         Assert.Equal(1, secondSummary.Saved);
@@ -744,7 +748,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 120m, null, labelId, false, null, null),
+            new TransferItemDto(part.Id, 20, 30, DateTime.UtcNow, 120m, null, labelId, TransferScenario.MoveLabel, false, null, null),
         });
 
         Assert.Equal(1, summary.Saved);
@@ -809,8 +813,8 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 50m, null, labels[0].Label.Id, false, null, null),
-            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labels[1].Label.Id, false, null, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 50m, null, labels[0].Label.Id, TransferScenario.MoveLabel, false, null, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 40m, null, labels[1].Label.Id, TransferScenario.MoveLabel, false, null, null),
         });
 
         Assert.Equal(2, summary.Saved);
@@ -858,8 +862,8 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, false, null, null),
-            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, false, null, null),
+            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, TransferScenario.MoveLabel, false, null, null),
+            new TransferItemDto(part.Id, 70, 75, transferDate, 120m, null, null, TransferScenario.MoveLabel, false, null, null),
         });
 
         Assert.Equal(2, summary.Saved);
@@ -920,7 +924,7 @@ public class TransferServiceTests
 
         var summary = await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, transferDate, 30m, null, null, false, null, null),
+            new TransferItemDto(part.Id, 10, 20, transferDate, 30m, null, null, TransferScenario.MoveLabel, false, null, null),
         });
 
         var audit = await dbContext.TransferAudits.SingleAsync();
@@ -973,7 +977,7 @@ public class TransferServiceTests
         var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, false, null, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, TransferScenario.MoveLabel, false, null, null),
         });
 
         var storedLabel = await dbContext.WipLabels.SingleAsync(x => x.Id == setup.Label.Id);
@@ -1012,7 +1016,7 @@ public class TransferServiceTests
         var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
         await service.AddTransfersBatchAsync(new[]
         {
-            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, true, null, null),
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, TransferScenario.SplitAndTransfer, true, null, null),
         });
 
         var source = await dbContext.WipLabels.SingleAsync(x => x.Id == setup.Label.Id);
@@ -1023,8 +1027,164 @@ public class TransferServiceTests
         Assert.Equal(expectedRootId, residual.RootLabelId);
         Assert.Equal("330", residual.RootNumber);
         Assert.Equal(1, residual.Suffix);
-        Assert.Equal(section10.Id, residual.CurrentSectionId);
-        Assert.Equal(10, residual.CurrentOpNumber);
+        Assert.Equal(section20.Id, residual.CurrentSectionId);
+        Assert.Equal(20, residual.CurrentOpNumber);
+    }
+
+    [Fact]
+    public async Task AddTransfersBatchAsync_WithMoveLabelScenario_WritesMoveLedgerEvent()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var section10 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var section20 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
+        var operation10 = new Operation { Id = Guid.NewGuid(), Name = "010" };
+        var operation20 = new Operation { Id = Guid.NewGuid(), Name = "020" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(section10, section20);
+        dbContext.Operations.AddRange(operation10, operation20);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, section10.Id, operation10.Id, 10),
+            CreateRoute(part.Id, section20.Id, operation20.Id, 20));
+        dbContext.WipBalances.AddRange(
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section10.Id, OpNumber = 10, Quantity = 100m },
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section20.Id, OpNumber = 20, Quantity = 0m });
+
+        var setup = CreateLabelWithReceipt(part.Id, section10.Id, 10, "500", 100m);
+        dbContext.WipLabels.Add(setup.Label);
+        dbContext.WipReceipts.Add(setup.Receipt);
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
+        await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, TransferScenario.MoveLabel, false, null, null),
+        });
+
+        var ledger = await dbContext.WipLabelLedger.ToListAsync();
+        Assert.Contains(ledger, x => x.EventType == WipLabelEventType.Move);
+        Assert.DoesNotContain(ledger, x => x.EventType == WipLabelEventType.Split);
+    }
+
+    [Fact]
+    public async Task AddTransfersBatchAsync_WithSplitAndTransferScenario_WritesSplitLedgerEvent()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var section10 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var section20 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
+        var operation10 = new Operation { Id = Guid.NewGuid(), Name = "010" };
+        var operation20 = new Operation { Id = Guid.NewGuid(), Name = "020" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(section10, section20);
+        dbContext.Operations.AddRange(operation10, operation20);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, section10.Id, operation10.Id, 10),
+            CreateRoute(part.Id, section20.Id, operation20.Id, 20));
+        dbContext.WipBalances.AddRange(
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section10.Id, OpNumber = 10, Quantity = 100m },
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section20.Id, OpNumber = 20, Quantity = 0m });
+
+        var setup = CreateLabelWithReceipt(part.Id, section10.Id, 10, "501", 100m);
+        dbContext.WipLabels.Add(setup.Label);
+        dbContext.WipReceipts.Add(setup.Receipt);
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
+        await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, TransferScenario.SplitAndTransfer, true, null, null),
+        });
+
+        var ledger = await dbContext.WipLabelLedger.ToListAsync();
+        Assert.Contains(ledger, x => x.EventType == WipLabelEventType.Transfer);
+        Assert.Contains(ledger, x => x.EventType == WipLabelEventType.Split);
+    }
+
+    [Fact]
+    public async Task AddTransfersBatchAsync_WithSplitAndTransferScenario_WritesTransferLabelUsage()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var section10 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var section20 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
+        var operation10 = new Operation { Id = Guid.NewGuid(), Name = "010" };
+        var operation20 = new Operation { Id = Guid.NewGuid(), Name = "020" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(section10, section20);
+        dbContext.Operations.AddRange(operation10, operation20);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, section10.Id, operation10.Id, 10),
+            CreateRoute(part.Id, section20.Id, operation20.Id, 20));
+        dbContext.WipBalances.AddRange(
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section10.Id, OpNumber = 10, Quantity = 100m },
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section20.Id, OpNumber = 20, Quantity = 0m });
+
+        var setup = CreateLabelWithReceipt(part.Id, section10.Id, 10, "700", 100m);
+        dbContext.WipLabels.Add(setup.Label);
+        dbContext.WipReceipts.Add(setup.Receipt);
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
+        await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, TransferScenario.SplitAndTransfer, true, null, null),
+        });
+
+        var usage = await dbContext.TransferLabelUsages.SingleAsync();
+        Assert.Equal(40m, usage.Qty);
+        Assert.Equal(0m, usage.ScrapQty);
+        Assert.Equal(100m, usage.RemainingBefore);
+        Assert.True(usage.Qty + usage.ScrapQty <= usage.RemainingBefore);
+        Assert.Equal(setup.Label.Id, usage.FromLabelId);
+        Assert.NotNull(usage.CreatedToLabelId);
+    }
+
+    [Fact]
+    public async Task AddTransfersBatchAsync_WithMoveLabelScenario_WritesTransferLabelUsageWithoutCreatedLabel()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var section10 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var section20 = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
+        var operation10 = new Operation { Id = Guid.NewGuid(), Name = "010" };
+        var operation20 = new Operation { Id = Guid.NewGuid(), Name = "020" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(section10, section20);
+        dbContext.Operations.AddRange(operation10, operation20);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, section10.Id, operation10.Id, 10),
+            CreateRoute(part.Id, section20.Id, operation20.Id, 20));
+        dbContext.WipBalances.AddRange(
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section10.Id, OpNumber = 10, Quantity = 100m },
+            new WipBalance { Id = Guid.NewGuid(), PartId = part.Id, SectionId = section20.Id, OpNumber = 20, Quantity = 0m });
+
+        var setup = CreateLabelWithReceipt(part.Id, section10.Id, 10, "701", 100m);
+        dbContext.WipLabels.Add(setup.Label);
+        dbContext.WipReceipts.Add(setup.Receipt);
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
+        await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, 20, DateTime.UtcNow, 40m, null, setup.Label.Id, TransferScenario.MoveLabel, false, null, null),
+        });
+
+        var usage = await dbContext.TransferLabelUsages.SingleAsync();
+        Assert.Equal(40m, usage.Qty);
+        Assert.Equal(0m, usage.ScrapQty);
+        Assert.Equal(100m, usage.RemainingBefore);
+        Assert.True(usage.Qty + usage.ScrapQty <= usage.RemainingBefore);
+        Assert.Equal(setup.Label.Id, usage.FromLabelId);
+        Assert.Null(usage.CreatedToLabelId);
     }
 
     private static (WipLabel Label, WipReceipt Receipt) CreateLabelWithReceipt(Guid partId, Guid sectionId, int opNumber, string number, decimal quantity)

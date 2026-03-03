@@ -32,11 +32,21 @@ public class WipLabel
 
     public int Suffix { get; set; }
 
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
     public virtual Part? Part { get; set; }
 
     public virtual WipReceipt? WipReceipt { get; set; }
 
     public virtual ICollection<WipTransfer> Transfers { get; set; } = new List<WipTransfer>();
+
+    public virtual ICollection<TransferLabelUsage> TransferUsagesAsSource { get; set; } = new List<TransferLabelUsage>();
+
+    public virtual ICollection<TransferLabelUsage> TransferUsagesAsCreated { get; set; } = new List<TransferLabelUsage>();
+
+    public virtual ICollection<LabelMerge> MergeOutputs { get; set; } = new List<LabelMerge>();
+
+    public virtual ICollection<LabelMerge> MergeInputs { get; set; } = new List<LabelMerge>();
 
     public virtual ICollection<WarehouseLabelItem> WarehouseLabelItems { get; set; } = new List<WarehouseLabelItem>();
 }

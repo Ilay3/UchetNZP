@@ -6,10 +6,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Transfers;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Web.Configuration;
 using UchetNZP.Web.Models;
 using UchetNZP.Shared;
 
@@ -20,13 +22,16 @@ public class WipTransfersController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly ITransferService _transferService;
+    private readonly TransferOptions _transferOptions;
 
     public WipTransfersController(
         AppDbContext dbContext,
-        ITransferService transferService)
+        ITransferService transferService,
+        IOptions<TransferOptions> transferOptions)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _transferService = transferService ?? throw new ArgumentNullException(nameof(transferService));
+        _transferOptions = transferOptions?.Value ?? throw new ArgumentNullException(nameof(transferOptions));
     }
 
     [HttpGet("")]
@@ -341,6 +346,11 @@ public class WipTransfersController : Controller
             return BadRequest("Список передач пуст.");
         }
 
+        if (_transferOptions.StrictLabelTraceability && request.Items.Any(x => !x.WipLabelId.HasValue))
+        {
+            return BadRequest("Строгая прослеживаемость ярлыков включена: передача без исходного ярлыка запрещена.");
+        }
+
         List<TransferItemDto> dtos;
         try
         {
@@ -353,6 +363,7 @@ public class WipTransfersController : Controller
                     x.Quantity,
                     x.Comment,
                     x.WipLabelId,
+                    ResolveScenario(x),
                     x.CreateResidualLabel,
                     x.ResidualLabelNumber,
                     x.Scrap is null
@@ -373,6 +384,14 @@ public class WipTransfersController : Controller
         catch (InvalidOperationException ex)
         {
             return BadRequest(ex.Message);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            return Conflict($"Конфликт параллельного изменения: {ex.Message}");
+        }
+        catch (DbUpdateException ex)
+        {
+            return BadRequest($"Операция отклонена ограничениями БД: {ex.InnerException?.Message ?? ex.Message}");
         }
 
         List<TransferSummaryItemViewModel> summaryItems;
@@ -562,6 +581,7 @@ public class WipTransfersController : Controller
         decimal Quantity,
         string? Comment,
         Guid? WipLabelId,
+        TransferScenario Scenario,
         bool CreateResidualLabel,
         int? ResidualLabelNumber,
         TransferScrapSaveItem? Scrap);
@@ -570,6 +590,18 @@ public class WipTransfersController : Controller
         ScrapType ScrapType,
         decimal Quantity,
         string? Comment);
+
+    private static TransferScenario ResolveScenario(TransferSaveItem in_item)
+    {
+        if (in_item.Scenario is TransferScenario.MoveLabel or TransferScenario.TransferFromLabel or TransferScenario.SplitAndTransfer)
+        {
+            return in_item.Scenario;
+        }
+
+        return in_item.CreateResidualLabel
+            ? TransferScenario.SplitAndTransfer
+            : TransferScenario.MoveLabel;
+    }
 
     private async Task<Dictionary<(Guid PartId, Guid SectionId, int OpNumber), IReadOnlyList<TransferOperationLabelBalanceViewModel>>> LoadLabelBalancesAsync(
         IReadOnlyCollection<(Guid PartId, Guid SectionId, int OpNumber)> in_keys,

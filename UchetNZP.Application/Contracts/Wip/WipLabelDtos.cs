@@ -165,3 +165,31 @@ public record WipLabelLedgerEventDto(
     string RefEntityType,
     Guid? RefEntityId
 );
+
+public record WipLabelMergeRequestDto(
+    IReadOnlyCollection<Guid> InputLabelIds,
+    DateTime MergeDate,
+    string? NumberBase
+);
+
+public record WipLabelMergeResultDto(
+    Guid OutputLabelId,
+    string OutputLabelNumber,
+    decimal Quantity,
+    IReadOnlyCollection<Guid> InputLabelIds
+);
+
+public record WipLabelMergeLinkDto(
+    Guid InputLabelId,
+    string InputLabelNumber,
+    Guid OutputLabelId,
+    string OutputLabelNumber,
+    DateTime CreatedAt
+);
+
+public record WipLabelMergeTraceDto(
+    Guid LabelId,
+    string LabelNumber,
+    IReadOnlyCollection<WipLabelMergeLinkDto> FromLabels,
+    IReadOnlyCollection<WipLabelMergeLinkDto> ToLabels
+);
