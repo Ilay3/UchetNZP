@@ -727,14 +727,46 @@ public class WipTransfersController : Controller
             list.Add(new TransferOperationLabelBalanceViewModel(pair.Key.LabelId, number, pair.Value));
         }
 
+        var balanceLookup = await _dbContext.WipBalances
+            .AsNoTracking()
+            .Where(x => partIds.Contains(x.PartId) && sectionIds.Contains(x.SectionId) && opNumbers.Contains(x.OpNumber))
+            .ToDictionaryAsync(
+                x => (x.PartId, x.SectionId, x.OpNumber),
+                x => Math.Max(0m, x.Quantity),
+                in_cancellationToken)
+            .ConfigureAwait(false);
+
         foreach (var pair in buffer.ToList())
         {
             var sorted = pair.Value
-                .OrderBy(x => x.Number, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x.Number.Contains('/') ? 1 : 0)
+                .ThenBy(x => x.Number, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(x => x.Id)
                 .ToList();
 
-            buffer[pair.Key] = sorted;
+            var available = balanceLookup.TryGetValue(pair.Key, out var operationBalance)
+                ? operationBalance
+                : sorted.Sum(x => x.RemainingQuantity);
+
+            var capped = new List<TransferOperationLabelBalanceViewModel>(sorted.Count);
+            foreach (var label in sorted)
+            {
+                if (available <= 0m)
+                {
+                    break;
+                }
+
+                var quantity = Math.Min(label.RemainingQuantity, available);
+                if (quantity <= 0m)
+                {
+                    continue;
+                }
+
+                capped.Add(label with { RemainingQuantity = quantity });
+                available -= quantity;
+            }
+
+            buffer[pair.Key] = capped;
         }
 
         foreach (var pair in buffer)
