@@ -44,6 +44,21 @@
     const toLabelsElement = document.getElementById("transferToLabels");
     const labelSelect = document.getElementById("transferLabelSelect");
     const labelHintElement = document.getElementById("transferLabelHint");
+    const labelNumberInput = document.getElementById("transferLabelNumberInput");
+    const labelChooseButton = document.getElementById("transferLabelChooseButton");
+    const labelMetaElement = document.getElementById("transferLabelMeta");
+    const labelErrorElement = document.getElementById("transferLabelError");
+    const createResidualCheckbox = document.getElementById("transferCreateResidualLabel");
+    const previewQuantityElement = document.getElementById("transferPreviewQuantity");
+    const previewScrapElement = document.getElementById("transferPreviewScrap");
+    const previewRemainingElement = document.getElementById("transferPreviewRemaining");
+    const previewResidualElement = document.getElementById("transferPreviewResidual");
+    const labelChooserModalElement = document.getElementById("labelChooserModal");
+    const labelChooserSearchInput = document.getElementById("labelChooserSearch");
+    const labelChooserTableBody = document.querySelector("#labelChooserTable tbody");
+    const labelCardModalElement = document.getElementById("labelCardModal");
+    const labelCardHeader = document.getElementById("labelCardHeader");
+    const labelCardHistoryBody = document.querySelector("#labelCardHistory tbody");
     const scenarioSelect = document.getElementById("transferScenarioSelect");
     const residualLabelNumberInput = document.getElementById("transferResidualLabelNumberInput");
     const residualLabelHintElement = document.getElementById("transferResidualLabelHint");
@@ -69,6 +84,8 @@
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement, { backdrop: false }) : null;
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
+    const labelChooserModal = labelChooserModalElement ? new bootstrap.Modal(labelChooserModalElement) : null;
+    const labelCardModal = labelCardModalElement ? new bootstrap.Modal(labelCardModalElement) : null;
 
     fromOperationInput.disabled = true;
     toOperationInput.disabled = true;
@@ -115,6 +132,7 @@
     let selectedLabelOption = null;
     let labelsAbortController = null;
     let labelsRequestId = 0;
+    let previewState = null;
 
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
@@ -139,6 +157,7 @@
         updateToOperationsDatalist();
         updateBalanceLabels();
         updateFormState();
+        void refreshPreview();
     });
 
     fromOperationInput.addEventListener("input", () => {
@@ -220,6 +239,7 @@
             updateBalanceLabels();
         }
         updateFormState();
+        void refreshPreview();
     });
 
     toOperationInput.addEventListener("change", () => {
@@ -247,6 +267,7 @@
         toOperationNumberInput.value = operation.opNumber;
         void refreshBalances();
         updateFormState();
+        void refreshPreview();
     });
 
     labelSelect?.addEventListener("change", () => {
@@ -258,8 +279,11 @@
             selectedLabelOption = labelOptions.find(option => String(option.id) === value) ?? null;
         }
 
+        if (labelNumberInput) { labelNumberInput.value = selectedLabelOption?.number ?? ""; }
         updateLabelHint();
         updateResidualLabelHint();
+        syncSelectedLabelMeta();
+        void refreshPreview();
     });
 
     scenarioSelect?.addEventListener("change", () => {
@@ -275,7 +299,37 @@
         updateResidualLabelHint();
     });
 
-    residualLabelNumberInput?.addEventListener("input", () => updateResidualLabelHint());
+    residualLabelNumberInput?.addEventListener("input", () => { updateResidualLabelHint(); void refreshPreview(); });
+
+    labelNumberInput?.addEventListener("change", () => void lookupLabelByNumber());
+    labelChooseButton?.addEventListener("click", () => { void loadLabelChooser(); labelChooserModal?.show(); });
+    labelChooserSearchInput?.addEventListener("input", () => void loadLabelChooser());
+    labelChooserTableBody?.addEventListener("click", event => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || target.dataset.action !== "pick") {
+            return;
+        }
+
+        const labelId = target.dataset.labelId;
+        if (!labelId) {
+            return;
+        }
+
+        selectedLabelOption = labelOptions.find(x => String(x.id) === labelId) ?? selectedLabelOption;
+        labelSelect.value = labelId;
+        updateLabelHint();
+        syncSelectedLabelMeta();
+        labelChooserModal?.hide();
+        void refreshPreview();
+    });
+    createResidualCheckbox?.addEventListener("change", () => {
+        if (scenarioSelect) {
+            scenarioSelect.value = createResidualCheckbox.checked ? "SplitAndTransfer" : "MoveLabel";
+        }
+        updateFormState();
+        void refreshPreview();
+    });
+    quantityInput?.addEventListener("input", () => void refreshPreview());
 
     addButton.addEventListener("click", () => void addToCart());
     resetButton.addEventListener("click", () => resetForm());
@@ -295,6 +349,11 @@
             return;
         }
 
+        if (target.dataset.action === "open-label-card") {
+            void openLabelCard(target.dataset.labelId);
+            return;
+        }
+
         if (target.dataset.action === "remove") {
             removeCartItem(index);
         }
@@ -306,6 +365,11 @@
     recentTableBody?.addEventListener("click", event => {
         const target = event.target;
         if (!(target instanceof HTMLElement)) {
+            return;
+        }
+
+        if (target.dataset.action === "open-label-card") {
+            void openLabelCard(target.dataset.labelId);
             return;
         }
 
@@ -649,6 +713,14 @@
             return false;
         }
 
+        if (createResidualCheckbox?.checked && !selectedLabelOption) {
+            return false;
+        }
+
+        if (previewState && Array.isArray(previewState.errors) && previewState.errors.length > 0) {
+            return false;
+        }
+
         const labelId = selectedLabelOption?.id ?? null;
         const availableFrom = getAvailableBalance(part.id, selectedFromOperation.opNumber, labelId);
         if (quantity > availableFrom + 1e-9) {
@@ -670,6 +742,15 @@
             labelSelect.disabled = !selectedFromOperation || isLoadingOperations || isLoadingLabels;
         }
 
+        if (labelNumberInput) {
+            labelNumberInput.disabled = !selectedFromOperation;
+        }
+
+        if (labelChooseButton) {
+            labelChooseButton.disabled = !selectedFromOperation;
+        }
+
+        syncSelectedLabelMeta();
         addButton.disabled = !canAddToCart();
         saveButton.disabled = cart.length === 0;
     }
@@ -1122,6 +1203,148 @@
         residualLabelHintElement.textContent = "Будет использован указанный базовый номер нового ярлыка.";
     }
 
+    function setFieldError(element, message) {
+        if (!element) {
+            return;
+        }
+
+        if (message) {
+            element.textContent = message;
+            element.classList.remove("d-none");
+        }
+        else {
+            element.textContent = "";
+            element.classList.add("d-none");
+        }
+    }
+
+    function syncSelectedLabelMeta() {
+        if (!labelMetaElement) {
+            return;
+        }
+
+        if (!selectedLabelOption) {
+            labelMetaElement.textContent = "Ярлык не выбран.";
+            return;
+        }
+
+        const section = selectedFromOperation?.sectionId ?? "—";
+        const op = selectedFromOperation?.opNumber ?? "—";
+        labelMetaElement.innerHTML = `№ ${escapeHtml(selectedLabelOption.number ?? "")} • Остаток: ${formatQuantityText(selectedLabelOption.remainingQuantity ?? 0)} • Кол-во: ${formatQuantityText(selectedLabelOption.quantity ?? 0)} • Место: ${escapeHtml(String(section))}/${escapeHtml(String(op))}`;
+    }
+
+    async function lookupLabelByNumber() {
+        const part = partLookup.getSelected();
+        const value = labelNumberInput?.value?.trim() ?? "";
+        if (!part?.id || !value) {
+            return;
+        }
+
+        const response = await fetch(`/api/wip/labels/by-number?partId=${encodeURIComponent(part.id)}&number=${encodeURIComponent(value)}`);
+        if (!response.ok) {
+            setFieldError(labelErrorElement, await response.text());
+            return;
+        }
+
+        const data = await response.json();
+        selectedLabelOption = labelOptions.find(x => String(x.id) === String(data.wipLabelId)) ?? {
+            id: data.wipLabelId,
+            number: data.number,
+            quantity: data.quantity,
+            remainingQuantity: data.remainingQuantity,
+        };
+        labelSelect.value = String(data.wipLabelId);
+        updateLabelHint();
+        syncSelectedLabelMeta();
+        setFieldError(labelErrorElement, "");
+        void refreshPreview();
+        updateFormState();
+    }
+
+    async function loadLabelChooser() {
+        const part = partLookup.getSelected();
+        if (!part?.id || !labelChooserTableBody) {
+            return;
+        }
+
+        const q = labelChooserSearchInput?.value?.trim() ?? "";
+        const response = await fetch(`/api/wip/labels/search?partId=${encodeURIComponent(part.id)}&q=${encodeURIComponent(q)}&onlyWithRemaining=true`);
+        if (!response.ok) {
+            return;
+        }
+
+        const rows = await response.json();
+        labelChooserTableBody.innerHTML = "";
+        rows.forEach(item => {
+            const row = document.createElement("tr");
+            row.innerHTML = `<td>${escapeHtml(item.number ?? "")}</td><td>${formatQuantityText(item.remainingQuantity ?? 0)}</td><td>${escapeHtml(String(item.currentSectionId ?? "—"))}/${escapeHtml(String(item.currentOp ?? "—"))}</td><td>${escapeHtml(String(item.labelDate ?? "").slice(0,10))}</td><td><button type="button" class="btn btn-sm btn-primary" data-action="pick" data-label-id="${item.id}">Выбрать</button></td>`;
+            labelChooserTableBody.appendChild(row);
+        });
+    }
+
+    async function refreshPreview() {
+        const part = partLookup.getSelected();
+        if (!part?.id || !selectedFromOperation || !selectedToOperation) {
+            return;
+        }
+
+        const quantity = Number(quantityInput?.value ?? 0) || 0;
+        const payload = {
+            partId: part.id,
+            fromSectionId: selectedFromOperation.sectionId,
+            fromOpNumber: parseOpNumber(selectedFromOperation.opNumber),
+            toSectionId: selectedToOperation.sectionId,
+            toOpNumber: parseOpNumber(selectedToOperation.opNumber),
+            quantity,
+            scrapQty: 0,
+            scrapType: null,
+            createResidualLabel: Boolean(createResidualCheckbox?.checked),
+            wipLabelId: selectedLabelOption?.id ?? null,
+        };
+
+        previewQuantityElement && (previewQuantityElement.textContent = formatQuantityText(quantity));
+        previewScrapElement && (previewScrapElement.textContent = formatQuantityText(0));
+
+        const response = await fetch('/api/wip/transfers/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await response.json();
+        previewState = data;
+        if (previewRemainingElement) {
+            previewRemainingElement.textContent = formatQuantityText(data.remainingAfter ?? 0);
+        }
+
+        if (previewResidualElement) {
+            previewResidualElement.textContent = data.proposedResidualLabelNumber ?? '—';
+        }
+
+        const firstError = Array.isArray(data.errors) && data.errors.length ? data.errors[0] : '';
+        setFieldError(labelErrorElement, firstError);
+        updateFormState();
+    }
+
+    async function openLabelCard(labelId) {
+        if (!labelId || !labelCardHeader || !labelCardHistoryBody) {
+            return;
+        }
+
+        labelCardHeader.textContent = 'Загрузка...';
+        labelCardHistoryBody.innerHTML = '';
+        labelCardModal?.show();
+        const response = await fetch(`/api/wip/labels/${encodeURIComponent(labelId)}/card`);
+        if (!response.ok) {
+            labelCardHeader.textContent = await response.text();
+            return;
+        }
+
+        const data = await response.json();
+        const h = data.header;
+        labelCardHeader.textContent = `№ ${h.number} • Quantity: ${formatQuantityText(h.quantity)} • Remaining: ${formatQuantityText(h.remainingQuantity)} • Part: ${h.part ?? '—'} • Статус: ${h.status}`;
+        (data.historyRows ?? []).forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${escapeHtml(String(item.date ?? '').slice(0,19).replace('T',' '))}</td><td>${escapeHtml(item.type ?? '')}</td><td>${escapeHtml(String(item.document ?? ''))}</td><td>${formatQuantityText(item.change ?? 0)}</td><td>${escapeHtml(item.comment ?? '')}</td>`;
+            labelCardHistoryBody.appendChild(tr);
+        });
+    }
+
     function resetForm() {
         quantityInput.value = "";
         commentInput.value = "";
@@ -1135,6 +1358,11 @@
             residualLabelNumberInput.value = "";
             residualLabelNumberInput.disabled = false;
         }
+        if (labelNumberInput) {
+            labelNumberInput.value = "";
+        }
+        previewState = null;
+        setFieldError(labelErrorElement, "");
 
         selectedFromOperation = null;
         selectedToOperation = null;
@@ -1176,6 +1404,11 @@
             return;
         }
 
+        if (previewState && Array.isArray(previewState.errors) && previewState.errors.length > 0) {
+            alert(previewState.errors[0]);
+            return;
+        }
+
         const date = dateInput?.value;
         if (!date) {
             alert("Укажите дату передачи.");
@@ -1183,7 +1416,7 @@
         }
 
         const scenario = scenarioSelect?.value ?? "SplitAndTransfer";
-        const createResidualLabel = scenario === "SplitAndTransfer";
+        const createResidualLabel = Boolean(createResidualCheckbox?.checked) || scenario === "SplitAndTransfer";
         const residualLabelNumberRaw = residualLabelNumberInput?.value?.trim() ?? "";
         let residualLabelNumber = null;
         if ((scenario === "TransferFromLabel" || scenario === "SplitAndTransfer") && residualLabelNumberRaw.length > 0) {
@@ -1197,11 +1430,9 @@
         }
 
         const label = selectedLabelOption;
-        if (labelOptions.length > 0 && !label) {
-            const confirmed = confirm("Добавить передачу без списания по ярлыку?");
-            if (!confirmed) {
-                return;
-            }
+        if (!label) {
+            alert("Выберите ярлык-источник.");
+            return;
         }
 
         const fromAvailable = getAvailableBalance(part.id, selectedFromOperation.opNumber, label?.id ?? null);
@@ -1494,7 +1725,10 @@
             return `${base}${residualDetail}`;
         }
 
-        return `<div>${escapeHtml(number)}${detail}${residualDetail}</div>`;
+        const labelDisplay = item.labelId
+            ? `<button type="button" class="btn btn-link btn-sm p-0 align-baseline" data-action="open-label-card" data-label-id="${escapeHtml(String(item.labelId))}">${escapeHtml(number)}</button>`
+            : escapeHtml(number);
+        return `<div>${labelDisplay}${detail}${residualDetail}</div>`;
     }
 
     function updateLabelElement(element, labels) {
@@ -1590,7 +1824,8 @@
                     <div class="fw-semibold">${escapeHtml(item.toOpNumber ?? "")}</div>
                     ${toName}
                 </td>
-                <td>${formatSelectedLabel(item)}</td>
+                <td>${formatSelectedLabel({ ...item, residualLabelNumber: null })}</td>
+                <td>${item.residualLabelNumber ? escapeHtml(item.residualLabelNumber) : "<span class=\"text-muted\">—</span>"}</td>
                 <td>${quantityText}</td>
                 <td>${fromBalanceText}</td>
                 <td>${toBalanceText}</td>

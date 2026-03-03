@@ -34,10 +34,16 @@
                 <div class="form-text">Выберите операцию, на которую передаётся НЗП.</div>
             </div>
             <div class="col-12 col-xl-6">
-                <label class="form-label" for="transferLabelSelect">Ярлык</label>
-                <select id="transferLabelSelect" class="form-select form-select-lg w-100">
+                <label class="form-label" for="transferLabelNumberInput">Ярлык-источник</label>
+                <div class="input-group input-group-lg mb-2">
+                    <input id="transferLabelNumberInput" class="form-control" type="text" maxlength="11" placeholder="Номер ярлыка" />
+                    <button class="btn btn-outline-secondary" type="button" id="transferLabelChooseButton">Выбрать</button>
+                </div>
+                <select id="transferLabelSelect" class="form-select d-none" aria-hidden="true">
                     <option value="">— Свободные ярлыки будут загружены —</option>
                 </select>
+                <div class="small text-muted border rounded p-2 bg-light" id="transferLabelMeta">Ярлык не выбран.</div>
+                <div class="invalid-feedback d-block" id="transferLabelError"></div>
                 <div class="form-text" id="transferLabelHint">Сначала выберите операцию «откуда», затем ярлык.</div>
             </div>
             <div class="col-12 col-xl-6">
@@ -48,6 +54,13 @@
                     <option value="SplitAndTransfer" selected>SplitAndTransfer — отрыв и передача</option>
                 </select>
                 <div class="form-text mb-2" id="transferScenarioHint">Выберите явный тип операции: Move / Transfer / Split+Transfer.</div>
+                <div class="form-check form-switch mb-2">
+                    <input class="form-check-input" type="checkbox" id="transferCreateResidualLabel" checked>
+                    <label class="form-check-label" for="transferCreateResidualLabel">Отрыв остатка</label>
+                </div>
+                <div class="small text-muted border rounded p-2 bg-light mb-2" id="transferPreviewBox">
+                    Передать: <span id="transferPreviewQuantity">0</span> • Брак: <span id="transferPreviewScrap">0</span> • Останется: <span id="transferPreviewRemaining">—</span> • Новый ярлык: <span id="transferPreviewResidual">—</span>
+                </div>
                 <label class="form-label" for="transferResidualLabelNumberInput">Базовый номер нового ярлыка (при создании)</label>
                 <input id="transferResidualLabelNumberInput" class="form-control form-control-lg" type="number" min="1" step="1" placeholder="Например, 103" disabled />
                 <div class="form-text" id="transferResidualLabelHint">Для сценариев с созданием ярлыка номер можно не указывать — будет выбран следующий суффикс автоматически.</div>
@@ -106,7 +119,8 @@
                         <th scope="col">Деталь</th>
                         <th scope="col">Операция до</th>
                         <th scope="col">Операция после</th>
-                        <th scope="col">Ярлыки</th>
+                        <th scope="col">Ярлык</th>
+                        <th scope="col">Остаточный ярлык</th>
                         <th scope="col">Количество</th>
                         <th scope="col">Остаток до (было → станет)</th>
                         <th scope="col">Остаток после (было → станет)</th>
@@ -138,7 +152,8 @@
                         <th scope="col">Деталь</th>
                         <th scope="col">Операция до</th>
                         <th scope="col">Операция после</th>
-                        <th scope="col">Ярлыки</th>
+                        <th scope="col">Ярлык</th>
+                        <th scope="col">Остаточный ярлык</th>
                         <th scope="col">Количество</th>
                         <th scope="col">Остаток до</th>
                         <th scope="col">Остаток после</th>
@@ -212,6 +227,41 @@
             </div>
             <div class="modal-footer flex-column flex-sm-row gap-3">
                 <button type="button" class="btn btn-danger btn-lg w-100 w-sm-auto" id="transferScrapConfirmButton" disabled>Списать остаток как брак</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<div class="modal fade" id="labelChooserModal" tabindex="-1" aria-labelledby="labelChooserTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="labelChooserTitle">Выбрать ярлык</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <input class="form-control mb-3" id="labelChooserSearch" placeholder="Поиск по номеру ярлыка" />
+                <div class="table-responsive">
+                    <table class="table table-sm" id="labelChooserTable"><thead><tr><th>Номер</th><th>Остаток</th><th>Место</th><th>Дата</th><th></th></tr></thead><tbody></tbody></table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="labelCardModal" tabindex="-1" aria-labelledby="labelCardTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="labelCardTitle">Карточка ярлыка</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div id="labelCardHeader" class="small text-muted mb-3">Загрузка...</div>
+                <div class="table-responsive">
+                    <table class="table table-sm" id="labelCardHistory"><thead><tr><th>Дата</th><th>Тип</th><th>Документ</th><th>Изменение</th><th>Комментарий</th></tr></thead><tbody></tbody></table>
+                </div>
             </div>
         </div>
     </div>
