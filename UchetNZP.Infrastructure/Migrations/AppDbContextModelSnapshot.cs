@@ -86,6 +86,33 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.ToTable("ImportJobItems", (string)null);
                 });
 
+            modelBuilder.Entity("UchetNZP.Domain.Entities.LabelMerge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InputLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OutputLabelId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InputLabelId");
+
+                    b.HasIndex("OutputLabelId");
+
+                    b.HasIndex("InputLabelId", "OutputLabelId")
+                        .IsUnique();
+
+                    b.ToTable("LabelMerges", (string)null);
+                });
+
             modelBuilder.Entity("UchetNZP.Domain.Entities.LabelNumberCounter", b =>
                 {
                     b.Property<string>("RootNumber")
@@ -413,6 +440,53 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.ToTable("TransferAuditOperations");
                 });
 
+            modelBuilder.Entity("UchetNZP.Domain.Entities.TransferLabelUsage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CreatedToLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FromLabelId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Qty")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<decimal>("RemainingBefore")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<decimal>("ScrapQty")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)");
+
+                    b.Property<Guid>("TransferId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedToLabelId");
+
+                    b.HasIndex("FromLabelId");
+
+                    b.HasIndex("TransferId");
+
+                    b.ToTable("TransferLabelUsages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TransferLabelUsages_Consumption_WithinRemaining", "(\"Qty\" + \"ScrapQty\") <= \"RemainingBefore\"");
+
+                            t.HasCheckConstraint("CK_TransferLabelUsages_Qty_NonNegative", "\"Qty\" >= 0");
+
+                            t.HasCheckConstraint("CK_TransferLabelUsages_RemainingBefore_NonNegative", "\"RemainingBefore\" >= 0");
+
+                            t.HasCheckConstraint("CK_TransferLabelUsages_ScrapQty_NonNegative", "\"ScrapQty\" >= 0");
+                        });
+                });
+
             modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -608,6 +682,12 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bytea")
+                        .HasDefaultValueSql("'\\x'::bytea");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -630,7 +710,14 @@ namespace UchetNZP.Infrastructure.Migrations
 
                     b.HasIndex("Status", "CurrentSectionId", "CurrentOpNumber");
 
-                    b.ToTable("WipLabels", (string)null);
+                    b.ToTable("WipLabels", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_WipLabels_Quantity_Positive", "\"Quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_WipLabels_Remaining_NonNegative", "\"RemainingQuantity\" >= 0");
+
+                            t.HasCheckConstraint("CK_WipLabels_Remaining_NotGreaterThanQuantity", "\"RemainingQuantity\" <= \"Quantity\"");
+                        });
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipLabelLedger", b =>
@@ -981,6 +1068,25 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Navigation("ImportJob");
                 });
 
+            modelBuilder.Entity("UchetNZP.Domain.Entities.LabelMerge", b =>
+                {
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "InputLabel")
+                        .WithMany("MergeOutputs")
+                        .HasForeignKey("InputLabelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "OutputLabel")
+                        .WithMany("MergeInputs")
+                        .HasForeignKey("OutputLabelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InputLabel");
+
+                    b.Navigation("OutputLabel");
+                });
+
             modelBuilder.Entity("UchetNZP.Domain.Entities.PartRoute", b =>
                 {
                     b.HasOne("UchetNZP.Domain.Entities.Operation", "Operation")
@@ -1017,6 +1123,32 @@ namespace UchetNZP.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("TransferAudit");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.TransferLabelUsage", b =>
+                {
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "CreatedToLabel")
+                        .WithMany("TransferUsagesAsCreated")
+                        .HasForeignKey("CreatedToLabelId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("UchetNZP.Domain.Entities.WipLabel", "FromLabel")
+                        .WithMany("TransferUsagesAsSource")
+                        .HasForeignKey("FromLabelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("UchetNZP.Domain.Entities.WipTransfer", "Transfer")
+                        .WithMany("LabelUsages")
+                        .HasForeignKey("TransferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CreatedToLabel");
+
+                    b.Navigation("FromLabel");
+
+                    b.Navigation("Transfer");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
@@ -1330,6 +1462,14 @@ namespace UchetNZP.Infrastructure.Migrations
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipLabel", b =>
                 {
+                    b.Navigation("MergeInputs");
+
+                    b.Navigation("MergeOutputs");
+
+                    b.Navigation("TransferUsagesAsCreated");
+
+                    b.Navigation("TransferUsagesAsSource");
+
                     b.Navigation("Transfers");
 
                     b.Navigation("WarehouseLabelItems");
@@ -1344,6 +1484,8 @@ namespace UchetNZP.Infrastructure.Migrations
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WipTransfer", b =>
                 {
+                    b.Navigation("LabelUsages");
+
                     b.Navigation("Operations");
 
                     b.Navigation("Scrap");

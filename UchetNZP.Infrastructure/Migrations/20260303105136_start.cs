@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace UchetNZP.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class _1 : Migration
+    public partial class start : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -27,6 +27,18 @@ namespace UchetNZP.Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ImportJobs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "LabelNumberCounters",
+                columns: table => new
+                {
+                    RootNumber = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    NextSuffix = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LabelNumberCounters", x => x.RootNumber);
                 });
 
             migrationBuilder.CreateTable(
@@ -138,6 +150,31 @@ namespace UchetNZP.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "WipLabelLedger",
+                columns: table => new
+                {
+                    EventId = table.Column<Guid>(type: "uuid", nullable: false),
+                    EventTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TransactionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    EventType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    FromLabelId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ToLabelId = table.Column<Guid>(type: "uuid", nullable: true),
+                    FromSectionId = table.Column<Guid>(type: "uuid", nullable: true),
+                    FromOpNumber = table.Column<int>(type: "integer", nullable: true),
+                    ToSectionId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ToOpNumber = table.Column<int>(type: "integer", nullable: true),
+                    Qty = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    ScrapQty = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    RefEntityType = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: false),
+                    RefEntityId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_WipLabelLedger", x => x.EventId);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ImportJobItems",
                 columns: table => new
                 {
@@ -167,12 +204,23 @@ namespace UchetNZP.Infrastructure.Migrations
                     LabelDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Quantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
                     RemainingQuantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
-                    Number = table.Column<string>(type: "character varying(5)", maxLength: 5, nullable: false),
-                    IsAssigned = table.Column<bool>(type: "boolean", nullable: false)
+                    Number = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    IsAssigned = table.Column<bool>(type: "boolean", nullable: false),
+                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    CurrentSectionId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CurrentOpNumber = table.Column<int>(type: "integer", nullable: true),
+                    RootLabelId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ParentLabelId = table.Column<Guid>(type: "uuid", nullable: true),
+                    RootNumber = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    Suffix = table.Column<int>(type: "integer", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true, defaultValueSql: "'\\x'::bytea")
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_WipLabels", x => x.Id);
+                    table.CheckConstraint("CK_WipLabels_Quantity_Positive", "\"Quantity\" > 0");
+                    table.CheckConstraint("CK_WipLabels_Remaining_NonNegative", "\"RemainingQuantity\" >= 0");
+                    table.CheckConstraint("CK_WipLabels_Remaining_NotGreaterThanQuantity", "\"RemainingQuantity\" <= \"Quantity\"");
                     table.ForeignKey(
                         name: "FK_WipLabels_Parts_PartId",
                         column: x => x.PartId,
@@ -298,6 +346,32 @@ namespace UchetNZP.Infrastructure.Migrations
                         principalTable: "TransferAudits",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "LabelMerges",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    InputLabelId = table.Column<Guid>(type: "uuid", nullable: false),
+                    OutputLabelId = table.Column<Guid>(type: "uuid", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_LabelMerges", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_LabelMerges_WipLabels_InputLabelId",
+                        column: x => x.InputLabelId,
+                        principalTable: "WipLabels",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_LabelMerges_WipLabels_OutputLabelId",
+                        column: x => x.OutputLabelId,
+                        principalTable: "WipLabels",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -455,6 +529,45 @@ namespace UchetNZP.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "TransferLabelUsages",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    TransferId = table.Column<Guid>(type: "uuid", nullable: false),
+                    FromLabelId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Qty = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    ScrapQty = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    RemainingBefore = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
+                    CreatedToLabelId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TransferLabelUsages", x => x.Id);
+                    table.CheckConstraint("CK_TransferLabelUsages_Consumption_WithinRemaining", "(\"Qty\" + \"ScrapQty\") <= \"RemainingBefore\"");
+                    table.CheckConstraint("CK_TransferLabelUsages_Qty_NonNegative", "\"Qty\" >= 0");
+                    table.CheckConstraint("CK_TransferLabelUsages_RemainingBefore_NonNegative", "\"RemainingBefore\" >= 0");
+                    table.CheckConstraint("CK_TransferLabelUsages_ScrapQty_NonNegative", "\"ScrapQty\" >= 0");
+                    table.ForeignKey(
+                        name: "FK_TransferLabelUsages_WipLabels_CreatedToLabelId",
+                        column: x => x.CreatedToLabelId,
+                        principalTable: "WipLabels",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TransferLabelUsages_WipLabels_FromLabelId",
+                        column: x => x.FromLabelId,
+                        principalTable: "WipLabels",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_TransferLabelUsages_WipTransfers_TransferId",
+                        column: x => x.TransferId,
+                        principalTable: "WipTransfers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "WarehouseItems",
                 columns: table => new
                 {
@@ -597,6 +710,22 @@ namespace UchetNZP.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_LabelMerges_InputLabelId",
+                table: "LabelMerges",
+                column: "InputLabelId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_LabelMerges_InputLabelId_OutputLabelId",
+                table: "LabelMerges",
+                columns: new[] { "InputLabelId", "OutputLabelId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_LabelMerges_OutputLabelId",
+                table: "LabelMerges",
+                column: "OutputLabelId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Operations_Code",
                 table: "Operations",
                 column: "Code",
@@ -634,6 +763,21 @@ namespace UchetNZP.Infrastructure.Migrations
                 name: "IX_TransferAuditOperations_TransferAuditId",
                 table: "TransferAuditOperations",
                 column: "TransferAuditId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferLabelUsages_CreatedToLabelId",
+                table: "TransferLabelUsages",
+                column: "CreatedToLabelId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferLabelUsages_FromLabelId",
+                table: "TransferLabelUsages",
+                column: "FromLabelId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_TransferLabelUsages_TransferId",
+                table: "TransferLabelUsages",
+                column: "TransferId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_WarehouseItems_PartId",
@@ -683,6 +827,26 @@ namespace UchetNZP.Infrastructure.Migrations
                 column: "SectionId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_WipLabelLedger_EventTime",
+                table: "WipLabelLedger",
+                column: "EventTime");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WipLabelLedger_FromLabelId",
+                table: "WipLabelLedger",
+                column: "FromLabelId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WipLabelLedger_ToLabelId",
+                table: "WipLabelLedger",
+                column: "ToLabelId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WipLabelLedger_TransactionId",
+                table: "WipLabelLedger",
+                column: "TransactionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_WipLabels_Number",
                 table: "WipLabels",
                 column: "Number",
@@ -692,6 +856,22 @@ namespace UchetNZP.Infrastructure.Migrations
                 name: "IX_WipLabels_PartId",
                 table: "WipLabels",
                 column: "PartId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WipLabels_RootLabelId",
+                table: "WipLabels",
+                column: "RootLabelId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WipLabels_RootNumber_Suffix",
+                table: "WipLabels",
+                columns: new[] { "RootNumber", "Suffix" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_WipLabels_Status_CurrentSectionId_CurrentOpNumber",
+                table: "WipLabels",
+                columns: new[] { "Status", "CurrentSectionId", "CurrentOpNumber" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_WipLaunches_PartId_SectionId_LaunchDate",
@@ -794,16 +974,28 @@ namespace UchetNZP.Infrastructure.Migrations
                 name: "ImportJobItems");
 
             migrationBuilder.DropTable(
+                name: "LabelMerges");
+
+            migrationBuilder.DropTable(
+                name: "LabelNumberCounters");
+
+            migrationBuilder.DropTable(
                 name: "ReceiptAudits");
 
             migrationBuilder.DropTable(
                 name: "TransferAuditOperations");
 
             migrationBuilder.DropTable(
+                name: "TransferLabelUsages");
+
+            migrationBuilder.DropTable(
                 name: "WarehouseLabelItems");
 
             migrationBuilder.DropTable(
                 name: "WipBalanceAdjustments");
+
+            migrationBuilder.DropTable(
+                name: "WipLabelLedger");
 
             migrationBuilder.DropTable(
                 name: "WipLaunchOperations");
