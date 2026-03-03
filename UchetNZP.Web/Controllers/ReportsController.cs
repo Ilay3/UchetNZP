@@ -434,11 +434,16 @@ public class ReportsController : Controller
             .ThenBy(x => x.EventType)
             .ToList();
 
+        var remainingLookup = await LoadActualLabelRemainingQuantitiesAsync(new[] { label.Id }, cancellationToken).ConfigureAwait(false);
+        var actualRemaining = remainingLookup.TryGetValue(label.Id, out var computedRemaining)
+            ? computedRemaining
+            : label.RemainingQuantity;
+
         var model = new LabelMovementReportViewModel(
             filter,
             orderedItems,
             label.Quantity,
-            label.RemainingQuantity);
+            actualRemaining);
 
         return View("~/Views/Reports/LabelMovementReport.cshtml", model);
     }
@@ -481,22 +486,122 @@ public class ReportsController : Controller
             query = query.Where(x => x.Number.ToLower().Contains(term));
         }
 
-        var items = await query
+        var labels = await query
             .OrderByDescending(x => x.LabelDate)
             .ThenBy(x => x.Number)
             .Take(100)
             .Select(x => new
             {
-                id = x.Id,
-                number = x.Number,
-                quantity = x.Quantity,
-                remainingQuantity = x.RemainingQuantity,
-                labelDate = x.LabelDate,
+                x.Id,
+                x.Number,
+                x.Quantity,
+                x.RemainingQuantity,
+                x.LabelDate,
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var remainingLookup = await LoadActualLabelRemainingQuantitiesAsync(labels.Select(x => x.Id).ToArray(), cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = labels
+            .Select(x => new
+            {
+                id = x.Id,
+                number = x.Number,
+                quantity = x.Quantity,
+                remainingQuantity = remainingLookup.TryGetValue(x.Id, out var computedRemaining)
+                    ? computedRemaining
+                    : x.RemainingQuantity,
+                labelDate = x.LabelDate,
+            })
+            .ToList();
+
         return Ok(items);
+    }
+
+    private async Task<Dictionary<Guid, decimal>> LoadActualLabelRemainingQuantitiesAsync(
+        IReadOnlyCollection<Guid> labelIds,
+        CancellationToken cancellationToken)
+    {
+        var ret = new Dictionary<Guid, decimal>();
+        if (labelIds is null || labelIds.Count == 0)
+        {
+            return ret;
+        }
+
+        var normalizedIds = labelIds
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        if (normalizedIds.Length == 0)
+        {
+            return ret;
+        }
+
+        var receiptSums = await _dbContext.WipReceipts
+            .AsNoTracking()
+            .Where(x => x.WipLabelId != null && normalizedIds.Contains(x.WipLabelId.Value))
+            .GroupBy(x => x.WipLabelId!.Value)
+            .Select(g => new
+            {
+                LabelId = g.Key,
+                Quantity = g.Sum(x => x.Quantity),
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var item in receiptSums)
+        {
+            ret[item.LabelId] = item.Quantity;
+        }
+
+        foreach (var labelId in normalizedIds)
+        {
+            ret.TryAdd(labelId, 0m);
+        }
+
+        var auditRows = await _dbContext.TransferAudits
+            .AsNoTracking()
+            .Where(x => !x.IsReverted &&
+                ((x.WipLabelId != null && normalizedIds.Contains(x.WipLabelId.Value)) ||
+                 (x.ResidualWipLabelId != null && normalizedIds.Contains(x.ResidualWipLabelId.Value))))
+            .Select(x => new
+            {
+                x.WipLabelId,
+                x.ResidualWipLabelId,
+                x.ScrapQuantity,
+                x.ResidualLabelQuantity,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var audit in auditRows)
+        {
+            if (audit.WipLabelId.HasValue && ret.ContainsKey(audit.WipLabelId.Value))
+            {
+                var residualOut = Math.Max(0m, audit.ResidualLabelQuantity ?? 0m);
+                var scrap = Math.Max(0m, audit.ScrapQuantity);
+                ret[audit.WipLabelId.Value] -= residualOut + scrap;
+            }
+
+            if (audit.ResidualWipLabelId.HasValue && ret.ContainsKey(audit.ResidualWipLabelId.Value))
+            {
+                var residualIn = Math.Max(0m, audit.ResidualLabelQuantity ?? 0m);
+                ret[audit.ResidualWipLabelId.Value] += residualIn;
+            }
+        }
+
+        foreach (var labelId in normalizedIds)
+        {
+            if (ret[labelId] < 0m)
+            {
+                ret[labelId] = 0m;
+            }
+        }
+
+        return ret;
     }
 
     private async Task<WipBatchReportViewModel> LoadWipBatchReportAsync(
@@ -593,7 +698,7 @@ public class ReportsController : Controller
         foreach (var transfer in transferLabels)
         {
             var fromKey = (transfer.PartId, transfer.FromSectionId, transfer.FromOpNumber, transfer.LabelId);
-            var fromDelta = transfer.Quantity + transfer.ScrapQuantity;
+            var fromDelta = transfer.Quantity + transfer.ScrapQuantity + transfer.ResidualLabelQuantity.GetValueOrDefault();
             if (keyBalances.TryGetValue(fromKey, out var fromExisting))
             {
                 keyBalances[fromKey] = (fromExisting.Quantity - fromDelta, fromExisting.LastDate > transfer.TransferDate ? fromExisting.LastDate : transfer.TransferDate);
@@ -1004,38 +1109,59 @@ public class ReportsController : Controller
             OperationNumber.Format(in_transfer.ToOpNumber),
             toText);
 
-        var actualLabelNumbers = new List<string>();
-
-        if (in_transfer.WipLabel is not null && !string.IsNullOrWhiteSpace(in_transfer.WipLabel.Number))
-        {
-            var labelText = in_transfer.WipLabel.Number;
-            if (!string.IsNullOrWhiteSpace(in_transfer.Comment))
-            {
-                labelText = string.Concat(labelText, " (", in_transfer.Comment, ")");
-            }
-
-            actualLabelNumbers.Add(labelText);
-        }
-        else if (in_labelNumbers is not null && in_labelNumbers.Count > 0)
-        {
-            actualLabelNumbers.AddRange(in_labelNumbers);
-        }
+        var transferredLabels = new List<string>();
+        string? residualLabel = null;
 
         if (!string.IsNullOrWhiteSpace(in_residualLabelNumber))
         {
-            var normalizedResidual = in_residualLabelNumber.Trim();
-            if (!actualLabelNumbers.Contains(normalizedResidual, StringComparer.OrdinalIgnoreCase))
+            residualLabel = in_residualLabelNumber.Trim();
+        }
+
+        if (in_transfer.WipLabel is not null && !string.IsNullOrWhiteSpace(in_transfer.WipLabel.Number))
+        {
+            transferredLabels.Add(in_transfer.WipLabel.Number.Trim());
+        }
+        else if (in_labelNumbers is not null && in_labelNumbers.Count > 0)
+        {
+            foreach (var label in in_labelNumbers)
             {
-                actualLabelNumbers.Add(normalizedResidual);
+                if (string.IsNullOrWhiteSpace(label))
+                {
+                    continue;
+                }
+
+                var normalized = label.Trim();
+                if (!string.IsNullOrWhiteSpace(residualLabel)
+                    && string.Equals(normalized, residualLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!transferredLabels.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                {
+                    transferredLabels.Add(normalized);
+                }
             }
         }
 
-        if (actualLabelNumbers.Count > 0)
+        var details = new List<string>();
+        if (transferredLabels.Count > 0)
         {
-            var prefix = actualLabelNumbers.Count == 1 ? "Ярлык" : "Ярлыки";
-            ret = string.Concat(ret, Environment.NewLine, prefix, ": ", string.Join(", ", actualLabelNumbers));
+            var prefix = transferredLabels.Count == 1 ? "Передан ярлык" : "Переданы ярлыки";
+            details.Add(string.Concat(prefix, ": ", string.Join(", ", transferredLabels)));
         }
-        else if (!string.IsNullOrWhiteSpace(in_transfer.Comment))
+
+        if (!string.IsNullOrWhiteSpace(residualLabel))
+        {
+            details.Add(string.Concat("Ярлык остатка: ", residualLabel));
+        }
+
+        if (details.Count > 0)
+        {
+            ret = string.Concat(ret, Environment.NewLine, string.Join(Environment.NewLine, details));
+        }
+
+        if (!string.IsNullOrWhiteSpace(in_transfer.Comment))
         {
             ret = string.Concat(ret, Environment.NewLine, "Комментарий: ", in_transfer.Comment);
         }

@@ -37,13 +37,6 @@
     }
 
     const feedback = document.getElementById("historyActionFeedback");
-    const modalElement = document.getElementById("historyRevertModal");
-    const versionsContainer = document.getElementById("historyRevertVersions");
-    const confirmButton = document.getElementById("historyRevertConfirm");
-    const modalLabel = document.getElementById("historyRevertModalLabel");
-    const modal = modalElement ? new bootstrap.Modal(modalElement) : null;
-
-    let currentReceiptContext = null;
 
     function formatQuantity(value) {
         const number = Number(value);
@@ -151,102 +144,6 @@
         });
     }
 
-    function buildVersionItem(version, index) {
-        const label = document.createElement("label");
-        label.className = "list-group-item list-group-item-action d-flex justify-content-between align-items-start gap-3";
-
-        const radio = document.createElement("input");
-        radio.type = "radio";
-        radio.name = "historyReceiptVersion";
-        radio.value = version.versionId ?? "";
-        radio.className = "form-check-input mt-1";
-        radio.checked = index === 0;
-        radio.required = true;
-
-        const body = document.createElement("div");
-        body.className = "flex-grow-1";
-
-        const title = document.createElement("div");
-        title.className = "fw-semibold";
-        title.textContent = `${version.action ?? "Версия"} — ${formatQuantity(version.newQuantity ?? version.previousQuantity ?? 0)} шт`;
-
-        const details = document.createElement("div");
-        details.className = "text-muted small";
-        const previous = formatQuantity(version.previousQuantity ?? 0);
-        const next = formatQuantity(version.newQuantity ?? 0);
-        const createdAt = version.createdAt ? new Date(version.createdAt).toLocaleString("ru-RU") : "";
-        const labelInfo = version.labelNumber ? `, ярлык ${version.labelNumber}` : "";
-        details.textContent = `${previous} → ${next} шт • ${createdAt}${labelInfo}`;
-
-        if (version.comment) {
-            const comment = document.createElement("div");
-            comment.className = "small";
-            comment.textContent = version.comment;
-            body.append(title, details, comment);
-        }
-        else {
-            body.append(title, details);
-        }
-
-        label.append(radio, body);
-        return label;
-    }
-
-    async function loadReceiptVersions(entry) {
-        if (!modal || !versionsContainer || !confirmButton) {
-            return;
-        }
-
-        const receiptId = entry.getAttribute("data-entry-id");
-        if (!receiptId) {
-            showMessage("danger", "Не удалось определить идентификатор прихода.");
-            return;
-        }
-
-        versionsContainer.innerHTML = "";
-        confirmButton.disabled = true;
-        currentReceiptContext = { entry, receiptId };
-
-        const response = await fetch(`/wip/receipts/${encodeURIComponent(receiptId)}/versions`, {
-            headers: { Accept: "application/json" },
-        });
-
-        if (!response.ok) {
-            showMessage("danger", "Не удалось загрузить версии прихода.");
-            return;
-        }
-
-        const data = await response.json();
-        const versions = Array.isArray(data?.versions) ? data.versions : [];
-
-        if (modalLabel) {
-            const partName = entry.getAttribute("data-part-name") ?? "Приход";
-            modalLabel.textContent = `Восстановление прихода — ${partName}`;
-        }
-
-        if (!versions.length) {
-            const empty = document.createElement("div");
-            empty.className = "text-muted";
-            empty.textContent = "Версии для восстановления не найдены.";
-            versionsContainer.append(empty);
-            modal.show();
-            return;
-        }
-
-        versions.forEach((version, index) => {
-            const item = buildVersionItem(version, index);
-            versionsContainer.append(item);
-        });
-
-        confirmButton.disabled = false;
-        modal.show();
-    }
-
-    function getSelectedVersionId() {
-        const selected = versionsContainer?.querySelector("input[name=\"historyReceiptVersion\"]:checked");
-        return selected ? selected.value : null;
-    }
-
     function updateEntryQuantity(entry, quantity) {
         entry.dataset.quantity = (Number(quantity) || 0).toString();
         const quantityElement = entry.querySelector(".js-history-quantity");
@@ -314,47 +211,6 @@
         }
 
         showMessage("success", messageParts.join(" "));
-        return true;
-    }
-
-    async function revertReceipt() {
-        if (!currentReceiptContext || !confirmButton) {
-            return false;
-        }
-
-        const versionId = getSelectedVersionId();
-        if (!versionId) {
-            showMessage("warning", "Выберите версию для восстановления.");
-            return false;
-        }
-
-        const { entry, receiptId } = currentReceiptContext;
-        const response = await fetch(`/wip/receipts/${encodeURIComponent(receiptId)}/revert`, {
-            method: "POST",
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ versionId }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            showMessage("danger", errorText?.trim() || "Не удалось восстановить приход.");
-            return false;
-        }
-
-        const result = await response.json();
-        modal?.hide();
-
-        updateEntryQuantity(entry, result?.newQuantity ?? result?.targetQuantity ?? entry.dataset.quantity ?? 0);
-        entry.setAttribute("data-version-id", result?.versionId ?? versionId);
-        currentReceiptContext = null;
-        recalcTotals();
-
-        const previousText = formatQuantity(result?.previousQuantity ?? 0);
-        const newText = formatQuantity(result?.newQuantity ?? result?.targetQuantity ?? 0);
-        showMessage("success", `Приход восстановлен: ${previousText} → ${newText} шт.`);
         return true;
     }
 
@@ -432,16 +288,6 @@
             }
         }
 
-        const receiptButton = target.closest(".js-history-receipt-revert");
-        if (receiptButton instanceof HTMLButtonElement) {
-            const entry = receiptButton.closest(".js-history-entry");
-            if (entry) {
-                loadReceiptVersions(entry).catch(() => {
-                    showMessage("danger", "Не удалось загрузить версии прихода.");
-                });
-            }
-        }
-
         const deleteButton = target.closest(".js-history-receipt-delete");
         if (deleteButton instanceof HTMLButtonElement) {
             const entry = deleteButton.closest(".js-history-entry");
@@ -459,31 +305,6 @@
             }
         }
 
-        if (target.name === "historyReceiptVersion") {
-            if (confirmButton) {
-                confirmButton.disabled = false;
-            }
-        }
-    });
-
-    confirmButton?.addEventListener("click", () => {
-        confirmButton.disabled = true;
-        revertReceipt()
-            .then(success => {
-                if (!success) {
-                    confirmButton.disabled = false;
-                }
-            })
-            .catch(() => {
-                confirmButton.disabled = false;
-            });
-    });
-
-    modalElement?.addEventListener("change", event => {
-        const target = event.target;
-        if (target instanceof HTMLInputElement && target.name === "historyReceiptVersion" && confirmButton) {
-            confirmButton.disabled = false;
-        }
     });
 
     recalcTotals();
