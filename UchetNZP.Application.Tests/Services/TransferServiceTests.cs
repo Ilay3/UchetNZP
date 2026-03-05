@@ -161,6 +161,62 @@ public class TransferServiceTests
     }
 
     [Fact]
+    public async Task AddTransfersBatchAsync_WithPartialScrap_KeepsRemainingFromBalance()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 10" };
+        var toSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ 20" };
+        var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "010" };
+        var toOperation = new Operation { Id = Guid.NewGuid(), Name = "020" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.AddRange(fromSection, toSection);
+        dbContext.Operations.AddRange(fromOperation, toOperation);
+        dbContext.PartRoutes.AddRange(
+            CreateRoute(part.Id, fromSection.Id, fromOperation.Id, 10),
+            CreateRoute(part.Id, toSection.Id, toOperation.Id, 20));
+
+        dbContext.WipBalances.Add(new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = fromSection.Id,
+            OpNumber = 10,
+            Quantity = 120m,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
+
+        var summary = await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(
+                part.Id,
+                10,
+                20,
+                new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                80m,
+                null,
+                null,
+                TransferScenario.MoveLabel,
+                false,
+                null,
+                new TransferScrapDto(ScrapType.Technological, 20m, null))
+        });
+
+        var item = Assert.Single(summary.Items);
+        Assert.Equal(20m, item.FromBalanceAfter);
+        Assert.NotNull(item.Scrap);
+        Assert.Equal(20m, item.Scrap!.Quantity);
+
+        var updatedFromBalance = await dbContext.WipBalances.SingleAsync(x => x.PartId == part.Id && x.OpNumber == 10);
+        Assert.Equal(20m, updatedFromBalance.Quantity);
+    }
+
+    [Fact]
     public async Task AddTransfersBatchAsync_ToWarehouse_StoresWarehouseEntry()
     {
         await using var dbContext = CreateContext();
