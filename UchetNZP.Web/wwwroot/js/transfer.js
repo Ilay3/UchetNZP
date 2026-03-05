@@ -94,6 +94,7 @@
 
     let scrapModalResolver = null;
     let scrapSelectedTypeKey = null;
+    let scrapModalContext = null;
 
     const today = new Date().toISOString().slice(0, 10);
     if (dateInput) {
@@ -361,6 +362,7 @@
         updateScrapTypeButtons();
         if (scrapConfirmButton) {
             scrapConfirmButton.disabled = true;
+            scrapConfirmButton.classList.remove("d-none");
         }
     });
 
@@ -380,6 +382,7 @@
         scrapSelectedTypeKey = null;
         updateScrapTypeButtons();
         scrapConfirmButton.disabled = true;
+        scrapConfirmButton.classList.add("d-none");
     });
 
     scrapCloseButton?.addEventListener("click", () => {
@@ -422,15 +425,23 @@
         scrapPrimaryActions.classList.remove("d-none");
         scrapDetails.classList.add("d-none");
         scrapConfirmButton.disabled = true;
+        scrapConfirmButton.classList.add("d-none");
         scrapSelectedTypeKey = null;
         if (scrapCommentInput) {
             scrapCommentInput.value = "";
         }
+
+        if (scrapSplitButton) {
+            const allowSplit = scrapModalContext?.allowSplit !== false;
+            scrapSplitButton.classList.toggle("d-none", !allowSplit);
+        }
+
         updateScrapTypeButtons();
     });
 
     scrapModalElement?.addEventListener("hidden.bs.modal", () => {
         resolveScrapModal({ confirmed: false }, true);
+        scrapModalContext = null;
         scrapSelectedTypeKey = null;
         updateScrapTypeButtons();
         cleanupStaleBackdrops();
@@ -479,6 +490,10 @@
         if (!scrapModal || !scrapIntro) {
             return Promise.resolve({ confirmed: false });
         }
+
+        scrapModalContext = {
+            allowSplit: context?.allowSplit !== false,
+        };
 
         const leftoverText = Number(context.leftover).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
         const partText = context.partDisplay ? ` для ${context.partDisplay}` : "";
@@ -1458,6 +1473,7 @@
                 leftover,
                 partDisplay: item.partDisplay,
                 fromOperation: `${selectedFromOperation.opNumber} ${selectedFromOperation.operationName ?? ""}`.trim(),
+                allowSplit: !isSplitChildLabelNumber(item.labelNumber ?? ""),
             });
 
             if (!decision?.confirmed) {
