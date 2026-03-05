@@ -5,9 +5,12 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Services;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Configuration;
+using QuestPDF.Infrastructure;
 using UchetNZP.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+QuestPDF.Settings.License = LicenseType.Community;
 
 builder.Services.AddControllersWithViews();
 builder.Host.UseWindowsService();
@@ -46,6 +49,9 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IScrapReportExcelExporter, ScrapReportExcelExporter>();
 builder.Services.AddSingleton<ITransferPeriodReportExcelExporter, TransferPeriodReportExcelExporter>();
 builder.Services.AddSingleton<IWipBatchReportExcelExporter, WipBatchReportExcelExporter>();
+builder.Services.AddSingleton<IScrapReportPdfExporter, ScrapReportPdfExporter>();
+builder.Services.AddSingleton<ITransferPeriodReportPdfExporter, TransferPeriodReportPdfExporter>();
+builder.Services.AddSingleton<IWipBatchReportPdfExporter, WipBatchReportPdfExporter>();
 builder.Services.AddHostedService<WarehouseDailyResetService>();
 
 var app = builder.Build();
