@@ -310,15 +310,15 @@ public class TransferService : ITransferService
                         throw new InvalidOperationException($"Количество брака должно быть положительным для детали {item.PartId}.");
                     }
 
-                    if (remainingAfterTransfer != item.Scrap.Quantity)
+                    if (item.Scrap.Quantity > remainingAfterTransfer)
                     {
                         throw new InvalidOperationException(
-                            $"Количество брака ({item.Scrap.Quantity}) не совпадает с остатком ({remainingAfterTransfer}) для операции {item.FromOpNumber} детали {item.PartId}.");
+                            $"Количество брака ({item.Scrap.Quantity}) не может превышать доступный остаток ({remainingAfterTransfer}) для операции {item.FromOpNumber} детали {item.PartId}.");
                     }
 
                     scrapQuantity = item.Scrap.Quantity;
 
-                    fromBalance.Quantity = 0m;
+                    fromBalance.Quantity = remainingAfterTransfer - item.Scrap.Quantity;
 
                     var scrap = new WipScrap
                     {
