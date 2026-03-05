@@ -695,18 +695,20 @@ public class TransferService : ITransferService
             throw new InvalidOperationException($"Ярлык {label.Number} относится к другой детали и не может быть использован для передачи детали {item.PartId}.");
         }
 
-        if (label.WipReceipt is null)
+        if (!isMoveLabel && label.WipReceipt is null)
         {
             throw new InvalidOperationException($"Невозможно выполнить передачу: ярлык {label.Number} не связан с приходом. Используйте сценарий операции с ярлыком, созданным через приход, или выберите другой ярлык.");
         }
 
-        var operationQuantity = await GetLabelQuantityAtOperationAsync(
-                label.Id,
-                item.PartId,
-                fromRoute.SectionId,
-                item.FromOpNumber,
-                cancellationToken)
-            .ConfigureAwait(false);
+        var operationQuantity = isMoveLabel && label.WipReceipt is null && label.CurrentSectionId == fromRoute.SectionId && label.CurrentOpNumber == item.FromOpNumber
+            ? label.RemainingQuantity
+            : await GetLabelQuantityAtOperationAsync(
+                    label.Id,
+                    item.PartId,
+                    fromRoute.SectionId,
+                    item.FromOpNumber,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         if (operationQuantity + 0.000001m < requiredQuantity)
         {
