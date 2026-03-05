@@ -245,26 +245,27 @@ public class RoutesController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var hasLaunches = await _dbContext.WipLaunchOperations
-            .AsNoTracking()
-            .AnyAsync(x => x.PartRouteId == id, cancellationToken)
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        await _dbContext.WipLaunchOperations
+            .Where(x => x.PartRouteId == id)
+            .ExecuteUpdateAsync(
+                updates => updates.SetProperty(x => x.PartRouteId, (Guid?)null),
+                cancellationToken)
             .ConfigureAwait(false);
 
-        var hasTransfers = await _dbContext.WipTransferOperations
-            .AsNoTracking()
-            .AnyAsync(x => x.PartRouteId == id, cancellationToken)
+        await _dbContext.WipTransferOperations
+            .Where(x => x.PartRouteId == id)
+            .ExecuteUpdateAsync(
+                updates => updates.SetProperty(x => x.PartRouteId, (Guid?)null),
+                cancellationToken)
             .ConfigureAwait(false);
-
-        if (hasLaunches || hasTransfers)
-        {
-            TempData["RouteError"] = "Нельзя удалить маршрут, который используется в запусках или передачах.";
-            return RedirectToAction(nameof(Index));
-        }
 
         _dbContext.PartRoutes.Remove(route);
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
-        TempData["RouteMessage"] = "Маршрут удалён.";
+        TempData["RouteMessage"] = "Маршрут удалён. Исторические записи сохранены без привязки к маршруту.";
 
         return RedirectToAction(nameof(Index));
     }
