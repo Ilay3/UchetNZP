@@ -96,6 +96,9 @@ public class ReportsControllerTests
             new StubScrapExporter(),
             new StubTransferExporter(),
             new StubWipBatchExporter(),
+            new StubScrapPdfExporter(),
+            new StubTransferPdfExporter(),
+            new StubWipBatchPdfExporter(),
             new WipLabelLookupService(dbContext));
 
         var result = await controller.WipBatchReport(null, CancellationToken.None);
@@ -177,6 +180,9 @@ public class ReportsControllerTests
             new StubScrapExporter(),
             new StubTransferExporter(),
             new StubWipBatchExporter(),
+            new StubScrapPdfExporter(),
+            new StubTransferPdfExporter(),
+            new StubWipBatchPdfExporter(),
             new WipLabelLookupService(dbContext));
 
         var queryDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified);
@@ -216,6 +222,25 @@ public class ReportsControllerTests
     }
 
     private sealed class StubWipBatchExporter : IWipBatchReportExcelExporter
+    {
+        public byte[] Export(WipBatchReportFilterViewModel filter, System.Collections.Generic.IReadOnlyList<WipBatchReportItemViewModel> items, decimal totalQuantity)
+            => Array.Empty<byte>();
+    }
+
+
+    private sealed class StubScrapPdfExporter : IScrapReportPdfExporter
+    {
+        public byte[] Export(ScrapReportFilterViewModel filter, System.Collections.Generic.IReadOnlyList<ScrapReportItemViewModel> items)
+            => Array.Empty<byte>();
+    }
+
+    private sealed class StubTransferPdfExporter : ITransferPeriodReportPdfExporter
+    {
+        public byte[] Export(TransferPeriodReportFilterViewModel filter, System.Collections.Generic.IReadOnlyList<DateTime> dates, System.Collections.Generic.IReadOnlyList<TransferPeriodReportItemViewModel> items)
+            => Array.Empty<byte>();
+    }
+
+    private sealed class StubWipBatchPdfExporter : IWipBatchReportPdfExporter
     {
         public byte[] Export(WipBatchReportFilterViewModel filter, System.Collections.Generic.IReadOnlyList<WipBatchReportItemViewModel> items, decimal totalQuantity)
             => Array.Empty<byte>();
