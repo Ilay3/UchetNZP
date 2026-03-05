@@ -63,6 +63,15 @@
                        asp-route-opNumber='@Model.Filter.OpNumber'>
                         Экспорт в Excel
                     </a>
+                    <a class="btn btn-outline-success"
+                       asp-action="WipBatchReportExportPdf"
+                       asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
+                       asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
+                       asp-route-part='@Model.Filter.Part'
+                       asp-route-section='@Model.Filter.Section'
+                       asp-route-opNumber='@Model.Filter.OpNumber'>
+                        Экспорт в PDF
+                    </a>
                 </div>
             </div>
         </div>

@@ -20,6 +20,9 @@ public class ReportsController : Controller
     private readonly IScrapReportExcelExporter _scrapReportExcelExporter;
     private readonly ITransferPeriodReportExcelExporter _transferPeriodReportExcelExporter;
     private readonly IWipBatchReportExcelExporter _wipBatchReportExcelExporter;
+    private readonly IScrapReportPdfExporter _scrapReportPdfExporter;
+    private readonly ITransferPeriodReportPdfExporter _transferPeriodReportPdfExporter;
+    private readonly IWipBatchReportPdfExporter _wipBatchReportPdfExporter;
     private readonly IWipLabelLookupService _labelLookupService;
 
     public ReportsController(
@@ -27,12 +30,18 @@ public class ReportsController : Controller
         IScrapReportExcelExporter scrapReportExcelExporter,
         ITransferPeriodReportExcelExporter transferPeriodReportExcelExporter,
         IWipBatchReportExcelExporter wipBatchReportExcelExporter,
+        IScrapReportPdfExporter scrapReportPdfExporter,
+        ITransferPeriodReportPdfExporter transferPeriodReportPdfExporter,
+        IWipBatchReportPdfExporter wipBatchReportPdfExporter,
         IWipLabelLookupService labelLookupService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _scrapReportExcelExporter = scrapReportExcelExporter ?? throw new ArgumentNullException(nameof(scrapReportExcelExporter));
         _transferPeriodReportExcelExporter = transferPeriodReportExcelExporter ?? throw new ArgumentNullException(nameof(transferPeriodReportExcelExporter));
         _wipBatchReportExcelExporter = wipBatchReportExcelExporter ?? throw new ArgumentNullException(nameof(wipBatchReportExcelExporter));
+        _scrapReportPdfExporter = scrapReportPdfExporter ?? throw new ArgumentNullException(nameof(scrapReportPdfExporter));
+        _transferPeriodReportPdfExporter = transferPeriodReportPdfExporter ?? throw new ArgumentNullException(nameof(transferPeriodReportPdfExporter));
+        _wipBatchReportPdfExporter = wipBatchReportPdfExporter ?? throw new ArgumentNullException(nameof(wipBatchReportPdfExporter));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
@@ -135,6 +144,15 @@ public class ReportsController : Controller
         return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
+    [HttpGet("scrap/export-pdf")]
+    public async Task<IActionResult> ScrapReportExportPdf([FromQuery] ScrapReportQuery? query, CancellationToken cancellationToken)
+    {
+        var (filter, items) = await LoadScrapReportAsync(query, cancellationToken).ConfigureAwait(false);
+        var content = _scrapReportPdfExporter.Export(filter, items);
+        var fileName = $"scrap-report-{filter.From:yyyyMMdd}-{filter.To:yyyyMMdd}.pdf";
+        return File(content, "application/pdf", fileName);
+    }
+
     [HttpGet("transfer-period")]
     public async Task<IActionResult> TransferPeriodReport([FromQuery] TransferPeriodReportQuery? in_query, CancellationToken in_cancellationToken)
     {
@@ -153,6 +171,19 @@ public class ReportsController : Controller
             model.Filter.From,
             model.Filter.To);
         IActionResult ret = File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        return ret;
+    }
+
+    [HttpGet("transfer-period/export-pdf")]
+    public async Task<IActionResult> TransferPeriodReportExportPdf([FromQuery] TransferPeriodReportQuery? in_query, CancellationToken in_cancellationToken)
+    {
+        var model = await LoadTransferPeriodReportAsync(in_query, in_cancellationToken).ConfigureAwait(false);
+        var content = _transferPeriodReportPdfExporter.Export(model.Filter, model.Dates, model.Items);
+        var fileName = string.Format(
+            "transfer-period-report-{0:yyyyMMdd}-{1:yyyyMMdd}.pdf",
+            model.Filter.From,
+            model.Filter.To);
+        IActionResult ret = File(content, "application/pdf", fileName);
         return ret;
     }
 
@@ -317,6 +348,18 @@ public class ReportsController : Controller
             model.Filter.From,
             model.Filter.To);
         return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    [HttpGet("wip-batches/export-pdf")]
+    public async Task<IActionResult> WipBatchReportExportPdf([FromQuery] WipBatchReportQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await LoadWipBatchReportAsync(query, cancellationToken).ConfigureAwait(false);
+        var content = _wipBatchReportPdfExporter.Export(model.Filter, model.Items, model.TotalQuantity);
+        var fileName = string.Format(
+            "wip-batch-report-{0:yyyyMMdd}-{1:yyyyMMdd}.pdf",
+            model.Filter.From,
+            model.Filter.To);
+        return File(content, "application/pdf", fileName);
     }
 
     [HttpGet("label-movement")]
