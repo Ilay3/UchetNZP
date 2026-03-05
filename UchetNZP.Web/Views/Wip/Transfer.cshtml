@@ -96,8 +96,9 @@
         <button type="button" class="btn btn-success btn-lg" id="transferSaveButton">Сохранить все передачи (Ctrl+S)</button>
     </div>
     <div class="card-body">
+        <p class="text-muted mb-3">Перед сохранением проверьте строки: ключевые данные выделены, а детали сгруппированы по смыслу.</p>
         <div class="table-responsive">
-            <table class="table table-striped align-middle" id="transferCartTable" aria-describedby="transferCartCaption">
+            <table class="table table-striped align-middle transfer-cart-table" id="transferCartTable" aria-describedby="transferCartCaption">
                 <caption id="transferCartCaption" class="visually-hidden">Передачи НЗП, подготовленные к сохранению</caption>
                 <thead class="table-light">
                     <tr>
@@ -108,8 +109,8 @@
                         <th scope="col">Ярлык</th>
                         <th scope="col">Остаточный ярлык</th>
                         <th scope="col">Количество</th>
-                        <th scope="col">Остаток до (было → станет)</th>
-                        <th scope="col">Остаток после (было → станет)</th>
+                        <th scope="col">Остаток до</th>
+                        <th scope="col">Остаток после</th>
                         <th scope="col">Комментарий</th>
                         <th scope="col">Брак</th>
                         <th scope="col" class="text-center">Действия</th>
@@ -117,7 +118,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="11" class="text-center text-muted">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td>
+                        <td colspan="12" class="text-center text-muted">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td>
                     </tr>
                 </tbody>
             </table>

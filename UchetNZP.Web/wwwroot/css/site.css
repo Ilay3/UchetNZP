@@ -359,3 +359,65 @@ table {
   min-height: 32px;
   font-size: 0.82rem;
 }
+
+.transfer-cart-table {
+    font-size: 0.92rem;
+}
+
+.transfer-cart-table th {
+    white-space: nowrap;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.transfer-cell-main {
+    font-weight: 600;
+}
+
+.transfer-cell-date {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.transfer-op-number {
+    font-weight: 700;
+    line-height: 1.1;
+}
+
+.transfer-op-name {
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+}
+
+.transfer-quantity-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(25, 135, 84, 0.14);
+    color: #0f5132;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.transfer-balance-cell {
+    min-width: 11rem;
+}
+
+.transfer-balance-caption {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+}
+
+.transfer-balance-value {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.transfer-comment-text {
+    display: inline-block;
+    max-width: 16rem;
+    white-space: normal;
+    color: #334155;
+}

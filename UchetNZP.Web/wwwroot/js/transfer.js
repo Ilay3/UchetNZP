@@ -1549,7 +1549,7 @@
 
     function renderCart() {
         if (!cart.length) {
-            cartTableBody.innerHTML = "<tr><td colspan=\"11\" class=\"text-center text-muted\">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td></tr>";
+            cartTableBody.innerHTML = "<tr><td colspan=\"12\" class=\"text-center text-muted\">Добавьте записи передачи, чтобы подготовить пакет к сохранению.</td></tr>";
             updateFormState();
             return;
         }
@@ -1557,22 +1557,28 @@
         cartTableBody.innerHTML = "";
         cart.forEach((item, index) => {
             const row = document.createElement("tr");
+            const quantityText = item.quantity.toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+            const fromBalanceText = formatBalanceChange(item.fromBalanceBefore, item.fromBalanceAfter);
+            const toBalanceText = formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter);
             row.innerHTML = `
-                <td>${item.date}</td>
-                <td>${item.partDisplay}</td>
+                <td><span class="transfer-cell-date">${item.date}</span></td>
                 <td>
-                    <div class="fw-semibold">${item.fromOpNumber}</div>
-                    <div class="small text-muted">${item.fromOperationName ?? ""}</div>
+                    <div class="transfer-cell-main">${item.partDisplay}</div>
                 </td>
                 <td>
-                    <div class="fw-semibold">${item.toOpNumber}</div>
-                    <div class="small text-muted">${item.toOperationName ?? ""}</div>
+                    <div class="transfer-op-number">${item.fromOpNumber}</div>
+                    <div class="transfer-op-name">${item.fromOperationName ?? ""}</div>
+                </td>
+                <td>
+                    <div class="transfer-op-number">${item.toOpNumber}</div>
+                    <div class="transfer-op-name">${item.toOperationName ?? ""}</div>
                 </td>
                 <td>${formatSelectedLabel(item)}</td>
-                <td>${item.quantity.toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
-                <td>${formatBalanceChange(item.fromBalanceBefore, item.fromBalanceAfter)}</td>
-                <td>${formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter)}</td>
-                <td>${item.comment ? escapeHtml(item.comment) : ""}</td>
+                <td>${formatResidualLabelCell(item)}</td>
+                <td><span class="transfer-quantity-badge">${quantityText}</span></td>
+                <td>${formatBalanceCell("до", fromBalanceText)}</td>
+                <td>${formatBalanceCell("после", toBalanceText)}</td>
+                <td>${item.comment ? `<span class="transfer-comment-text">${escapeHtml(item.comment)}</span>` : "<span class=\"text-muted\">—</span>"}</td>
                 <td>${formatScrapCell(item)}</td>
                 <td class="text-center">
                     <button type="button" class="btn btn-link btn-lg text-decoration-none" data-action="edit" data-index="${index}" aria-label="Изменить запись">✎</button>
@@ -1581,6 +1587,23 @@
             cartTableBody.appendChild(row);
         });
         updateFormState();
+    }
+
+    function formatResidualLabelCell(item) {
+        const residual = typeof item?.residualLabelNumber === "string" ? item.residualLabelNumber.trim() : "";
+        if (!residual.length) {
+            return '<span class="text-muted">Остаток на исходном ярлыке</span>';
+        }
+
+        return `<span class="badge text-bg-success">${escapeHtml(residual)}</span>`;
+    }
+
+    function formatBalanceCell(label, value) {
+        return `
+            <div class="transfer-balance-cell">
+                <div class="transfer-balance-caption">${label}</div>
+                <div class="transfer-balance-value">${value}</div>
+            </div>`;
     }
 
     function formatBalanceChange(before, after) {
