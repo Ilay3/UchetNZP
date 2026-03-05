@@ -71,7 +71,7 @@ public class RouteEditInputModel
 
     [Display(Name = "Норматив (н/ч)")]
     [Required(ErrorMessage = "Укажите норматив.")]
-    [Range(typeof(decimal), "0.001", "79228162514264337593543950335", ErrorMessage = "Норматив должен быть больше нуля.")]
+    [Range(0.001d, double.MaxValue, ErrorMessage = "Норматив должен быть больше нуля.")]
     public decimal NormHours { get; set; }
 
     [Required(ErrorMessage = "Укажите вид работ.")]
