@@ -86,7 +86,7 @@ public class WarehouseControllerTests
 
         var controller = CreateController(dbContext);
 
-        var actionResult = await controller.Index(partId, 2, 2, CancellationToken.None).ConfigureAwait(false);
+        var actionResult = await controller.Index(partId, null, 2, 2, CancellationToken.None).ConfigureAwait(false);
 
         var viewResult = Assert.IsType<ViewResult>(actionResult);
         var model = Assert.IsType<WarehouseIndexViewModel>(viewResult.Model);
@@ -136,7 +136,7 @@ public class WarehouseControllerTests
 
         var controller = CreateController(dbContext);
 
-        var actionResult = await controller.Index(partId, 10, -5, CancellationToken.None).ConfigureAwait(false);
+        var actionResult = await controller.Index(partId, null, 10, -5, CancellationToken.None).ConfigureAwait(false);
 
         var viewResult = Assert.IsType<ViewResult>(actionResult);
         var model = Assert.IsType<WarehouseIndexViewModel>(viewResult.Model);

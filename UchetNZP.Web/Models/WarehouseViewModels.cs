@@ -7,6 +7,8 @@ public class WarehouseIndexViewModel
 {
     public Guid? SelectedPartId { get; init; }
 
+    public string PartSearch { get; init; } = string.Empty;
+
     public IReadOnlyCollection<SelectListItem> Parts { get; init; } = Array.Empty<SelectListItem>();
 
     public IReadOnlyCollection<WarehouseItemRowViewModel> Items { get; init; } = Array.Empty<WarehouseItemRowViewModel>();
