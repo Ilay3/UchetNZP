@@ -228,6 +228,53 @@ public class TransferServiceTests
     }
 
     [Fact]
+    public async Task AddTransfersBatchAsync_ToWarehouse_WithLegacyNumber_CreatesWarehouseReferences()
+    {
+        await using var dbContext = CreateContext();
+
+        var part = new Part { Id = Guid.NewGuid(), Name = "Деталь" };
+        var fromSection = new Section { Id = Guid.NewGuid(), Name = "Вид работ" };
+        var fromOperation = new Operation { Id = Guid.NewGuid(), Name = "010" };
+
+        dbContext.Parts.Add(part);
+        dbContext.Sections.Add(fromSection);
+        dbContext.Operations.Add(fromOperation);
+        dbContext.PartRoutes.Add(CreateRoute(part.Id, fromSection.Id, fromOperation.Id, 10));
+
+        dbContext.WipBalances.Add(new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            SectionId = fromSection.Id,
+            OpNumber = 10,
+            Quantity = 50m,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new TransferService(dbContext, new RouteService(dbContext), new TestCurrentUserService(), new LabelNumberingService(dbContext));
+
+        var summary = await service.AddTransfersBatchAsync(new[]
+        {
+            new TransferItemDto(part.Id, 10, WarehouseDefaults.LegacyOperationNumber, DateTime.UtcNow, 20m, null, null, TransferScenario.MoveLabel, false, null, null),
+        });
+
+        var item = Assert.Single(summary.Items);
+        Assert.Equal(WarehouseDefaults.OperationNumber, item.ToOpNumber);
+        Assert.Equal(WarehouseDefaults.SectionId, item.ToSectionId);
+
+        var transferOperation = await dbContext.WipTransferOperations
+            .Where(x => x.WipTransferId == item.TransferId && x.QuantityChange > 0)
+            .SingleAsync();
+
+        Assert.Equal(WarehouseDefaults.OperationId, transferOperation.OperationId);
+        Assert.Equal(WarehouseDefaults.SectionId, transferOperation.SectionId);
+
+        Assert.NotNull(await dbContext.Operations.FindAsync(WarehouseDefaults.OperationId));
+        Assert.NotNull(await dbContext.Sections.FindAsync(WarehouseDefaults.SectionId));
+    }
+
+    [Fact]
     public async Task AddTransfersBatchAsync_WithLabel_TransferBetweenOperations_DoesNotReduceRemainingQuantity()
     {
         await using var dbContext = CreateContext();

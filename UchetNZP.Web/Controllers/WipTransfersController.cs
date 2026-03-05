@@ -189,7 +189,7 @@ public class WipTransfersController : Controller
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var isWarehouseTransfer = toOp == WarehouseDefaults.OperationNumber;
+        var isWarehouseTransfer = WarehouseDefaults.IsWarehouseOperationNumber(toOp);
         Guid toSectionId;
         decimal toBalanceValue;
 

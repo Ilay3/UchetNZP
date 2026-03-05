@@ -150,12 +150,18 @@ public class TransferService : ITransferService
                     throw new InvalidOperationException($"Операция {item.FromOpNumber} для детали {item.PartId} отсутствует в маршруте.");
                 }
 
-                var isWarehouseTransfer = item.ToOpNumber == WarehouseDefaults.OperationNumber;
+                var isWarehouseTransfer = WarehouseDefaults.IsWarehouseOperationNumber(item.ToOpNumber);
+                var normalizedToOpNumber = isWarehouseTransfer ? WarehouseDefaults.OperationNumber : item.ToOpNumber;
+
+                if (isWarehouseTransfer)
+                {
+                    await EnsureWarehouseReferencesAsync(cancellationToken).ConfigureAwait(false);
+                }
 
                 PartRoute? toRoute = null;
                 if (!isWarehouseTransfer)
                 {
-                    toRoute = orderedRoute.FirstOrDefault(x => x.OpNumber == item.ToOpNumber);
+                    toRoute = orderedRoute.FirstOrDefault(x => x.OpNumber == normalizedToOpNumber);
                     if (toRoute is null)
                     {
                         throw new InvalidOperationException($"Операция {item.ToOpNumber} для детали {item.PartId} отсутствует в маршруте.");
@@ -170,7 +176,7 @@ public class TransferService : ITransferService
 
                 if (!isWarehouseTransfer)
                 {
-                    var toIndex = orderedRoute.FindIndex(x => x.OpNumber == item.ToOpNumber);
+                    var toIndex = orderedRoute.FindIndex(x => x.OpNumber == normalizedToOpNumber);
                     if (toIndex < 0 || toIndex <= fromIndex)
                     {
                         throw new InvalidOperationException($"Операция {item.ToOpNumber} должна следовать за {item.FromOpNumber} для детали {item.PartId}.");
@@ -242,7 +248,7 @@ public class TransferService : ITransferService
                     FromSectionId = fromRoute.SectionId,
                     FromOpNumber = item.FromOpNumber,
                     ToSectionId = toSectionId,
-                    ToOpNumber = item.ToOpNumber,
+                    ToOpNumber = normalizedToOpNumber,
                     TransferDate = transferDate,
                     CreatedAt = now,
                     Quantity = item.Quantity,
@@ -268,7 +274,7 @@ public class TransferService : ITransferService
                     WipTransferId = transfer.Id,
                     OperationId = toOperationId,
                     SectionId = toSectionId,
-                    OpNumber = item.ToOpNumber,
+                    OpNumber = normalizedToOpNumber,
                     PartRouteId = toPartRouteId,
                     QuantityChange = item.Quantity,
                 };
@@ -362,7 +368,7 @@ public class TransferService : ITransferService
                             labelUsage.Label,
                             createsTransferChildLabel ? item.Quantity : 0m,
                             isWarehouseTransfer ? WarehouseDefaults.SectionId : toSectionId,
-                            item.ToOpNumber,
+                            normalizedToOpNumber,
                             transferDate,
                             cancellationToken)
                         .ConfigureAwait(false);
@@ -498,7 +504,7 @@ public class TransferService : ITransferService
                     FromSectionId = fromRoute.SectionId,
                     FromOpNumber = item.FromOpNumber,
                     ToSectionId = toSectionId,
-                    ToOpNumber = item.ToOpNumber,
+                    ToOpNumber = normalizedToOpNumber,
                     Quantity = item.Quantity,
                     Comment = trimmedComment,
                     TransferDate = transferDate,
@@ -557,7 +563,7 @@ public class TransferService : ITransferService
                     fromRoute.SectionId,
                     fromBalanceBefore,
                     fromBalance.Quantity,
-                    item.ToOpNumber,
+                    normalizedToOpNumber,
                     toSectionId,
                     toBalanceBefore,
                     isWarehouseTransfer ? toBalanceAfter : toBalance!.Quantity,
@@ -593,6 +599,35 @@ public class TransferService : ITransferService
         {
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
+        }
+    }
+
+    private async Task EnsureWarehouseReferencesAsync(CancellationToken cancellationToken)
+    {
+        var hasWarehouseOperation = await _dbContext.Operations
+            .AnyAsync(x => x.Id == WarehouseDefaults.OperationId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!hasWarehouseOperation)
+        {
+            await _dbContext.Operations.AddAsync(new Operation
+            {
+                Id = WarehouseDefaults.OperationId,
+                Name = WarehouseDefaults.OperationName,
+            }, cancellationToken).ConfigureAwait(false);
+        }
+
+        var hasWarehouseSection = await _dbContext.Sections
+            .AnyAsync(x => x.Id == WarehouseDefaults.SectionId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!hasWarehouseSection)
+        {
+            await _dbContext.Sections.AddAsync(new Section
+            {
+                Id = WarehouseDefaults.SectionId,
+                Name = WarehouseDefaults.SectionName,
+            }, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -930,7 +965,7 @@ public class TransferService : ITransferService
             TransferDeleteWarehouseItemDto? warehouseDto = null;
             decimal toBalanceBefore;
             decimal toBalanceAfter;
-            var isWarehouseTransfer = transfer.ToOpNumber == WarehouseDefaults.OperationNumber;
+            var isWarehouseTransfer = WarehouseDefaults.IsWarehouseOperationNumber(transfer.ToOpNumber);
 
             if (isWarehouseTransfer)
             {
