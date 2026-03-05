@@ -7,6 +7,12 @@ namespace UchetNZP.Web.Services;
 
 public class WarehouseDailyResetService : BackgroundService
 {
+    private static readonly TimeZoneInfo ResetTimeZone = TimeZoneInfo.CreateCustomTimeZone(
+        "WarehouseResetUtcPlus4",
+        TimeSpan.FromHours(4),
+        "UTC+04:00",
+        "UTC+04:00");
+
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IOptionsMonitor<WarehouseDailyResetOptions> _optionsMonitor;
     private readonly ILogger<WarehouseDailyResetService> _logger;
@@ -25,11 +31,13 @@ public class WarehouseDailyResetService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            var now = DateTime.Now;
-            var nextRun = now.Date.AddDays(1);
-            var delay = nextRun - now;
+            var nowUtc = DateTimeOffset.UtcNow;
+            var nextRun = GetNextRun(nowUtc);
+            var delay = nextRun - nowUtc;
 
-            _logger.LogInformation("Следующее ежедневное обнуление склада запланировано на {NextRun}.", nextRun);
+            _logger.LogInformation(
+                "Следующее ежедневное обнуление склада запланировано на {NextRunLocal} (UTC+4).",
+                nextRun);
 
             try
             {
@@ -61,6 +69,27 @@ public class WarehouseDailyResetService : BackgroundService
         }
     }
 
+    private static DateTimeOffset GetNextRun(DateTimeOffset nowUtc)
+    {
+        var localNow = TimeZoneInfo.ConvertTime(nowUtc, ResetTimeZone);
+        var localDate = localNow.Date;
+        var localTarget = new DateTimeOffset(
+            localDate.Year,
+            localDate.Month,
+            localDate.Day,
+            18,
+            0,
+            0,
+            ResetTimeZone.BaseUtcOffset);
+
+        if (localNow >= localTarget)
+        {
+            localTarget = localTarget.AddDays(1);
+        }
+
+        return localTarget.ToUniversalTime();
+    }
+
     private async Task ResetWarehouseAsync(CancellationToken cancellationToken)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
@@ -68,19 +97,25 @@ public class WarehouseDailyResetService : BackgroundService
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
-        var deletedLabelItems = await dbContext.WarehouseLabelItems
-            .ExecuteDeleteAsync(cancellationToken)
+        var updatedAt = DateTime.UtcNow;
+
+        var updatedLabelItems = await dbContext.WarehouseLabelItems
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.Quantity, 0m)
+                .SetProperty(item => item.UpdatedAt, updatedAt), cancellationToken)
             .ConfigureAwait(false);
 
-        var deletedItems = await dbContext.WarehouseItems
-            .ExecuteDeleteAsync(cancellationToken)
+        var updatedItems = await dbContext.WarehouseItems
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.Quantity, 0m)
+                .SetProperty(item => item.UpdatedAt, updatedAt), cancellationToken)
             .ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
 
         _logger.LogInformation(
-            "Ежедневное обнуление склада выполнено: удалено записей склада {DeletedItems}, ярлыков склада {DeletedLabelItems}.",
-            deletedItems,
-            deletedLabelItems);
+            "Ежедневное обнуление склада выполнено в 18:00 UTC+4: обновлено записей склада {UpdatedItems}, ярлыков склада {UpdatedLabelItems}.",
+            updatedItems,
+            updatedLabelItems);
     }
 }

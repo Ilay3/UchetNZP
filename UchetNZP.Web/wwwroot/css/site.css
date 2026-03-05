@@ -343,3 +343,19 @@ table {
         text-align: center;
     }
 }
+
+.warehouse-compact-accordion .accordion-button {
+  font-size: 0.92rem;
+}
+
+.warehouse-compact-table td,
+.warehouse-compact-table th {
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
+  font-size: 0.86rem;
+}
+
+.warehouse-compact-table .form-control {
+  min-height: 32px;
+  font-size: 0.82rem;
+}

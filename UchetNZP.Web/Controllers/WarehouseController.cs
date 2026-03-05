@@ -24,13 +24,36 @@ public class WarehouseController : Controller
     }
 
     [HttpGet("")]
-    public async Task<IActionResult> Index(Guid? partId, int page = 1, int pageSize = DefaultPageSize, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(Guid? partId, string? partSearch = null, int page = 1, int pageSize = DefaultPageSize, CancellationToken cancellationToken = default)
     {
         var statusMessage = TempData["WarehouseMessage"] as string;
         var errorMessage = TempData["WarehouseError"] as string;
 
-        var model = await BuildIndexViewModelAsync(partId, statusMessage, errorMessage, page, pageSize, cancellationToken).ConfigureAwait(false);
+        var model = await BuildIndexViewModelAsync(partId, partSearch, statusMessage, errorMessage, page, pageSize, cancellationToken).ConfigureAwait(false);
         return View(model);
+    }
+
+    [HttpGet("parts")]
+    public async Task<IActionResult> GetParts([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var partQuery = _dbContext.Parts.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLowerInvariant();
+            partQuery = partQuery.Where(part =>
+                part.Name.ToLower().Contains(term) ||
+                (part.Code != null && part.Code.ToLower().Contains(term)));
+        }
+
+        var items = await partQuery
+            .OrderBy(part => part.Name)
+            .Take(25)
+            .Select(part => new LookupItemViewModel(part.Id, part.Name, part.Code))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items);
     }
 
     [HttpPost("update")]
@@ -89,6 +112,7 @@ public class WarehouseController : Controller
             new
             {
                 partId = model.FilterPartId,
+                partSearch = string.Empty,
                 page = currentPage,
                 pageSize = currentPageSize,
             });
@@ -96,6 +120,7 @@ public class WarehouseController : Controller
 
     private async Task<WarehouseIndexViewModel> BuildIndexViewModelAsync(
         Guid? partId,
+        string? partSearch,
         string? statusMessage,
         string? errorMessage,
         int page,
@@ -254,6 +279,7 @@ public class WarehouseController : Controller
         return new WarehouseIndexViewModel
         {
             SelectedPartId = partId,
+            PartSearch = parts.FirstOrDefault(x => x.Selected)?.Text ?? (partSearch ?? string.Empty),
             Parts = parts,
             Items = items,
             PartGroups = partGroups,

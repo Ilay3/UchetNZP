@@ -6,7 +6,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Склад НЗП</h1>
-    <p class="lead mb-0">Просматривайте остатки деталей на складе и при необходимости корректируйте запись.</p>
+    <p class="lead mb-0">Компактный просмотр остатков и быстрое редактирование записей в одной таблице.</p>
 </div>
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -19,20 +19,22 @@
     <div class="d-none" data-toast-message="@Model.ErrorMessage" data-toast-variant="danger"></div>
 }
 
-<div class="card shadow-sm mb-4">
+<div id="warehouseRoot" class="card shadow-sm mb-4">
     <div class="card-header bg-light fw-semibold">Фильтр</div>
     <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-lg-6">
-                <label class="form-label" for="warehousePartSelect">Деталь</label>
-                <select id="warehousePartSelect" class="form-select" name="partId" asp-items="Model.Parts"></select>
+        <form method="get" class="row g-2 align-items-end" autocomplete="off">
+            <div class="col-lg-7">
+                <label class="form-label mb-1" for="warehouseFilterPart">Деталь</label>
+                <input id="warehouseFilterPart" class="form-control" type="text" value="@Model.PartSearch" list="warehousePartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
+                <datalist id="warehousePartOptions"></datalist>
+                <input type="hidden" id="warehouseFilterPartId" name="partId" value="@Model.SelectedPartId" />
             </div>
             <div class="col-lg-3 d-flex gap-2">
-                <button type="submit" class="btn btn-primary flex-grow-1">Применить</button>
+                <button type="submit" class="btn btn-primary flex-grow-1">Показать</button>
                 <a class="btn btn-secondary" asp-action="Index">Сбросить</a>
             </div>
-            <div class="col-lg-3 text-lg-end">
-                <span class="text-muted">Всего на складе: <span class="fw-semibold">@Model.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)</span> шт</span>
+            <div class="col-lg-2 text-lg-end">
+                <span class="text-muted small">Всего: <span class="fw-semibold">@Model.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)</span> шт</span>
             </div>
         </form>
     </div>
@@ -40,7 +42,7 @@
 
 <div class="card shadow-sm">
     <div class="card-header bg-light fw-semibold">Записи склада</div>
-    <div class="card-body">
+    <div class="card-body py-3">
         @if (Model.PartGroups.Count == 0)
         {
             <div class="text-muted">Записей не найдено.</div>
@@ -50,7 +52,7 @@
             var accordionId = "warehouseAccordion";
             var accordionIndex = 0;
 
-            <div class="accordion" id="@accordionId">
+            <div class="accordion warehouse-compact-accordion" id="@accordionId">
                 @foreach (var partGroup in Model.PartGroups)
                 {
                     var collapseId = $"warehouse-collapse-{accordionIndex}";
@@ -61,77 +63,43 @@
 
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="@headingId">
-                            <button class="accordion-button collapsed d-flex flex-column flex-lg-row align-items-lg-center gap-2" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">
-                                <span class="flex-grow-1 text-start">
+                            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#@collapseId" aria-expanded="false" aria-controls="@collapseId">
+                                <span class="d-flex flex-wrap align-items-center gap-2 w-100 pe-2">
                                     <span class="fw-semibold">@partGroup.PartDisplay</span>
-                                    <span class="d-block small text-muted">Ярлыков: @labelCount • Записей: @itemCount</span>
-                                </span>
-                                <span class="badge bg-primary text-uppercase">
-                                    Всего: @partGroup.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)
+                                    <span class="badge text-bg-light">Ярлыков: @labelCount</span>
+                                    <span class="badge text-bg-light">Записей: @itemCount</span>
+                                    <span class="badge bg-primary ms-lg-auto">@partGroup.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture) шт</span>
                                 </span>
                             </button>
                         </h2>
                         <div id="@collapseId" class="accordion-collapse collapse" aria-labelledby="@headingId" data-bs-parent="#@accordionId">
-                            <div class="accordion-body">
-                                <div class="mb-4">
-                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                                        <h6 class="mb-0">Ярлыки детали</h6>
-                                        <small class="text-muted">Всего: @labelCount</small>
-                                    </div>
-                                    @if (labelCount == 0)
-                                    {
-                                        <div class="text-muted">Для этой детали нет привязанных ярлыков.</div>
-                                    }
-                                    else
-                                    {
-                                        <div class="table-responsive">
-                                            <table class="table table-sm align-middle mb-0">
-                                                <thead>
+                            <div class="accordion-body py-2">
+                                @if (labelCount > 0)
+                                {
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm table-bordered align-middle mb-0 warehouse-compact-table">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Ярлык</th>
+                                                    <th class="text-end">Количество</th>
+                                                    <th>Добавлен</th>
+                                                    <th>Обновлён</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var label in partGroup.LabelGroups)
+                                                {
                                                     <tr>
-                                                        <th scope="col">Номер</th>
-                                                        <th scope="col" class="text-end">Количество</th>
-                                                        <th scope="col">Дата добавления</th>
-                                                        <th scope="col">Обновлено</th>
+                                                        <td class="fw-semibold">@(string.IsNullOrWhiteSpace(label.LabelNumber) ? "—" : label.LabelNumber)</td>
+                                                        <td class="text-end">@label.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
+                                                        <td>@label.FirstAddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</td>
+                                                        <td>@(label.LastUpdatedAt.HasValue ? label.LastUpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture) : "—")</td>
                                                     </tr>
-                                                </thead>
-                                                <tbody>
-                                                    @foreach (var label in partGroup.LabelGroups)
-                                                    {
-                                                        <tr>
-                                                            <td class="fw-semibold">
-                                                                @if (string.IsNullOrWhiteSpace(label.LabelNumber))
-                                                                {
-                                                                    <span class="text-muted">—</span>
-                                                                }
-                                                                else
-                                                                {
-                                                                    @label.LabelNumber
-                                                                }
-                                                            </td>
-                                                            <td class="text-end">@label.TotalQuantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
-                                                            <td>@label.FirstAddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</td>
-                                                            <td>
-                                                                @if (label.LastUpdatedAt.HasValue)
-                                                                {
-                                                                    @label.LastUpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)
-                                                                }
-                                                                else
-                                                                {
-                                                                    <span class="text-muted">—</span>
-                                                                }
-                                                            </td>
-                                                        </tr>
-                                                    }
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    }
-                                </div>
-
-                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-                                    <h6 class="mb-0">Записи склада</h6>
-                                    <small class="text-muted">Всего: @itemCount</small>
-                                </div>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
 
                                 @if (itemCount == 0)
                                 {
@@ -139,60 +107,51 @@
                                 }
                                 else
                                 {
-                                    <div class="row g-3">
-                                        @foreach (var row in partGroup.Items)
-                                        {
-                                            <div class="col-12">
-                                                <div class="border rounded p-3 app-surface h-100">
-                                                    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
-                                                        <div>
-                                                            <div class="fw-semibold">Запись от @row.AddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)</div>
-                                                            <div class="text-muted small">
-                                                                @if (row.UpdatedAt.HasValue)
-                                                                {
-                                                                    <text> • Обновлено: @row.UpdatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.CurrentCulture)</text>
-                                                                }
-                                                            </div>
-                                                            @if (string.IsNullOrWhiteSpace(row.Comment))
-                                                            {
-                                                                <div class="text-muted small fst-italic mt-1">Комментарий не указан.</div>
-                                                            }
-                                                            else
-                                                            {
-                                                                <div class="small mt-1">Комментарий: @row.Comment</div>
-                                                            }
-                                                        </div>
-                                                        <div class="text-lg-end">
-                                                            <div class="fs-3 fw-semibold">@row.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</div>
-                                                            <div class="text-muted small">Количество, шт</div>
-                                                        </div>
-                                                    </div>
-                                                    <form asp-action="Update" method="post" class="row g-2 g-lg-3 align-items-end" data-loading-submit>
-                                                        @Html.AntiForgeryToken()
-                                                        <input type="hidden" name="Id" value="@row.Id" />
-                                                        <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
-                                                        <input type="hidden" name="FilterPage" value="@Model.CurrentPage" />
-                                                        <input type="hidden" name="FilterPageSize" value="@Model.PageSize" />
-                                                        <div class="col-12 col-md-4 col-lg-3">
-                                                            <label class="form-label" for="qty-@row.Id">Количество</label>
-                                                            <input id="qty-@row.Id" class="form-control" type="number" name="Quantity" value='@row.Quantity.ToString("0.###", CultureInfo.InvariantCulture)' min="0" step="0.001" />
-                                                        </div>
-                                                        <div class="col-12 col-md-4 col-lg-3">
-                                                            <label class="form-label" for="date-@row.Id">Дата</label>
-                                                            <input id="date-@row.Id" class="form-control" type="date" name="AddedAt" value="@row.AddedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
-                                                        </div>
-                                                        <div class="col-12 col-md-4 col-lg-4">
-                                                            <label class="form-label" for="comment-@row.Id">Комментарий</label>
-                                                            <input id="comment-@row.Id" class="form-control" type="text" name="Comment" maxlength="512" value="@(row.Comment ?? string.Empty)" placeholder="Комментарий" />
-                                                        </div>
-                                                        <div class="col-12 col-lg-2 d-flex gap-2 justify-content-end">
-                                                            <button type="submit" class="btn btn-primary" data-loading-label="Сохранение...">Сохранить</button>
-                                                            <button type="reset" class="btn btn-secondary">Отмена</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        }
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-hover align-middle warehouse-compact-table mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Дата</th>
+                                                    <th class="text-end">Кол-во</th>
+                                                    <th>Комментарий</th>
+                                                    <th style="width: 430px;">Изменить</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var row in partGroup.Items)
+                                                {
+                                                    <tr>
+                                                        <td>
+                                                            @row.AddedAt.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.CurrentCulture)
+                                                            <div class="small text-muted">@(row.UpdatedAt.HasValue ? $"Обновлено: {row.UpdatedAt.Value.ToLocalTime():dd.MM.yyyy HH:mm}" : "Без изменений")</div>
+                                                        </td>
+                                                        <td class="text-end fw-semibold">@row.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
+                                                        <td class="small text-break">@(string.IsNullOrWhiteSpace(row.Comment) ? "—" : row.Comment)</td>
+                                                        <td>
+                                                            <form asp-action="Update" method="post" class="row g-1 align-items-end" data-loading-submit>
+                                                                @Html.AntiForgeryToken()
+                                                                <input type="hidden" name="Id" value="@row.Id" />
+                                                                <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
+                                                                <input type="hidden" name="FilterPage" value="@Model.CurrentPage" />
+                                                                <input type="hidden" name="FilterPageSize" value="@Model.PageSize" />
+                                                                <div class="col-12 col-xl-3">
+                                                                    <input class="form-control form-control-sm" type="number" name="Quantity" value='@row.Quantity.ToString("0.###", CultureInfo.InvariantCulture)' min="0" step="0.001" />
+                                                                </div>
+                                                                <div class="col-12 col-xl-3">
+                                                                    <input class="form-control form-control-sm" type="date" name="AddedAt" value="@row.AddedAt.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                                                                </div>
+                                                                <div class="col-12 col-xl-4">
+                                                                    <input class="form-control form-control-sm" type="text" name="Comment" maxlength="512" value="@(row.Comment ?? string.Empty)" placeholder="Комментарий" />
+                                                                </div>
+                                                                <div class="col-12 col-xl-2 d-grid">
+                                                                    <button type="submit" class="btn btn-sm btn-primary" data-loading-label="...">OK</button>
+                                                                </div>
+                                                            </form>
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
                                     </div>
                                 }
                             </div>
@@ -208,56 +167,22 @@
                 var previousPage = isFirstPage ? 1 : Model.CurrentPage - 1;
                 var nextPage = isLastPage ? Model.TotalPages : Model.CurrentPage + 1;
 
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3">
                     <div class="text-muted small">Страница @Model.CurrentPage из @Model.TotalPages</div>
                     <nav aria-label="Навигация по страницам склада">
-                        <ul class="pagination justify-content-center flex-wrap mb-0">
-                            @if (isFirstPage)
-                            {
-                                <li class="page-item disabled">
-                                    <span class="page-link" aria-hidden="true">&laquo;</span>
-                                </li>
-                            }
-                            else
-                            {
-                                <li class="page-item">
-                                    <a class="page-link" asp-action="Index" asp-route-partId="@Model.SelectedPartId" asp-route-page="@previousPage" asp-route-pageSize="@Model.PageSize" aria-label="Предыдущая">
-                                        <span aria-hidden="true">&laquo;</span>
-                                    </a>
-                                </li>
-                            }
-
+                        <ul class="pagination pagination-sm justify-content-center flex-wrap mb-0">
+                            <li class="page-item @(isFirstPage ? "disabled" : string.Empty)">
+                                <a class="page-link" asp-action="Index" asp-route-partId="@Model.SelectedPartId" asp-route-page="@previousPage" asp-route-pageSize="@Model.PageSize">&laquo;</a>
+                            </li>
                             @for (var pageNumber = 1; pageNumber <= Model.TotalPages; pageNumber++)
                             {
-                                var isActive = pageNumber == Model.CurrentPage;
-                                if (isActive)
-                                {
-                                    <li class="page-item active" aria-current="page">
-                                        <span class="page-link">@pageNumber</span>
-                                    </li>
-                                }
-                                else
-                                {
-                                    <li class="page-item">
-                                        <a class="page-link" asp-action="Index" asp-route-partId="@Model.SelectedPartId" asp-route-page="@pageNumber" asp-route-pageSize="@Model.PageSize">@pageNumber</a>
-                                    </li>
-                                }
-                            }
-
-                            @if (isLastPage)
-                            {
-                                <li class="page-item disabled">
-                                    <span class="page-link" aria-hidden="true">&raquo;</span>
+                                <li class="page-item @(pageNumber == Model.CurrentPage ? "active" : string.Empty)">
+                                    <a class="page-link" asp-action="Index" asp-route-partId="@Model.SelectedPartId" asp-route-page="@pageNumber" asp-route-pageSize="@Model.PageSize">@pageNumber</a>
                                 </li>
                             }
-                            else
-                            {
-                                <li class="page-item">
-                                    <a class="page-link" asp-action="Index" asp-route-partId="@Model.SelectedPartId" asp-route-page="@nextPage" asp-route-pageSize="@Model.PageSize" aria-label="Следующая">
-                                        <span aria-hidden="true">&raquo;</span>
-                                    </a>
-                                </li>
-                            }
+                            <li class="page-item @(isLastPage ? "disabled" : string.Empty)">
+                                <a class="page-link" asp-action="Index" asp-route-partId="@Model.SelectedPartId" asp-route-page="@nextPage" asp-route-pageSize="@Model.PageSize">&raquo;</a>
+                            </li>
                         </ul>
                     </nav>
                 </div>
@@ -265,3 +190,7 @@
         }
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/warehouse.js" asp-append-version="true"></script>
+}
