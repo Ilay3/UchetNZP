@@ -38,8 +38,7 @@
                 <select id="transferLabelSelect" class="form-select form-select-lg mb-2">
                     <option value="">— Сначала выберите операцию «откуда» —</option>
                 </select>
-                <input id="transferLabelNumberInput" class="form-control" type="text" maxlength="11" placeholder="Или введите номер ярлыка вручную (например, 00001/1)" />
-                <div class="small text-muted border rounded p-2 bg-light" id="transferLabelMeta">Ярлык не выбран.</div>
+                <input id="transferLabelNumberInput" class="form-control" type="text" maxlength="11" placeholder="Введите номер ярлыка вручную (например, 102/1)" />
                 <div class="invalid-feedback d-block" id="transferLabelError"></div>
                 <div class="form-text" id="transferLabelHint">Показываются только ярлыки выбранной операции «откуда».</div>
             </div>
@@ -47,9 +46,6 @@
                 <div class="form-check form-switch mb-2">
                     <input class="form-check-input" type="checkbox" id="transferCreateResidualLabel">
                     <label class="form-check-label" for="transferCreateResidualLabel">Отрыв остатка</label>
-                </div>
-                <div class="small text-muted border rounded p-2 bg-light mb-2" id="transferPreviewBox">
-                    Передать: <span id="transferPreviewQuantity">0</span> • Брак: <span id="transferPreviewScrap">0</span> • Останется: <span id="transferPreviewRemaining">—</span> • Новый ярлык: <span id="transferPreviewResidual">—</span>
                 </div>
                 <label class="form-label" for="transferResidualLabelNumberInput">Базовый номер нового ярлыка (при отрыве)</label>
                 <input id="transferResidualLabelNumberInput" class="form-control form-control-lg" type="number" min="1" step="1" placeholder="Например, 103" disabled />
@@ -216,6 +212,8 @@
                 </div>
             </div>
             <div class="modal-footer flex-column flex-sm-row gap-3">
+                <button type="button" class="btn btn-outline-secondary btn-lg w-100 w-sm-auto" id="transferScrapBackButton">Назад</button>
+                <button type="button" class="btn btn-outline-dark btn-lg w-100 w-sm-auto" id="transferScrapCloseButton">Закрыть и вернуться</button>
                 <button type="button" class="btn btn-danger btn-lg w-100 w-sm-auto" id="transferScrapConfirmButton" disabled>Списать остаток как брак</button>
             </div>
         </div>

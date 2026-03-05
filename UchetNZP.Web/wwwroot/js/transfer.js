@@ -45,13 +45,8 @@
     const labelSelect = document.getElementById("transferLabelSelect");
     const labelHintElement = document.getElementById("transferLabelHint");
     const labelNumberInput = document.getElementById("transferLabelNumberInput");
-    const labelMetaElement = document.getElementById("transferLabelMeta");
     const labelErrorElement = document.getElementById("transferLabelError");
     const createResidualCheckbox = document.getElementById("transferCreateResidualLabel");
-    const previewQuantityElement = document.getElementById("transferPreviewQuantity");
-    const previewScrapElement = document.getElementById("transferPreviewScrap");
-    const previewRemainingElement = document.getElementById("transferPreviewRemaining");
-    const previewResidualElement = document.getElementById("transferPreviewResidual");
     const labelCardModalElement = document.getElementById("labelCardModal");
     const labelCardHeader = document.getElementById("labelCardHeader");
     const labelCardHistoryBody = document.querySelector("#labelCardHistory tbody");
@@ -71,6 +66,8 @@
     const scrapSplitButton = document.getElementById("transferScrapSplitButton");
     const scrapMarkButton = document.getElementById("transferScrapMarkButton");
     const scrapConfirmButton = document.getElementById("transferScrapConfirmButton");
+    const scrapBackButton = document.getElementById("transferScrapBackButton");
+    const scrapCloseButton = document.getElementById("transferScrapCloseButton");
     const scrapCommentInput = document.getElementById("transferScrapComment");
     const scrapTypeButtons = Array.from(scrapDetails?.querySelectorAll("[data-scrap-type]") ?? []);
     const recentTableBody = document.querySelector("#transferRecentTable tbody");
@@ -275,8 +272,8 @@
 
         if (labelNumberInput) { labelNumberInput.value = selectedLabelOption?.number ?? ""; }
         updateLabelHint();
+        enforceResidualAvailabilityByLabel();
         updateResidualLabelHint();
-        syncSelectedLabelMeta();
         void refreshPreview();
     });
 
@@ -292,6 +289,7 @@
             residualLabelNumberInput.disabled = !Boolean(createResidualCheckbox?.checked);
         }
 
+        enforceResidualAvailabilityByLabel();
         updateResidualLabelHint();
         updateFormState();
         void refreshPreview();
@@ -367,12 +365,25 @@
     });
 
     scrapSplitButton?.addEventListener("click", () => {
-        const confirmed = confirm("Подтвердить отрыв ярлыка для остатка?");
-        if (!confirmed) {
+        resolveScrapModal({ confirmed: true, action: "split" });
+        scrapModal?.hide();
+    });
+
+
+    scrapBackButton?.addEventListener("click", () => {
+        if (!scrapPrimaryActions || !scrapDetails || !scrapConfirmButton) {
             return;
         }
 
-        resolveScrapModal({ confirmed: true, action: "split" });
+        scrapPrimaryActions.classList.remove("d-none");
+        scrapDetails.classList.add("d-none");
+        scrapSelectedTypeKey = null;
+        updateScrapTypeButtons();
+        scrapConfirmButton.disabled = true;
+    });
+
+    scrapCloseButton?.addEventListener("click", () => {
+        resolveScrapModal({ confirmed: false });
         scrapModal?.hide();
     });
 
@@ -709,7 +720,6 @@
             labelNumberInput.disabled = !selectedFromOperation;
         }
 
-        syncSelectedLabelMeta();
         addButton.disabled = !canAddToCart();
         saveButton.disabled = cart.length === 0;
     }
@@ -1166,6 +1176,40 @@
         residualLabelHintElement.textContent = "Будет использован указанный базовый номер, а суффикс (/1, /2...) подберётся автоматически.";
     }
 
+
+    function isSplitChildLabelNumber(number) {
+        const normalized = typeof number === "string" ? number.trim() : "";
+        return /\/\d+$/.test(normalized);
+    }
+
+    function enforceResidualAvailabilityByLabel() {
+        const selectedNumber = selectedLabelOption?.number ?? labelNumberInput?.value ?? "";
+        const mustDisableResidual = isSplitChildLabelNumber(selectedNumber);
+
+        if (!createResidualCheckbox) {
+            return;
+        }
+
+        createResidualCheckbox.disabled = mustDisableResidual;
+        if (mustDisableResidual) {
+            createResidualCheckbox.checked = false;
+            if (residualLabelNumberInput) {
+                residualLabelNumberInput.value = "";
+                residualLabelNumberInput.disabled = true;
+            }
+
+            if (residualLabelHintElement) {
+                residualLabelHintElement.textContent = `Ярлык ${selectedNumber} нельзя отрывать: доступна только передача целиком.`;
+            }
+
+            return;
+        }
+
+        if (residualLabelNumberInput) {
+            residualLabelNumberInput.disabled = !Boolean(createResidualCheckbox.checked);
+        }
+    }
+
     function setFieldError(element, message) {
         if (!element) {
             return;
@@ -1179,21 +1223,6 @@
             element.textContent = "";
             element.classList.add("d-none");
         }
-    }
-
-    function syncSelectedLabelMeta() {
-        if (!labelMetaElement) {
-            return;
-        }
-
-        if (!selectedLabelOption) {
-            labelMetaElement.textContent = "Ярлык не выбран.";
-            return;
-        }
-
-        const section = selectedFromOperation?.sectionId ?? "—";
-        const op = selectedFromOperation?.opNumber ?? "—";
-        labelMetaElement.innerHTML = `№ ${escapeHtml(selectedLabelOption.number ?? "")} • Остаток: ${formatQuantityText(selectedLabelOption.remainingQuantity ?? 0)} • Кол-во: ${formatQuantityText(selectedLabelOption.quantity ?? 0)} • Место: ${escapeHtml(String(section))}/${escapeHtml(String(op))}`;
     }
 
     async function lookupLabelByNumber() {
@@ -1218,7 +1247,7 @@
         };
         labelSelect.value = String(data.wipLabelId);
         updateLabelHint();
-        syncSelectedLabelMeta();
+        enforceResidualAvailabilityByLabel();
         setFieldError(labelErrorElement, "");
         void refreshPreview();
         updateFormState();
@@ -1243,9 +1272,6 @@
             createResidualLabel: Boolean(createResidualCheckbox?.checked),
             wipLabelId: selectedLabelOption?.id ?? null,
         };
-
-        previewQuantityElement && (previewQuantityElement.textContent = formatQuantityText(quantity));
-        previewScrapElement && (previewScrapElement.textContent = formatQuantityText(0));
 
         const response = await fetch('/api/wip/transfers/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         const data = await response.json();
@@ -1367,6 +1393,11 @@
         }
 
         const label = selectedLabelOption;
+        if (createResidualLabel && isSplitChildLabelNumber(label?.number ?? "")) {
+            alert("Для ярлыка с суффиксом (/1, /2...) отрыв остатка недоступен. Передавайте ярлык целиком.");
+            return;
+        }
+
         if (!label) {
             alert("Выберите ярлык-источник.");
             return;
@@ -1847,16 +1878,6 @@
             return;
         }
 
-        const description = [
-            item.partDisplay ?? item.partId ?? "",
-            item.fromOpNumber && item.toOpNumber ? `${item.fromOpNumber} → ${item.toOpNumber}` : "",
-            Number(item.quantity).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 }),
-        ].filter(Boolean).join(" / ");
-
-        if (!window.confirm(`Откатить передачу?\n${description}`)) {
-            return;
-        }
-
         if (!item.transferAuditId) {
             alert("Не найден идентификатор аудита для отката.");
             return;
@@ -2079,7 +2100,7 @@
         commentInput.value = item.comment ?? "";
         quantityInput.value = item.quantity;
         if (createResidualCheckbox) {
-            createResidualCheckbox.checked = Boolean(item.createResidualLabel) || item.scenario === "SplitAndTransfer" || item.scenario === "TransferFromLabel";
+            createResidualCheckbox.checked = Boolean(item.createResidualLabel) || item.scenario === "SplitAndTransfer";
         }
         if (residualLabelNumberInput) {
             residualLabelNumberInput.disabled = !Boolean(createResidualCheckbox?.checked);
@@ -2119,10 +2140,6 @@
             return;
         }
 
-        if (!window.confirm("Сохранить выбранные передачи?")) {
-            return;
-        }
-
         const payload = {
             items: cart.map(item => ({
                 partId: item.partId,
@@ -2159,9 +2176,9 @@
             const summary = await response.json();
             rememberRecentTransfers(summary, cartSnapshot);
             showSummary(summary);
-            updateBalancesAfterSave(summary);
             pendingChanges.clear();
             labelPendingChanges.clear();
+            updateBalancesAfterSave(summary);
             cart = [];
             renderCart();
             resetForm();
@@ -2375,6 +2392,7 @@
     if (residualLabelNumberInput) {
         residualLabelNumberInput.disabled = !Boolean(createResidualCheckbox?.checked);
     }
+    enforceResidualAvailabilityByLabel();
     updateResidualLabelHint();
     updateFormState();
 
