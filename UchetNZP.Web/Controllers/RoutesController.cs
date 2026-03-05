@@ -208,6 +208,20 @@ public class RoutesController : Controller
 
         if (updatedRoute.Id != existingRoute.Id)
         {
+            await _dbContext.WipLaunchOperations
+                .Where(x => x.PartRouteId == existingRoute.Id)
+                .ExecuteUpdateAsync(
+                    updates => updates.SetProperty(x => x.PartRouteId, updatedRoute.Id),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            await _dbContext.WipTransferOperations
+                .Where(x => x.PartRouteId == existingRoute.Id)
+                .ExecuteUpdateAsync(
+                    updates => updates.SetProperty(x => x.PartRouteId, updatedRoute.Id),
+                    cancellationToken)
+                .ConfigureAwait(false);
+
             _dbContext.PartRoutes.Remove(existingRoute);
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -236,9 +250,14 @@ public class RoutesController : Controller
             .AnyAsync(x => x.PartRouteId == id, cancellationToken)
             .ConfigureAwait(false);
 
-        if (hasLaunches)
+        var hasTransfers = await _dbContext.WipTransferOperations
+            .AsNoTracking()
+            .AnyAsync(x => x.PartRouteId == id, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (hasLaunches || hasTransfers)
         {
-            TempData["RouteError"] = "Нельзя удалить маршрут, который используется в запусках.";
+            TempData["RouteError"] = "Нельзя удалить маршрут, который используется в запусках или передачах.";
             return RedirectToAction(nameof(Index));
         }
 
