@@ -256,34 +256,36 @@ public class WipService : IWipService
                 .FirstOrDefaultAsync(x => x.Number == normalizedLabelNumber && x.LabelYear == labelYear, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (ret is null)
+            if (ret is not null)
             {
-                ret = new WipLabel
-                {
-                    Id = Guid.NewGuid(),
-                    PartId = in_item.PartId,
-                    LabelDate = NormalizeLabelDate(in_item.ReceiptDate),
-                    LabelYear = NormalizeLabelDate(in_item.ReceiptDate).Year,
-                    Quantity = in_item.Quantity,
-                    RemainingQuantity = in_item.Quantity,
-                    Number = normalizedLabelNumber,
-                    IsAssigned = true,
-                    Status = WipLabelStatus.Active,
-                    CurrentSectionId = in_item.SectionId,
-                    CurrentOpNumber = in_item.OpNumber,
-                    RootLabelId = Guid.Empty,
-                    ParentLabelId = null,
-                    RootNumber = string.Empty,
-                    Suffix = 0,
-                };
-
-                var parsedNumber = WipLabelInvariants.ParseNumber(ret.Number);
-                ret.RootLabelId = ret.Id;
-                ret.RootNumber = parsedNumber.RootNumber;
-                ret.Suffix = parsedNumber.Suffix;
-
-                await _dbContext.WipLabels.AddAsync(ret, cancellationToken).ConfigureAwait(false);
+                throw new InvalidOperationException($"Ярлык {normalizedLabelNumber} уже существует в системе за {labelYear} год. Укажите другой номер ярлыка.");
             }
+
+            ret = new WipLabel
+            {
+                Id = Guid.NewGuid(),
+                PartId = in_item.PartId,
+                LabelDate = NormalizeLabelDate(in_item.ReceiptDate),
+                LabelYear = NormalizeLabelDate(in_item.ReceiptDate).Year,
+                Quantity = in_item.Quantity,
+                RemainingQuantity = in_item.Quantity,
+                Number = normalizedLabelNumber,
+                IsAssigned = true,
+                Status = WipLabelStatus.Active,
+                CurrentSectionId = in_item.SectionId,
+                CurrentOpNumber = in_item.OpNumber,
+                RootLabelId = Guid.Empty,
+                ParentLabelId = null,
+                RootNumber = string.Empty,
+                Suffix = 0,
+            };
+
+            var parsedNumber = WipLabelInvariants.ParseNumber(ret.Number);
+            ret.RootLabelId = ret.Id;
+            ret.RootNumber = parsedNumber.RootNumber;
+            ret.Suffix = parsedNumber.Suffix;
+
+            await _dbContext.WipLabels.AddAsync(ret, cancellationToken).ConfigureAwait(false);
         }
         else
         {

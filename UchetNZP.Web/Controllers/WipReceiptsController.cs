@@ -132,6 +132,30 @@ public class WipReceiptsController : Controller
         return Ok(balance);
     }
 
+    [HttpGet("labels/exists")]
+    public async Task<IActionResult> LabelExists([FromQuery] string? labelNumber, [FromQuery] DateTime? receiptDate, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(labelNumber))
+        {
+            return BadRequest("Не указан номер ярлыка.");
+        }
+
+        if (!receiptDate.HasValue)
+        {
+            return BadRequest("Не указана дата прихода.");
+        }
+
+        var normalizedLabelNumber = labelNumber.Trim();
+        var year = receiptDate.Value.Date.Year;
+
+        var exists = await _dbContext.WipLabels
+            .AsNoTracking()
+            .AnyAsync(x => x.Number == normalizedLabelNumber && x.LabelYear == year, cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(new { exists });
+    }
+
     [HttpPost("save")]
     public async Task<IActionResult> Save([FromBody] ReceiptSaveRequest? request, CancellationToken cancellationToken)
     {

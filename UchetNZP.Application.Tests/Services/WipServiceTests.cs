@@ -109,6 +109,79 @@ public class WipServiceTests
         Assert.Equal(1, await dbContext.ReceiptAudits.CountAsync());
     }
 
+
+    [Fact]
+    public async Task AddReceiptsBatchAsync_ThrowsWhenLabelAlreadyExistsInSystem()
+    {
+        await using var dbContext = createContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        const int opNumber = 15;
+        const decimal receiptQuantity = 3m;
+        const string labelNumber = "00001";
+        var receiptDate = DateTime.SpecifyKind(new DateTime(2024, 2, 1), DateTimeKind.Unspecified);
+
+        dbContext.Parts.Add(new Part
+        {
+            Id = partId,
+            Name = "Деталь",
+            Code = "DET-1",
+        });
+
+        dbContext.Sections.Add(new Section
+        {
+            Id = sectionId,
+            Name = "Секция",
+        });
+
+        dbContext.Operations.Add(new Operation
+        {
+            Id = operationId,
+            Name = "Операция",
+        });
+
+        dbContext.PartRoutes.Add(new PartRoute
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OperationId = operationId,
+            OpNumber = opNumber,
+            NormHours = 1m,
+        });
+
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            LabelDate = DateTime.SpecifyKind(new DateTime(2024, 1, 1), DateTimeKind.Unspecified),
+            LabelYear = 2024,
+            Quantity = receiptQuantity,
+            RemainingQuantity = receiptQuantity,
+            Number = labelNumber,
+            IsAssigned = true,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new WipService(dbContext, new TestCurrentUserService());
+        var dto = new ReceiptItemDto(
+            partId,
+            opNumber,
+            sectionId,
+            receiptDate,
+            receiptQuantity,
+            null,
+            null,
+            labelNumber,
+            true);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AddReceiptsBatchAsync(new[] { dto }));
+
+        Assert.Contains("уже существует в системе", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task RevertReceiptAsync_RestoresDeletedReceipt()
     {
