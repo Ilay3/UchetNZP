@@ -77,6 +77,9 @@
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement, { backdrop: false }) : null;
     const scrapModal = scrapModalElement ? new bootstrap.Modal(scrapModalElement, { backdrop: "static", keyboard: false }) : null;
     const labelCardModal = labelCardModalElement ? new bootstrap.Modal(labelCardModalElement) : null;
+    const draftStorage = typeof namespace.createDraftStorage === "function"
+        ? namespace.createDraftStorage("uchetnzp.transfer.draft", { ttlMs: 24 * 60 * 60 * 1000 })
+        : null;
 
     fromOperationInput.disabled = true;
     toOperationInput.disabled = true;
@@ -126,6 +129,110 @@
     let labelsRequestId = 0;
     let previewState = null;
 
+    function collectDraftState() {
+        return {
+            part: partLookup.getSelected(),
+            fromOperationNumber: selectedFromOperation?.opNumber ?? "",
+            toOperationNumber: selectedToOperation?.opNumber ?? "",
+            date: dateInput?.value || "",
+            quantity: quantityInput.value || "",
+            comment: commentInput.value || "",
+            labelNumber: labelNumberInput?.value || "",
+            selectedLabelId: selectedLabelOption?.id ?? null,
+            createResidualLabel: Boolean(createResidualCheckbox?.checked),
+            residualLabelNumber: residualLabelNumberInput?.value || "",
+            cart,
+        };
+    }
+
+    function saveDraft() {
+        draftStorage?.save(collectDraftState());
+    }
+
+    async function restoreDraft(state) {
+        if (!state || typeof state !== "object") {
+            return;
+        }
+
+        if (state.part?.id) {
+            partLookup.setSelected({ id: state.part.id, name: state.part.name, code: state.part.code ?? null });
+            await loadOperations(state.part.id);
+        }
+
+        if (typeof state.date === "string" && state.date && dateInput) {
+            dateInput.value = state.date;
+        }
+        if (state.quantity !== undefined && state.quantity !== null) {
+            quantityInput.value = state.quantity;
+        }
+        if (typeof state.comment === "string") {
+            commentInput.value = state.comment;
+        }
+
+        if (selectedFromOperation == null && typeof state.fromOperationNumber === "string" && state.fromOperationNumber) {
+            const fromOperation = operations.find(op => op.opNumber === state.fromOperationNumber) ?? null;
+            if (fromOperation) {
+                selectedFromOperation = fromOperation;
+                fromOperationInput.value = formatOperation(fromOperation);
+                fromOperationNumberInput.value = fromOperation.opNumber;
+                await loadLabels(state.part.id, fromOperation.opNumber);
+            }
+        }
+
+        updateToOperationsDatalist();
+
+        if (selectedToOperation == null && typeof state.toOperationNumber === "string" && state.toOperationNumber) {
+            const toOperation = operations.find(op => op.opNumber === state.toOperationNumber) ?? null;
+            if (toOperation) {
+                selectedToOperation = toOperation;
+                toOperationInput.value = formatOperation(toOperation);
+                toOperationNumberInput.value = toOperation.opNumber;
+            }
+        }
+
+        if (createResidualCheckbox) {
+            createResidualCheckbox.checked = Boolean(state.createResidualLabel);
+        }
+        if (residualLabelNumberInput) {
+            residualLabelNumberInput.disabled = !Boolean(createResidualCheckbox?.checked);
+            residualLabelNumberInput.value = typeof state.residualLabelNumber === "string" ? state.residualLabelNumber : "";
+        }
+        if (labelNumberInput) {
+            labelNumberInput.value = typeof state.labelNumber === "string" ? state.labelNumber : "";
+        }
+        if (state.selectedLabelId !== undefined && state.selectedLabelId !== null) {
+            selectedLabelOption = labelOptions.find(option => String(option.id) === String(state.selectedLabelId)) ?? selectedLabelOption;
+            if (selectedLabelOption && labelSelect) {
+                labelSelect.value = String(selectedLabelOption.id);
+            }
+        }
+
+        if (Array.isArray(state.cart)) {
+            cart = state.cart;
+            pendingChanges.clear();
+            labelPendingChanges.clear();
+            cart.forEach(item => {
+                applyPendingChange(item.partId, item.fromOpNumber, -item.quantity);
+                applyPendingChange(item.partId, item.toOpNumber, item.quantity);
+                if (item.scrapQuantity && item.scrapQuantity > 0) {
+                    applyPendingChange(item.partId, item.fromOpNumber, -item.scrapQuantity);
+                }
+                if (item.labelId) {
+                    const labelDelta = -Number(item.quantity ?? 0) - Number(item.scrapQuantity ?? 0);
+                    applyLabelPendingChange(item.partId, item.fromOpNumber, item.labelId, labelDelta);
+                }
+            });
+            renderCart();
+        }
+
+        updateLabelHint();
+        enforceResidualAvailabilityByLabel();
+        updateResidualLabelHint();
+        updateBalanceLabels();
+        updateFormState();
+        await refreshPreview();
+    }
+
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
         if (part && part.id) {
@@ -133,6 +240,7 @@
             void loadOperations(part.id);
         }
         updateFormState();
+        saveDraft();
     });
 
     partLookup.inputElement?.addEventListener("input", () => {
@@ -150,6 +258,7 @@
         updateBalanceLabels();
         updateFormState();
         void refreshPreview();
+        saveDraft();
     });
 
     fromOperationInput.addEventListener("input", () => {
@@ -180,6 +289,7 @@
         updateToOperationsDatalist();
         updateBalanceLabels();
         updateFormState();
+        saveDraft();
     });
 
     toOperationInput.addEventListener("input", () => {
@@ -203,6 +313,7 @@
 
         updateBalanceLabels();
         updateFormState();
+        saveDraft();
     });
 
     fromOperationInput.addEventListener("change", () => {
@@ -232,6 +343,7 @@
         }
         updateFormState();
         void refreshPreview();
+        saveDraft();
     });
 
     toOperationInput.addEventListener("change", () => {
@@ -260,6 +372,7 @@
         void refreshBalances();
         updateFormState();
         void refreshPreview();
+        saveDraft();
     });
 
     labelSelect?.addEventListener("change", () => {
@@ -276,11 +389,12 @@
         enforceResidualAvailabilityByLabel();
         updateResidualLabelHint();
         void refreshPreview();
+        saveDraft();
     });
 
-    residualLabelNumberInput?.addEventListener("input", () => { updateResidualLabelHint(); void refreshPreview(); });
+    residualLabelNumberInput?.addEventListener("input", () => { updateResidualLabelHint(); void refreshPreview(); saveDraft(); });
 
-    labelNumberInput?.addEventListener("change", () => void lookupLabelByNumber());
+    labelNumberInput?.addEventListener("change", () => { void lookupLabelByNumber(); saveDraft(); });
     createResidualCheckbox?.addEventListener("change", () => {
         if (!createResidualCheckbox?.checked && residualLabelNumberInput) {
             residualLabelNumberInput.value = "";
@@ -294,15 +408,17 @@
         updateResidualLabelHint();
         updateFormState();
         void refreshPreview();
+        saveDraft();
     });
-    quantityInput?.addEventListener("input", () => void refreshPreview());
+    quantityInput?.addEventListener("input", () => { void refreshPreview(); saveDraft(); });
 
     addButton.addEventListener("click", () => void addToCart());
     resetButton.addEventListener("click", () => resetForm());
     saveButton.addEventListener("click", () => void saveCart());
-    quantityInput.addEventListener("input", () => updateFormState());
-    dateInput?.addEventListener("change", () => updateFormState());
-    dateInput?.addEventListener("input", () => updateFormState());
+    quantityInput.addEventListener("input", () => { updateFormState(); saveDraft(); });
+    commentInput.addEventListener("input", () => saveDraft());
+    dateInput?.addEventListener("change", () => { updateFormState(); saveDraft(); });
+    dateInput?.addEventListener("input", () => { updateFormState(); saveDraft(); });
 
     cartTableBody.addEventListener("click", event => {
         const target = event.target;
@@ -1357,6 +1473,7 @@
         updateBalanceLabels();
         updateResidualLabelHint();
         updateFormState();
+        saveDraft();
     }
 
     async function addToCart() {
@@ -1545,6 +1662,7 @@
         renderCart();
         resetForm();
         updateBalanceLabels();
+        saveDraft();
     }
 
     function renderCart() {
@@ -2102,6 +2220,7 @@
 
         renderCart();
         updateBalanceLabels();
+        saveDraft();
     }
 
     async function editCartItem(index) {
@@ -2171,6 +2290,7 @@
         updateBalanceLabels();
         updateResidualLabelHint();
         updateFormState();
+        saveDraft();
     }
 
     async function saveCart() {
@@ -2221,6 +2341,7 @@
             cart = [];
             renderCart();
             resetForm();
+            draftStorage?.clear();
         }
         catch (error) {
             console.error(error);
@@ -2439,5 +2560,11 @@
         onEnter: () => void addToCart(),
         onSave: () => void saveCart(),
         onCancel: () => resetForm(),
+    });
+
+    queueMicrotask(() => {
+        draftStorage?.restoreOrClear(state => {
+            void restoreDraft(state);
+        });
     });
 })();

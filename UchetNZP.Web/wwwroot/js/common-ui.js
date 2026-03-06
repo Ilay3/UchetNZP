@@ -77,6 +77,101 @@
 
     globalNamespace.showToast = showToast;
 
+    function showDraftToast(action) {
+        if (action === "restored") {
+            showToast("Черновик восстановлен.", "info");
+            return;
+        }
+
+        if (action === "removed") {
+            showToast("Черновик удалён.", "secondary");
+        }
+    }
+
+    globalNamespace.showDraftToast = showDraftToast;
+
+    function createDraftStorage(in_key, in_options = {}) {
+        if (!in_key) {
+            throw new Error("Не задан ключ черновика.");
+        }
+
+        const ttlMs = Number(in_options.ttlMs) > 0 ? Number(in_options.ttlMs) : 24 * 60 * 60 * 1000;
+
+        function readRaw() {
+            const raw = window.localStorage.getItem(in_key);
+            if (!raw) {
+                return null;
+            }
+
+            try {
+                return JSON.parse(raw);
+            }
+            catch (error) {
+                console.error(error);
+                window.localStorage.removeItem(in_key);
+                return null;
+            }
+        }
+
+        function save(data) {
+            if (!data) {
+                return;
+            }
+
+            const payload = {
+                savedAt: new Date().toISOString(),
+                data,
+            };
+            window.localStorage.setItem(in_key, JSON.stringify(payload));
+        }
+
+        function clear() {
+            window.localStorage.removeItem(in_key);
+        }
+
+        function getFresh() {
+            const payload = readRaw();
+            if (!payload || !payload.savedAt || !payload.data) {
+                return null;
+            }
+
+            const savedAtMs = Date.parse(payload.savedAt);
+            if (!Number.isFinite(savedAtMs) || (Date.now() - savedAtMs) > ttlMs) {
+                clear();
+                return null;
+            }
+
+            return payload;
+        }
+
+        function restoreOrClear(onRestore) {
+            const payload = getFresh();
+            if (!payload) {
+                return;
+            }
+
+            const shouldRestore = window.confirm("Найден свежий черновик. Восстановить его?\nНажмите «Отмена», чтобы удалить черновик.");
+            if (!shouldRestore) {
+                clear();
+                showDraftToast("removed");
+                return;
+            }
+
+            if (typeof onRestore === "function") {
+                onRestore(payload.data);
+            }
+            showDraftToast("restored");
+        }
+
+        return {
+            save,
+            clear,
+            restoreOrClear,
+        };
+    }
+
+    globalNamespace.createDraftStorage = createDraftStorage;
+
     function cleanupModalBackdrops() {
         document.querySelectorAll(".modal-backdrop").forEach(backdrop => backdrop.remove());
 
