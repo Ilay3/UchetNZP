@@ -16,6 +16,8 @@ public class WipLabel
 
     public string Number { get; set; } = string.Empty;
 
+    public int CycleYear { get; set; }
+
     public bool IsAssigned { get; set; }
 
     public WipLabelStatus Status { get; set; } = WipLabelStatus.Active;

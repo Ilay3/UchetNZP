@@ -138,12 +138,12 @@ public class WipLabelService : IWipLabelService
         {
             var exists = await m_dbContext.WipLabels
                 .AsNoTracking()
-                .AnyAsync(x => x.Number == normalizedNumber, in_cancellationToken)
+                .AnyAsync(x => x.Number == normalizedNumber && x.CycleYear == normalizedDate.Year, in_cancellationToken)
                 .ConfigureAwait(false);
 
             if (exists)
             {
-                throw new InvalidOperationException($"Ярлык с номером {normalizedNumber} уже существует.");
+                throw new InvalidOperationException($"Ярлык с номером {normalizedNumber} уже существует в цикле {normalizedDate.Year}.");
             }
 
             var part = await GetPartAsync(in_request.PartId, in_cancellationToken).ConfigureAwait(false);
@@ -156,6 +156,7 @@ public class WipLabelService : IWipLabelService
                 Quantity = in_request.Quantity,
                 RemainingQuantity = in_request.Quantity,
                 Number = normalizedNumber,
+                CycleYear = normalizedDate.Year,
                 IsAssigned = false,
                 Status = WipLabelStatus.Active,
                 RootLabelId = Guid.Empty,
@@ -222,17 +223,18 @@ public class WipLabelService : IWipLabelService
         {
             var exists = await m_dbContext.WipLabels
                 .AsNoTracking()
-                .AnyAsync(x => x.Number == normalizedNumber && x.Id != label.Id, in_cancellationToken)
+                .AnyAsync(x => x.Number == normalizedNumber && x.CycleYear == normalizedDate.Year && x.Id != label.Id, in_cancellationToken)
                 .ConfigureAwait(false);
 
             if (exists)
             {
-                throw new InvalidOperationException($"Ярлык с номером {normalizedNumber} уже существует.");
+                throw new InvalidOperationException($"Ярлык с номером {normalizedNumber} уже существует в цикле {normalizedDate.Year}.");
             }
         }
 
         label.Number = normalizedNumber;
         label.LabelDate = normalizedDate;
+        label.CycleYear = normalizedDate.Year;
         var parsedNumber = WipLabelInvariants.ParseNumber(normalizedNumber);
         label.RootNumber = parsedNumber.RootNumber;
         label.Suffix = parsedNumber.Suffix;
@@ -410,7 +412,7 @@ public class WipLabelService : IWipLabelService
 
             var mergeDate = NormalizeDate(in_request.MergeDate);
             var mergeRoot = await ResolveMergeRootNumberAsync(in_request.NumberBase, labels, in_cancellationToken).ConfigureAwait(false);
-            var nextSuffix = await ResolveNextSuffixAsync(mergeRoot, in_cancellationToken).ConfigureAwait(false);
+            var nextSuffix = await ResolveNextSuffixAsync(mergeRoot, mergeDate.Year, in_cancellationToken).ConfigureAwait(false);
             var outputNumber = WipLabelInvariants.FormatNumber(mergeRoot, nextSuffix);
             var outputQuantity = labels.Sum(x => x.RemainingQuantity);
             var now = DateTime.UtcNow;
@@ -423,6 +425,7 @@ public class WipLabelService : IWipLabelService
                 Quantity = outputQuantity,
                 RemainingQuantity = outputQuantity,
                 Number = outputNumber,
+                CycleYear = mergeDate.Year,
                 IsAssigned = true,
                 Status = WipLabelStatus.Active,
                 RootLabelId = Guid.Empty,
@@ -552,8 +555,9 @@ public class WipLabelService : IWipLabelService
                     Quantity = in_quantity,
                     RemainingQuantity = in_quantity,
                     Number = number,
+                    CycleYear = normalizedDate.Year,
                     IsAssigned = false,
-                Status = WipLabelStatus.Active,
+                    Status = WipLabelStatus.Active,
                 RootLabelId = Guid.Empty,
                 ParentLabelId = null,
                 RootNumber = string.Empty,
@@ -701,11 +705,11 @@ public class WipLabelService : IWipLabelService
         return WipLabelInvariants.ParseNumber(generated[0]).RootNumber;
     }
 
-    private async Task<int> ResolveNextSuffixAsync(string in_rootNumber, CancellationToken in_cancellationToken)
+    private async Task<int> ResolveNextSuffixAsync(string in_rootNumber, int in_cycleYear, CancellationToken in_cancellationToken)
     {
         var maxSuffix = await m_dbContext.WipLabels
             .AsNoTracking()
-            .Where(x => x.RootNumber == in_rootNumber)
+            .Where(x => x.RootNumber == in_rootNumber && x.CycleYear == in_cycleYear)
             .Select(x => (int?)x.Suffix)
             .MaxAsync(in_cancellationToken)
             .ConfigureAwait(false);

@@ -23,12 +23,15 @@ public class WipApiController : ControllerBase
         var normalized = (number ?? string.Empty).Trim();
         var label = await _db.WipLabels.AsNoTracking()
             .Where(x => x.PartId == partId && x.Number == normalized)
+            .OrderByDescending(x => x.CycleYear)
+            .ThenByDescending(x => x.LabelDate)
             .Select(x => new
             {
                 wipLabelId = x.Id,
                 x.Number,
                 x.Quantity,
                 x.RemainingQuantity,
+                x.CycleYear,
                 currentSectionId = x.CurrentSectionId,
                 currentOp = x.CurrentOpNumber,
                 status = x.Status.ToString(),
@@ -150,6 +153,7 @@ public class WipApiController : ControllerBase
                 x.Number,
                 x.Quantity,
                 x.RemainingQuantity,
+                x.CycleYear,
                 x.LabelDate,
                 part = x.Part != null ? x.Part.Name : null,
                 x.CurrentSectionId,

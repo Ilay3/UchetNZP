@@ -109,6 +109,68 @@ public class WipServiceTests
         Assert.Equal(1, await dbContext.ReceiptAudits.CountAsync());
     }
 
+
+    [Fact]
+    public async Task AddReceiptsBatchAsync_CreatesNewCycleLabelWhenSameNumberExistsInPreviousYear()
+    {
+        await using var dbContext = createContext();
+        var partId = Guid.NewGuid();
+        var anotherPartId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        const int opNumber = 15;
+        const decimal receiptQuantity = 3m;
+        const string labelNumber = "00001";
+
+        dbContext.Parts.AddRange(
+            new Part { Id = partId, Name = "Деталь A", Code = "DET-A" },
+            new Part { Id = anotherPartId, Name = "Деталь B", Code = "DET-B" });
+
+        dbContext.Sections.Add(new Section { Id = sectionId, Name = "Секция" });
+        dbContext.Operations.Add(new Operation { Id = operationId, Name = "Операция" });
+
+        dbContext.PartRoutes.Add(new PartRoute
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OperationId = operationId,
+            OpNumber = opNumber,
+            NormHours = 1m,
+        });
+
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = Guid.NewGuid(),
+            PartId = anotherPartId,
+            LabelDate = DateTime.SpecifyKind(new DateTime(2025, 12, 31), DateTimeKind.Unspecified),
+            CycleYear = 2025,
+            Quantity = receiptQuantity,
+            RemainingQuantity = receiptQuantity,
+            Number = labelNumber,
+            IsAssigned = true,
+            RootLabelId = Guid.NewGuid(),
+            RootNumber = labelNumber,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new WipService(dbContext, new TestCurrentUserService());
+        var result = await service.AddReceiptsBatchAsync(
+            new[]
+            {
+                new ReceiptItemDto(partId, opNumber, sectionId, DateTime.SpecifyKind(new DateTime(2026, 1, 10), DateTimeKind.Unspecified), receiptQuantity, null, null, labelNumber, true),
+            });
+
+        var summary = Assert.Single(result.Items);
+        Assert.Equal(labelNumber, summary.LabelNumber);
+
+        var labels = await dbContext.WipLabels.OrderBy(x => x.LabelDate).ToListAsync();
+        Assert.Equal(2, labels.Count);
+        Assert.Contains(labels, x => x.Number == labelNumber && x.CycleYear == 2026 && x.PartId == partId);
+        Assert.Contains(labels, x => x.Number == labelNumber && x.CycleYear == 2025 && x.PartId == anotherPartId);
+    }
+
     [Fact]
     public async Task RevertReceiptAsync_RestoresDeletedReceipt()
     {
