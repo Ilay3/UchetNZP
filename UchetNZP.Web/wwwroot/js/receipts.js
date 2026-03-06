@@ -83,8 +83,70 @@
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
+    const draftStorage = typeof namespace.createDraftStorage === "function"
+        ? namespace.createDraftStorage("uchetnzp.receipts.draft", { ttlMs: 24 * 60 * 60 * 1000 })
+        : null;
 
     const labelNumberPattern = /^\d{1,5}(?:\/\d{1,5})?$/;
+
+    function collectDraftState() {
+        return {
+            part: partLookup.getSelected(),
+            section: sectionLookup.getSelected(),
+            date: dateInput.value || "",
+            quantity: quantityInput.value || "",
+            comment: commentInput.value || "",
+            labelNumber: labelSearchInput?.value || "",
+            cart,
+        };
+    }
+
+    function saveDraft() {
+        draftStorage?.save(collectDraftState());
+    }
+
+    async function restoreDraft(state) {
+        if (!state || typeof state !== "object") {
+            return;
+        }
+
+        if (state.part?.id) {
+            partLookup.setSelected({ id: state.part.id, name: state.part.name, code: state.part.code ?? null });
+            await loadOperations(state.part.id);
+        }
+
+        if (state.section?.id) {
+            sectionLookup.setSelected({ id: state.section.id, name: state.section.name, code: null });
+        }
+
+        if (typeof state.date === "string" && state.date) {
+            dateInput.value = state.date;
+        }
+        if (state.quantity !== undefined && state.quantity !== null) {
+            quantityInput.value = state.quantity;
+        }
+        if (typeof state.comment === "string") {
+            commentInput.value = state.comment;
+        }
+        if (labelSearchInput && typeof state.labelNumber === "string") {
+            labelSearchInput.value = state.labelNumber;
+        }
+
+        if (Array.isArray(state.cart)) {
+            cart = state.cart;
+            pendingAdjustments.clear();
+            cart.forEach(item => {
+                const key = getBalanceKey(item.partId, item.sectionId, item.opNumber);
+                const current = pendingAdjustments.get(key) ?? 0;
+                pendingAdjustments.set(key, current + Number(item.quantity ?? 0));
+            });
+            renderCart();
+        }
+
+        renderOperations();
+        updateBalanceLabel();
+        updateFormState();
+    }
 
     function getManualLabelNumber()
     {
@@ -116,12 +178,14 @@
 
         loadOperations(part.id);
         updateFormState();
+        saveDraft();
     });
 
     sectionLookup.inputElement?.addEventListener("lookup:selected", () => {
         renderOperations();
         updateBalanceLabel();
         updateFormState();
+        saveDraft();
     });
 
     partLookup.inputElement?.addEventListener("input", () => {
@@ -130,24 +194,29 @@
         renderOperations();
         updateBalanceLabel();
         updateFormState();
+        saveDraft();
     });
 
     sectionLookup.inputElement?.addEventListener("input", () => {
         renderOperations();
         updateBalanceLabel();
         updateFormState();
+        saveDraft();
     });
 
     labelSearchInput?.addEventListener("input", () => {
         void checkLabelExistsInSystem();
+        saveDraft();
     });
 
     dateInput?.addEventListener("change", () => {
         void checkLabelExistsInSystem();
+        saveDraft();
     });
 
     dateInput?.addEventListener("input", () => {
         void checkLabelExistsInSystem();
+        saveDraft();
     });
 
     function getBalanceKey(partId, sectionId, opNumber) {
@@ -747,6 +816,7 @@
         editingIndex = null;
         renderCart();
         updateBalanceLabel();
+        saveDraft();
     }
 
     async function editCartItem(index) {
@@ -778,6 +848,7 @@
         renderOperations();
         renderCart();
         updateBalanceLabel();
+        saveDraft();
     }
 
     addButton.addEventListener("click", () => addToCart());
@@ -786,7 +857,11 @@
     saveButton.addEventListener("click", () => saveCart());
     bulkConfirmButton?.addEventListener("click", () => void addBulkToCart());
 
-    quantityInput.addEventListener("input", () => updateFormState());
+    quantityInput.addEventListener("input", () => {
+        updateFormState();
+        saveDraft();
+    });
+    commentInput.addEventListener("input", () => saveDraft());
     dateInput.addEventListener("change", () => updateFormState());
     dateInput.addEventListener("input", () => updateFormState());
 
@@ -805,6 +880,7 @@
         renderOperations();
         updateBalanceLabel();
         updateFormState();
+        saveDraft();
     }
 
     async function addToCart() {
@@ -863,6 +939,7 @@
         editingIndex = null;
         renderCart();
         resetForm();
+        saveDraft();
     }
 
     async function collectReceiptState() {
@@ -1098,6 +1175,7 @@
             updateBalanceAfterSave(summary);
             updateHistoryAfterSave(cartSnapshot, summary);
             resetForm();
+            draftStorage?.clear();
         }
         catch (error) {
             console.error(error);
@@ -1253,5 +1331,11 @@
         onEnter: () => addToCart(),
         onSave: () => saveCart(),
         onCancel: () => resetForm(),
+    });
+
+    queueMicrotask(() => {
+        draftStorage?.restoreOrClear(state => {
+            void restoreDraft(state);
+        });
     });
 })();

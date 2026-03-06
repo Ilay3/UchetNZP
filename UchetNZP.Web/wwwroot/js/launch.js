@@ -51,6 +51,9 @@
     const summaryIntro = document.getElementById("launchSummaryIntro");
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
+    const draftStorage = typeof namespace.createDraftStorage === "function"
+        ? namespace.createDraftStorage("uchetnzp.launch.draft", { ttlMs: 24 * 60 * 60 * 1000 })
+        : null;
 
     operationInput.disabled = true;
     quantityInput.disabled = true;
@@ -77,11 +80,64 @@
     let tailRequestId = 0;
     const addButtonLabel = addButton ? addButton.textContent : "";
 
+    function collectDraftState() {
+        return {
+            part: partLookup.getSelected(),
+            date: dateInput.value || "",
+            quantity: quantityInput.value || "",
+            comment: commentInput.value || "",
+            cart,
+        };
+    }
+
+    function saveDraft() {
+        draftStorage?.save(collectDraftState());
+    }
+
+    async function restoreDraft(state) {
+        if (!state || typeof state !== "object") {
+            return;
+        }
+
+        const draftPart = state.part;
+        if (draftPart && draftPart.id) {
+            partLookup.setSelected({ id: draftPart.id, name: draftPart.name, code: draftPart.code ?? null });
+            await loadOperations(draftPart.id);
+        }
+
+        if (typeof state.date === "string" && state.date) {
+            dateInput.value = state.date;
+        }
+        if (state.quantity !== undefined && state.quantity !== null) {
+            quantityInput.value = state.quantity;
+        }
+        if (typeof state.comment === "string") {
+            commentInput.value = state.comment;
+        }
+
+        if (Array.isArray(state.cart)) {
+            cart = state.cart;
+            pendingLaunches.clear();
+            cart.forEach(item => {
+                const key = getRemainderKey(item.partId, item.opNumber);
+                const current = pendingLaunches.get(key) ?? 0;
+                pendingLaunches.set(key, current + Number(item.quantity ?? 0));
+            });
+            renderCart();
+        }
+
+        updateRemainderLabel();
+        updateHours();
+        updateStepState();
+    }
+
     partLookup.inputElement?.addEventListener("lookup:selected", event => {
         const part = event.detail;
         if (part && part.id) {
             loadOperations(part.id);
         }
+
+        saveDraft();
     });
 
     partLookup.inputElement?.addEventListener("input", () => {
@@ -93,6 +149,7 @@
         renderTail();
         updateHours();
         updateStepState();
+        saveDraft();
     });
 
     operationInput.addEventListener("input", () => {
@@ -103,6 +160,7 @@
         updateRemainderLabel();
         updateHours();
         updateStepState();
+        saveDraft();
     });
 
     operationInput.addEventListener("change", () => {
@@ -124,15 +182,24 @@
             updateHours();
         }
         updateStepState();
+        saveDraft();
     });
 
     quantityInput.addEventListener("input", () => {
         updateHours();
         updateStepState();
+        saveDraft();
     });
 
-    dateInput.addEventListener("change", () => updateStepState());
-    dateInput.addEventListener("input", () => updateStepState());
+    dateInput.addEventListener("change", () => {
+        updateStepState();
+        saveDraft();
+    });
+    dateInput.addEventListener("input", () => {
+        updateStepState();
+        saveDraft();
+    });
+    commentInput.addEventListener("input", () => saveDraft());
 
     addButton.addEventListener("click", () => addToCart());
     resetButton.addEventListener("click", () => resetForm());
@@ -412,6 +479,7 @@
         updateRemainderLabel();
         updateHours();
         updateStepState();
+        saveDraft();
     }
 
     async function addToCart() {
@@ -480,6 +548,7 @@
         renderCart();
         resetForm();
         updateRemainderLabel();
+        saveDraft();
     }
 
     function renderCart() {
@@ -521,6 +590,7 @@
 
         renderCart();
         updateRemainderLabel();
+        saveDraft();
     }
 
     async function editCartItem(index) {
@@ -564,6 +634,7 @@
         }
 
         updateRemainderLabel();
+        saveDraft();
     }
 
     async function saveCart() {
@@ -608,6 +679,7 @@
             cart = [];
             renderCart();
             resetForm();
+            draftStorage?.clear();
         }
         catch (error) {
             console.error(error);
@@ -801,5 +873,11 @@
         onEnter: () => addToCart(),
         onSave: () => saveCart(),
         onCancel: () => resetForm(),
+    });
+
+    queueMicrotask(() => {
+        draftStorage?.restoreOrClear(state => {
+            void restoreDraft(state);
+        });
     });
 })();
