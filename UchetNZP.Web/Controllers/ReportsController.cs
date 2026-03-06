@@ -508,6 +508,55 @@ public class ReportsController : Controller
         return Ok(items);
     }
 
+    [HttpGet("label-movement/resolve")]
+    public async Task<IActionResult> LabelMovementResolve([FromQuery] string? label, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(label))
+        {
+            return Ok(new { found = false });
+        }
+
+        var normalizedLabel = label.Trim();
+        var result = await _dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => x.Number == normalizedLabel)
+            .Select(x => new
+            {
+                x.Id,
+                x.PartId,
+                x.Number,
+            })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (result == null)
+        {
+            return Ok(new { found = false });
+        }
+
+        var part = await _dbContext.Parts
+            .AsNoTracking()
+            .Where(x => x.Id == result.PartId)
+            .Select(x => new { x.Id, x.Name, x.Code })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (part == null)
+        {
+            return Ok(new { found = false });
+        }
+
+        return Ok(new
+        {
+            found = true,
+            labelId = result.Id,
+            labelNumber = result.Number,
+            partId = part.Id,
+            partName = part.Name,
+            partCode = part.Code,
+        });
+    }
+
     [HttpGet("label-movement/labels")]
     public async Task<IActionResult> LabelMovementLabels([FromQuery] Guid partId, [FromQuery] string? search, CancellationToken cancellationToken)
     {
@@ -1236,6 +1285,7 @@ public class ReportsController : Controller
     public sealed record LabelMovementReportQuery(
         Guid? PartId,
         Guid? LabelId,
+        string? Label,
         bool SplitOnly = false);
 
     private sealed record TransferPeriodCell(Guid PartId, string PartName, string? PartCode, DateTime Date, string Text);
