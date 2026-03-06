@@ -15,6 +15,9 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.Property(x => x.LabelDate)
             .IsRequired();
 
+        builder.Property(x => x.LabelYear)
+            .IsRequired();
+
         builder.Property(x => x.Quantity)
             .HasPrecision(12, 3);
 
@@ -57,7 +60,7 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.HasIndex(x => new { x.RootNumber, x.Suffix })
             .IsUnique();
 
-        builder.HasIndex(x => x.Number)
+        builder.HasIndex(x => new { x.Number, x.LabelYear })
             .IsUnique();
 
         builder.HasOne(x => x.Part)

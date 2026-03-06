@@ -22,7 +22,9 @@ public class WipApiController : ControllerBase
     {
         var normalized = (number ?? string.Empty).Trim();
         var label = await _db.WipLabels.AsNoTracking()
-            .Where(x => x.PartId == partId && x.Number == normalized)
+                        .Where(x => x.PartId == partId && x.Number == normalized)
+            .OrderByDescending(x => x.LabelYear)
+            .ThenByDescending(x => x.LabelDate)
             .Select(x => new
             {
                 wipLabelId = x.Id,

@@ -138,7 +138,7 @@ public class WipLabelService : IWipLabelService
         {
             var exists = await m_dbContext.WipLabels
                 .AsNoTracking()
-                .AnyAsync(x => x.Number == normalizedNumber, in_cancellationToken)
+                .AnyAsync(x => x.Number == normalizedNumber && x.LabelYear == normalizedDate.Year, in_cancellationToken)
                 .ConfigureAwait(false);
 
             if (exists)
@@ -153,6 +153,7 @@ public class WipLabelService : IWipLabelService
                 Id = Guid.NewGuid(),
                 PartId = in_request.PartId,
                 LabelDate = normalizedDate,
+                LabelYear = normalizedDate.Year,
                 Quantity = in_request.Quantity,
                 RemainingQuantity = in_request.Quantity,
                 Number = normalizedNumber,
@@ -222,7 +223,7 @@ public class WipLabelService : IWipLabelService
         {
             var exists = await m_dbContext.WipLabels
                 .AsNoTracking()
-                .AnyAsync(x => x.Number == normalizedNumber && x.Id != label.Id, in_cancellationToken)
+                .AnyAsync(x => x.Number == normalizedNumber && x.LabelYear == normalizedDate.Year && x.Id != label.Id, in_cancellationToken)
                 .ConfigureAwait(false);
 
             if (exists)
@@ -233,6 +234,7 @@ public class WipLabelService : IWipLabelService
 
         label.Number = normalizedNumber;
         label.LabelDate = normalizedDate;
+        label.LabelYear = normalizedDate.Year;
         var parsedNumber = WipLabelInvariants.ParseNumber(normalizedNumber);
         label.RootNumber = parsedNumber.RootNumber;
         label.Suffix = parsedNumber.Suffix;
@@ -420,6 +422,7 @@ public class WipLabelService : IWipLabelService
                 Id = Guid.NewGuid(),
                 PartId = distinctPartIds[0],
                 LabelDate = mergeDate,
+                LabelYear = mergeDate.Year,
                 Quantity = outputQuantity,
                 RemainingQuantity = outputQuantity,
                 Number = outputNumber,
@@ -549,6 +552,7 @@ public class WipLabelService : IWipLabelService
                     Id = Guid.NewGuid(),
                     PartId = in_partId,
                     LabelDate = normalizedDate,
+                    LabelYear = normalizedDate.Year,
                     Quantity = in_quantity,
                     RemainingQuantity = in_quantity,
                     Number = number,

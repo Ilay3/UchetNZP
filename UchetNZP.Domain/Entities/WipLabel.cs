@@ -10,6 +10,8 @@ public class WipLabel
 
     public DateTime LabelDate { get; set; }
 
+    public int LabelYear { get; set; }
+
     public decimal Quantity { get; set; }
 
     public decimal RemainingQuantity { get; set; }

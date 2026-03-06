@@ -251,8 +251,9 @@ public class WipService : IWipService
         }
         else if (!string.IsNullOrWhiteSpace(normalizedLabelNumber))
         {
+            var labelYear = NormalizeLabelDate(in_item.ReceiptDate).Year;
             ret = await _dbContext.WipLabels
-                .FirstOrDefaultAsync(x => x.Number == normalizedLabelNumber, cancellationToken)
+                .FirstOrDefaultAsync(x => x.Number == normalizedLabelNumber && x.LabelYear == labelYear, cancellationToken)
                 .ConfigureAwait(false);
 
             if (ret is null)
@@ -262,6 +263,7 @@ public class WipService : IWipService
                     Id = Guid.NewGuid(),
                     PartId = in_item.PartId,
                     LabelDate = NormalizeLabelDate(in_item.ReceiptDate),
+                    LabelYear = NormalizeLabelDate(in_item.ReceiptDate).Year,
                     Quantity = in_item.Quantity,
                     RemainingQuantity = in_item.Quantity,
                     Number = normalizedLabelNumber,
@@ -316,6 +318,16 @@ public class WipService : IWipService
         if (ret.IsAssigned && !in_item.IsAssigned)
         {
             throw new InvalidOperationException($"Ярлык {ret.Number} уже назначен и не может быть использован повторно.");
+        }
+
+        if (ret.LabelYear == 0)
+        {
+            ret.LabelYear = ret.LabelDate.Year;
+        }
+
+        if (ret.LabelYear != NormalizeLabelDate(in_item.ReceiptDate).Year)
+        {
+            throw new InvalidOperationException($"Ярлык {ret.Number} относится к году {ret.LabelYear} и не может быть использован для прихода с датой {NormalizeLabelDate(in_item.ReceiptDate):dd.MM.yyyy}.");
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedLabelNumber) && !string.Equals(normalizedLabelNumber, ret.Number, StringComparison.Ordinal))
