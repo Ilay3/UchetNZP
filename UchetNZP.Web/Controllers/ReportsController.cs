@@ -23,6 +23,7 @@ public class ReportsController : Controller
     private readonly IScrapReportPdfExporter _scrapReportPdfExporter;
     private readonly ITransferPeriodReportPdfExporter _transferPeriodReportPdfExporter;
     private readonly IWipBatchReportPdfExporter _wipBatchReportPdfExporter;
+    private readonly IWipBatchInventoryDocumentExporter _wipBatchInventoryDocumentExporter;
     private readonly IWipLabelLookupService _labelLookupService;
 
     public ReportsController(
@@ -33,6 +34,7 @@ public class ReportsController : Controller
         IScrapReportPdfExporter scrapReportPdfExporter,
         ITransferPeriodReportPdfExporter transferPeriodReportPdfExporter,
         IWipBatchReportPdfExporter wipBatchReportPdfExporter,
+        IWipBatchInventoryDocumentExporter wipBatchInventoryDocumentExporter,
         IWipLabelLookupService labelLookupService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
@@ -42,6 +44,7 @@ public class ReportsController : Controller
         _scrapReportPdfExporter = scrapReportPdfExporter ?? throw new ArgumentNullException(nameof(scrapReportPdfExporter));
         _transferPeriodReportPdfExporter = transferPeriodReportPdfExporter ?? throw new ArgumentNullException(nameof(transferPeriodReportPdfExporter));
         _wipBatchReportPdfExporter = wipBatchReportPdfExporter ?? throw new ArgumentNullException(nameof(wipBatchReportPdfExporter));
+        _wipBatchInventoryDocumentExporter = wipBatchInventoryDocumentExporter ?? throw new ArgumentNullException(nameof(wipBatchInventoryDocumentExporter));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
@@ -336,6 +339,72 @@ public class ReportsController : Controller
     {
         var model = await LoadWipBatchReportAsync(query, cancellationToken).ConfigureAwait(false);
         return View("~/Views/Reports/WipBatchReport.cshtml", model);
+    }
+
+    [HttpPost("wip-batches/inventory-documents")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> WipBatchInventoryDocumentCreate([FromQuery] WipBatchReportQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await LoadWipBatchReportAsync(query, cancellationToken).ConfigureAwait(false);
+
+        var lastNumber = await _dbContext.WipBatchInventoryDocuments
+            .AsNoTracking()
+            .OrderByDescending(x => x.InventoryNumber)
+            .Select(x => (int?)x.InventoryNumber)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var nextNumber = (lastNumber ?? 0) + 1;
+        var generatedAt = DateTime.UtcNow;
+        var composedAtLocalDate = DateTime.Now.Date;
+
+        var content = _wipBatchInventoryDocumentExporter.Export(nextNumber, generatedAt.ToLocalTime(), composedAtLocalDate, model);
+        var fileName = $"akt-inventarizacii-nezavershennogo-proizvodstva-{nextNumber:0000}.html";
+
+        var entity = new WipBatchInventoryDocument
+        {
+            Id = Guid.NewGuid(),
+            InventoryNumber = nextNumber,
+            GeneratedAt = generatedAt,
+            ComposedAt = ToUtcStartOfDay(composedAtLocalDate),
+            PeriodFrom = ToUtcStartOfDay(model.Filter.From),
+            PeriodTo = ToUtcStartOfDay(model.Filter.To),
+            PartFilter = model.Filter.Part,
+            SectionFilter = model.Filter.Section,
+            OpNumberFilter = model.Filter.OpNumber,
+            RowCount = model.Items.Count,
+            TotalQuantity = model.TotalQuantity,
+            FileName = fileName,
+            Content = content,
+        };
+
+        _dbContext.WipBatchInventoryDocuments.Add(entity);
+        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return RedirectToAction(nameof(WipBatchReport), new
+        {
+            from = model.Filter.From.ToString("yyyy-MM-dd"),
+            to = model.Filter.To.ToString("yyyy-MM-dd"),
+            part = model.Filter.Part,
+            section = model.Filter.Section,
+            opNumber = model.Filter.OpNumber,
+        });
+    }
+
+    [HttpGet("wip-batches/inventory-documents/{id:guid}/download")]
+    public async Task<IActionResult> WipBatchInventoryDocumentDownload([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        var document = await _dbContext.WipBatchInventoryDocuments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (document == null)
+        {
+            return NotFound();
+        }
+
+        return File(document.Content, "text/html; charset=utf-8", document.FileName);
     }
 
     [HttpGet("wip-batches/export")]
@@ -749,7 +818,7 @@ public class ReportsController : Controller
             }
             else
             {
-                var emptyModel = new WipBatchReportViewModel(filter, Array.Empty<WipBatchReportItemViewModel>(), 0m);
+                var emptyModel = new WipBatchReportViewModel(filter, Array.Empty<WipBatchReportItemViewModel>(), 0m, await LoadWipBatchInventoryDocumentsAsync(cancellationToken).ConfigureAwait(false));
                 return emptyModel;
             }
         }
@@ -1012,8 +1081,27 @@ public class ReportsController : Controller
             .ThenBy(x => x.OpNumber)
             .ToList();
 
-        var model = new WipBatchReportViewModel(filter, items, items.Sum(x => x.Quantity));
+        var model = new WipBatchReportViewModel(filter, items, items.Sum(x => x.Quantity), await LoadWipBatchInventoryDocumentsAsync(cancellationToken).ConfigureAwait(false));
         return model;
+    }
+
+    private async Task<IReadOnlyList<WipBatchInventoryDocumentListItemViewModel>> LoadWipBatchInventoryDocumentsAsync(CancellationToken cancellationToken)
+    {
+        var documents = await _dbContext.WipBatchInventoryDocuments
+            .AsNoTracking()
+            .OrderByDescending(x => x.InventoryNumber)
+            .Take(100)
+            .Select(x => new WipBatchInventoryDocumentListItemViewModel(
+                x.Id,
+                x.InventoryNumber,
+                x.GeneratedAt,
+                x.RowCount,
+                x.TotalQuantity,
+                x.FileName))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return documents;
     }
 
     private async Task<(ScrapReportFilterViewModel Filter, List<ScrapReportItemViewModel> Items)> LoadScrapReportAsync(
