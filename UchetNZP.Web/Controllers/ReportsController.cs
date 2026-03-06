@@ -557,6 +557,41 @@ public class ReportsController : Controller
         });
     }
 
+<<<<<<< codex/add-compact-search-form-to-navbar
+    [HttpGet("label-movement/suggest")]
+    public async Task<IActionResult> LabelMovementSuggest([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        var term = search.Trim();
+        if (term.Length < 2)
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        var suggestions = await _dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => x.Number.Contains(term))
+            .OrderByDescending(x => x.LabelDate)
+            .ThenBy(x => x.Number)
+            .Select(x => x.Number)
+            .Distinct()
+            .Take(10)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var items = suggestions
+            .Select(x => new { number = x })
+            .ToList();
+
+        return Ok(items);
+    }
+
+=======
+>>>>>>> master
     [HttpGet("label-movement/labels")]
     public async Task<IActionResult> LabelMovementLabels([FromQuery] Guid partId, [FromQuery] string? search, CancellationToken cancellationToken)
     {

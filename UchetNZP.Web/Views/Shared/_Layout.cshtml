@@ -117,10 +117,12 @@
                                    class="form-control"
                                    type="text"
                                    name="label"
+                                   list="navbarLabelSearchOptions"
                                    placeholder="12345 или 12345/1"
                                    inputmode="numeric"
                                    aria-describedby="navbarLabelSearchError"
                                    maxlength="11" />
+                            <datalist id="navbarLabelSearchOptions"></datalist>
                             <button type="submit" class="btn btn-outline-primary">Найти</button>
                         </div>
                         <div id="navbarLabelSearchError" class="invalid-feedback d-block d-none"></div>
@@ -176,7 +178,9 @@
             const form = document.getElementById("navbarLabelSearchForm");
             const input = document.getElementById("navbarLabelSearchInput");
             const error = document.getElementById("navbarLabelSearchError");
+            const suggestions = document.getElementById("navbarLabelSearchOptions");
             const labelNumberPattern = /^\d{1,5}(?:\/\d{1,5})?$/;
+            let suggestTimer = null;
 
             function normalizeLabelNumber(rawValue) {
                 if (typeof rawValue !== "string") {
@@ -207,6 +211,47 @@
                 input.classList.remove("is-invalid");
             }
 
+
+            function renderSuggestions(items) {
+                if (!suggestions) {
+                    return;
+                }
+
+                suggestions.innerHTML = "";
+                items.forEach(item => {
+                    if (!item || typeof item.number !== "string" || !item.number.trim()) {
+                        return;
+                    }
+
+                    const option = document.createElement("option");
+                    option.value = item.number.trim();
+                    suggestions.appendChild(option);
+                });
+            }
+
+            async function loadSuggestions(rawValue) {
+                const term = typeof rawValue === "string" ? rawValue.trim() : "";
+                if (term.length < 2) {
+                    renderSuggestions([]);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/reports/label-movement/suggest?search=${encodeURIComponent(term)}`);
+                    if (!response.ok) {
+                        renderSuggestions([]);
+                        return;
+                    }
+
+                    const data = await response.json();
+                    renderSuggestions(Array.isArray(data) ? data : []);
+                }
+                catch (errorFetch) {
+                    console.error(errorFetch);
+                    renderSuggestions([]);
+                }
+            }
+
             form?.addEventListener("submit", event => {
                 const normalized = normalizeLabelNumber(input?.value ?? "");
                 if (!normalized) {
@@ -222,7 +267,17 @@
                 clearError();
             });
 
-            input?.addEventListener("input", clearError);
+            input?.addEventListener("input", () => {
+                clearError();
+
+                if (suggestTimer) {
+                    window.clearTimeout(suggestTimer);
+                }
+
+                suggestTimer = window.setTimeout(() => {
+                    void loadSuggestions(input.value);
+                }, 200);
+            });
         })();
     </script>
     <script src="~/js/site.js" asp-append-version="true"></script>
