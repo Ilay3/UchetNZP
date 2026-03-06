@@ -827,6 +827,7 @@ public class TransferService : ITransferService
             Id = Guid.NewGuid(),
             PartId = item.PartId,
             LabelDate = transferDate,
+            LabelYear = transferDate.Year,
             Quantity = transferQuantity,
             RemainingQuantity = transferQuantity,
             Number = residualNumber,
