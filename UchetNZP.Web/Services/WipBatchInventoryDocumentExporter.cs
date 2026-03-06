@@ -85,12 +85,10 @@ public class WipBatchInventoryDocumentExporter : IWipBatchInventoryDocumentExpor
                         static IContainer D(IContainer container)
                             => container.Border(0.8f).Padding(2);
 
-                        table.Cell().RowSpan(3).Element(H).AlignCenter().AlignMiddle().Text("N\nп/п");
-                        table.Cell().RowSpan(3).Element(H).AlignCenter().AlignMiddle().Text("Наименование детали в производстве");
-                        table.Cell().RowSpan(3).Element(H).AlignCenter().AlignMiddle().Text("Фактическое количество НЗП, шт.");
-                        table.Cell().RowSpan(2).Element(H).AlignCenter().AlignMiddle().Text("Операция");
-                        table.Cell().ColumnSpan(2).Element(H).AlignCenter().AlignMiddle().Text("Подробная информация");
-                        table.Cell().ColumnSpan(2).Element(H).AlignCenter().AlignMiddle().Text("нарастающим итогом");
+                        table.Cell().Element(H).AlignCenter().AlignMiddle().Text("N\nп/п");
+                        table.Cell().Element(H).AlignCenter().AlignMiddle().Text("Наименование детали в производстве");
+                        table.Cell().Element(H).AlignCenter().AlignMiddle().Text("Фактическое количество НЗП, шт.");
+                        table.Cell().Element(H).AlignCenter().AlignMiddle().Text("Операция");
                         table.Cell().Element(H).AlignCenter().AlignMiddle().Text("Номер ярлыка (партии)");
                         table.Cell().Element(H).AlignCenter().AlignMiddle().Text("Фактическое количество на партии");
 
@@ -118,8 +116,6 @@ public class WipBatchInventoryDocumentExporter : IWipBatchInventoryDocumentExpor
                             }
                         }
                     });
-
-                    column.Item().PaddingTop(6).Text($"Итого: {model.TotalQuantity:0.###} шт.").Bold();
                 });
             });
         });
