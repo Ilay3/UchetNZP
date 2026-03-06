@@ -58,6 +58,8 @@ public class AppDbContext : DbContext
 
     public DbSet<LabelNumberCounter> LabelNumberCounters => Set<LabelNumberCounter>();
 
+    public DbSet<WipBatchInventoryDocument> WipBatchInventoryDocuments => Set<WipBatchInventoryDocument>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
