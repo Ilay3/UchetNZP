@@ -97,10 +97,19 @@ public record WipBatchReportItemViewModel(
 public record WipBatchReportViewModel(
     WipBatchReportFilterViewModel Filter,
     IReadOnlyList<WipBatchReportItemViewModel> Items,
-    decimal TotalQuantity)
+    decimal TotalQuantity,
+    IReadOnlyList<WipBatchInventoryDocumentListItemViewModel> Documents)
 {
     public bool HasData => Items.Count > 0;
 }
+
+public record WipBatchInventoryDocumentListItemViewModel(
+    Guid Id,
+    int InventoryNumber,
+    DateTime CreatedAt,
+    int RowCount,
+    decimal TotalQuantity,
+    string FileName);
 
 public class LabelMovementReportFilterViewModel
 {
