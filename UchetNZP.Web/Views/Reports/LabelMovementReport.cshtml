@@ -21,6 +21,7 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body">
         <form method="get" class="row g-3 align-items-end" autocomplete="off" id="labelMovementFilterForm">
+            <input type="hidden" id="labelMovementQueryLabel" value="@Context.Request.Query["label"]" />
             <div class="col-lg-5">
                 <label class="form-label" for="labelMovementPartInput">Деталь</label>
                 <input id="labelMovementPartInput" class="form-control form-control-lg" type="text" list="labelMovementPartOptions" placeholder="Начните вводить деталь" autocomplete="off" value="@(Model.Filter.PartName ?? string.Empty)" />
@@ -41,6 +42,10 @@
             </div>
             <div class="col-lg-2 d-grid">
                 <button type="submit" class="btn btn-primary btn-lg" id="labelMovementApplyButton" disabled>Показать</button>
+            </div>
+            <div class="col-12">
+                <div id="labelMovementLabelHint" class="form-text text-muted">Сначала выберите деталь.</div>
+                <div id="labelMovementSearchError" class="alert alert-danger d-none mt-2 mb-0" role="alert"></div>
             </div>
         </form>
     </div>

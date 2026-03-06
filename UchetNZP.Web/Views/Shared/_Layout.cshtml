@@ -26,7 +26,7 @@
                         aria-expanded="false" aria-label="Переключить навигацию">
                     <span class="navbar-toggler-icon"></span>
                 </button>
-                <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between">
+                <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between align-items-lg-center gap-3">
                     <ul class="navbar-nav flex-grow-1 gap-3">
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="operationsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -102,6 +102,31 @@
                             </ul>
                         </li>
                     </ul>
+
+                    <form id="navbarLabelSearchForm"
+                          class="d-flex flex-column flex-lg-row gap-2 my-3 my-lg-0"
+                          method="get"
+                          asp-area=""
+                          asp-controller="Reports"
+                          asp-action="LabelMovementReport"
+                          autocomplete="off"
+                          novalidate>
+                        <label for="navbarLabelSearchInput" class="form-label mb-0 small text-muted">Ярлык</label>
+                        <div class="input-group input-group-sm">
+                            <input id="navbarLabelSearchInput"
+                                   class="form-control"
+                                   type="text"
+                                   name="label"
+                                   list="navbarLabelSearchOptions"
+                                   placeholder="12345 или 12345/1"
+                                   inputmode="numeric"
+                                   aria-describedby="navbarLabelSearchError"
+                                   maxlength="11" />
+                            <datalist id="navbarLabelSearchOptions"></datalist>
+                            <button type="submit" class="btn btn-outline-primary">Найти</button>
+                        </div>
+                        <div id="navbarLabelSearchError" class="invalid-feedback d-block d-none"></div>
+                    </form>
                 </div>
             </div>
         </nav>
@@ -148,6 +173,113 @@
         }));
     </script>
     <script src="~/js/background-bubbles.js" asp-append-version="true"></script>
+    <script>
+        (function () {
+            const form = document.getElementById("navbarLabelSearchForm");
+            const input = document.getElementById("navbarLabelSearchInput");
+            const error = document.getElementById("navbarLabelSearchError");
+            const suggestions = document.getElementById("navbarLabelSearchOptions");
+            const labelNumberPattern = /^\d{1,5}(?:\/\d{1,5})?$/;
+            let suggestTimer = null;
+
+            function normalizeLabelNumber(rawValue) {
+                if (typeof rawValue !== "string") {
+                    return "";
+                }
+
+                const value = rawValue.trim();
+                return labelNumberPattern.test(value) ? value : "";
+            }
+
+            function showError(message) {
+                if (!error || !input) {
+                    return;
+                }
+
+                error.textContent = message;
+                error.classList.remove("d-none");
+                input.classList.add("is-invalid");
+            }
+
+            function clearError() {
+                if (!error || !input) {
+                    return;
+                }
+
+                error.textContent = "";
+                error.classList.add("d-none");
+                input.classList.remove("is-invalid");
+            }
+
+
+            function renderSuggestions(items) {
+                if (!suggestions) {
+                    return;
+                }
+
+                suggestions.innerHTML = "";
+                items.forEach(item => {
+                    if (!item || typeof item.number !== "string" || !item.number.trim()) {
+                        return;
+                    }
+
+                    const option = document.createElement("option");
+                    option.value = item.number.trim();
+                    suggestions.appendChild(option);
+                });
+            }
+
+            async function loadSuggestions(rawValue) {
+                const term = typeof rawValue === "string" ? rawValue.trim() : "";
+                if (term.length < 2) {
+                    renderSuggestions([]);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/reports/label-movement/suggest?search=${encodeURIComponent(term)}`);
+                    if (!response.ok) {
+                        renderSuggestions([]);
+                        return;
+                    }
+
+                    const data = await response.json();
+                    renderSuggestions(Array.isArray(data) ? data : []);
+                }
+                catch (errorFetch) {
+                    console.error(errorFetch);
+                    renderSuggestions([]);
+                }
+            }
+
+            form?.addEventListener("submit", event => {
+                const normalized = normalizeLabelNumber(input?.value ?? "");
+                if (!normalized) {
+                    event.preventDefault();
+                    showError("Введите номер ярлыка в формате 12345 или 12345/1.");
+                    return;
+                }
+
+                if (input) {
+                    input.value = normalized;
+                }
+
+                clearError();
+            });
+
+            input?.addEventListener("input", () => {
+                clearError();
+
+                if (suggestTimer) {
+                    window.clearTimeout(suggestTimer);
+                }
+
+                suggestTimer = window.setTimeout(() => {
+                    void loadSuggestions(input.value);
+                }, 200);
+            });
+        })();
+    </script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
