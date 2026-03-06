@@ -172,7 +172,19 @@
             return false;
         }
 
+        if (isLabelAlreadyInCart(manualLabelNumber)) {
+            return false;
+        }
+
         return true;
+    }
+
+    function isLabelAlreadyInCart(labelNumber) {
+        if (typeof labelNumber !== "string" || !labelNumber.trim()) {
+            return false;
+        }
+
+        return cart.some(item => item.isAssigned && item.labelNumber === labelNumber);
     }
 
     function canOpenBulkAdd() {
@@ -263,6 +275,12 @@
         if (rawInput && !manualLabelNumber && !labelNumberPattern.test(rawInput))
         {
             showLabelMessage("Номер ярлыка должен быть в формате 12345 или 12345/1.", "danger");
+            return;
+        }
+
+        if (manualLabelNumber && isLabelAlreadyInCart(manualLabelNumber))
+        {
+            showLabelMessage("Такой ярлык уже добавлен в корзину. Выберите другой номер.", "danger");
             return;
         }
 
@@ -729,11 +747,16 @@
         }
 
         const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending } = state;
+        const manualLabelNumber = getManualLabelNumber();
+        if (manualLabelNumber && isLabelAlreadyInCart(manualLabelNumber)) {
+            alert("Этот ярлык уже есть в корзине. Дублирование ярлыков запрещено.");
+            return;
+        }
+
         const was = (base ?? 0) + pending;
         const become = was + quantity;
         pendingAdjustments.set(key, pending + quantity);
 
-        const manualLabelNumber = getManualLabelNumber();
         const labelId = null;
         const labelNumber = manualLabelNumber || null;
         const labelIsAssigned = Boolean(manualLabelNumber);
@@ -871,6 +894,12 @@
         }
 
         const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending } = state;
+        const duplicateLabels = parsedLabels.filter(labelNumber => isLabelAlreadyInCart(labelNumber));
+        if (duplicateLabels.length > 0) {
+            alert(`Следующие ярлыки уже есть в корзине: ${duplicateLabels.join(", ")}. Удалите дубликаты и повторите.`);
+            return;
+        }
+
         let runningPending = pending;
 
         parsedLabels.forEach(labelNumber => {
