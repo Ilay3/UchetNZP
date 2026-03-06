@@ -78,6 +78,8 @@
     let balanceRequestId = 0;
     const balanceRequests = new Map();
     let selectedLabel = null;
+    let labelExistsInSystem = false;
+    let labelCheckRequestId = 0;
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
@@ -136,7 +138,17 @@
         updateFormState();
     });
 
-    labelSearchInput?.addEventListener("input", () => updateFormState());
+    labelSearchInput?.addEventListener("input", () => {
+        void checkLabelExistsInSystem();
+    });
+
+    dateInput?.addEventListener("change", () => {
+        void checkLabelExistsInSystem();
+    });
+
+    dateInput?.addEventListener("input", () => {
+        void checkLabelExistsInSystem();
+    });
 
     function getBalanceKey(partId, sectionId, opNumber) {
         return `${partId}:${sectionId}:${opNumber}`;
@@ -173,6 +185,10 @@
         }
 
         if (isLabelAlreadyInCart(manualLabelNumber)) {
+            return false;
+        }
+
+        if (labelExistsInSystem) {
             return false;
         }
 
@@ -284,7 +300,57 @@
             return;
         }
 
+        if (manualLabelNumber && labelExistsInSystem)
+        {
+            showLabelMessage("Ярлык с таким номером уже существует в системе. Используйте другой номер.", "danger");
+            return;
+        }
+
         hideLabelMessage();
+    }
+
+    async function checkLabelExistsInSystem()
+    {
+        const manualLabelNumber = getManualLabelNumber();
+        const receiptDate = dateInput?.value || "";
+
+        if (!manualLabelNumber || !receiptDate)
+        {
+            labelExistsInSystem = false;
+            updateFormState();
+            return;
+        }
+
+        const requestId = ++labelCheckRequestId;
+
+        try
+        {
+            const response = await fetch(`/wip/receipts/labels/exists?labelNumber=${encodeURIComponent(manualLabelNumber)}&receiptDate=${encodeURIComponent(receiptDate)}`);
+            if (!response.ok)
+            {
+                throw new Error("Не удалось проверить существование ярлыка.");
+            }
+
+            const result = await response.json();
+            if (requestId !== labelCheckRequestId)
+            {
+                return;
+            }
+
+            labelExistsInSystem = Boolean(result?.exists);
+        }
+        catch (error)
+        {
+            console.error(error);
+            if (requestId !== labelCheckRequestId)
+            {
+                return;
+            }
+
+            labelExistsInSystem = false;
+        }
+
+        updateFormState();
     }
 
     async function loadOperations(partId) {
@@ -735,6 +801,7 @@
         {
             labelSearchInput.value = "";
         }
+        labelExistsInSystem = false;
         renderOperations();
         updateBalanceLabel();
         updateFormState();
@@ -750,6 +817,12 @@
         const manualLabelNumber = getManualLabelNumber();
         if (manualLabelNumber && isLabelAlreadyInCart(manualLabelNumber)) {
             alert("Этот ярлык уже есть в корзине. Дублирование ярлыков запрещено.");
+            return;
+        }
+
+        await checkLabelExistsInSystem();
+        if (manualLabelNumber && labelExistsInSystem) {
+            alert("Ярлык с таким номером уже существует в системе. Используйте другой номер.");
             return;
         }
 
@@ -786,6 +859,7 @@
         {
             labelSearchInput.value = "";
         }
+        labelExistsInSystem = false;
         editingIndex = null;
         renderCart();
         resetForm();
@@ -900,6 +974,12 @@
             return;
         }
 
+        const duplicateInSystem = await findExistingLabelsInSystem(parsedLabels, date);
+        if (duplicateInSystem.length > 0) {
+            alert(`Следующие ярлыки уже существуют в системе: ${duplicateInSystem.join(", ")}. Удалите дубликаты и повторите.`);
+            return;
+        }
+
         let runningPending = pending;
 
         parsedLabels.forEach(labelNumber => {
@@ -931,6 +1011,35 @@
         bulkModal?.hide();
         renderCart();
         resetForm();
+    }
+
+    async function findExistingLabelsInSystem(labelNumbers, receiptDate)
+    {
+        if (!Array.isArray(labelNumbers) || labelNumbers.length === 0 || !receiptDate)
+        {
+            return [];
+        }
+
+        const checks = await Promise.all(labelNumbers.map(async labelNumber => {
+            try
+            {
+                const response = await fetch(`/wip/receipts/labels/exists?labelNumber=${encodeURIComponent(labelNumber)}&receiptDate=${encodeURIComponent(receiptDate)}`);
+                if (!response.ok)
+                {
+                    return null;
+                }
+
+                const result = await response.json();
+                return result?.exists ? labelNumber : null;
+            }
+            catch (error)
+            {
+                console.error(error);
+                return null;
+            }
+        }));
+
+        return checks.filter(label => typeof label === "string");
     }
 
     async function saveCart() {
@@ -1136,6 +1245,7 @@
         }
     }
 
+    void checkLabelExistsInSystem();
     updateFormState();
     renderHistory();
 

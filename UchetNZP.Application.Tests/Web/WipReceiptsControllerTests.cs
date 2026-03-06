@@ -16,6 +16,38 @@ namespace UchetNZP.Application.Tests.Web;
 
 public class WipReceiptsControllerTests
 {
+
+    [Fact]
+    public async Task LabelExists_ReturnsTrue_WhenLabelAlreadyStoredForReceiptYear()
+    {
+        await using var dbContext = CreateContext();
+
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = Guid.NewGuid(),
+            PartId = Guid.NewGuid(),
+            LabelDate = DateTime.SpecifyKind(new DateTime(2026, 1, 10), DateTimeKind.Unspecified),
+            LabelYear = 2026,
+            Quantity = 12m,
+            RemainingQuantity = 12m,
+            Number = "12",
+            IsAssigned = true,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var controller = new WipReceiptsController(dbContext, new WipService(dbContext, new TestCurrentUserService()));
+
+        var actionResult = await controller.LabelExists("12", new DateTime(2026, 3, 6), CancellationToken.None);
+
+        var okResult = Assert.IsType<OkObjectResult>(actionResult);
+        Assert.NotNull(okResult.Value);
+        var existsProperty = okResult.Value.GetType().GetProperty("exists");
+        Assert.NotNull(existsProperty);
+        var exists = existsProperty!.GetValue(okResult.Value);
+        Assert.Equal(true, exists);
+    }
+
     [Fact]
     public async Task Revert_ReturnsRestoredReceipt()
     {
