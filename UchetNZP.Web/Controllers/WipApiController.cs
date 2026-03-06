@@ -122,11 +122,10 @@ public class WipApiController : ControllerBase
                     var root = string.IsNullOrWhiteSpace(label.RootNumber)
                         ? WipLabelInvariants.ParseNumber(label.Number).RootNumber
                         : label.RootNumber;
-                    var maxSuffix = await _db.WipLabels.AsNoTracking()
+                    var maxSuffix = (await _db.WipLabels.AsNoTracking()
                         .Where(x => x.RootNumber == root)
-                        .Select(x => x.Suffix)
-                        .DefaultIfEmpty(0)
-                        .MaxAsync(ct);
+                        .Select(x => (int?)x.Suffix)
+                        .MaxAsync(ct)) ?? 0;
                     proposedResidual = WipLabelInvariants.FormatNumber(root, maxSuffix + 1);
                 }
             }
