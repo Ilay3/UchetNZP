@@ -557,7 +557,6 @@ public class ReportsController : Controller
         });
     }
 
-<<<<<<< codex/add-compact-search-form-to-navbar
     [HttpGet("label-movement/suggest")]
     public async Task<IActionResult> LabelMovementSuggest([FromQuery] string? search, CancellationToken cancellationToken)
     {
@@ -590,8 +589,7 @@ public class ReportsController : Controller
         return Ok(items);
     }
 
-=======
->>>>>>> master
+
     [HttpGet("label-movement/labels")]
     public async Task<IActionResult> LabelMovementLabels([FromQuery] Guid partId, [FromQuery] string? search, CancellationToken cancellationToken)
     {
