@@ -54,24 +54,16 @@
                     <span>Суммарный остаток: @Model.TotalQuantity.ToString("0.###")</span>
                 </div>
                 <div class="d-flex gap-2">
-                    <a class="btn btn-success"
-                       asp-action="WipBatchReportExport"
-                       asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
-                       asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
-                       asp-route-part='@Model.Filter.Part'
-                       asp-route-section='@Model.Filter.Section'
-                       asp-route-opNumber='@Model.Filter.OpNumber'>
-                        Экспорт в Excel
-                    </a>
-                    <a class="btn btn-outline-success"
-                       asp-action="WipBatchReportExportPdf"
-                       asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
-                       asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
-                       asp-route-part='@Model.Filter.Part'
-                       asp-route-section='@Model.Filter.Section'
-                       asp-route-opNumber='@Model.Filter.OpNumber'>
-                        Экспорт в PDF
-                    </a>
+                    <form method="post"
+                          asp-action="WipBatchInventoryDocumentCreate"
+                          asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
+                          asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
+                          asp-route-part='@Model.Filter.Part'
+                          asp-route-section='@Model.Filter.Section'
+                          asp-route-opNumber='@Model.Filter.OpNumber'>
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success">Сформировать акт инвентаризации</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -123,4 +115,49 @@ else
 
 <div class="d-flex justify-content-end mt-4">
     <a class="btn btn-link" asp-controller="Home" asp-action="Index">← Вернуться на главную</a>
+</div>
+
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Список сформированных документов</div>
+    <div class="card-body">
+        @if (Model.Documents.Count == 0)
+        {
+            <div class="text-muted">Документы ещё не формировались.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">ID</th>
+                            <th scope="col">Инв. номер</th>
+                            <th scope="col">Дата формирования</th>
+                            <th scope="col">Строк</th>
+                            <th scope="col">Итого</th>
+                            <th scope="col"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var doc in Model.Documents)
+                        {
+                            <tr>
+                                <td class="small text-break">@doc.Id</td>
+                                <td>@doc.InventoryNumber.ToString("00")/инв</td>
+                                <td>@doc.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                                <td>@doc.RowCount</td>
+                                <td>@doc.TotalQuantity.ToString("0.###")</td>
+                                <td>
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       asp-action="WipBatchInventoryDocumentDownload"
+                                       asp-route-id='@doc.Id'>Скачать</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
 </div>
