@@ -381,14 +381,7 @@ public class ReportsController : Controller
         _dbContext.WipBatchInventoryDocuments.Add(entity);
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return RedirectToAction(nameof(WipBatchReport), new
-        {
-            from = model.Filter.From.ToString("yyyy-MM-dd"),
-            to = model.Filter.To.ToString("yyyy-MM-dd"),
-            part = model.Filter.Part,
-            section = model.Filter.Section,
-            opNumber = model.Filter.OpNumber,
-        });
+        return File(entity.Content, "text/html; charset=utf-8", entity.FileName);
     }
 
     [HttpGet("wip-batches/inventory-documents/{id:guid}/download")]

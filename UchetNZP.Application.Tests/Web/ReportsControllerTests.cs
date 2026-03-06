@@ -112,6 +112,79 @@ public class ReportsControllerTests
         Assert.Contains("00001/1: 10", row.LabelNumbers!, StringComparison.Ordinal);
     }
 
+
+    [Fact]
+    public async Task WipBatchInventoryDocumentCreate_ReturnsFile_AndPersistsDocument()
+    {
+        await using var dbContext = CreateContext();
+
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var labelId = Guid.NewGuid();
+
+        dbContext.Parts.Add(new Part { Id = partId, Name = "Втулка", Code = "4ЭТК.02.01.111-7" });
+        dbContext.Sections.Add(new Section { Id = sectionId, Name = "Термическая" });
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = labelId,
+            PartId = partId,
+            LabelDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified),
+            Quantity = 10m,
+            RemainingQuantity = 10m,
+            Number = "00001",
+            IsAssigned = true,
+        });
+
+        dbContext.WipReceipts.Add(new WipReceipt
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OpNumber = 40,
+            ReceiptDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Utc),
+            Quantity = 10m,
+            WipLabelId = labelId,
+        });
+
+        dbContext.WipBalances.Add(new WipBalance
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OpNumber = 40,
+            Quantity = 10m,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var controller = new ReportsController(
+            dbContext,
+            new StubScrapExporter(),
+            new StubTransferExporter(),
+            new StubWipBatchExporter(),
+            new StubScrapPdfExporter(),
+            new StubTransferPdfExporter(),
+            new StubWipBatchPdfExporter(),
+            new StubWipBatchInventoryDocumentExporter(),
+            new WipLabelLookupService(dbContext));
+
+        var reportDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified);
+        var result = await controller.WipBatchInventoryDocumentCreate(
+            new ReportsController.WipBatchReportQuery(reportDate, reportDate, null, null, "040"),
+            CancellationToken.None);
+
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("text/html; charset=utf-8", fileResult.ContentType);
+        Assert.EndsWith(".html", fileResult.FileDownloadName, StringComparison.OrdinalIgnoreCase);
+
+        var docs = await dbContext.WipBatchInventoryDocuments.ToListAsync();
+        var doc = Assert.Single(docs);
+        Assert.Equal(1, doc.InventoryNumber);
+        Assert.Equal(DateTimeKind.Utc, doc.ComposedAt.Kind);
+        Assert.Equal(DateTimeKind.Utc, doc.PeriodFrom.Kind);
+        Assert.Equal(DateTimeKind.Utc, doc.PeriodTo.Kind);
+    }
+
     [Fact]
     public async Task TransferPeriodReport_IncludesResidualSlashLabelInCellText()
     {
