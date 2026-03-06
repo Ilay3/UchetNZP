@@ -9,5 +9,6 @@ public record ReceiptItemDto(
     string? Comment,
     Guid? WipLabelId,
     string? LabelNumber,
-    bool IsAssigned
+    bool IsAssigned,
+    bool ReuseFromWarehouseLabel = false
 );

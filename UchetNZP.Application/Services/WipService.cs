@@ -7,6 +7,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Wip;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Shared;
 
 namespace UchetNZP.Application.Services;
 
@@ -283,6 +284,7 @@ public class WipService : IWipService
                 ret.Suffix = parsedNumber.Suffix;
 
                 await _dbContext.WipLabels.AddAsync(ret, cancellationToken).ConfigureAwait(false);
+                createdNewLabel = true;
             }
         }
         else
@@ -321,9 +323,27 @@ public class WipService : IWipService
             throw new InvalidOperationException($"Количество ярлыка {ret.Number} ({ret.Quantity}) не совпадает с количеством прихода ({in_item.Quantity}).");
         }
 
-        if (ret.IsAssigned && !in_item.IsAssigned)
+        if (ret.IsAssigned && !createdNewLabel)
         {
-            throw new InvalidOperationException($"Ярлык {ret.Number} уже назначен и не может быть использован повторно.");
+            if (in_item.ReuseFromWarehouseLabel)
+            {
+                var isClosedOnWarehouse = ret.Status == WipLabelStatus.Closed
+                    && ret.CurrentSectionId == WarehouseDefaults.SectionId
+                    && WarehouseDefaults.IsWarehouseOperationNumber(ret.CurrentOpNumber ?? 0);
+
+                if (!isClosedOnWarehouse)
+                {
+                    throw new InvalidOperationException($"Повторное использование ярлыка {ret.Number} разрешено только для статуса Closed на складе.");
+                }
+            }
+            else if (!in_item.IsAssigned)
+            {
+                throw new InvalidOperationException($"Ярлык {ret.Number} уже назначен и не может быть использован повторно.");
+            }
+            else
+            {
+                throw new InvalidOperationException($"Ярлык {ret.Number} уже назначен. Для повторного использования со склада нажмите отдельную кнопку подтверждения.");
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(normalizedLabelNumber) && !string.Equals(normalizedLabelNumber, ret.Number, StringComparison.Ordinal))
