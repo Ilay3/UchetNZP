@@ -202,6 +202,7 @@ namespace UchetNZP.Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     PartId = table.Column<Guid>(type: "uuid", nullable: false),
                     LabelDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LabelYear = table.Column<int>(type: "integer", nullable: false),
                     Quantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
                     RemainingQuantity = table.Column<decimal>(type: "numeric(12,3)", precision: 12, scale: 3, nullable: false),
                     Number = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
@@ -847,9 +848,9 @@ namespace UchetNZP.Infrastructure.Migrations
                 column: "TransactionId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_WipLabels_Number",
+                name: "IX_WipLabels_Number_LabelYear",
                 table: "WipLabels",
-                column: "Number",
+                columns: new[] { "Number", "LabelYear" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

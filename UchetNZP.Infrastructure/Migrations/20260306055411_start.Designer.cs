@@ -12,7 +12,7 @@ using UchetNZP.Infrastructure.Data;
 namespace UchetNZP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260303105136_start")]
+    [Migration("20260306055411_start")]
     partial class start
     {
         /// <inheritdoc />
@@ -658,6 +658,9 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Property<DateTime>("LabelDate")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("LabelYear")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Number")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -701,12 +704,12 @@ namespace UchetNZP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Number")
-                        .IsUnique();
-
                     b.HasIndex("PartId");
 
                     b.HasIndex("RootLabelId");
+
+                    b.HasIndex("Number", "LabelYear")
+                        .IsUnique();
 
                     b.HasIndex("RootNumber", "Suffix")
                         .IsUnique();
