@@ -356,9 +356,9 @@ public class ReportsController : Controller
 
         var nextNumber = (lastNumber ?? 0) + 1;
         var generatedAt = DateTime.UtcNow;
-        var composedAt = DateTime.Now.Date;
+        var composedAtLocalDate = DateTime.Now.Date;
 
-        var content = _wipBatchInventoryDocumentExporter.Export(nextNumber, generatedAt.ToLocalTime(), composedAt, model);
+        var content = _wipBatchInventoryDocumentExporter.Export(nextNumber, generatedAt.ToLocalTime(), composedAtLocalDate, model);
         var fileName = $"akt-inventarizacii-nezavershennogo-proizvodstva-{nextNumber:0000}.html";
 
         var entity = new WipBatchInventoryDocument
@@ -366,9 +366,9 @@ public class ReportsController : Controller
             Id = Guid.NewGuid(),
             InventoryNumber = nextNumber,
             GeneratedAt = generatedAt,
-            ComposedAt = composedAt,
-            PeriodFrom = model.Filter.From,
-            PeriodTo = model.Filter.To,
+            ComposedAt = ToUtcStartOfDay(composedAtLocalDate),
+            PeriodFrom = ToUtcStartOfDay(model.Filter.From),
+            PeriodTo = ToUtcStartOfDay(model.Filter.To),
             PartFilter = model.Filter.Part,
             SectionFilter = model.Filter.Section,
             OpNumberFilter = model.Filter.OpNumber,
