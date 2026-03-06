@@ -25,6 +25,9 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
             .HasMaxLength(32)
             .IsRequired();
 
+        builder.Property(x => x.CycleYear)
+            .IsRequired();
+
         builder.Property(x => x.Status)
             .HasConversion<string>()
             .HasMaxLength(20)
@@ -54,10 +57,10 @@ public class WipLabelConfiguration : IEntityTypeConfiguration<WipLabel>
         builder.HasIndex(x => x.RootLabelId);
 
 
-        builder.HasIndex(x => new { x.RootNumber, x.Suffix })
+        builder.HasIndex(x => new { x.RootNumber, x.Suffix, x.CycleYear })
             .IsUnique();
 
-        builder.HasIndex(x => x.Number)
+        builder.HasIndex(x => new { x.Number, x.CycleYear })
             .IsUnique();
 
         builder.HasOne(x => x.Part)
