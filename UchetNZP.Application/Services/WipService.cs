@@ -231,7 +231,7 @@ public class WipService : IWipService
         }
 
         WipLabel? ret = null;
-        var createdNewLabel = false;
+        var cycleYear = NormalizeLabelDate(in_item.ReceiptDate).Year;
 
         string? normalizedLabelNumber = null;
 
@@ -254,7 +254,7 @@ public class WipService : IWipService
         else if (!string.IsNullOrWhiteSpace(normalizedLabelNumber))
         {
             ret = await _dbContext.WipLabels
-                .FirstOrDefaultAsync(x => x.Number == normalizedLabelNumber, cancellationToken)
+                .FirstOrDefaultAsync(x => x.Number == normalizedLabelNumber && (x.CycleYear == cycleYear || (x.CycleYear == 0 && x.LabelDate.Year == cycleYear)), cancellationToken)
                 .ConfigureAwait(false);
 
             if (ret is null)
@@ -267,6 +267,7 @@ public class WipService : IWipService
                     Quantity = in_item.Quantity,
                     RemainingQuantity = in_item.Quantity,
                     Number = normalizedLabelNumber,
+                    CycleYear = cycleYear,
                     IsAssigned = true,
                     Status = WipLabelStatus.Active,
                     CurrentSectionId = in_item.SectionId,
@@ -289,7 +290,7 @@ public class WipService : IWipService
         else
         {
             ret = await _dbContext.WipLabels
-                .Where(x => !x.IsAssigned && x.PartId == in_item.PartId && x.Quantity == in_item.Quantity)
+                .Where(x => !x.IsAssigned && x.PartId == in_item.PartId && x.Quantity == in_item.Quantity && (x.CycleYear == cycleYear || (x.CycleYear == 0 && x.LabelDate.Year == cycleYear)))
                 .Where(x => !in_reservedLabelIds.Contains(x.Id))
                 .OrderBy(x => x.Number)
                 .FirstOrDefaultAsync(cancellationToken)
@@ -305,6 +306,12 @@ public class WipService : IWipService
         {
             throw new InvalidOperationException($"Ярлык {ret.Number} уже зарезервирован в текущей операции сохранения.");
         }
+
+        var labelCycleYear = ret.CycleYear == 0 ? ret.LabelDate.Year : ret.CycleYear;
+        if (labelCycleYear != cycleYear)
+            {
+                throw new InvalidOperationException($"Ярлык {ret.Number} относится к циклу {labelCycleYear} и не может быть использован для прихода за {cycleYear} год.");
+            }
 
         if (ret.PartId != in_item.PartId)
         {

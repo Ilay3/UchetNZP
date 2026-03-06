@@ -811,11 +811,11 @@ public class TransferService : ITransferService
 
         var residualNumber = WipLabelInvariants.FormatNumber(baseNumber, nextIndex);
         var duplicateExists = await _dbContext.WipLabels
-            .AnyAsync(x => x.RootNumber == baseNumber && x.Suffix == nextIndex, cancellationToken)
+            .AnyAsync(x => x.RootNumber == baseNumber && x.Suffix == nextIndex && x.CycleYear == transferDate.Year, cancellationToken)
             .ConfigureAwait(false);
 
         var duplicateInMemory = _dbContext.WipLabels.Local
-            .Any(x => string.Equals(x.RootNumber, baseNumber, StringComparison.Ordinal) && x.Suffix == nextIndex);
+            .Any(x => string.Equals(x.RootNumber, baseNumber, StringComparison.Ordinal) && x.Suffix == nextIndex && x.CycleYear == transferDate.Year);
 
         if (duplicateExists || duplicateInMemory)
         {
@@ -830,6 +830,7 @@ public class TransferService : ITransferService
             Quantity = transferQuantity,
             RemainingQuantity = transferQuantity,
             Number = residualNumber,
+            CycleYear = transferDate.Year,
             IsAssigned = true,
             Status = WipLabelStatus.Active,
             CurrentSectionId = toSectionId,
