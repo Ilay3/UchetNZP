@@ -29,7 +29,10 @@
                 <label class="form-label" for="receiptLabelSearchInput">Ярлык детали</label>
                 <input id="receiptLabelSearchInput" class="form-control form-control-lg" type="text" inputmode="numeric" placeholder="Введите номер ярлыка вручную (например, 12345 или 12345/1)" autocomplete="off" aria-describedby="receiptLabelHelp" />
                 <input type="hidden" id="receiptLabelId" />
-                <div class="form-text" id="receiptLabelHelp">Ярлык выбирается только вручную. Автоматический подбор отключён для упрощения работы.</div>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-outline-warning" id="receiptReuseWarehouseLabelButton">Повторно использовать со склада</button>
+                </div>
+                <div class="form-text" id="receiptLabelHelp">Ярлык выбирается вручную. Для повторного использования закрытого складского ярлыка нажмите кнопку подтверждения.</div>
                 <div id="receiptLabelMessage" class="alert alert-warning d-none mt-3" role="alert"></div>
             </div>
             <div class="col-lg-4">
