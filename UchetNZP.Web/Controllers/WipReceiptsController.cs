@@ -152,7 +152,8 @@ public class WipReceiptsController : Controller
                 x.Comment,
                 x.WipLabelId,
                 x.LabelNumber,
-                x.IsAssigned)).ToList();
+                x.IsAssigned,
+                x.ReuseFromWarehouseLabel)).ToList();
         }
         catch (ArgumentException ex)
         {
@@ -335,7 +336,8 @@ public class WipReceiptsController : Controller
         string? Comment,
         Guid? WipLabelId,
         string? LabelNumber,
-        bool IsAssigned = false);
+        bool IsAssigned = false,
+        bool ReuseFromWarehouseLabel = false);
 
     private static DateTime ToLocalDateTime(DateTime value)
     {
