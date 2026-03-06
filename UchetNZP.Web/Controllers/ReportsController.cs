@@ -359,7 +359,7 @@ public class ReportsController : Controller
         var composedAtLocalDate = DateTime.Now.Date;
 
         var content = _wipBatchInventoryDocumentExporter.Export(nextNumber, generatedAt.ToLocalTime(), composedAtLocalDate, model);
-        var fileName = $"akt-inventarizacii-nezavershennogo-proizvodstva-{nextNumber:0000}.html";
+        var fileName = $"akt-inventarizacii-nezavershennogo-proizvodstva-{nextNumber:0000}.pdf";
 
         var entity = new WipBatchInventoryDocument
         {
@@ -381,7 +381,7 @@ public class ReportsController : Controller
         _dbContext.WipBatchInventoryDocuments.Add(entity);
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return File(entity.Content, "text/html; charset=utf-8", entity.FileName);
+        return File(entity.Content, "application/pdf", entity.FileName);
     }
 
     [HttpGet("wip-batches/inventory-documents/{id:guid}/download")]
@@ -397,7 +397,11 @@ public class ReportsController : Controller
             return NotFound();
         }
 
-        return File(document.Content, "text/html; charset=utf-8", document.FileName);
+        var contentType = document.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+            ? "application/pdf"
+            : "text/html; charset=utf-8";
+
+        return File(document.Content, contentType, document.FileName);
     }
 
     [HttpGet("wip-batches/export")]

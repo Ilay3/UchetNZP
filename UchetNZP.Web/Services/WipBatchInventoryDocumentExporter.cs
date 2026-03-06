@@ -1,6 +1,8 @@
 using System.Globalization;
-using System.Net;
-using System.Text;
+using System.Linq;
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Services;
@@ -16,131 +18,146 @@ public class WipBatchInventoryDocumentExporter : IWipBatchInventoryDocumentExpor
 
     public byte[] Export(int inventoryNumber, DateTime generatedAt, DateTime composedAt, WipBatchReportViewModel model)
     {
-        var sb = new StringBuilder();
+        ArgumentNullException.ThrowIfNull(model);
+
         var inventory = inventoryNumber.ToString("00", CultureInfo.InvariantCulture);
+        var rows = model.Items
+            .SelectMany((item, idx) => ExpandRows(item, idx + 1))
+            .ToList();
 
-        sb.AppendLine("<!DOCTYPE html>");
-        sb.AppendLine("<html lang=\"ru\"><head><meta charset=\"utf-8\" /><title>Акт инвентаризации НЗП</title>");
-        sb.AppendLine("<style>");
-        sb.AppendLine("body{font-family:'Times New Roman',serif;font-size:18px;line-height:1.2;color:#000;max-width:1120px;margin:0 auto;padding:24px 28px;}");
-        sb.AppendLine(".header-org{text-align:center;font-size:38px;line-height:1.1;margin-bottom:2px;}");
-        sb.AppendLine(".header-note{text-align:center;font-size:28px;margin-bottom:28px;}");
-        sb.AppendLine(".h-line{border-top:1px solid #000;margin-bottom:14px;}");
-        sb.AppendLine("table{border-collapse:collapse;width:100%;}");
-        sb.AppendLine(".meta{width:360px;margin-left:auto;margin-bottom:12px;font-size:34px;}");
-        sb.AppendLine(".meta td{border:1px solid #000;padding:3px 8px;}");
-        sb.AppendLine(".meta td:first-child{border:none;text-align:right;padding-right:12px;}");
-        sb.AppendLine(".meta2{width:360px;margin-left:auto;margin-bottom:20px;font-size:34px;}");
-        sb.AppendLine(".meta2 th,.meta2 td{border:1px solid #000;padding:3px 8px;text-align:center;}");
-        sb.AppendLine(".title{text-align:center;font-size:44px;font-weight:700;margin:22px 0 0;}");
-        sb.AppendLine(".subtitle{text-align:center;font-size:42px;font-weight:700;margin:0 0 22px;}");
-        sb.AppendLine(".text{font-size:40px;margin:0 0 10px;}");
-        sb.AppendLine(".act{font-size:30px;}");
-        sb.AppendLine(".act th,.act td{border:1px solid #000;padding:4px 6px;vertical-align:top;}");
-        sb.AppendLine(".act th{font-weight:400;text-align:center;}");
-        sb.AppendLine(".right{text-align:right;}");
-        sb.AppendLine(".center{text-align:center;}");
-        sb.AppendLine(".w-num{width:62px;}.w-part{width:300px;}.w-total{width:180px;}.w-op{width:260px;}.w-label{width:180px;}.w-labelqty{width:230px;}");
-        sb.AppendLine(".col-index td{padding:2px 6px;text-align:center;}");
-        sb.AppendLine("</style></head><body>");
-
-        sb.AppendLine("<div class=\"header-org\">ООО \"Промавтоматика\"</div>");
-        sb.AppendLine("<div class=\"h-line\"></div>");
-        sb.AppendLine("<div class=\"header-note\">организация</div>");
-
-        sb.AppendLine("<table class=\"meta\">");
-        sb.AppendLine($"<tr><td>номер</td><td class=\"right\">{inventory}/инв</td></tr>");
-        sb.AppendLine($"<tr><td>дата</td><td class=\"right\">{generatedAt:dd.MM.yyyy}</td></tr>");
-        sb.AppendLine("</table>");
-
-        sb.AppendLine("<table class=\"meta2\">");
-        sb.AppendLine("<tr><th>N</th><th>Дата составления</th></tr>");
-        sb.AppendLine($"<tr><td>{inventory}</td><td>{composedAt:dd.MM.yyyy}</td></tr>");
-        sb.AppendLine("</table>");
-
-        sb.AppendLine("<div class=\"title\">АКТ ИНВЕНТАРИЗАЦИИ</div>");
-        sb.AppendLine("<div class=\"subtitle\">незавершенного производства</div>");
-
-        sb.AppendLine($"<p class=\"text\">Акт о том, что по состоянию на <strong>{ToLongRussianDate(composedAt)}</strong> проведена инвентаризация незавершенного производства.</p>");
-        sb.AppendLine("<p class=\"text\">При инвентаризации установлено следующее:</p>");
-
-        sb.AppendLine("<table class=\"act\">");
-        sb.AppendLine("<thead>");
-        sb.AppendLine("<tr>");
-        sb.AppendLine("<th class=\"w-num\" rowspan=\"3\">N<br/>п/п</th>");
-        sb.AppendLine("<th class=\"w-part\" rowspan=\"3\">Наименование детали в производстве</th>");
-        sb.AppendLine("<th class=\"w-total\" rowspan=\"3\">Фактическое количество НЗП, шт.</th>");
-        sb.AppendLine("<th class=\"w-op\" rowspan=\"2\">Операция</th>");
-        sb.AppendLine("<th colspan=\"2\">Подробная информация</th>");
-        sb.AppendLine("</tr>");
-        sb.AppendLine("<tr>");
-        sb.AppendLine("<th colspan=\"2\">нарастающим итогом</th>");
-        sb.AppendLine("</tr>");
-        sb.AppendLine("<tr>");
-        sb.AppendLine("<th>4</th>");
-        sb.AppendLine("<th class=\"w-label\">Номер ярлыка (партии)</th>");
-        sb.AppendLine("<th class=\"w-labelqty\">Фактическое количество на партии</th>");
-        sb.AppendLine("</tr>");
-        sb.AppendLine("<tr class=\"col-index\"><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td></tr>");
-        sb.AppendLine("</thead><tbody>");
-
-        if (model.Items.Count == 0)
+        var document = Document.Create(container =>
         {
-            sb.AppendLine("<tr><td colspan=\"6\" class=\"center\">Нет данных по выбранным условиям</td></tr>");
-        }
-        else
-        {
-            var rowNo = 1;
-            foreach (var item in model.Items)
+            container.Page(page =>
             {
-                var labelRows = ParseLabelRows(item.LabelNumbers, item.Quantity);
-                var first = true;
-                foreach (var labelRow in labelRows)
+                page.Size(PageSizes.A4);
+                page.Margin(20);
+                page.DefaultTextStyle(x => x.FontSize(9).FontFamily(Fonts.TimesNewRoman));
+
+                page.Content().Column(column =>
                 {
-                    sb.Append("<tr>");
-                    if (first)
-                    {
-                        sb.Append($"<td>{rowNo}</td>");
-                        sb.Append("<td>" + HtmlPart(item) + "</td>");
-                        sb.Append($"<td class=\"center\"><strong>{item.Quantity:0.###}</strong></td>");
-                        sb.Append("<td>" + WebUtility.HtmlEncode(item.OpNumber + " " + item.SectionName) + "</td>");
-                        first = false;
-                    }
-                    else
-                    {
-                        sb.Append("<td></td><td></td><td></td><td></td>");
-                    }
+                    column.Spacing(4);
 
-                    sb.Append("<td class=\"center\">" + WebUtility.HtmlEncode(labelRow.LabelNumber) + "</td>");
-                    sb.Append($"<td class=\"center\">{labelRow.Quantity:0.###}</td>");
-                    sb.AppendLine("</tr>");
-                }
+                    column.Item().AlignCenter().Text("ООО \"Промавтоматика\"").FontSize(12);
+                    column.Item().LineHorizontal(0.8f);
+                    column.Item().AlignCenter().Text("организация").FontSize(8);
 
-                rowNo++;
-            }
+                    column.Item().AlignRight().Width(180).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.RelativeColumn(1);
+                            columns.RelativeColumn(2);
+                        });
+
+                        table.Cell().AlignRight().PaddingRight(6).Text("номер");
+                        table.Cell().Border(0.8f).PaddingVertical(2).PaddingHorizontal(6).AlignRight().Text($"{inventory}/инв");
+
+                        table.Cell().AlignRight().PaddingRight(6).Text("дата");
+                        table.Cell().Border(0.8f).PaddingVertical(2).PaddingHorizontal(6).AlignRight().Text(generatedAt.ToString("dd.MM.yyyy", RuCulture));
+                    });
+
+                    column.Item().PaddingTop(6).AlignCenter().Text("АКТ ИНВЕНТАРИЗАЦИИ").FontSize(13).Bold();
+                    column.Item().AlignCenter().Text("незавершенного производства").FontSize(11).Bold();
+
+                    column.Item().PaddingTop(6).Text(text =>
+                    {
+                        text.Span("Акт о том, что по состоянию на ");
+                        text.Span(ToLongRussianDate(composedAt)).Bold();
+                        text.Span(" проведена инвентаризация незавершенного производства.");
+                    });
+                    column.Item().Text("При инвентаризации установлено следующее:");
+
+                    column.Item().PaddingTop(4).Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(28);
+                            columns.RelativeColumn(2.3f);
+                            columns.ConstantColumn(56);
+                            columns.RelativeColumn(1.8f);
+                            columns.ConstantColumn(74);
+                            columns.ConstantColumn(72);
+                        });
+
+                        static IContainer H(IContainer container)
+                            => container.Border(0.8f).Padding(2).Background(Colors.White);
+
+                        static IContainer D(IContainer container)
+                            => container.Border(0.8f).Padding(2);
+
+                        table.Cell().RowSpan(3).Element(H).AlignCenter().AlignMiddle().Text("N\nп/п");
+                        table.Cell().RowSpan(3).Element(H).AlignCenter().AlignMiddle().Text("Наименование детали в производстве");
+                        table.Cell().RowSpan(3).Element(H).AlignCenter().AlignMiddle().Text("Фактическое количество НЗП, шт.");
+                        table.Cell().RowSpan(2).Element(H).AlignCenter().AlignMiddle().Text("Операция");
+                        table.Cell().ColumnSpan(2).Element(H).AlignCenter().AlignMiddle().Text("Подробная информация");
+                        table.Cell().ColumnSpan(2).Element(H).AlignCenter().AlignMiddle().Text("нарастающим итогом");
+                        table.Cell().Element(H).AlignCenter().AlignMiddle().Text("Номер ярлыка (партии)");
+                        table.Cell().Element(H).AlignCenter().AlignMiddle().Text("Фактическое количество на партии");
+
+                        table.Cell().Element(H).AlignCenter().Text("1");
+                        table.Cell().Element(H).AlignCenter().Text("2");
+                        table.Cell().Element(H).AlignCenter().Text("3");
+                        table.Cell().Element(H).AlignCenter().Text("4");
+                        table.Cell().Element(H).AlignCenter().Text("5");
+                        table.Cell().Element(H).AlignCenter().Text("6");
+
+                        if (rows.Count == 0)
+                        {
+                            table.Cell().ColumnSpan(6).Element(D).AlignCenter().Text("Нет данных по выбранным условиям");
+                        }
+                        else
+                        {
+                            foreach (var row in rows)
+                            {
+                                table.Cell().Element(D).AlignCenter().Text(row.IndexText);
+                                table.Cell().Element(D).Text(row.PartText);
+                                table.Cell().Element(D).AlignCenter().Text(row.TotalQty);
+                                table.Cell().Element(D).Text(row.OperationText);
+                                table.Cell().Element(D).AlignCenter().Text(row.LabelNumber);
+                                table.Cell().Element(D).AlignCenter().Text(row.LabelQty);
+                            }
+                        }
+                    });
+
+                    column.Item().PaddingTop(6).Text($"Итого: {model.TotalQuantity:0.###} шт.").Bold();
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
+    private static IReadOnlyList<InventoryRow> ExpandRows(WipBatchReportItemViewModel item, int index)
+    {
+        var labels = ParseLabelRows(item.LabelNumbers, item.Quantity);
+        var rows = new List<InventoryRow>(labels.Count);
+        for (var i = 0; i < labels.Count; i++)
+        {
+            var label = labels[i];
+            rows.Add(new InventoryRow(
+                i == 0 ? index.ToString(CultureInfo.InvariantCulture) : string.Empty,
+                i == 0 ? BuildPartText(item) : string.Empty,
+                i == 0 ? item.Quantity.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty,
+                i == 0 ? $"{item.OpNumber} {item.SectionName}" : string.Empty,
+                label.LabelNumber,
+                label.Quantity.ToString("0.###", CultureInfo.InvariantCulture)));
         }
 
-        sb.AppendLine("</tbody></table>");
-        sb.AppendLine($"<p class=\"text\"><strong>Итого:</strong> {model.TotalQuantity:0.###} шт.</p>");
-        sb.AppendLine("</body></html>");
-
-        return Encoding.UTF8.GetBytes(sb.ToString());
+        return rows;
     }
 
-    private static string ToLongRussianDate(DateTime date)
-    {
-        return $"{date.Day} {date.ToString("MMMM", RuCulture)} {date.Year} г.";
-    }
-
-    private static string HtmlPart(WipBatchReportItemViewModel item)
+    private static string BuildPartText(WipBatchReportItemViewModel item)
     {
         if (string.IsNullOrWhiteSpace(item.PartCode))
         {
-            return WebUtility.HtmlEncode(item.PartName);
+            return item.PartName;
         }
 
-        return WebUtility.HtmlEncode(item.PartName) + "<br/>" + WebUtility.HtmlEncode(item.PartCode);
+        return $"{item.PartName}\n{item.PartCode}";
     }
+
+    private static string ToLongRussianDate(DateTime date)
+        => $"{date.Day} {date.ToString("MMMM", RuCulture)} {date.Year} г.";
 
     private static IReadOnlyList<(string LabelNumber, decimal Quantity)> ParseLabelRows(string? labels, decimal fallbackQuantity)
     {
@@ -184,4 +201,12 @@ public class WipBatchInventoryDocumentExporter : IWipBatchInventoryDocumentExpor
 
         return result.Count == 0 ? new[] { ("—", fallbackQuantity) } : result;
     }
+
+    private sealed record InventoryRow(
+        string IndexText,
+        string PartText,
+        string TotalQty,
+        string OperationText,
+        string LabelNumber,
+        string LabelQty);
 }

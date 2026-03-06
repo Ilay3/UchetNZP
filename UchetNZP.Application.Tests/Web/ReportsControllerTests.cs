@@ -174,8 +174,8 @@ public class ReportsControllerTests
             CancellationToken.None);
 
         var fileResult = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("text/html; charset=utf-8", fileResult.ContentType);
-        Assert.EndsWith(".html", fileResult.FileDownloadName, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("application/pdf", fileResult.ContentType);
+        Assert.EndsWith(".pdf", fileResult.FileDownloadName, StringComparison.OrdinalIgnoreCase);
 
         var docs = await dbContext.WipBatchInventoryDocuments.ToListAsync();
         var doc = Assert.Single(docs);
