@@ -109,6 +109,116 @@ public class WipServiceTests
         Assert.Equal(1, await dbContext.ReceiptAudits.CountAsync());
     }
 
+
+    [Fact]
+    public async Task AddReceiptsBatchAsync_RejectsAssignedLabelWithoutWarehouseReuseFlag()
+    {
+        await using var dbContext = createContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        var labelId = Guid.NewGuid();
+        const int opNumber = 15;
+        const decimal receiptQuantity = 3m;
+        const string labelNumber = "10001";
+
+        dbContext.Parts.Add(new Part { Id = partId, Name = "Деталь", Code = "DET-1" });
+        dbContext.Sections.Add(new Section { Id = sectionId, Name = "Секция" });
+        dbContext.Operations.Add(new Operation { Id = operationId, Name = "Операция" });
+        dbContext.PartRoutes.Add(new PartRoute
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OperationId = operationId,
+            OpNumber = opNumber,
+            NormHours = 1m,
+        });
+
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = labelId,
+            PartId = partId,
+            LabelDate = DateTime.SpecifyKind(new DateTime(2024, 1, 1), DateTimeKind.Unspecified),
+            Quantity = receiptQuantity,
+            RemainingQuantity = receiptQuantity,
+            Number = labelNumber,
+            IsAssigned = true,
+            Status = WipLabelStatus.Active,
+            CurrentSectionId = sectionId,
+            CurrentOpNumber = opNumber,
+            RootLabelId = labelId,
+            RootNumber = labelNumber,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new WipService(dbContext, new TestCurrentUserService());
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.AddReceiptsBatchAsync(
+            new[]
+            {
+                new ReceiptItemDto(partId, opNumber, sectionId, DateTime.SpecifyKind(new DateTime(2024, 2, 1), DateTimeKind.Unspecified), receiptQuantity, null, labelId, labelNumber, true),
+            }));
+
+        Assert.Contains("отдельную кнопку подтверждения", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AddReceiptsBatchAsync_AllowsClosedWarehouseLabelWithReuseFlag()
+    {
+        await using var dbContext = createContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var operationId = Guid.NewGuid();
+        var labelId = Guid.NewGuid();
+        const int opNumber = 15;
+        const decimal receiptQuantity = 3m;
+        const string labelNumber = "10002";
+
+        dbContext.Parts.Add(new Part { Id = partId, Name = "Деталь", Code = "DET-1" });
+        dbContext.Sections.Add(new Section { Id = sectionId, Name = "Секция" });
+        dbContext.Operations.Add(new Operation { Id = operationId, Name = "Операция" });
+        dbContext.PartRoutes.Add(new PartRoute
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OperationId = operationId,
+            OpNumber = opNumber,
+            NormHours = 1m,
+        });
+
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = labelId,
+            PartId = partId,
+            LabelDate = DateTime.SpecifyKind(new DateTime(2024, 1, 1), DateTimeKind.Unspecified),
+            Quantity = receiptQuantity,
+            RemainingQuantity = 0m,
+            Number = labelNumber,
+            IsAssigned = true,
+            Status = WipLabelStatus.Closed,
+            CurrentSectionId = UchetNZP.Shared.WarehouseDefaults.SectionId,
+            CurrentOpNumber = UchetNZP.Shared.WarehouseDefaults.OperationNumber,
+            RootLabelId = labelId,
+            RootNumber = labelNumber,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var service = new WipService(dbContext, new TestCurrentUserService());
+        var summary = await service.AddReceiptsBatchAsync(
+            new[]
+            {
+                new ReceiptItemDto(partId, opNumber, sectionId, DateTime.SpecifyKind(new DateTime(2024, 2, 1), DateTimeKind.Unspecified), receiptQuantity, null, labelId, labelNumber, true, true),
+            });
+
+        Assert.Equal(1, summary.Saved);
+        var savedItem = Assert.Single(summary.Items);
+        Assert.Equal(labelId, savedItem.WipLabelId);
+    }
+
     [Fact]
     public async Task RevertReceiptAsync_RestoresDeletedReceipt()
     {

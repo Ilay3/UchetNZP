@@ -51,6 +51,7 @@
     const labelSearchInput = document.getElementById("receiptLabelSearchInput");
     const labelHiddenInput = document.getElementById("receiptLabelId");
     const labelMessage = document.getElementById("receiptLabelMessage");
+    const reuseWarehouseLabelButton = document.getElementById("receiptReuseWarehouseLabelButton");
     const addButton = document.getElementById("receiptAddButton");
     const bulkAddButton = document.getElementById("receiptBulkAddButton");
     const saveButton = document.getElementById("receiptSaveButton");
@@ -78,6 +79,7 @@
     let balanceRequestId = 0;
     const balanceRequests = new Map();
     let selectedLabel = null;
+    let warehouseReuseApprovedNumber = null;
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
@@ -136,7 +138,16 @@
         updateFormState();
     });
 
-    labelSearchInput?.addEventListener("input", () => updateFormState());
+    labelSearchInput?.addEventListener("input", () => {
+        const manualLabelNumber = getManualLabelNumber();
+        if (!manualLabelNumber || warehouseReuseApprovedNumber !== manualLabelNumber) {
+            warehouseReuseApprovedNumber = null;
+        }
+
+        updateFormState();
+    });
+
+    reuseWarehouseLabelButton?.addEventListener("click", () => void approveWarehouseLabelReuse());
 
     function getBalanceKey(partId, sectionId, opNumber) {
         return `${partId}:${sectionId}:${opNumber}`;
@@ -513,9 +524,14 @@
         const part = partLookup.getSelected();
         const hasPart = Boolean(part && part.id);
         const shouldEnable = hasPart;
+        const manualLabelNumber = getManualLabelNumber();
 
         if (labelSearchInput) {
             labelSearchInput.disabled = !shouldEnable;
+        }
+
+        if (reuseWarehouseLabelButton) {
+            reuseWarehouseLabelButton.disabled = !shouldEnable || !manualLabelNumber;
         }
     }
 
@@ -538,6 +554,7 @@
 
     function resetLabels() {
         setSelectedLabel(null);
+        warehouseReuseApprovedNumber = null;
 
         if (labelSearchInput) {
             labelSearchInput.value = "";
@@ -545,6 +562,56 @@
 
         updateLabelControlsState();
         hideLabelMessage();
+    }
+
+
+    async function approveWarehouseLabelReuse() {
+        const part = partLookup.getSelected();
+        if (!part || !part.id) {
+            showLabelMessage("Сначала выберите деталь.", "danger");
+            return;
+        }
+
+        const manualLabelNumber = getManualLabelNumber();
+        if (!manualLabelNumber) {
+            showLabelMessage("Введите номер ярлыка в формате 12345 или 12345/1.", "danger");
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/wip/labels/by-number?partId=${encodeURIComponent(part.id)}&number=${encodeURIComponent(manualLabelNumber)}`);
+            if (response.status === 404) {
+                showLabelMessage("Ярлык не найден. Для нового ярлыка подтверждение склада не требуется.", "info");
+                warehouseReuseApprovedNumber = null;
+                return;
+            }
+
+            if (!response.ok) {
+                throw new Error("Не удалось проверить ярлык по складу.");
+            }
+
+            const label = await response.json();
+            const isClosed = typeof label.status === "string" && label.status.toLowerCase() === "closed";
+            const isWarehouse = label.currentSectionId === "5bbce7d5-8c24-4fb6-a5a6-9487f61c7b69"
+                && (Number(label.currentOp) === 999999 || Number(label.currentOp) === 99999);
+
+            if (!isClosed || !isWarehouse) {
+                warehouseReuseApprovedNumber = null;
+                showLabelMessage("Повторное использование разрешено только для ярлыка в статусе Closed на складской операции.", "danger");
+                return;
+            }
+
+            warehouseReuseApprovedNumber = manualLabelNumber;
+            showLabelMessage(`Повторное использование ярлыка ${manualLabelNumber} подтверждено.`, "info");
+        }
+        catch (error) {
+            console.error(error);
+            warehouseReuseApprovedNumber = null;
+            showLabelMessage("Ошибка проверки ярлыка. Повторите попытку.", "danger");
+        }
+        finally {
+            updateFormState();
+        }
     }
 
     function renderCart() {
@@ -713,6 +780,7 @@
         dateInput.value = new Date().toISOString().slice(0, 10);
         selectedOperation = null;
         setSelectedLabel(null);
+        warehouseReuseApprovedNumber = null;
         if (labelSearchInput)
         {
             labelSearchInput.value = "";
@@ -737,6 +805,7 @@
         const labelId = null;
         const labelNumber = manualLabelNumber || null;
         const labelIsAssigned = Boolean(manualLabelNumber);
+        const reuseFromWarehouseLabel = Boolean(manualLabelNumber) && warehouseReuseApprovedNumber === manualLabelNumber;
 
         const item = {
             partId: part.id,
@@ -756,6 +825,7 @@
             wipLabelId: labelId,
             labelNumber,
             isAssigned: labelIsAssigned,
+            reuseFromWarehouseLabel,
         };
 
         cart.push(item);
@@ -895,6 +965,7 @@
                 wipLabelId: null,
                 labelNumber,
                 isAssigned: true,
+                reuseFromWarehouseLabel: false,
             });
         });
 
@@ -927,6 +998,7 @@
                 wipLabelId: item.wipLabelId,
                 labelNumber: item.labelNumber,
                 isAssigned: item.isAssigned,
+                reuseFromWarehouseLabel: Boolean(item.reuseFromWarehouseLabel),
             })),
         };
 
