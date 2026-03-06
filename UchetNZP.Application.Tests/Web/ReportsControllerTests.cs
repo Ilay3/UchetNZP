@@ -99,6 +99,7 @@ public class ReportsControllerTests
             new StubScrapPdfExporter(),
             new StubTransferPdfExporter(),
             new StubWipBatchPdfExporter(),
+            new StubWipBatchInventoryDocumentExporter(),
             new WipLabelLookupService(dbContext));
 
         var result = await controller.WipBatchReport(null, CancellationToken.None);
@@ -183,6 +184,7 @@ public class ReportsControllerTests
             new StubScrapPdfExporter(),
             new StubTransferPdfExporter(),
             new StubWipBatchPdfExporter(),
+            new StubWipBatchInventoryDocumentExporter(),
             new WipLabelLookupService(dbContext));
 
         var queryDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified);
@@ -245,4 +247,11 @@ public class ReportsControllerTests
         public byte[] Export(WipBatchReportFilterViewModel filter, System.Collections.Generic.IReadOnlyList<WipBatchReportItemViewModel> items, decimal totalQuantity)
             => Array.Empty<byte>();
     }
+
+    private sealed class StubWipBatchInventoryDocumentExporter : IWipBatchInventoryDocumentExporter
+    {
+        public byte[] Export(int inventoryNumber, DateTime generatedAt, DateTime composedAt, WipBatchReportViewModel model)
+            => Array.Empty<byte>();
+    }
+
 }
