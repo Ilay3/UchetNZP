@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -754,6 +755,87 @@ public class WipHistoryController : Controller
             .ConfigureAwait(false);
 
         return Ok(items);
+    }
+
+    private static string BuildExportCsv(IReadOnlyList<WipHistoryEntryViewModel> entries)
+    {
+        const char separator = ';';
+        var builder = new StringBuilder();
+        builder.AppendLine(string.Join(separator, new[]
+        {
+            "Дата/время",
+            "Тип операции",
+            "Деталь",
+            "Операция от/куда",
+            "Количество",
+            "Статус/отмена",
+            "Комментарий",
+            "Пользователь",
+        }));
+
+        foreach (var entry in entries)
+        {
+            var status = entry.IsCancelled ? "Отменено" : "Проведено";
+            var row = new[]
+            {
+                entry.OccurredAt.ToString("dd.MM.yyyy HH:mm"),
+                entry.TypeDisplayName,
+                entry.PartDisplayName,
+                BuildOperationPathForExport(entry),
+                entry.Quantity.ToString("0.###"),
+                status,
+                entry.Comment ?? string.Empty,
+                entry.UserDisplay ?? string.Empty,
+            };
+
+            builder.AppendLine(string.Join(separator, row.Select(value => EscapeCsv(value, separator))));
+        }
+
+        return builder.ToString();
+    }
+
+    private static string BuildOperationPathForExport(WipHistoryEntryViewModel entry)
+    {
+        var fromSection = string.IsNullOrWhiteSpace(entry.SectionName) ? string.Empty : entry.SectionName.Trim();
+        var toSection = string.IsNullOrWhiteSpace(entry.TargetSectionName) ? string.Empty : entry.TargetSectionName.Trim();
+        var operationPath = string.IsNullOrWhiteSpace(entry.FullOperationPath)
+            ? entry.OperationRange ?? string.Empty
+            : entry.FullOperationPath;
+
+        if (!string.IsNullOrWhiteSpace(fromSection) && !string.IsNullOrWhiteSpace(toSection))
+        {
+            return string.IsNullOrWhiteSpace(operationPath)
+                ? $"{fromSection} → {toSection}"
+                : $"{fromSection} → {toSection} ({operationPath})";
+        }
+
+        if (!string.IsNullOrWhiteSpace(fromSection))
+        {
+            return string.IsNullOrWhiteSpace(operationPath)
+                ? fromSection
+                : $"{fromSection} ({operationPath})";
+        }
+
+        if (!string.IsNullOrWhiteSpace(toSection))
+        {
+            return string.IsNullOrWhiteSpace(operationPath)
+                ? toSection
+                : $"{toSection} ({operationPath})";
+        }
+
+        return operationPath;
+    }
+
+    private static string EscapeCsv(string value, char separator)
+    {
+        if (value.Contains('"'))
+        {
+            value = value.Replace("\"", "\"\"");
+        }
+
+        return value.IndexOfAny(new[] { separator, '"', '\n', '\r' }) >= 0
+            ? string.Concat('"', value, '"')
+            : value;
     }
 
     private static bool HasActionButtons(WipHistoryEntryViewModel entry)
