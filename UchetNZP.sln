@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UchetNZP.Shared", "UchetNZP
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UchetNZP.Application.Tests", "UchetNZP.Application.Tests\UchetNZP.Application.Tests.csproj", "{AA00CCC8-D8E0-45C3-9198-4E8B9F851B25}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UchetNZP.Desktop", "UchetNZP.Desktop\UchetNZP.Desktop.csproj", "{FF8A1C0C-20E7-4463-A833-2A4BCE333B76}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{AA00CCC8-D8E0-45C3-9198-4E8B9F851B25}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AA00CCC8-D8E0-45C3-9198-4E8B9F851B25}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AA00CCC8-D8E0-45C3-9198-4E8B9F851B25}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF8A1C0C-20E7-4463-A833-2A4BCE333B76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF8A1C0C-20E7-4463-A833-2A4BCE333B76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF8A1C0C-20E7-4463-A833-2A4BCE333B76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF8A1C0C-20E7-4463-A833-2A4BCE333B76}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
