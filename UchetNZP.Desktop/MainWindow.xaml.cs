@@ -34,7 +34,7 @@ public partial class MainWindow : Window
             return fromEnv;
         }
 
-        return new Uri("http://192.168.1.200:8008/");
+        return new Uri("http://192.168.1.200:8003/");
     }
 
     private static bool ShouldAutoStartBackend(Uri homeUri)
@@ -50,7 +50,6 @@ public partial class MainWindow : Window
 
     private async void OnLoadedAsync(object sender, RoutedEventArgs e)
     {
-        StatusText.Text = "Инициализация браузера...";
         await Browser.EnsureCoreWebView2Async();
 
         Browser.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
@@ -70,18 +69,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            StatusText.Text = "Запуск backend...";
             await _backendHost.StartAsync(_cts.Token);
-            StatusText.Text = "Backend запущен.";
         }
-        catch (Exception ex)
+        catch
         {
-            StatusText.Text = "Backend не запущен. Работа через внешний URL.";
-            MessageBox.Show(
-                $"Автозапуск backend не удался: {ex.Message}\n\nОкно продолжит работу, можно открыть внешний адрес вручную.",
-                "Предупреждение",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            // внешний URL может работать без локального backend
         }
     }
 
@@ -108,13 +100,11 @@ public partial class MainWindow : Window
 
         Browser.Source = uri;
         AddressBox.Text = uri.ToString();
-        StatusText.Text = $"Переход: {uri}";
     }
 
     private void BrowserOnNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
     {
         AddressBox.Text = Browser.Source?.ToString() ?? string.Empty;
-        StatusText.Text = e.IsSuccess ? "Готово" : $"Ошибка навигации: {e.WebErrorStatus}";
         UpdateNavigationButtons();
     }
 
@@ -143,21 +133,6 @@ public partial class MainWindow : Window
     private void RefreshButton_OnClick(object sender, RoutedEventArgs e)
     {
         Browser.Reload();
-    }
-
-    private void StopButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        Browser.Stop();
-    }
-
-    private void HomeButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        Navigate(_homeUri.ToString());
-    }
-
-    private void GoButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        Navigate(AddressBox.Text);
     }
 
     private void AddressBox_OnKeyDown(object sender, KeyEventArgs e)
