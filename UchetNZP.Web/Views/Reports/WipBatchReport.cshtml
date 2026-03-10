@@ -68,6 +68,10 @@
             </div>
         </div>
         <div class="card-body">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+                <div class="text-muted small">Таблица разбита на страницы, чтобы список остатков было проще просматривать.</div>
+                <div id="batchItemsPaginationSummary" class="small text-muted"></div>
+            </div>
             <div class="table-responsive">
                 <table class="table table-striped align-middle" aria-describedby="batchReportCaption">
                     <caption id="batchReportCaption" class="visually-hidden">Отчёт по остаткам партий НЗП</caption>
@@ -81,7 +85,7 @@
                             <th scope="col">Дата партии</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="batchItemsTableBody">
                         @foreach (var item in Model.Items)
                         {
                             <tr>
@@ -102,6 +106,7 @@
                     </tbody>
                 </table>
             </div>
+            <nav id="batchItemsPagination" aria-label="Постраничная навигация по остаткам партий"></nav>
         </div>
     </div>
 }
@@ -121,6 +126,10 @@ else
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-light fw-semibold">Список сформированных документов</div>
     <div class="card-body">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+            <div class="text-muted small">Документы показаны частями, чтобы страница оставалась компактной.</div>
+            <div id="batchDocumentsPaginationSummary" class="small text-muted"></div>
+        </div>
         @if (Model.Documents.Count == 0)
         {
             <div class="text-muted">Документы ещё не формировались.</div>
@@ -139,7 +148,7 @@ else
                             <th scope="col"></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="batchDocumentsTableBody">
                         @foreach (var doc in Model.Documents)
                         {
                             <tr>
@@ -158,6 +167,81 @@ else
                     </tbody>
                 </table>
             </div>
+            <nav id="batchDocumentsPagination" aria-label="Постраничная навигация по сформированным документам"></nav>
         }
     </div>
 </div>
+
+<script>
+    (function () {
+        function setupPagination(tableBodyId, pagerId, summaryId, pageSize) {
+            const tableBody = document.getElementById(tableBodyId);
+            const pager = document.getElementById(pagerId);
+            const summary = document.getElementById(summaryId);
+            if (!tableBody || !pager) {
+                return;
+            }
+
+            const rows = Array.from(tableBody.querySelectorAll("tr"));
+            const totalRows = rows.length;
+            if (totalRows <= pageSize) {
+                if (summary) {
+                    summary.textContent = totalRows > 0
+                        ? `Показаны все записи: ${totalRows}`
+                        : "";
+                }
+                pager.innerHTML = "";
+                return;
+            }
+
+            const totalPages = Math.ceil(totalRows / pageSize);
+            let currentPage = 1;
+
+            function render() {
+                const start = (currentPage - 1) * pageSize;
+                const end = start + pageSize;
+
+                rows.forEach((row, index) => {
+                    row.style.display = index >= start && index < end ? "" : "none";
+                });
+
+                if (summary) {
+                    summary.textContent = `Показано ${Math.min(end, totalRows)} из ${totalRows}`;
+                }
+
+                const prevDisabled = currentPage === 1 ? " disabled" : "";
+                const nextDisabled = currentPage === totalPages ? " disabled" : "";
+                pager.innerHTML = `
+                    <ul class="pagination pagination-sm flex-wrap mb-0">
+                        <li class="page-item${prevDisabled}">
+                            <button type="button" class="page-link" data-page="${currentPage - 1}">Назад</button>
+                        </li>
+                        <li class="page-item disabled"><span class="page-link">${currentPage} / ${totalPages}</span></li>
+                        <li class="page-item${nextDisabled}">
+                            <button type="button" class="page-link" data-page="${currentPage + 1}">Вперёд</button>
+                        </li>
+                    </ul>`;
+            }
+
+            pager.addEventListener("click", function (event) {
+                const target = event.target;
+                if (!(target instanceof HTMLButtonElement)) {
+                    return;
+                }
+
+                const page = Number(target.dataset.page);
+                if (!Number.isFinite(page) || page < 1 || page > totalPages) {
+                    return;
+                }
+
+                currentPage = page;
+                render();
+            });
+
+            render();
+        }
+
+        setupPagination("batchItemsTableBody", "batchItemsPagination", "batchItemsPaginationSummary", 20);
+        setupPagination("batchDocumentsTableBody", "batchDocumentsPagination", "batchDocumentsPaginationSummary", 10);
+    })();
+</script>
