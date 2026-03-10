@@ -421,3 +421,28 @@ table {
     white-space: normal;
     color: #334155;
 }
+
+.app-loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(1px);
+  z-index: 2000;
+}
+
+.app-loading-overlay__content {
+  min-width: 10rem;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-md);
+  background-color: rgba(17, 24, 39, 0.9);
+  color: #fff;
+  text-align: center;
+  font-weight: 600;
+}
+
+.app-loading-overlay[aria-hidden="true"] {
+  pointer-events: none;
+}
