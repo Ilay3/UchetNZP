@@ -236,6 +236,101 @@
 
     globalNamespace.setButtonLoading = setButtonLoading;
 
+    const globalLoadingOverlay = document.getElementById("appGlobalLoadingOverlay");
+    let globalLoadingCounter = 0;
+
+    function syncGlobalLoadingState() {
+        if (!globalLoadingOverlay) {
+            return;
+        }
+
+        const isLoading = globalLoadingCounter > 0;
+        globalLoadingOverlay.classList.toggle("d-none", !isLoading);
+        globalLoadingOverlay.setAttribute("aria-hidden", isLoading ? "false" : "true");
+    }
+
+    function beginGlobalLoading() {
+        globalLoadingCounter += 1;
+        syncGlobalLoadingState();
+    }
+
+    function endGlobalLoading() {
+        globalLoadingCounter = Math.max(0, globalLoadingCounter - 1);
+        syncGlobalLoadingState();
+    }
+
+    function shouldTrackRequest(input) {
+        if (typeof input !== "string") {
+            return true;
+        }
+
+        return !input.includes("/internal/health");
+    }
+
+    function installGlobalLoadingTracking() {
+        if (globalNamespace.globalLoadingInstalled) {
+            return;
+        }
+
+        globalNamespace.globalLoadingInstalled = true;
+
+        if (typeof window.fetch === "function") {
+            const nativeFetch = window.fetch.bind(window);
+            window.fetch = function (...args) {
+                if (!shouldTrackRequest(args[0])) {
+                    return nativeFetch(...args);
+                }
+
+                beginGlobalLoading();
+                return nativeFetch(...args)
+                    .finally(() => {
+                        endGlobalLoading();
+                    });
+            };
+        }
+
+        if (typeof window.XMLHttpRequest === "function") {
+            const originalOpen = window.XMLHttpRequest.prototype.open;
+            const originalSend = window.XMLHttpRequest.prototype.send;
+
+            window.XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+                this.__uchetTrackLoading = shouldTrackRequest(url);
+                return originalOpen.call(this, method, url, ...rest);
+            };
+
+            window.XMLHttpRequest.prototype.send = function (...args) {
+                if (!this.__uchetTrackLoading) {
+                    return originalSend.apply(this, args);
+                }
+
+                beginGlobalLoading();
+                this.addEventListener("loadend", () => endGlobalLoading(), { once: true });
+                return originalSend.apply(this, args);
+            };
+        }
+
+        document.addEventListener("submit", event => {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            if (form.dataset.noGlobalLoading === "true") {
+                return;
+            }
+
+            beginGlobalLoading();
+        });
+
+        window.addEventListener("pageshow", () => {
+            globalLoadingCounter = 0;
+            syncGlobalLoadingState();
+        });
+    }
+
+    globalNamespace.beginGlobalLoading = beginGlobalLoading;
+    globalNamespace.endGlobalLoading = endGlobalLoading;
+
     const confirmModalElement = document.getElementById("appConfirmModal");
     const confirmMessageElement = document.getElementById("appConfirmModalMessage");
     const confirmEntityElement = document.getElementById("appConfirmModalEntity");
@@ -316,6 +411,7 @@
     });
 
     document.addEventListener("DOMContentLoaded", () => {
+        installGlobalLoadingTracking();
         disableModalBackdrops();
         cleanupModalBackdrops();
         watchModalBackdrops();
