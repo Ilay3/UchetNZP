@@ -12,6 +12,7 @@ using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Shared;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -20,11 +21,16 @@ public class WipHistoryController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly IWipService? _wipService;
+    private readonly IWipHistoryExcelExporter _wipHistoryExcelExporter;
 
-    public WipHistoryController(AppDbContext dbContext, IWipService? wipService = null)
+    public WipHistoryController(
+        AppDbContext dbContext,
+        IWipService? wipService = null,
+        IWipHistoryExcelExporter? wipHistoryExcelExporter = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _wipService = wipService;
+        _wipHistoryExcelExporter = wipHistoryExcelExporter ?? new WipHistoryExcelExporter();
     }
 
     [HttpGet("")]
@@ -44,10 +50,9 @@ public class WipHistoryController : Controller
             .ThenBy(entry => entry.PartDisplayName, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
-        var csv = BuildExportCsv(entries);
-        var fileName = $"wip-history-{model.Filter.From:yyyyMMdd}-{model.Filter.To:yyyyMMdd}.csv";
-        var csvBytes = new UTF8Encoding(true).GetBytes(csv);
-        return File(csvBytes, "text/csv; charset=utf-8", fileName);
+        var content = _wipHistoryExcelExporter.Export(entries);
+        var fileName = $"wip-history-{model.Filter.From:yyyyMMdd}-{model.Filter.To:yyyyMMdd}.xlsx";
+        return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
     private async Task<WipHistoryViewModel> BuildHistoryViewModelAsync(WipHistoryQuery? query, CancellationToken cancellationToken)

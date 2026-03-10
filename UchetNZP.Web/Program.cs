@@ -53,6 +53,7 @@ builder.Services.AddSingleton<IScrapReportPdfExporter, ScrapReportPdfExporter>()
 builder.Services.AddSingleton<ITransferPeriodReportPdfExporter, TransferPeriodReportPdfExporter>();
 builder.Services.AddSingleton<IWipBatchReportPdfExporter, WipBatchReportPdfExporter>();
 builder.Services.AddSingleton<IWipBatchInventoryDocumentExporter, WipBatchInventoryDocumentExporter>();
+builder.Services.AddSingleton<IWipHistoryExcelExporter, WipHistoryExcelExporter>();
 builder.Services.AddHostedService<WarehouseDailyResetService>();
 
 var app = builder.Build();
