@@ -55,6 +55,7 @@
                 </div>
                 <div class="d-flex gap-2">
                     <form method="post"
+                          data-blocking-loader
                           asp-action="WipBatchInventoryDocumentCreate"
                           asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
                           asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
@@ -159,6 +160,7 @@ else
                                 <td>@doc.TotalQuantity.ToString("0.###")</td>
                                 <td>
                                     <a class="btn btn-sm btn-outline-primary"
+                                       data-blocking-loader
                                        asp-action="WipBatchInventoryDocumentDownload"
                                        asp-route-id='@doc.Id'>Скачать</a>
                                 </td>

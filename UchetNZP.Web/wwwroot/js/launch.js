@@ -774,6 +774,8 @@
             exportButton.disabled = true;
         }
 
+        namespace.showBlockingLoader?.();
+
         try {
             const response = await fetch("/wip/launch/export-cart", {
                 method: "POST",
@@ -809,6 +811,7 @@
             alert(message);
         }
         finally {
+            namespace.hideBlockingLoader?.();
             if (exportButton) {
                 exportButton.disabled = cart.length === 0;
             }

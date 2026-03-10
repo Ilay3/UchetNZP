@@ -236,6 +236,99 @@
 
     globalNamespace.setButtonLoading = setButtonLoading;
 
+    let blockingLoaderElement = null;
+    let blockingLoaderCounter = 0;
+
+    function ensureBlockingLoaderElement() {
+        if (blockingLoaderElement) {
+            return blockingLoaderElement;
+        }
+
+        const overlay = document.createElement("div");
+        overlay.className = "app-loading-overlay d-none";
+        overlay.setAttribute("role", "status");
+        overlay.setAttribute("aria-live", "polite");
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.innerHTML = `
+            <div class="app-loading-overlay__content">
+                <div class="spinner-border text-light" role="presentation" aria-hidden="true"></div>
+                <div class="mt-2">Загрузка...</div>
+            </div>`;
+
+        document.body.appendChild(overlay);
+        blockingLoaderElement = overlay;
+        return blockingLoaderElement;
+    }
+
+    function syncBlockingLoaderState() {
+        const overlay = ensureBlockingLoaderElement();
+        const isVisible = blockingLoaderCounter > 0;
+        overlay.classList.toggle("d-none", !isVisible);
+        overlay.setAttribute("aria-hidden", isVisible ? "false" : "true");
+    }
+
+    function showBlockingLoader() {
+        blockingLoaderCounter += 1;
+        syncBlockingLoaderState();
+    }
+
+    function hideBlockingLoader() {
+        blockingLoaderCounter = Math.max(0, blockingLoaderCounter - 1);
+        syncBlockingLoaderState();
+    }
+
+    function resolveLinkLoaderTimeoutMs(link) {
+        const raw = link?.dataset?.blockingLoaderTimeoutMs;
+        const parsed = Number(raw);
+        if (Number.isFinite(parsed) && parsed >= 0) {
+            return parsed;
+        }
+
+        return 8000;
+    }
+
+    function installBlockingLoaderHandlers() {
+        document.addEventListener("click", event => {
+            const link = event.target.closest("a[data-blocking-loader]");
+            if (!link) {
+                return;
+            }
+
+            showBlockingLoader();
+            const timeoutMs = resolveLinkLoaderTimeoutMs(link);
+            if (timeoutMs > 0) {
+                window.setTimeout(() => {
+                    hideBlockingLoader();
+                }, timeoutMs);
+            }
+        });
+
+        document.addEventListener("submit", event => {
+            const form = event.target;
+            if (!(form instanceof HTMLFormElement)) {
+                return;
+            }
+
+            const submitter = event.submitter;
+            const shouldShow = form.hasAttribute("data-blocking-loader")
+                || (submitter instanceof HTMLElement && submitter.hasAttribute("data-blocking-loader"));
+
+            if (!shouldShow) {
+                return;
+            }
+
+            showBlockingLoader();
+        });
+
+        window.addEventListener("pageshow", () => {
+            blockingLoaderCounter = 0;
+            syncBlockingLoaderState();
+        });
+    }
+
+    globalNamespace.showBlockingLoader = showBlockingLoader;
+    globalNamespace.hideBlockingLoader = hideBlockingLoader;
+
     const confirmModalElement = document.getElementById("appConfirmModal");
     const confirmMessageElement = document.getElementById("appConfirmModalMessage");
     const confirmEntityElement = document.getElementById("appConfirmModalEntity");
@@ -316,6 +409,7 @@
     });
 
     document.addEventListener("DOMContentLoaded", () => {
+        installBlockingLoaderHandlers();
         disableModalBackdrops();
         cleanupModalBackdrops();
         watchModalBackdrops();

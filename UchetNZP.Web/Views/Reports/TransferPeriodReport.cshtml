@@ -48,8 +48,8 @@
                     <span>Дней в периоде: @Model.Dates.Count</span>
                 </div>
                 <div class="d-flex gap-2">
-                    <a class="btn btn-success" asp-controller="Reports" asp-action="TransferPeriodReportExport" asp-route-from="@Model.Filter.From.ToString("yyyy-MM-dd")" asp-route-to="@Model.Filter.To.ToString("yyyy-MM-dd")" asp-route-part="@Model.Filter.Part" asp-route-section="@Model.Filter.Section">Экспорт в Excel</a>
-                    <a class="btn btn-outline-success" asp-controller="Reports" asp-action="TransferPeriodReportExportPdf" asp-route-from="@Model.Filter.From.ToString("yyyy-MM-dd")" asp-route-to="@Model.Filter.To.ToString("yyyy-MM-dd")" asp-route-part="@Model.Filter.Part" asp-route-section="@Model.Filter.Section">Экспорт в PDF</a>
+                    <a class="btn btn-success" data-blocking-loader asp-controller="Reports" asp-action="TransferPeriodReportExport" asp-route-from="@Model.Filter.From.ToString("yyyy-MM-dd")" asp-route-to="@Model.Filter.To.ToString("yyyy-MM-dd")" asp-route-part="@Model.Filter.Part" asp-route-section="@Model.Filter.Section">Экспорт в Excel</a>
+                    <a class="btn btn-outline-success" data-blocking-loader asp-controller="Reports" asp-action="TransferPeriodReportExportPdf" asp-route-from="@Model.Filter.From.ToString("yyyy-MM-dd")" asp-route-to="@Model.Filter.To.ToString("yyyy-MM-dd")" asp-route-part="@Model.Filter.Part" asp-route-section="@Model.Filter.Section">Экспорт в PDF</a>
                 </div>
             </div>
         </div>
