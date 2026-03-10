@@ -146,7 +146,8 @@ public class WipHistoryEntryViewModel
         bool isReverted,
         Guid? versionId,
         Guid? auditId,
-        string? splitEventText)
+        string? splitEventText,
+        string? userDisplay)
     {
         Id = id;
         Type = type;
@@ -168,6 +169,7 @@ public class WipHistoryEntryViewModel
         VersionId = versionId;
         AuditId = auditId;
         SplitEventText = splitEventText;
+        UserDisplay = userDisplay;
     }
 
     public Guid Id { get; }
@@ -209,6 +211,8 @@ public class WipHistoryEntryViewModel
     public Guid? AuditId { get; }
 
     public string? SplitEventText { get; }
+
+    public string? UserDisplay { get; }
 
     public bool CanDeleteReceipt { get; set; } = true;
 

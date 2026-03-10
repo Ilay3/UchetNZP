@@ -11,6 +11,7 @@ using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Shared;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -19,15 +20,41 @@ public class WipHistoryController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly IWipService? _wipService;
+    private readonly IWipHistoryExcelExporter _wipHistoryExcelExporter;
 
-    public WipHistoryController(AppDbContext dbContext, IWipService? wipService = null)
+    public WipHistoryController(
+        AppDbContext dbContext,
+        IWipService? wipService = null,
+        IWipHistoryExcelExporter? wipHistoryExcelExporter = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _wipService = wipService;
+        _wipHistoryExcelExporter = wipHistoryExcelExporter ?? new WipHistoryExcelExporter();
     }
 
     [HttpGet("")]
     public async Task<IActionResult> Index([FromQuery] WipHistoryQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await BuildHistoryViewModelAsync(query, cancellationToken).ConfigureAwait(false);
+        return View("~/Views/Wip/History.cshtml", model);
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export([FromQuery] WipHistoryQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await BuildHistoryViewModelAsync(query, cancellationToken).ConfigureAwait(false);
+        var entries = model.Groups
+            .SelectMany(group => group.Entries)
+            .OrderBy(entry => entry.OccurredAt)
+            .ThenBy(entry => entry.PartDisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        var content = _wipHistoryExcelExporter.Export(entries);
+        var fileName = $"wip-history-{model.Filter.From:yyyyMMdd}-{model.Filter.To:yyyyMMdd}.xlsx";
+        return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    private async Task<WipHistoryViewModel> BuildHistoryViewModelAsync(WipHistoryQuery? query, CancellationToken cancellationToken)
     {
         var now = DateTime.Now.Date;
         var defaultFrom = now.AddDays(-13);
@@ -163,7 +190,8 @@ public class WipHistoryController : Controller
                     false,
                     null,
                     null,
-                    null);
+                    null,
+                    launch.UserId.ToString());
 
                 entries.Add(entry);
             }
@@ -340,7 +368,8 @@ public class WipHistoryController : Controller
                     false,
                     latestVersionId,
                     null,
-                    null);
+                    null,
+                    receipt.UserId.ToString());
 
                 entry.CanDeleteReceipt = canDeleteReceipt;
                 entries.Add(entry);
@@ -406,7 +435,8 @@ public class WipHistoryController : Controller
                     x.ScrapType,
                     x.ScrapQuantity,
                     x.ScrapComment,
-                    x.IsReverted
+                    x.IsReverted,
+                    x.UserId
                 })
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -533,7 +563,8 @@ public class WipHistoryController : Controller
                     transfer.IsReverted,
                     null,
                     transfer.Id,
-                    null);
+                    null,
+                    transfer.UserId.ToString());
 
                 entries.Add(entry);
             }
@@ -593,7 +624,8 @@ public class WipHistoryController : Controller
                     false,
                     null,
                     null,
-                    null);
+                    null,
+                    transfer.UserId.ToString());
 
                 entries.Add(entry);
             }
@@ -675,8 +707,7 @@ public class WipHistoryController : Controller
         };
 
         var model = new WipHistoryViewModel(filter, grouped);
-
-        return View("~/Views/Wip/History.cshtml", model);
+        return model;
     }
 
     [HttpGet("parts")]
