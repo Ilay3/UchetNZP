@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -28,6 +29,27 @@ public class WipHistoryController : Controller
 
     [HttpGet("")]
     public async Task<IActionResult> Index([FromQuery] WipHistoryQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await BuildHistoryViewModelAsync(query, cancellationToken).ConfigureAwait(false);
+        return View("~/Views/Wip/History.cshtml", model);
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export([FromQuery] WipHistoryQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await BuildHistoryViewModelAsync(query, cancellationToken).ConfigureAwait(false);
+        var entries = model.Groups
+            .SelectMany(group => group.Entries)
+            .OrderBy(entry => entry.OccurredAt)
+            .ThenBy(entry => entry.PartDisplayName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        var csv = BuildExportCsv(entries);
+        var fileName = $"wip-history-{model.Filter.From:yyyyMMdd}-{model.Filter.To:yyyyMMdd}.csv";
+        return File(Encoding.UTF8.GetBytes(csv), "text/csv; charset=utf-8", fileName);
+    }
+
+    private async Task<WipHistoryViewModel> BuildHistoryViewModelAsync(WipHistoryQuery? query, CancellationToken cancellationToken)
     {
         var now = DateTime.Now.Date;
         var defaultFrom = now.AddDays(-13);
@@ -163,7 +185,8 @@ public class WipHistoryController : Controller
                     false,
                     null,
                     null,
-                    null);
+                    null,
+                    launch.UserId.ToString());
 
                 entries.Add(entry);
             }
@@ -340,7 +363,8 @@ public class WipHistoryController : Controller
                     false,
                     latestVersionId,
                     null,
-                    null);
+                    null,
+                    receipt.UserId.ToString());
 
                 entry.CanDeleteReceipt = canDeleteReceipt;
                 entries.Add(entry);
@@ -406,7 +430,8 @@ public class WipHistoryController : Controller
                     x.ScrapType,
                     x.ScrapQuantity,
                     x.ScrapComment,
-                    x.IsReverted
+                    x.IsReverted,
+                    x.UserId
                 })
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -533,7 +558,8 @@ public class WipHistoryController : Controller
                     transfer.IsReverted,
                     null,
                     transfer.Id,
-                    null);
+                    null,
+                    transfer.UserId.ToString());
 
                 entries.Add(entry);
             }
@@ -593,7 +619,8 @@ public class WipHistoryController : Controller
                     false,
                     null,
                     null,
-                    null);
+                    null,
+                    transfer.UserId.ToString());
 
                 entries.Add(entry);
             }
@@ -675,8 +702,7 @@ public class WipHistoryController : Controller
         };
 
         var model = new WipHistoryViewModel(filter, grouped);
-
-        return View("~/Views/Wip/History.cshtml", model);
+        return model;
     }
 
     [HttpGet("parts")]
@@ -725,6 +751,43 @@ public class WipHistoryController : Controller
         return Ok(items);
     }
 
+    private static string BuildExportCsv(IReadOnlyList<WipHistoryEntryViewModel> entries)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("Дата/время,Тип операции,Деталь,Операция от/куда,Количество,Статус/отмена,Комментарий,Пользователь");
+
+        foreach (var entry in entries)
+        {
+            var status = entry.IsCancelled ? "Отменено" : "Проведено";
+            var row = new[]
+            {
+                entry.OccurredAt.ToString("dd.MM.yyyy HH:mm"),
+                entry.TypeDisplayName,
+                entry.PartDisplayName,
+                entry.OperationRange ?? string.Empty,
+                entry.Quantity.ToString("0.###"),
+                status,
+                entry.Comment ?? string.Empty,
+                entry.UserDisplay ?? string.Empty,
+            };
+
+            builder.AppendLine(string.Join(',', row.Select(EscapeCsv)));
+        }
+
+        return builder.ToString();
+    }
+
+    private static string EscapeCsv(string value)
+    {
+        if (value.Contains('\"'))
+        {
+            value = value.Replace("\"", "\"\"");
+        }
+
+        return value.IndexOfAny(new[] { ',', '\"', '\n', '\r' }) >= 0
+            ? string.Concat('\"', value, '\"')
+            : value;
+    }
     private static bool HasActionButtons(WipHistoryEntryViewModel entry)
     {
         return entry.Type == WipHistoryEntryType.Receipt ||
