@@ -342,6 +342,7 @@
         formData.append("file", fileInput.files[0]);
 
         importButton.disabled = true;
+        namespace.showBlockingLoader?.();
         importSummaryContainer.innerHTML = "Загрузка файла...";
 
         try {
@@ -362,6 +363,7 @@
             importSummaryContainer.innerHTML = "<div class=\"alert alert-danger\">Не удалось выполнить импорт. Попробуйте ещё раз.</div>";
         }
         finally {
+            namespace.hideBlockingLoader?.();
             importButton.disabled = false;
         }
     }

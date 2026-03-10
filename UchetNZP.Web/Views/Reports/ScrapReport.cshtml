@@ -61,6 +61,7 @@
 
 <div class="d-flex justify-content-end gap-2 mb-4">
     <a class="btn btn-secondary btn-lg"
+       data-blocking-loader
        asp-action="ScrapReportExport"
        asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
        asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
@@ -68,6 +69,7 @@
        asp-route-scrapType='@Model.Filter.ScrapType'
        asp-route-employee='@Model.Filter.Employee'>Экспорт в Excel</a>
     <a class="btn btn-outline-secondary btn-lg"
+       data-blocking-loader
        asp-action="ScrapReportExportPdf"
        asp-route-from='@Model.Filter.From.ToString("yyyy-MM-dd")'
        asp-route-to='@Model.Filter.To.ToString("yyyy-MM-dd")'
