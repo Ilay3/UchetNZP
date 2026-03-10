@@ -236,78 +236,56 @@
 
     globalNamespace.setButtonLoading = setButtonLoading;
 
-    const globalLoadingOverlay = document.getElementById("appGlobalLoadingOverlay");
-    let globalLoadingCounter = 0;
+    let blockingLoaderElement = null;
+    let blockingLoaderCounter = 0;
 
-    function syncGlobalLoadingState() {
-        if (!globalLoadingOverlay) {
-            return;
+    function ensureBlockingLoaderElement() {
+        if (blockingLoaderElement) {
+            return blockingLoaderElement;
         }
 
-        const isLoading = globalLoadingCounter > 0;
-        globalLoadingOverlay.classList.toggle("d-none", !isLoading);
-        globalLoadingOverlay.setAttribute("aria-hidden", isLoading ? "false" : "true");
+        const overlay = document.createElement("div");
+        overlay.className = "app-loading-overlay d-none";
+        overlay.setAttribute("role", "status");
+        overlay.setAttribute("aria-live", "polite");
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.innerHTML = `
+            <div class="app-loading-overlay__content">
+                <div class="spinner-border text-light" role="presentation" aria-hidden="true"></div>
+                <div class="mt-2">Загрузка...</div>
+            </div>`;
+
+        document.body.appendChild(overlay);
+        blockingLoaderElement = overlay;
+        return blockingLoaderElement;
     }
 
-    function beginGlobalLoading() {
-        globalLoadingCounter += 1;
-        syncGlobalLoadingState();
+    function syncBlockingLoaderState() {
+        const overlay = ensureBlockingLoaderElement();
+        const isVisible = blockingLoaderCounter > 0;
+        overlay.classList.toggle("d-none", !isVisible);
+        overlay.setAttribute("aria-hidden", isVisible ? "false" : "true");
     }
 
-    function endGlobalLoading() {
-        globalLoadingCounter = Math.max(0, globalLoadingCounter - 1);
-        syncGlobalLoadingState();
+    function showBlockingLoader() {
+        blockingLoaderCounter += 1;
+        syncBlockingLoaderState();
     }
 
-    function shouldTrackRequest(input) {
-        if (typeof input !== "string") {
-            return true;
-        }
-
-        return !input.includes("/internal/health");
+    function hideBlockingLoader() {
+        blockingLoaderCounter = Math.max(0, blockingLoaderCounter - 1);
+        syncBlockingLoaderState();
     }
 
-    function installGlobalLoadingTracking() {
-        if (globalNamespace.globalLoadingInstalled) {
-            return;
-        }
+    function installBlockingLoaderHandlers() {
+        document.addEventListener("click", event => {
+            const link = event.target.closest("a[data-blocking-loader]");
+            if (!link) {
+                return;
+            }
 
-        globalNamespace.globalLoadingInstalled = true;
-
-        if (typeof window.fetch === "function") {
-            const nativeFetch = window.fetch.bind(window);
-            window.fetch = function (...args) {
-                if (!shouldTrackRequest(args[0])) {
-                    return nativeFetch(...args);
-                }
-
-                beginGlobalLoading();
-                return nativeFetch(...args)
-                    .finally(() => {
-                        endGlobalLoading();
-                    });
-            };
-        }
-
-        if (typeof window.XMLHttpRequest === "function") {
-            const originalOpen = window.XMLHttpRequest.prototype.open;
-            const originalSend = window.XMLHttpRequest.prototype.send;
-
-            window.XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-                this.__uchetTrackLoading = shouldTrackRequest(url);
-                return originalOpen.call(this, method, url, ...rest);
-            };
-
-            window.XMLHttpRequest.prototype.send = function (...args) {
-                if (!this.__uchetTrackLoading) {
-                    return originalSend.apply(this, args);
-                }
-
-                beginGlobalLoading();
-                this.addEventListener("loadend", () => endGlobalLoading(), { once: true });
-                return originalSend.apply(this, args);
-            };
-        }
+            showBlockingLoader();
+        });
 
         document.addEventListener("submit", event => {
             const form = event.target;
@@ -315,21 +293,25 @@
                 return;
             }
 
-            if (form.dataset.noGlobalLoading === "true") {
+            const submitter = event.submitter;
+            const shouldShow = form.hasAttribute("data-blocking-loader")
+                || (submitter instanceof HTMLElement && submitter.hasAttribute("data-blocking-loader"));
+
+            if (!shouldShow) {
                 return;
             }
 
-            beginGlobalLoading();
+            showBlockingLoader();
         });
 
         window.addEventListener("pageshow", () => {
-            globalLoadingCounter = 0;
-            syncGlobalLoadingState();
+            blockingLoaderCounter = 0;
+            syncBlockingLoaderState();
         });
     }
 
-    globalNamespace.beginGlobalLoading = beginGlobalLoading;
-    globalNamespace.endGlobalLoading = endGlobalLoading;
+    globalNamespace.showBlockingLoader = showBlockingLoader;
+    globalNamespace.hideBlockingLoader = hideBlockingLoader;
 
     const confirmModalElement = document.getElementById("appConfirmModal");
     const confirmMessageElement = document.getElementById("appConfirmModalMessage");
@@ -411,7 +393,7 @@
     });
 
     document.addEventListener("DOMContentLoaded", () => {
-        installGlobalLoadingTracking();
+        installBlockingLoaderHandlers();
         disableModalBackdrops();
         cleanupModalBackdrops();
         watchModalBackdrops();
