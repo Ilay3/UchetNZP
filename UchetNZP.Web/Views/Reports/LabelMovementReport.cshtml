@@ -1,3 +1,4 @@
+@using UchetNZP.Shared
 @model UchetNZP.Web.Models.LabelMovementReportViewModel
 @{
     ViewData["Title"] = "Движение ярлыка";
@@ -56,7 +57,7 @@
     <div class="card shadow-sm mb-4">
         <div class="card-header bg-light fw-semibold d-flex flex-column flex-md-row justify-content-between gap-2">
             <span>Ярлык: @Model.Filter.LabelNumber</span>
-            <span class="text-muted small">Деталь: @Model.Filter.PartName @(string.IsNullOrWhiteSpace(Model.Filter.PartCode) ? string.Empty : $"({Model.Filter.PartCode})")</span>
+            <span class="text-muted small">Деталь: @NameWithCodeFormatter.getNameWithCode(Model.Filter.PartName, Model.Filter.PartCode)</span>
         </div>
         <div class="card-body">
             <div class="row g-3 mb-3">

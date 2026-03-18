@@ -3,6 +3,7 @@ using System.Linq;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using UchetNZP.Shared;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Services;
@@ -144,9 +145,9 @@ public class WipBatchInventoryDocumentExporter : IWipBatchInventoryDocumentExpor
 
     private static string BuildPartText(WipBatchReportItemViewModel item)
     {
-        if (string.IsNullOrWhiteSpace(item.PartCode))
+        if (!NameWithCodeFormatter.HasDistinctCode(item.PartName, item.PartCode))
         {
-            return item.PartName;
+            return NameWithCodeFormatter.getNameWithCode(item.PartName, item.PartCode);
         }
 
         return $"{item.PartName}\n{item.PartCode}";

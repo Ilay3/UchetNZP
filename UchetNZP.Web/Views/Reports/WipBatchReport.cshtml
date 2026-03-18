@@ -91,7 +91,7 @@
                             <tr>
                                 <td>
                                     <div class="fw-semibold">@item.PartName</div>
-                                    @if (!string.IsNullOrWhiteSpace(item.PartCode) && !string.Equals(item.PartCode?.Trim(), item.PartName?.Trim(), StringComparison.OrdinalIgnoreCase))
+                                    @if (NameWithCodeFormatter.HasDistinctCode(item.PartName, item.PartCode))
                                     {
                                         <div class="text-muted small">@item.PartCode</div>
                                     }
