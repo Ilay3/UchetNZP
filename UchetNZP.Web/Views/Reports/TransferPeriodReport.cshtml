@@ -1,3 +1,4 @@
+@using UchetNZP.Shared
 @using System.Text.Encodings.Web
 @model UchetNZP.Web.Models.TransferPeriodReportViewModel
 @{
@@ -72,7 +73,7 @@
                             <tr>
                                 <th scope="row" class="w-25">
                                     <div class="fw-semibold">@item.PartName</div>
-                                    @if (!string.IsNullOrWhiteSpace(item.PartCode))
+                                    @if (NameWithCodeFormatter.HasDistinctCode(item.PartName, item.PartCode))
                                     {
                                         <div class="text-muted small">@item.PartCode</div>
                                     }

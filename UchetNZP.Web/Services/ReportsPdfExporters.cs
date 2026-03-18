@@ -5,6 +5,7 @@ using System.Linq;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using UchetNZP.Shared;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Services;
@@ -121,7 +122,7 @@ public class TransferPeriodReportPdfExporter : ITransferPeriodReportPdfExporter
                     {
                         column.Item().PaddingTop(8).Border(1).Padding(6).Column(partColumn =>
                         {
-                            partColumn.Item().Text($"{item.PartName} {(string.IsNullOrWhiteSpace(item.PartCode) ? string.Empty : $"({item.PartCode})")}").Bold();
+                            partColumn.Item().Text(NameWithCodeFormatter.getNameWithCode(item.PartName, item.PartCode)).Bold();
                             foreach (var date in dates)
                             {
                                 if (!item.Cells.TryGetValue(date, out var cells) || cells.Count == 0)
