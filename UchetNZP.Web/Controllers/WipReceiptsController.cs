@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Wip;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
 using UchetNZP.Shared;
 
@@ -35,13 +36,7 @@ public class WipReceiptsController : Controller
     {
         var query = _dbContext.Sections.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            query = query.Where(x =>
-                x.Name.ToLower().Contains(term) ||
-                (x.Code != null && x.Code.ToLower().Contains(term)));
-        }
+        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code);
 
         var items = await query
             .OrderBy(x => x.Name)
@@ -58,13 +53,7 @@ public class WipReceiptsController : Controller
     {
         var query = _dbContext.Parts.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            query = query.Where(x =>
-                x.Name.ToLower().Contains(term) ||
-                (x.Code != null && x.Code.ToLower().Contains(term)));
-        }
+        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code);
 
         var items = await query
             .OrderBy(x => x.Name)

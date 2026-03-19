@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
 using UchetNZP.Web.Services;
 using UchetNZP.Shared;
@@ -62,23 +63,15 @@ public class ReportsController : Controller
             .AsNoTracking()
             .Where(x => x.ReceiptDate >= fromUtc && x.ReceiptDate < toUtcExclusive);
 
-        if (!string.IsNullOrWhiteSpace(query?.Section))
-        {
-            var term = query.Section.Trim().ToLowerInvariant();
-            receiptsQuery = receiptsQuery.Where(x =>
-                x.Section != null &&
-                (x.Section.Name.ToLower().Contains(term) ||
-                 (x.Section.Code != null && x.Section.Code.ToLower().Contains(term))));
-        }
+        receiptsQuery = receiptsQuery.WhereMatchesLookup(
+            query?.Section,
+            x => x.Section != null ? x.Section.Name : null,
+            x => x.Section != null ? x.Section.Code : null);
 
-        if (!string.IsNullOrWhiteSpace(query?.Part))
-        {
-            var term = query.Part.Trim().ToLowerInvariant();
-            receiptsQuery = receiptsQuery.Where(x =>
-                x.Part != null &&
-                (x.Part.Name.ToLower().Contains(term) ||
-                 (x.Part.Code != null && x.Part.Code.ToLower().Contains(term))));
-        }
+        receiptsQuery = receiptsQuery.WhereMatchesLookup(
+            query?.Part,
+            x => x.Part != null ? x.Part.Name : null,
+            x => x.Part != null ? x.Part.Code : null);
 
         if (query?.MinQuantity is decimal minQuantity)
         {
@@ -211,21 +204,68 @@ public class ReportsController : Controller
 
         if (!string.IsNullOrWhiteSpace(in_query?.Part))
         {
-            var partTerm = in_query.Part.Trim().ToLowerInvariant();
-            transfersQuery = transfersQuery.Where(x =>
-                x.Part != null &&
-                (x.Part.Name.ToLower().Contains(partTerm) ||
-                 (x.Part.Code != null && x.Part.Code.ToLower().Contains(partTerm))));
+            transfersQuery = transfersQuery.WhereMatchesLookup(
+                in_query.Part,
+                x => x.Part != null ? x.Part.Name : null,
+                x => x.Part != null ? x.Part.Code : null);
         }
 
         if (!string.IsNullOrWhiteSpace(in_query?.Section))
         {
             var sectionTerm = in_query.Section.Trim().ToLowerInvariant();
+            var normalizedSectionTerm = LookupSearchExtensions.NormalizeLookupTerm(sectionTerm);
             transfersQuery = transfersQuery.Where(x =>
                 x.Operations.Any(operation =>
                     operation.Section != null &&
                     (operation.Section.Name.ToLower().Contains(sectionTerm) ||
-                     (operation.Section.Code != null && operation.Section.Code.ToLower().Contains(sectionTerm)))));
+                     (operation.Section.Code != null && operation.Section.Code.ToLower().Contains(sectionTerm)) ||
+                     operation.Section.Name.ToLower()
+                         .Replace(" ", string.Empty)
+                         .Replace("\t", string.Empty)
+                         .Replace("\r", string.Empty)
+                         .Replace("\n", string.Empty)
+                         .Replace("(", string.Empty)
+                         .Replace(")", string.Empty)
+                         .Replace("[", string.Empty)
+                         .Replace("]", string.Empty)
+                         .Replace("{", string.Empty)
+                         .Replace("}", string.Empty)
+                         .Replace("-", string.Empty)
+                         .Replace("_", string.Empty)
+                         .Replace(".", string.Empty)
+                         .Replace(",", string.Empty)
+                         .Replace("/", string.Empty)
+                         .Replace("\\", string.Empty)
+                         .Replace("\"", string.Empty)
+                         .Replace("'", string.Empty)
+                         .Replace("№", string.Empty)
+                         .Replace(":", string.Empty)
+                         .Replace(";", string.Empty)
+                         .Contains(normalizedSectionTerm) ||
+                     (operation.Section.Code != null &&
+                      operation.Section.Code.ToLower()
+                          .Replace(" ", string.Empty)
+                          .Replace("\t", string.Empty)
+                          .Replace("\r", string.Empty)
+                          .Replace("\n", string.Empty)
+                          .Replace("(", string.Empty)
+                          .Replace(")", string.Empty)
+                          .Replace("[", string.Empty)
+                          .Replace("]", string.Empty)
+                          .Replace("{", string.Empty)
+                          .Replace("}", string.Empty)
+                          .Replace("-", string.Empty)
+                          .Replace("_", string.Empty)
+                          .Replace(".", string.Empty)
+                          .Replace(",", string.Empty)
+                          .Replace("/", string.Empty)
+                          .Replace("\\", string.Empty)
+                          .Replace("\"", string.Empty)
+                          .Replace("'", string.Empty)
+                          .Replace("№", string.Empty)
+                          .Replace(":", string.Empty)
+                          .Replace(";", string.Empty)
+                          .Contains(normalizedSectionTerm)))));
         }
 
         var transfers = await transfersQuery
@@ -558,11 +598,7 @@ public class ReportsController : Controller
     public async Task<IActionResult> LabelMovementParts([FromQuery] string? search, CancellationToken cancellationToken)
     {
         var query = _dbContext.Parts.AsNoTracking();
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            query = query.Where(x => x.Name.ToLower().Contains(term) || (x.Code != null && x.Code.ToLower().Contains(term)));
-        }
+        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code);
 
         var items = await query
             .OrderBy(x => x.Name)
@@ -1050,19 +1086,15 @@ public class ReportsController : Controller
 
         if (!string.IsNullOrWhiteSpace(query?.Part))
         {
-            var term = query.Part.Trim().ToLowerInvariant();
             groupedItems = groupedItems
-                .Where(x =>
-                    x.PartName.ToLower().Contains(term) ||
-                    (!string.IsNullOrWhiteSpace(x.PartCode) && x.PartCode!.ToLower().Contains(term)))
+                .Where(x => LookupSearchExtensions.MatchesLookup(query.Part, x.PartName, x.PartCode))
                 .ToList();
         }
 
         if (!string.IsNullOrWhiteSpace(query?.Section))
         {
-            var term = query.Section.Trim().ToLowerInvariant();
             groupedItems = groupedItems
-                .Where(x => x.SectionName.ToLower().Contains(term))
+                .Where(x => LookupSearchExtensions.MatchesLookup(query.Section, x.SectionName))
                 .ToList();
         }
 
@@ -1116,23 +1148,15 @@ public class ReportsController : Controller
             .AsNoTracking()
             .Where(x => x.RecordedAt >= fromUtc && x.RecordedAt < toUtcExclusive);
 
-        if (!string.IsNullOrWhiteSpace(query?.Section))
-        {
-            var term = query.Section.Trim().ToLowerInvariant();
-            scrapsQuery = scrapsQuery.Where(x =>
-                x.Section != null &&
-                (x.Section.Name.ToLower().Contains(term) ||
-                 (x.Section.Code != null && x.Section.Code.ToLower().Contains(term))));
-        }
+        scrapsQuery = scrapsQuery.WhereMatchesLookup(
+            query?.Section,
+            x => x.Section != null ? x.Section.Name : null,
+            x => x.Section != null ? x.Section.Code : null);
 
-        if (!string.IsNullOrWhiteSpace(query?.Part))
-        {
-            var term = query.Part.Trim().ToLowerInvariant();
-            scrapsQuery = scrapsQuery.Where(x =>
-                x.Part != null &&
-                (x.Part.Name.ToLower().Contains(term) ||
-                 (x.Part.Code != null && x.Part.Code.ToLower().Contains(term))));
-        }
+        scrapsQuery = scrapsQuery.WhereMatchesLookup(
+            query?.Part,
+            x => x.Part != null ? x.Part.Name : null,
+            x => x.Part != null ? x.Part.Code : null);
 
         if (!string.IsNullOrWhiteSpace(query?.ScrapType))
         {

@@ -11,6 +11,7 @@ using UchetNZP.Application.Abstractions;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Shared;
+using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
 using UchetNZP.Web.Services;
 
@@ -93,12 +94,9 @@ public class WipHistoryController : Controller
         var partIds = new List<Guid>();
         if (hasPartFilter)
         {
-            var normalizedPart = partSearch.ToLowerInvariant();
             partIds = await _dbContext.Parts
                 .AsNoTracking()
-                .Where(part =>
-                    part.Name.ToLower().IndexOf(normalizedPart) >= 0 ||
-                    (part.Code != null && part.Code.ToLower().IndexOf(normalizedPart) >= 0))
+                .WhereMatchesLookup(partSearch, part => part.Name, part => part.Code)
                 .Select(part => part.Id)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -107,12 +105,9 @@ public class WipHistoryController : Controller
         var sectionIds = new List<Guid>();
         if (hasSectionFilter)
         {
-            var normalizedSection = sectionSearch.ToLowerInvariant();
             sectionIds = await _dbContext.Sections
                 .AsNoTracking()
-                .Where(section =>
-                    section.Name.ToLower().IndexOf(normalizedSection) >= 0 ||
-                    (section.Code != null && section.Code.ToLower().IndexOf(normalizedSection) >= 0))
+                .WhereMatchesLookup(sectionSearch, section => section.Name, section => section.Code)
                 .Select(section => section.Id)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -714,15 +709,9 @@ public class WipHistoryController : Controller
     [HttpGet("parts")]
     public async Task<IActionResult> GetParts([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var partQuery = _dbContext.Parts.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            partQuery = partQuery.Where(part =>
-                part.Name.ToLower().Contains(term) ||
-                (part.Code != null && part.Code.ToLower().Contains(term)));
-        }
+        var partQuery = _dbContext.Parts
+            .AsNoTracking()
+            .WhereMatchesLookup(search, part => part.Name, part => part.Code);
 
         var items = await partQuery
             .OrderBy(part => part.Name)
@@ -737,15 +726,9 @@ public class WipHistoryController : Controller
     [HttpGet("sections")]
     public async Task<IActionResult> GetSections([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var sectionQuery = _dbContext.Sections.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            sectionQuery = sectionQuery.Where(section =>
-                section.Name.ToLower().Contains(term) ||
-                (section.Code != null && section.Code.ToLower().Contains(term)));
-        }
+        var sectionQuery = _dbContext.Sections
+            .AsNoTracking()
+            .WhereMatchesLookup(search, section => section.Name, section => section.Code);
 
         var items = await sectionQuery
             .OrderBy(section => section.Name)
