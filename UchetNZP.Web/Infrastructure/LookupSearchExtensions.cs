@@ -2,37 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
 
 namespace UchetNZP.Web.Infrastructure;
 
 public static class LookupSearchExtensions
 {
-    private static readonly string[] IgnoredFragments =
-    {
-        " ",
-        "\t",
-        "\r",
-        "\n",
-        "(",
-        ")",
-        "[",
-        "]",
-        "{",
-        "}",
-        "-",
-        "_",
-        ".",
-        ",",
-        "/",
-        "\\",
-        "\"",
-        "'",
-        "№",
-        ":",
-        ";",
-    };
-
     public static IQueryable<T> WhereMatchesLookup<T>(
         this IQueryable<T> query,
         string? search,
@@ -76,7 +50,7 @@ public static class LookupSearchExtensions
                     continue;
                 }
 
-                var comparison = BuildComparison(body, term.Raw, term.Normalized);
+                var comparison = BuildComparison(body, term);
                 termComparison = termComparison is null
                     ? comparison
                     : Expression.OrElse(termComparison, comparison);
@@ -125,15 +99,7 @@ public static class LookupSearchExtensions
                     continue;
                 }
 
-                var lowered = value.Trim().ToLowerInvariant();
-                if (lowered.Contains(term.Raw, StringComparison.Ordinal))
-                {
-                    matchesTerm = true;
-                    break;
-                }
-
-                if (!string.IsNullOrEmpty(term.Normalized) &&
-                    NormalizeLookupTerm(lowered).Contains(term.Normalized, StringComparison.Ordinal))
+                if (value.Trim().Contains(term, StringComparison.CurrentCultureIgnoreCase))
                 {
                     matchesTerm = true;
                     break;
@@ -149,84 +115,28 @@ public static class LookupSearchExtensions
         return true;
     }
 
-    public static string NormalizeLookupTerm(string? value)
+    private static IReadOnlyList<string> GetLookupTerms(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            return string.Empty;
+            return Array.Empty<string>();
         }
 
-        var builder = new StringBuilder(value.Trim().Length);
-        foreach (var ch in value.Trim())
-        {
-            var append = true;
-            foreach (var ignored in IgnoredFragments)
-            {
-                if (ignored.Length == 1 && ignored[0] == ch)
-                {
-                    append = false;
-                    break;
-                }
-            }
-
-            if (append)
-            {
-                builder.Append(char.ToLowerInvariant(ch));
-            }
-        }
-
-        return builder.ToString();
-    }
-
-    private static IReadOnlyList<LookupTerm> GetLookupTerms(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return Array.Empty<LookupTerm>();
-        }
-
-        var tokens = value
+        return value
             .Split((char[]?)null, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(token => new LookupTerm(token.ToLowerInvariant(), NormalizeLookupTerm(token)))
-            .Where(token => !string.IsNullOrWhiteSpace(token.Raw) || !string.IsNullOrWhiteSpace(token.Normalized))
-            .Distinct()
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
-
-        return tokens;
     }
 
-    private static Expression BuildComparison(Expression valueExpression, string term, string normalizedTerm)
+    private static Expression BuildComparison(Expression valueExpression, string term)
     {
         var nullCheck = Expression.NotEqual(valueExpression, Expression.Constant(null, typeof(string)));
-        var loweredValue = Expression.Call(valueExpression, typeof(string).GetMethod(nameof(string.ToLower), Type.EmptyTypes)!);
         var containsTerm = Expression.Call(
-            loweredValue,
+            valueExpression,
             typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!,
             Expression.Constant(term));
 
-        Expression comparison = containsTerm;
-
-        if (!string.IsNullOrEmpty(normalizedTerm))
-        {
-            var normalizedValue = loweredValue;
-            foreach (var ignored in IgnoredFragments)
-            {
-                normalizedValue = Expression.Call(
-                    normalizedValue,
-                    typeof(string).GetMethod(nameof(string.Replace), new[] { typeof(string), typeof(string) })!,
-                    Expression.Constant(ignored),
-                    Expression.Constant(string.Empty));
-            }
-
-            var containsNormalizedTerm = Expression.Call(
-                normalizedValue,
-                typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!,
-                Expression.Constant(normalizedTerm));
-
-            comparison = Expression.OrElse(comparison, containsNormalizedTerm);
-        }
-
-        return Expression.AndAlso(nullCheck, comparison);
+        return Expression.AndAlso(nullCheck, containsTerm);
     }
 
     private sealed class ReplaceParameterVisitor : ExpressionVisitor

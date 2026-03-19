@@ -9,22 +9,9 @@ namespace UchetNZP.Application.Tests.Web;
 public class LookupSearchExtensionsTests
 {
     [Theory]
-    [InlineData("ЭСУВТ ЭРЧМ", "эсувтэрчм")]
-    [InlineData("ЭСУВТ(ЭРЧМ)", "эсувтэрчм")]
-    [InlineData("ЭСУВТ-ЭРЧМ", "эсувтэрчм")]
-    public void NormalizeLookupTerm_RemovesSeparators(string value, string expected)
-    {
-        var normalized = LookupSearchExtensions.NormalizeLookupTerm(value);
-
-        Assert.Equal(expected, normalized);
-    }
-
-    [Theory]
-    [InlineData("ЭСУВТ ЭРЧМ", "Втулка", "ЭСУВТ(ЭРЧМ)")]
-    [InlineData("ЭСУВТ-ЭРЧМ", "Втулка", "ЭСУВТ ЭРЧМ")]
-    [InlineData(" втулка эсувтэрчм ", "Втулка (ЭСУВТ ЭРЧМ)", null)]
     [InlineData("Втулка ЭС", "Втулка", "ЭСУВТ101")]
-    public void MatchesLookup_IgnoresBracketsAndCommonPunctuation(string search, string? primary, string? secondary)
+    [InlineData("Ток ВТ", "Токарная", "ВТ-01")]
+    public void MatchesLookup_FindsTokensAcrossFields(string search, string? primary, string? secondary)
     {
         var matches = LookupSearchExtensions.MatchesLookup(search, primary, secondary);
 
@@ -32,7 +19,7 @@ public class LookupSearchExtensionsTests
     }
 
     [Fact]
-    public void WhereMatchesLookup_FindsPartByNormalizedCode()
+    public void WhereMatchesLookup_FindsPartByCodeTokens()
     {
         var parts = new[]
         {

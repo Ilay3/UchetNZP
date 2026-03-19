@@ -44,11 +44,6 @@
         return formatNameWithCode(item.name, item.code);
     }
 
-    function normalizeLookupValue(value) {
-        return toTrimmedString(value)
-            .toLowerCase()
-            .replace(/[\s()[\]{}\-_,./\\'"№:;]+/g, "");
-    }
     function getLookupValues(item, formatItem) {
         if (!item) {
             return [];
@@ -58,9 +53,6 @@
             formatItem(item),
             toTrimmedString(item.name),
             toTrimmedString(item.code),
-            normalizeLookupValue(formatItem(item)),
-            normalizeLookupValue(item?.name),
-            normalizeLookupValue(item?.code),
         ];
 
         return values.filter((value, index) => value && values.indexOf(value) === index);
@@ -432,13 +424,8 @@
             const trimmed = value.trim();
             const normalizeDisplay = options.normalizeDisplay === true;
             const normalizedTerm = trimmed.toLowerCase();
-            const normalizedLooseTerm = normalizeLookupValue(trimmed);
             const match = getAllItems().find(item => getLookupValues(item, formatItem)
-                .some(candidate => {
-                    const normalizedCandidate = candidate.toLowerCase();
-                    return normalizedCandidate === normalizedTerm ||
-                        (!!normalizedLooseTerm && normalizeLookupValue(candidate) === normalizedLooseTerm);
-                }));
+                .some(candidate => candidate.toLowerCase() === normalizedTerm));
             if (match) {
                 hiddenInput.value = match.id ?? "";
                 selectedItem = match;

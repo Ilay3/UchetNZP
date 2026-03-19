@@ -36,10 +36,10 @@ public class WipLabelsController : Controller
 
         if (!string.IsNullOrWhiteSpace(in_search))
         {
-            var term = in_search.Trim().ToLowerInvariant();
+            var term = in_search.Trim();
             query = query.Where(x =>
-                x.Name.ToLower().Contains(term) ||
-                (x.Code != null && x.Code.ToLower().Contains(term)));
+                x.Name.Contains(term) ||
+                (x.Code != null && x.Code.Contains(term)));
         }
 
         var items = await query
