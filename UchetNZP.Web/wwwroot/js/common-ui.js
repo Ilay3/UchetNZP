@@ -44,6 +44,20 @@
         return formatNameWithCode(item.name, item.code);
     }
 
+    function getLookupValues(item, formatItem) {
+        if (!item) {
+            return [];
+        }
+
+        const values = [
+            formatItem(item),
+            toTrimmedString(item.name),
+            toTrimmedString(item.code),
+        ];
+
+        return values.filter((value, index) => value && values.indexOf(value) === index);
+    }
+
     globalNamespace.formatNameWithCode = formatNameWithCode;
 
     function resolveToastContainer() {
@@ -370,12 +384,16 @@
                 return false;
             }
 
-            const value = formatItem(item);
-            if (!value) {
+            const values = getLookupValues(item, formatItem);
+            if (values.length === 0) {
                 return false;
             }
 
-            const exists = customItems.some(existing => formatItem(existing) === value);
+            const exists = customItems.some(existing => {
+                const existingValues = getLookupValues(existing, formatItem);
+                return existingValues.some(value => values.includes(value));
+            });
+
             if (!exists) {
                 customItems.push(item);
                 return true;
@@ -389,24 +407,31 @@
             const seenValues = new Set();
             const combined = [...customItems, ...items];
             combined.forEach(item => {
-                const value = formatItem(item);
-                if (!value || seenValues.has(value)) {
-                    return;
-                }
+                getLookupValues(item, formatItem).forEach(value => {
+                    if (!value || seenValues.has(value)) {
+                        return;
+                    }
 
-                seenValues.add(value);
-                const option = document.createElement("option");
-                option.value = value;
-                datalist.appendChild(option);
+                    seenValues.add(value);
+                    const option = document.createElement("option");
+                    option.value = value;
+                    datalist.appendChild(option);
+                });
             });
         }
 
-        function updateSelectionFromValue(value) {
+        function updateSelectionFromValue(value, options = {}) {
             const trimmed = value.trim();
-            const match = getAllItems().find(item => formatItem(item) === trimmed);
+            const normalizeDisplay = options.normalizeDisplay === true;
+            const normalizedTerm = trimmed.toLowerCase();
+            const match = getAllItems().find(item => getLookupValues(item, formatItem)
+                .some(candidate => candidate.toLowerCase() === normalizedTerm));
             if (match) {
                 hiddenInput.value = match.id ?? "";
                 selectedItem = match;
+                if (normalizeDisplay) {
+                    input.value = formatItem(match);
+                }
                 if (ensureCustomItem(match)) {
                     render(lastItems);
                 }
@@ -475,7 +500,7 @@
 
         input.addEventListener("change", () => {
             const value = input.value.trim();
-            updateSelectionFromValue(value);
+            updateSelectionFromValue(value, { normalizeDisplay: true });
             if (selectedItem) {
                 input.dispatchEvent(new CustomEvent("lookup:selected", { detail: selectedItem }));
             }
