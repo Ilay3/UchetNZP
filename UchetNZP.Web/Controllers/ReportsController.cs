@@ -212,60 +212,23 @@ public class ReportsController : Controller
 
         if (!string.IsNullOrWhiteSpace(in_query?.Section))
         {
-            var sectionTerm = in_query.Section.Trim().ToLowerInvariant();
-            var normalizedSectionTerm = LookupSearchExtensions.NormalizeLookupTerm(sectionTerm);
-            transfersQuery = transfersQuery.Where(x =>
-                x.Operations.Any(operation =>
-                    operation.Section != null &&
-                    (operation.Section.Name.ToLower().Contains(sectionTerm) ||
-                     (operation.Section.Code != null && operation.Section.Code.ToLower().Contains(sectionTerm)) ||
-                     operation.Section.Name.ToLower()
-                         .Replace(" ", string.Empty)
-                         .Replace("\t", string.Empty)
-                         .Replace("\r", string.Empty)
-                         .Replace("\n", string.Empty)
-                         .Replace("(", string.Empty)
-                         .Replace(")", string.Empty)
-                         .Replace("[", string.Empty)
-                         .Replace("]", string.Empty)
-                         .Replace("{", string.Empty)
-                         .Replace("}", string.Empty)
-                         .Replace("-", string.Empty)
-                         .Replace("_", string.Empty)
-                         .Replace(".", string.Empty)
-                         .Replace(",", string.Empty)
-                         .Replace("/", string.Empty)
-                         .Replace("\\", string.Empty)
-                         .Replace("\"", string.Empty)
-                         .Replace("'", string.Empty)
-                         .Replace("№", string.Empty)
-                         .Replace(":", string.Empty)
-                         .Replace(";", string.Empty)
-                         .Contains(normalizedSectionTerm) ||
-                     (operation.Section.Code != null &&
-                      operation.Section.Code.ToLower()
-                          .Replace(" ", string.Empty)
-                          .Replace("\t", string.Empty)
-                          .Replace("\r", string.Empty)
-                          .Replace("\n", string.Empty)
-                          .Replace("(", string.Empty)
-                          .Replace(")", string.Empty)
-                          .Replace("[", string.Empty)
-                          .Replace("]", string.Empty)
-                          .Replace("{", string.Empty)
-                          .Replace("}", string.Empty)
-                          .Replace("-", string.Empty)
-                          .Replace("_", string.Empty)
-                          .Replace(".", string.Empty)
-                          .Replace(",", string.Empty)
-                          .Replace("/", string.Empty)
-                          .Replace("\\", string.Empty)
-                          .Replace("\"", string.Empty)
-                          .Replace("'", string.Empty)
-                          .Replace("№", string.Empty)
-                          .Replace(":", string.Empty)
-                          .Replace(";", string.Empty)
-                          .Contains(normalizedSectionTerm)))));
+            var sectionTerms = in_query.Section
+                .Split((char[]?)null, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                .ToArray();
+
+            if (sectionTerms.Length > 0)
+            {
+                foreach (var sectionTerm in sectionTerms)
+                {
+                    var term = sectionTerm;
+                    transfersQuery = transfersQuery.Where(x =>
+                        x.Operations.Any(operation =>
+                            operation.Section != null &&
+                            (operation.Section.Name.Contains(term) ||
+                             (operation.Section.Code != null && operation.Section.Code.Contains(term)))));
+                }
+            }
         }
 
         var transfers = await transfersQuery
@@ -706,8 +669,8 @@ public class ReportsController : Controller
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim().ToLowerInvariant();
-            query = query.Where(x => x.Number.ToLower().Contains(term));
+            var term = search.Trim();
+            query = query.Where(x => x.Number.Contains(term));
         }
 
         var labels = await query

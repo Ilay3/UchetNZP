@@ -50,12 +50,12 @@ public class RoutesController : Controller
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = query.Search.Trim().ToLowerInvariant();
+            var term = query.Search.Trim();
             routesQuery = routesQuery.Where(x =>
-                x.part.Name.ToLower().Contains(term) ||
-                (x.part.Code != null && x.part.Code.ToLower().Contains(term)) ||
-                (x.operation != null && x.operation.Name.ToLower().Contains(term)) ||
-                (x.section != null && x.section.Name.ToLower().Contains(term)));
+                x.part.Name.Contains(term) ||
+                (x.part.Code != null && x.part.Code.Contains(term)) ||
+                (x.operation != null && x.operation.Name.Contains(term)) ||
+                (x.section != null && x.section.Name.Contains(term)));
         }
 
         if (query.SectionId.HasValue && query.SectionId.Value != Guid.Empty)
@@ -283,10 +283,10 @@ public class RoutesController : Controller
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim().ToLowerInvariant();
+            var term = search.Trim();
             query = query.Where(x =>
-                x.Name.ToLower().Contains(term) ||
-                (x.Code != null && x.Code.ToLower().Contains(term)));
+                x.Name.Contains(term) ||
+                (x.Code != null && x.Code.Contains(term)));
         }
 
         var items = await query
@@ -306,10 +306,10 @@ public class RoutesController : Controller
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim().ToLowerInvariant();
+            var term = search.Trim();
             query = query.Where(x =>
-                x.Name.ToLower().Contains(term) ||
-                (x.Code != null && x.Code.ToLower().Contains(term)));
+                x.Name.Contains(term) ||
+                (x.Code != null && x.Code.Contains(term)));
         }
 
         var operations = await query
@@ -373,10 +373,10 @@ public class RoutesController : Controller
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var term = search.Trim().ToLowerInvariant();
+            var term = search.Trim();
             query = query.Where(x =>
-                x.Name.ToLower().Contains(term) ||
-                (x.Code != null && x.Code.ToLower().Contains(term)));
+                x.Name.Contains(term) ||
+                (x.Code != null && x.Code.Contains(term)));
         }
 
         var items = await query
