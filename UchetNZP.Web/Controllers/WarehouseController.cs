@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Shared;
+using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Controllers;
@@ -38,13 +39,7 @@ public class WarehouseController : Controller
     {
         var partQuery = _dbContext.Parts.AsNoTracking();
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToLowerInvariant();
-            partQuery = partQuery.Where(part =>
-                part.Name.ToLower().Contains(term) ||
-                (part.Code != null && part.Code.ToLower().Contains(term)));
-        }
+        partQuery = partQuery.WhereMatchesLookup(search, part => part.Name, part => part.Code);
 
         var items = await partQuery
             .OrderBy(part => part.Name)
