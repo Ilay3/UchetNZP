@@ -23,6 +23,7 @@ public class LookupSearchExtensionsTests
     [InlineData("ЭСУВТ ЭРЧМ", "Втулка", "ЭСУВТ(ЭРЧМ)")]
     [InlineData("ЭСУВТ-ЭРЧМ", "Втулка", "ЭСУВТ ЭРЧМ")]
     [InlineData(" втулка эсувтэрчм ", "Втулка (ЭСУВТ ЭРЧМ)", null)]
+    [InlineData("Втулка ЭС", "Втулка", "ЭСУВТ101")]
     public void MatchesLookup_IgnoresBracketsAndCommonPunctuation(string search, string? primary, string? secondary)
     {
         var matches = LookupSearchExtensions.MatchesLookup(search, primary, secondary);
@@ -45,5 +46,23 @@ public class LookupSearchExtensionsTests
 
         var part = Assert.Single(result);
         Assert.Equal("Втулка", part.Name);
+    }
+
+    [Fact]
+    public void WhereMatchesLookup_FindsPartByTokensAcrossNameAndCode()
+    {
+        var parts = new[]
+        {
+            new Part { Id = Guid.NewGuid(), Name = "Втулка", Code = "ЭСУВТ101" },
+            new Part { Id = Guid.NewGuid(), Name = "Втулка", Code = "КРП-01" },
+            new Part { Id = Guid.NewGuid(), Name = "Корпус", Code = "ЭСУВТ101" },
+        }.AsQueryable();
+
+        var result = parts
+            .WhereMatchesLookup("Втулка ЭС", part => part.Name, part => part.Code)
+            .ToList();
+
+        var part = Assert.Single(result);
+        Assert.Equal("ЭСУВТ101", part.Code);
     }
 }
