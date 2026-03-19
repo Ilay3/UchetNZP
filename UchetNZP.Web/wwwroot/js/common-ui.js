@@ -44,15 +44,11 @@
         return formatNameWithCode(item.name, item.code);
     }
 
-<<<<<<< codex/fix-search-by-drawing-number
     function normalizeLookupValue(value) {
         return toTrimmedString(value)
             .toLowerCase()
             .replace(/[\s()[\]{}\-_,./\\'"№:;]+/g, "");
     }
-
-=======
->>>>>>> master
     function getLookupValues(item, formatItem) {
         if (!item) {
             return [];
@@ -62,12 +58,9 @@
             formatItem(item),
             toTrimmedString(item.name),
             toTrimmedString(item.code),
-<<<<<<< codex/fix-search-by-drawing-number
             normalizeLookupValue(formatItem(item)),
             normalizeLookupValue(item?.name),
             normalizeLookupValue(item?.code),
-=======
->>>>>>> master
         ];
 
         return values.filter((value, index) => value && values.indexOf(value) === index);
@@ -439,7 +432,6 @@
             const trimmed = value.trim();
             const normalizeDisplay = options.normalizeDisplay === true;
             const normalizedTerm = trimmed.toLowerCase();
-<<<<<<< codex/fix-search-by-drawing-number
             const normalizedLooseTerm = normalizeLookupValue(trimmed);
             const match = getAllItems().find(item => getLookupValues(item, formatItem)
                 .some(candidate => {
@@ -447,10 +439,6 @@
                     return normalizedCandidate === normalizedTerm ||
                         (!!normalizedLooseTerm && normalizeLookupValue(candidate) === normalizedLooseTerm);
                 }));
-=======
-            const match = getAllItems().find(item => getLookupValues(item, formatItem)
-                .some(candidate => candidate.toLowerCase() === normalizedTerm));
->>>>>>> master
             if (match) {
                 hiddenInput.value = match.id ?? "";
                 selectedItem = match;
