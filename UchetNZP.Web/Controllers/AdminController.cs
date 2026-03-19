@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Routing;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Admin;
 using UchetNZP.Shared;
+using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Controllers;
@@ -1278,7 +1279,7 @@ public class AdminController : Controller
         }
 
         var ret = source
-            .Where(x => ContainsText(x.Name, search) || (!string.IsNullOrEmpty(x.Code) && ContainsText(x.Code!, search)))
+            .Where(x => LookupSearchExtensions.MatchesLookup(search, x.Name, x.Code))
             .ToList();
 
         return ret;

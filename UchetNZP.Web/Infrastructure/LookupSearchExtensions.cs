@@ -48,28 +48,48 @@ public static class LookupSearchExtensions
             return query;
         }
 
-        var term = search.Trim().ToLowerInvariant();
-        var normalizedTerm = NormalizeLookupTerm(term);
+        var terms = GetLookupTerms(search);
+        if (terms.Count == 0)
+        {
+            return query;
+        }
+
         var parameter = Expression.Parameter(typeof(T), "entity");
         Expression? combined = null;
 
-        foreach (var selector in selectors)
+        foreach (var term in terms)
         {
-            if (selector is null)
+            Expression? termComparison = null;
+
+            foreach (var selector in selectors)
+            {
+                if (selector is null)
+                {
+                    continue;
+                }
+
+                var body = new ReplaceParameterVisitor(selector.Parameters[0], parameter)
+                    .Visit(selector.Body);
+
+                if (body is null)
+                {
+                    continue;
+                }
+
+                var comparison = BuildComparison(body, term.Raw, term.Normalized);
+                termComparison = termComparison is null
+                    ? comparison
+                    : Expression.OrElse(termComparison, comparison);
+            }
+
+            if (termComparison is null)
             {
                 continue;
             }
 
-            var body = new ReplaceParameterVisitor(selector.Parameters[0], parameter)
-                .Visit(selector.Body);
-
-            if (body is null)
-            {
-                continue;
-            }
-
-            var comparison = BuildComparison(body, term, normalizedTerm);
-            combined = combined is null ? comparison : Expression.OrElse(combined, comparison);
+            combined = combined is null
+                ? termComparison
+                : Expression.AndAlso(combined, termComparison);
         }
 
         if (combined is null)
@@ -88,30 +108,45 @@ public static class LookupSearchExtensions
             return true;
         }
 
-        var term = search.Trim().ToLowerInvariant();
-        var normalizedTerm = NormalizeLookupTerm(term);
-
-        foreach (var value in values)
+        var terms = GetLookupTerms(search);
+        if (terms.Count == 0)
         {
-            if (string.IsNullOrWhiteSpace(value))
+            return true;
+        }
+
+        foreach (var term in terms)
+        {
+            var matchesTerm = false;
+
+            foreach (var value in values)
             {
-                continue;
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                var lowered = value.Trim().ToLowerInvariant();
+                if (lowered.Contains(term.Raw, StringComparison.Ordinal))
+                {
+                    matchesTerm = true;
+                    break;
+                }
+
+                if (!string.IsNullOrEmpty(term.Normalized) &&
+                    NormalizeLookupTerm(lowered).Contains(term.Normalized, StringComparison.Ordinal))
+                {
+                    matchesTerm = true;
+                    break;
+                }
             }
 
-            var lowered = value.Trim().ToLowerInvariant();
-            if (lowered.Contains(term, StringComparison.Ordinal))
+            if (!matchesTerm)
             {
-                return true;
-            }
-
-            if (!string.IsNullOrEmpty(normalizedTerm) &&
-                NormalizeLookupTerm(lowered).Contains(normalizedTerm, StringComparison.Ordinal))
-            {
-                return true;
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     public static string NormalizeLookupTerm(string? value)
@@ -141,6 +176,23 @@ public static class LookupSearchExtensions
         }
 
         return builder.ToString();
+    }
+
+    private static IReadOnlyList<LookupTerm> GetLookupTerms(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Array.Empty<LookupTerm>();
+        }
+
+        var tokens = value
+            .Split((char[]?)null, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(token => new LookupTerm(token.ToLowerInvariant(), NormalizeLookupTerm(token)))
+            .Where(token => !string.IsNullOrWhiteSpace(token.Raw) || !string.IsNullOrWhiteSpace(token.Normalized))
+            .Distinct()
+            .ToArray();
+
+        return tokens;
     }
 
     private static Expression BuildComparison(Expression valueExpression, string term, string normalizedTerm)
@@ -193,4 +245,6 @@ public static class LookupSearchExtensions
             return node == _source ? _target : base.VisitParameter(node);
         }
     }
+
+    private sealed record LookupTerm(string Raw, string Normalized);
 }
