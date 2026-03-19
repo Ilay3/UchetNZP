@@ -155,4 +155,6 @@ public static class LookupSearchExtensions
             return node == _source ? _target : base.VisitParameter(node);
         }
     }
+
+    private sealed record LookupTerm(string Raw, string Normalized);
 }
