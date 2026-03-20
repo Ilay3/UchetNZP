@@ -374,9 +374,75 @@
         let lastItems = [];
         let selectedItem = null;
         const customItems = [];
+        const dropdownId = `${input.id || "lookup"}Suggestions`;
+        let renderItems = [];
+        let activeIndex = -1;
+        let suppressBlurHide = false;
+
+        input.removeAttribute("list");
+        input.setAttribute("autocomplete", "off");
+        input.setAttribute("aria-autocomplete", "list");
+        input.setAttribute("aria-expanded", "false");
+        input.setAttribute("aria-controls", dropdownId);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "lookup-dropdown";
+        input.parentNode?.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+        wrapper.appendChild(datalist);
+
+        const suggestionList = document.createElement("div");
+        suggestionList.id = dropdownId;
+        suggestionList.className = "lookup-dropdown__menu";
+        suggestionList.setAttribute("role", "listbox");
+        suggestionList.hidden = true;
+        wrapper.appendChild(suggestionList);
 
         function getAllItems() {
             return [...customItems, ...lastItems];
+        }
+
+        function isDropdownVisible() {
+            return !suggestionList.hidden;
+        }
+
+        function hideSuggestions() {
+            suggestionList.hidden = true;
+            suggestionList.innerHTML = "";
+            input.setAttribute("aria-expanded", "false");
+            input.removeAttribute("aria-activedescendant");
+            activeIndex = -1;
+        }
+
+        function showSuggestions() {
+            if (renderItems.length === 0) {
+                hideSuggestions();
+                return;
+            }
+
+            suggestionList.hidden = false;
+            input.setAttribute("aria-expanded", "true");
+        }
+
+        function renderActiveItem() {
+            Array.from(suggestionList.children).forEach((node, index) => {
+                if (!(node instanceof HTMLElement)) {
+                    return;
+                }
+
+                const isActive = index === activeIndex;
+                node.classList.toggle("active", isActive);
+                node.setAttribute("aria-selected", isActive ? "true" : "false");
+
+                if (isActive) {
+                    input.setAttribute("aria-activedescendant", node.id);
+                    node.scrollIntoView({ block: "nearest" });
+                }
+            });
+
+            if (activeIndex < 0) {
+                input.removeAttribute("aria-activedescendant");
+            }
         }
 
         function ensureCustomItem(item) {
@@ -404,37 +470,84 @@
 
         function render(items) {
             datalist.innerHTML = "";
-            const seenValues = new Set();
             const combined = [...customItems, ...items];
-            combined.forEach(item => {
-                getLookupValues(item, formatItem).forEach(value => {
-                    if (!value || seenValues.has(value)) {
-                        return;
-                    }
+            const seenValues = new Set();
 
-                    seenValues.add(value);
-                    const option = document.createElement("option");
-                    option.value = value;
-                    datalist.appendChild(option);
-                });
+            renderItems = combined.filter(item => {
+                const displayValue = formatItem(item);
+                if (!displayValue || seenValues.has(displayValue)) {
+                    return false;
+                }
+
+                seenValues.add(displayValue);
+                const option = document.createElement("option");
+                option.value = displayValue;
+                datalist.appendChild(option);
+                return true;
             });
+
+            suggestionList.innerHTML = "";
+            renderItems.forEach((item, index) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.id = `${dropdownId}Option${index}`;
+                button.className = "lookup-dropdown__option";
+                button.setAttribute("role", "option");
+                button.setAttribute("aria-selected", "false");
+                button.textContent = formatItem(item);
+                button.addEventListener("mousedown", event => {
+                    event.preventDefault();
+                    suppressBlurHide = true;
+                });
+                button.addEventListener("click", () => {
+                    applySelection(item, { dispatchEvent: true, normalizeDisplay: true });
+                    suppressBlurHide = false;
+                });
+                suggestionList.appendChild(button);
+            });
+
+            if (renderItems.length === 0) {
+                hideSuggestions();
+                return;
+            }
+
+            activeIndex = Math.min(activeIndex, renderItems.length - 1);
+            renderActiveItem();
+
+            if (document.activeElement === input) {
+                showSuggestions();
+            }
+        }
+
+        function applySelection(item, options = {}) {
+            const normalizeDisplay = options.normalizeDisplay !== false;
+            const dispatchEvent = options.dispatchEvent === true;
+
+            selectedItem = item;
+            hiddenInput.value = item?.id ?? "";
+            if (normalizeDisplay && item) {
+                input.value = formatItem(item);
+            }
+
+            if (item && ensureCustomItem(item)) {
+                render(lastItems);
+            }
+            else {
+                hideSuggestions();
+            }
+
+            if (dispatchEvent && item) {
+                input.dispatchEvent(new CustomEvent("lookup:selected", { detail: item }));
+            }
         }
 
         function updateSelectionFromValue(value, options = {}) {
             const trimmed = value.trim();
-            const normalizeDisplay = options.normalizeDisplay === true;
             const normalizedTerm = trimmed.toLowerCase();
             const match = getAllItems().find(item => getLookupValues(item, formatItem)
                 .some(candidate => candidate.toLowerCase() === normalizedTerm));
             if (match) {
-                hiddenInput.value = match.id ?? "";
-                selectedItem = match;
-                if (normalizeDisplay) {
-                    input.value = formatItem(match);
-                }
-                if (ensureCustomItem(match)) {
-                    render(lastItems);
-                }
+                applySelection(match, options);
                 return;
             }
 
@@ -459,6 +572,9 @@
                 if (typeof term === "string" && term.trim().length > 0) {
                     updateSelectionFromValue(term);
                 }
+                else if (document.activeElement === input) {
+                    showSuggestions();
+                }
             }
             catch (error) {
                 console.error(error);
@@ -479,6 +595,7 @@
                 if (ensureCustomItem(previousSelection)) {
                     render(lastItems);
                 }
+                showSuggestions();
                 return;
             }
 
@@ -496,14 +613,71 @@
             }
 
             updateSelectionFromValue(value);
+
+            if (value.length === 0 && !prefetch) {
+                hideSuggestions();
+            }
         });
 
         input.addEventListener("change", () => {
             const value = input.value.trim();
             updateSelectionFromValue(value, { normalizeDisplay: true });
-            if (selectedItem) {
-                input.dispatchEvent(new CustomEvent("lookup:selected", { detail: selectedItem }));
+        });
+
+        input.addEventListener("focus", () => {
+            if (renderItems.length > 0) {
+                showSuggestions();
             }
+        });
+
+        input.addEventListener("blur", () => {
+            window.setTimeout(() => {
+                if (suppressBlurHide) {
+                    suppressBlurHide = false;
+                    return;
+                }
+
+                hideSuggestions();
+            }, 150);
+        });
+
+        input.addEventListener("keydown", event => {
+            if (!isDropdownVisible()) {
+                if (event.key === "ArrowDown" && renderItems.length > 0) {
+                    activeIndex = 0;
+                    renderActiveItem();
+                    showSuggestions();
+                    event.preventDefault();
+                }
+                return;
+            }
+
+            if (event.key === "ArrowDown") {
+                activeIndex = Math.min(activeIndex + 1, renderItems.length - 1);
+                renderActiveItem();
+                event.preventDefault();
+            }
+            else if (event.key === "ArrowUp") {
+                activeIndex = activeIndex <= 0 ? 0 : activeIndex - 1;
+                renderActiveItem();
+                event.preventDefault();
+            }
+            else if (event.key === "Enter" && activeIndex >= 0 && renderItems[activeIndex]) {
+                applySelection(renderItems[activeIndex], { dispatchEvent: true, normalizeDisplay: true });
+                event.preventDefault();
+            }
+            else if (event.key === "Escape") {
+                hideSuggestions();
+            }
+        });
+
+        document.addEventListener("pointerdown", event => {
+            const target = event.target;
+            if (target instanceof Node && wrapper.contains(target)) {
+                return;
+            }
+
+            hideSuggestions();
         });
 
         if (prefetch) {
@@ -528,15 +702,11 @@
                     input.value = "";
                     hiddenInput.value = "";
                     selectedItem = null;
+                    hideSuggestions();
                     return;
                 }
 
-                selectedItem = item;
-                input.value = formatItem(item);
-                hiddenInput.value = item.id ?? "";
-                if (ensureCustomItem(item)) {
-                    render(lastItems);
-                }
+                applySelection(item, { normalizeDisplay: true });
             },
             clear: () => {
                 input.value = "";
@@ -544,7 +714,9 @@
                 selectedItem = null;
                 lastItems = [];
                 customItems.length = 0;
+                renderItems = [];
                 render(lastItems);
+                hideSuggestions();
             },
             refresh: (term) => request(term ?? input.value.trim()),
             addCustomItems: (items) => {
