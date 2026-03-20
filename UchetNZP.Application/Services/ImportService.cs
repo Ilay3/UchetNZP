@@ -175,9 +175,8 @@ public class ImportService : IImportService
                     return column > 0 ? row.Cell(column).GetString().Trim() : string.Empty;
                 }
 
-                var rawPartName = GetString(colPartName);
+                var partName = GetString(colPartName);
                 var partCode = GetString(colPartCode);
-                var partName = CombinePartName(rawPartName, partCode);
                 var operationName = GetString(colOperationName);
                 var opNumberText = GetString(colOpNumber);
                 var normText = GetString(colNorm);
@@ -328,24 +327,6 @@ public class ImportService : IImportService
             Status = status,
             Message = message,
         };
-    }
-
-    private static string CombinePartName(string name, string code)
-    {
-        name = name?.Trim() ?? string.Empty;
-        code = code?.Trim() ?? string.Empty;
-
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return code;
-        }
-
-        if (string.IsNullOrWhiteSpace(code))
-        {
-            return name;
-        }
-
-        return $"{name} {code}";
     }
 
     private static string GetSectionName(IXLRangeRow row, int column)
