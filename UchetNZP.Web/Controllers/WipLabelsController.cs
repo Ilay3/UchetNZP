@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Wip;
 using UchetNZP.Infrastructure.Data;
+using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
 
 namespace UchetNZP.Web.Controllers;
@@ -32,15 +33,9 @@ public class WipLabelsController : Controller
     [HttpGet("parts")]
     public async Task<IActionResult> GetParts([FromQuery(Name = "search")] string? in_search, CancellationToken in_cancellationToken)
     {
-        var query = m_dbContext.Parts.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(in_search))
-        {
-            var term = in_search.Trim();
-            query = query.Where(x =>
-                x.Name.Contains(term) ||
-                (x.Code != null && x.Code.Contains(term)));
-        }
+        var query = m_dbContext.Parts
+            .AsNoTracking()
+            .WhereMatchesLookup(in_search, x => x.Name, x => x.Code);
 
         var items = await query
             .OrderBy(x => x.Name)

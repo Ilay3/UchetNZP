@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Infrastructure;
 using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
@@ -279,15 +280,9 @@ public class RoutesController : Controller
     [HttpGet("import/parts")]
     public async Task<IActionResult> SearchParts([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Parts.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim();
-            query = query.Where(x =>
-                x.Name.Contains(term) ||
-                (x.Code != null && x.Code.Contains(term)));
-        }
+        var query = _dbContext.Parts
+            .AsNoTracking()
+            .WhereMatchesLookup(search, x => x.Name, x => x.Code);
 
         var items = await query
             .OrderBy(x => x.Name)
@@ -302,15 +297,9 @@ public class RoutesController : Controller
     [HttpGet("import/operations")]
     public async Task<IActionResult> SearchOperations([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Operations.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim();
-            query = query.Where(x =>
-                x.Name.Contains(term) ||
-                (x.Code != null && x.Code.Contains(term)));
-        }
+        var query = _dbContext.Operations
+            .AsNoTracking()
+            .WhereMatchesLookup(search, x => x.Name, x => x.Code);
 
         var operations = await query
             .OrderBy(x => x.Name)
@@ -369,15 +358,9 @@ public class RoutesController : Controller
     [HttpGet("import/sections")]
     public async Task<IActionResult> SearchSections([FromQuery] string? search, CancellationToken cancellationToken)
     {
-        var query = _dbContext.Sections.AsNoTracking();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim();
-            query = query.Where(x =>
-                x.Name.Contains(term) ||
-                (x.Code != null && x.Code.Contains(term)));
-        }
+        var query = _dbContext.Sections
+            .AsNoTracking()
+            .WhereMatchesLookup(search, x => x.Name, x => x.Code);
 
         var items = await query
             .OrderBy(x => x.Name)

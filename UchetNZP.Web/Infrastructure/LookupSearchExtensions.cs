@@ -7,6 +7,24 @@ namespace UchetNZP.Web.Infrastructure;
 
 public static class LookupSearchExtensions
 {
+    private static readonly char[] TokenSeparators =
+    [
+        ' ',
+        '\t',
+        '-',
+        '_',
+        '/',
+        '\\',
+        '.',
+        ',',
+        ';',
+        ':',
+        '(',
+        ')',
+        '[',
+        ']',
+    ];
+
     public static IQueryable<T> WhereMatchesLookup<T>(
         this IQueryable<T> query,
         string? search,
@@ -99,7 +117,7 @@ public static class LookupSearchExtensions
                     continue;
                 }
 
-                if (value.Trim().Contains(term, StringComparison.CurrentCultureIgnoreCase))
+                if (GetLookupSegments(value).Any(segment => segment.StartsWith(term, StringComparison.CurrentCultureIgnoreCase)))
                 {
                     matchesTerm = true;
                     break;
@@ -128,15 +146,43 @@ public static class LookupSearchExtensions
             .ToArray();
     }
 
+    private static IEnumerable<string> GetLookupSegments(string value)
+    {
+        return value
+            .Trim()
+            .Split(TokenSeparators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+    }
+
     private static Expression BuildComparison(Expression valueExpression, string term)
     {
         var nullCheck = Expression.NotEqual(valueExpression, Expression.Constant(null, typeof(string)));
-        var containsTerm = Expression.Call(
-            valueExpression,
-            typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!,
-            Expression.Constant(term));
+        var trimmedValue = Expression.Call(valueExpression, typeof(string).GetMethod(nameof(string.Trim), Type.EmptyTypes)!);
+        var normalizedValue = Expression.Call(trimmedValue, typeof(string).GetMethod(nameof(string.ToUpper), Type.EmptyTypes)!);
+        var normalizedTerm = term.ToUpper();
 
-        return Expression.AndAlso(nullCheck, containsTerm);
+        Expression comparison = Expression.Call(
+            normalizedValue,
+            typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) })!,
+            Expression.Constant(normalizedTerm));
+
+        foreach (var separator in TokenSeparators.Where(ch => !char.IsWhiteSpace(ch)))
+        {
+            comparison = Expression.OrElse(
+                comparison,
+                Expression.Call(
+                    normalizedValue,
+                    typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!,
+                    Expression.Constant(separator + normalizedTerm)));
+        }
+
+        comparison = Expression.OrElse(
+            comparison,
+            Expression.Call(
+                normalizedValue,
+                typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) })!,
+                Expression.Constant(" " + normalizedTerm)));
+
+        return Expression.AndAlso(nullCheck, comparison);
     }
 
     private sealed class ReplaceParameterVisitor : ExpressionVisitor
@@ -155,6 +201,4 @@ public static class LookupSearchExtensions
             return node == _source ? _target : base.VisitParameter(node);
         }
     }
-
-    private sealed record LookupTerm(string Raw, string Normalized);
 }

@@ -11,7 +11,8 @@ public class LookupSearchExtensionsTests
     [Theory]
     [InlineData("Втулка ЭС", "Втулка", "ЭСУВТ101")]
     [InlineData("Ток ВТ", "Токарная", "ВТ-01")]
-    public void MatchesLookup_FindsTokensAcrossFields(string search, string? primary, string? secondary)
+    [InlineData("втулка эсу", "Втулка", "ЭСУВТ101")]
+    public void MatchesLookup_FindsSequentialPrefixesAcrossFields(string search, string? primary, string? secondary)
     {
         var matches = LookupSearchExtensions.MatchesLookup(search, primary, secondary);
 
@@ -19,7 +20,15 @@ public class LookupSearchExtensionsTests
     }
 
     [Fact]
-    public void WhereMatchesLookup_FindsPartByCodeTokens()
+    public void MatchesLookup_DoesNotMatchMiddleOfValue()
+    {
+        var matches = LookupSearchExtensions.MatchesLookup("РП", "Корпус", "КРП-01");
+
+        Assert.False(matches);
+    }
+
+    [Fact]
+    public void WhereMatchesLookup_FindsPartByCodePrefixTokens()
     {
         var parts = new[]
         {
@@ -28,7 +37,7 @@ public class LookupSearchExtensionsTests
         }.AsQueryable();
 
         var result = parts
-            .WhereMatchesLookup("ЭСУВТ ЭРЧМ", part => part.Name, part => part.Code)
+            .WhereMatchesLookup("ЭСУВТ ЭР", part => part.Name, part => part.Code)
             .ToList();
 
         var part = Assert.Single(result);
@@ -36,7 +45,7 @@ public class LookupSearchExtensionsTests
     }
 
     [Fact]
-    public void WhereMatchesLookup_FindsPartByTokensAcrossNameAndCode()
+    public void WhereMatchesLookup_FindsPartBySequentialPrefixesAcrossNameAndCode()
     {
         var parts = new[]
         {
@@ -46,10 +55,26 @@ public class LookupSearchExtensionsTests
         }.AsQueryable();
 
         var result = parts
-            .WhereMatchesLookup("Втулка ЭС", part => part.Name, part => part.Code)
+            .WhereMatchesLookup("втул эсу", part => part.Name, part => part.Code)
             .ToList();
 
         var part = Assert.Single(result);
         Assert.Equal("ЭСУВТ101", part.Code);
+    }
+
+    [Fact]
+    public void WhereMatchesLookup_DoesNotMatchSubstringInsideField()
+    {
+        var parts = new[]
+        {
+            new Part { Id = Guid.NewGuid(), Name = "Корпус", Code = "КРП-01" },
+            new Part { Id = Guid.NewGuid(), Name = "Кронштейн", Code = "КН-02" },
+        }.AsQueryable();
+
+        var result = parts
+            .WhereMatchesLookup("РП", part => part.Name, part => part.Code)
+            .ToList();
+
+        Assert.Empty(result);
     }
 }
