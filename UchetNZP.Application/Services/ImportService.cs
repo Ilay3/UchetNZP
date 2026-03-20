@@ -126,11 +126,11 @@ public class ImportService : IImportService
         }
 
         var colPartName = Require("Наименование детали");
-        var colPartCode = Optional("Обозначение", "№ чертежа");
-        var colOperationName = Require("Наименование операции");
+        var colPartCode = Optional("Код детали", "Обозначение", "№ чертежа");
         var colOpNumber = Require("№ операции");
-        var colNorm = Require("Утвержденный норматив (н/ч)", "Технологический процесс");
-        var colSection = Optional("Вид работ", "Участок");
+        var colOperationName = Require("Наименование операции");
+        var colSection = Require("Вид работ", "Участок");
+        var colNorm = Require("Норматив, н/ч", "Утвержденный норматив (н/ч)", "Технологический процесс");
         var colRemaining = Optional("Количество остатка");
 
         var rows = worksheet.RangeUsed()?.RowsUsed().Skip(1).ToList() ?? new List<IXLRangeRow>();
@@ -181,7 +181,7 @@ public class ImportService : IImportService
                 var operationName = GetString(colOperationName);
                 var opNumberText = GetString(colOpNumber);
                 var normText = GetString(colNorm);
-                var sectionName = GetSectionName(row, colSection, operationName);
+                var sectionName = GetSectionName(row, colSection);
                 var remainingText = GetString(colRemaining);
                 decimal? remainingQuantity = null;
 
@@ -249,7 +249,6 @@ public class ImportService : IImportService
                 var operation = await ResolveOperationAsync(operationName, operationCache, cancellationToken).ConfigureAwait(false);
 
                 var routeKey = $"{part.Id}:{opNumber}";
-                var isNewRoute = false;
                 if (!routeCache.TryGetValue(routeKey, out var route))
                 {
                     route = await _dbContext.PartRoutes
@@ -266,24 +265,9 @@ public class ImportService : IImportService
                         };
 
                         await _dbContext.PartRoutes.AddAsync(route, cancellationToken).ConfigureAwait(false);
-                        isNewRoute = true;
                     }
 
                     routeCache[routeKey] = route;
-                }
-
-                if (!isNewRoute)
-                {
-                    var existingNames = await GetRouteNamesAsync(route, cancellationToken).ConfigureAwait(false);
-                    if (!NamesEqual(existingNames.OperationName, operation.Name) || !NamesEqual(existingNames.SectionName, section.Name))
-                    {
-                        var reason = "В файле указан другой вид работ или наименование операции для уже существующей строки.";
-                        items.Add(CreateJobItem(job.Id, rowNumber, "Skipped", reason));
-                        results.Add(new ImportItemResultDto(rowNumber, "Skipped", reason));
-                        RegisterErrorRow(row, reason, rowNumber);
-                        skipped++;
-                        continue;
-                    }
                 }
 
                 route.OperationId = operation.Id;
@@ -364,15 +348,14 @@ public class ImportService : IImportService
         return $"{name} {code}";
     }
 
-    private static string GetSectionName(IXLRangeRow row, int column, string operationName)
+    private static string GetSectionName(IXLRangeRow row, int column)
     {
         if (column <= 0)
         {
-            return operationName;
+            return string.Empty;
         }
 
-        var value = row.Cell(column).GetString().Trim();
-        return string.IsNullOrWhiteSpace(value) ? operationName : value;
+        return row.Cell(column).GetString().Trim();
     }
 
     private async Task<Part> ResolvePartAsync(string name, string code, Dictionary<string, Part> cache, CancellationToken cancellationToken)
@@ -513,36 +496,6 @@ public class ImportService : IImportService
         cache[key] = balance;
 
         return balance;
-    }
-
-    private async Task<(string OperationName, string SectionName)> GetRouteNamesAsync(PartRoute route, CancellationToken cancellationToken)
-    {
-        var operationName = route.Operation?.Name;
-        if (string.IsNullOrWhiteSpace(operationName))
-        {
-            operationName = await _dbContext.Operations
-                .Where(x => x.Id == route.OperationId)
-                .Select(x => x.Name)
-                .FirstOrDefaultAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        var sectionName = route.Section?.Name;
-        if (string.IsNullOrWhiteSpace(sectionName))
-        {
-            sectionName = await _dbContext.Sections
-                .Where(x => x.Id == route.SectionId)
-                .Select(x => x.Name)
-                .FirstOrDefaultAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        return (operationName ?? string.Empty, sectionName ?? string.Empty);
-    }
-
-    private static bool NamesEqual(string left, string right)
-    {
-        return string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryParseDecimal(string value, out decimal result)

@@ -81,12 +81,57 @@
             <div class="col-lg-6">
                 <label class="form-label" for="routeFileInput">Файл Excel</label>
                 <input id="routeFileInput" class="form-control form-control-lg" type="file" accept=".xlsx,.xls" />
-                <div class="form-text">Используйте шаблон с колонками: Наименование детали, Наименование операции, № операции, Утвержденный норматив (н/ч), Вид работ, Количество остатка (необязательно). После импорта будет показана сводка с именем файла, количеством успешных и пропущенных строк.</div>
+                <div class="form-text">Используйте Excel с колонками в таком порядке: Наименование детали, Код детали, № операции, Наименование операции, Вид работ, Норматив, н/ч. Колонка «Количество остатка» остаётся необязательной. При повторном импорте существующие строки обновляются, новые добавляются, удаление данных не выполняется.</div>
             </div>
             <div class="col-lg-6 d-flex align-items-end">
                 <button type="button" class="btn btn-secondary btn-lg" id="routeImportButton">Импортировать файл</button>
             </div>
         </form>
+
+        <div class="alert alert-secondary mt-4" role="note">
+            <div class="fw-semibold mb-2">Пример таблицы для импорта</div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Наименование детали</th>
+                            <th scope="col">Код детали</th>
+                            <th scope="col">№ операции</th>
+                            <th scope="col">Наименование операции</th>
+                            <th scope="col">Вид работ</th>
+                            <th scope="col">Норматив, н/ч</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Боковина</td>
+                            <td>ТЭМ2.70.900.355</td>
+                            <td>005</td>
+                            <td>Заготовительная</td>
+                            <td>Заготовительная</td>
+                            <td>0,017</td>
+                        </tr>
+                        <tr>
+                            <td>Боковина</td>
+                            <td>ТЭМ2.70.900.355</td>
+                            <td>010</td>
+                            <td>Фрезерная</td>
+                            <td>Фрезерная</td>
+                            <td>0,1</td>
+                        </tr>
+                        <tr>
+                            <td>Болт</td>
+                            <td>СТ2К.01.005-01</td>
+                            <td>010</td>
+                            <td>Токарная</td>
+                            <td>Токарная</td>
+                            <td>0,333</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <div id="routeImportSummary" class="mt-4"></div>
     </div>
 </div>
