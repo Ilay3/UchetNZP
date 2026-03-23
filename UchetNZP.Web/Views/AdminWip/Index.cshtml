@@ -10,6 +10,76 @@
     <p class="lead mb-0">Отфильтруйте список и скорректируйте количество по нужным операциям.</p>
 </div>
 
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+        <span>Ярлыки в системе</span>
+        <span class="small text-muted">Всего ярлыков: @Model.Labels.Count</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">
+            Здесь можно удалить ярлык напрямую, если он больше не нужен. Система всё равно заблокирует удаление ярлыков,
+            которые уже участвовали в приёмке, перемещениях, списании остатка или находятся на складе.
+        </p>
+
+        @if (!Model.Labels.Any())
+        {
+            <div class="text-muted">По выбранным условиям ярлыки не найдены.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped align-middle" aria-describedby="adminWipLabelsCaption">
+                    <caption id="adminWipLabelsCaption" class="visually-hidden">Ярлыки НЗП по текущему фильтру</caption>
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col">Ярлык</th>
+                            <th scope="col">Деталь</th>
+                            <th scope="col">Текущая позиция</th>
+                            <th scope="col">Статус</th>
+                            <th scope="col" class="text-end">Количество</th>
+                            <th scope="col" class="text-end">Остаток</th>
+                            <th scope="col" class="text-nowrap">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var label in Model.Labels)
+                        {
+                            var positionText = !string.IsNullOrWhiteSpace(label.CurrentSectionDisplay)
+                                ? $"{label.CurrentSectionDisplay} / {(string.IsNullOrWhiteSpace(label.CurrentOpNumber) ? "—" : label.CurrentOpNumber)}"
+                                : "Не привязан";
+
+                            <tr>
+                                <td>
+                                    <span class="fw-semibold">@label.Number</span>
+                                </td>
+                                <td>@label.PartDisplay</td>
+                                <td>@positionText</td>
+                                <td>
+                                    <span class="badge bg-secondary">@label.Status</span>
+                                </td>
+                                <td class="text-end">@label.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
+                                <td class="text-end">@label.RemainingQuantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
+                                <td>
+                                    <form asp-action="DeleteLabel"
+                                          method="post"
+                                          onsubmit="return confirm('Удалить ярлык @label.Number из системы?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="LabelId" value="@label.LabelId" />
+                                        <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
+                                        <input type="hidden" name="FilterSectionId" value="@Model.SelectedSectionId" />
+                                        <input type="hidden" name="FilterOpNumber" value="@Model.SelectedOpNumber" />
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
 {
     <div class="d-none" data-toast-message="@Model.StatusMessage" data-toast-variant="success"></div>

@@ -18,12 +18,18 @@ public class AdminWipController : Controller
     private readonly AppDbContext _dbContext;
     private readonly IAdminWipService _adminWipService;
     private readonly IWipLabelLookupService _labelLookupService;
+    private readonly IWipLabelService _wipLabelService;
 
-    public AdminWipController(AppDbContext dbContext, IAdminWipService adminWipService, IWipLabelLookupService labelLookupService)
+    public AdminWipController(
+        AppDbContext dbContext,
+        IAdminWipService adminWipService,
+        IWipLabelLookupService labelLookupService,
+        IWipLabelService wipLabelService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _adminWipService = adminWipService ?? throw new ArgumentNullException(nameof(adminWipService));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
+        _wipLabelService = wipLabelService ?? throw new ArgumentNullException(nameof(wipLabelService));
     }
 
     [HttpGet("")]
@@ -73,7 +79,52 @@ public class AdminWipController : Controller
         return RedirectToIndex(model);
     }
 
+    [HttpPost("delete-label")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteLabel(AdminWipDeleteLabelInputModel model)
+    {
+        if (!ModelState.IsValid || model.LabelId == Guid.Empty)
+        {
+            TempData["AdminWipError"] = "Не удалось определить ярлык для удаления.";
+            return RedirectToIndex(model);
+        }
+
+        try
+        {
+            var labelNumber = await _dbContext.WipLabels
+                .AsNoTracking()
+                .Where(x => x.Id == model.LabelId)
+                .Select(x => x.Number)
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+
+            await _wipLabelService.DeleteLabelAsync(model.LabelId).ConfigureAwait(false);
+
+            TempData["AdminWipMessage"] = string.IsNullOrWhiteSpace(labelNumber)
+                ? "Ярлык удалён из системы."
+                : $"Ярлык {labelNumber} удалён из системы.";
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
+        {
+            TempData["AdminWipError"] = ex.Message;
+        }
+
+        return RedirectToIndex(model);
+    }
+
     private RedirectToActionResult RedirectToIndex(AdminWipAdjustmentInputModel model)
+    {
+        return RedirectToAction(
+            nameof(Index),
+            new
+            {
+                partId = model.FilterPartId,
+                sectionId = model.FilterSectionId,
+                opNumber = model.FilterOpNumber,
+            });
+    }
+
+    private RedirectToActionResult RedirectToIndex(AdminWipDeleteLabelInputModel model)
     {
         return RedirectToAction(
             nameof(Index),
@@ -207,6 +258,50 @@ public class AdminWipController : Controller
             })
             .ToList();
 
+        var labelsQuery = _dbContext.WipLabels
+            .AsNoTracking()
+            .Include(x => x.Part)
+            .AsQueryable();
+
+        if (partId.HasValue)
+        {
+            labelsQuery = labelsQuery.Where(x => x.PartId == partId.Value);
+        }
+
+        if (sectionId.HasValue)
+        {
+            labelsQuery = labelsQuery.Where(x => x.CurrentSectionId == sectionId.Value);
+        }
+
+        if (parsedOpNumber.HasValue)
+        {
+            labelsQuery = labelsQuery.Where(x => x.CurrentOpNumber == parsedOpNumber.Value);
+        }
+
+        var labels = await labelsQuery
+            .OrderByDescending(x => x.LabelDate)
+            .ThenBy(x => x.Number)
+            .Select(x => new AdminWipLabelRowViewModel
+            {
+                LabelId = x.Id,
+                Number = x.Number,
+                PartDisplay = NameWithCodeFormatter.getNameWithCode(x.Part!.Name, x.Part.Code),
+                CurrentSectionDisplay = x.CurrentSectionId.HasValue
+                    ? _dbContext.Sections
+                        .Where(section => section.Id == x.CurrentSectionId.Value)
+                        .Select(section => NameWithCodeFormatter.getNameWithCode(section.Name, section.Code))
+                        .FirstOrDefault()
+                    : null,
+                CurrentOpNumber = x.CurrentOpNumber.HasValue
+                    ? OperationNumber.Format(x.CurrentOpNumber.Value)
+                    : null,
+                Status = x.Status.ToString(),
+                Quantity = x.Quantity,
+                RemainingQuantity = x.RemainingQuantity,
+            })
+            .ToListAsync()
+            .ConfigureAwait(false);
+
         return new AdminWipIndexViewModel
         {
             SelectedPartId = partId,
@@ -217,6 +312,7 @@ public class AdminWipController : Controller
             Parts = partItems,
             Sections = sectionItems,
             Balances = balances,
+            Labels = labels,
             StatusMessage = statusMessage,
             ErrorMessage = errorMessage,
         };
