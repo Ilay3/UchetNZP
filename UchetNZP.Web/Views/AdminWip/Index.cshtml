@@ -17,8 +17,8 @@
     </div>
     <div class="card-body">
         <p class="text-muted small mb-3">
-            Здесь можно удалить ярлык напрямую, если он больше не нужен. Система всё равно заблокирует удаление ярлыков,
-            которые уже участвовали в приёмке, перемещениях, списании остатка или находятся на складе.
+            Это принудительное админское удаление: система отвяжет ярлык от приёмок и перемещений, почистит служебные связи
+            и после этого удалит запись ярлыка из базы.
         </p>
 
         @if (!Model.Labels.Any())
@@ -62,13 +62,13 @@
                                 <td>
                                     <form asp-action="DeleteLabel"
                                           method="post"
-                                          onsubmit="return confirm('Удалить ярлык @label.Number из системы?');">
+                                          onsubmit="return confirm('Принудительно удалить ярлык @label.Number из системы? Связи будут очищены без возможности восстановления.');">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="LabelId" value="@label.LabelId" />
                                         <input type="hidden" name="FilterPartId" value="@Model.SelectedPartId" />
                                         <input type="hidden" name="FilterSectionId" value="@Model.SelectedSectionId" />
                                         <input type="hidden" name="FilterOpNumber" value="@Model.SelectedOpNumber" />
-                                        <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">Удалить принудительно</button>
                                     </form>
                                 </td>
                             </tr>

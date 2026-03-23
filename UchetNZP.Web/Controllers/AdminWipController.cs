@@ -23,8 +23,7 @@ public class AdminWipController : Controller
     public AdminWipController(
         AppDbContext dbContext,
         IAdminWipService adminWipService,
-        IWipLabelLookupService labelLookupService,
-        IWipLabelService wipLabelService)
+        IWipLabelLookupService labelLookupService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _adminWipService = adminWipService ?? throw new ArgumentNullException(nameof(adminWipService));
@@ -91,18 +90,11 @@ public class AdminWipController : Controller
 
         try
         {
-            var labelNumber = await _dbContext.WipLabels
-                .AsNoTracking()
-                .Where(x => x.Id == model.LabelId)
-                .Select(x => x.Number)
-                .FirstOrDefaultAsync()
-                .ConfigureAwait(false);
-
-            await _wipLabelService.DeleteLabelAsync(model.LabelId).ConfigureAwait(false);
+            var labelNumber = await _adminWipService.ForceDeleteLabelAsync(model.LabelId).ConfigureAwait(false);
 
             TempData["AdminWipMessage"] = string.IsNullOrWhiteSpace(labelNumber)
                 ? "Ярлык удалён из системы."
-                : $"Ярлык {labelNumber} удалён из системы.";
+                : $"Ярлык {labelNumber} принудительно удалён из системы.";
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or KeyNotFoundException)
         {
