@@ -18,6 +18,7 @@ public class AdminWipController : Controller
     private readonly AppDbContext _dbContext;
     private readonly IAdminWipService _adminWipService;
     private readonly IWipLabelLookupService _labelLookupService;
+    private readonly IWipLabelService _wipLabelService;
 
     public AdminWipController(
         AppDbContext dbContext,
@@ -27,6 +28,7 @@ public class AdminWipController : Controller
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _adminWipService = adminWipService ?? throw new ArgumentNullException(nameof(adminWipService));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
+        _wipLabelService = wipLabelService ?? throw new ArgumentNullException(nameof(wipLabelService));
     }
 
     [HttpGet("")]
