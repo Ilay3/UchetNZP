@@ -17,6 +17,8 @@ public class AdminWipIndexViewModel
 
     public IReadOnlyCollection<AdminWipBalanceRowViewModel> Balances { get; init; } = Array.Empty<AdminWipBalanceRowViewModel>();
 
+    public IReadOnlyCollection<AdminWipLabelRowViewModel> Labels { get; init; } = Array.Empty<AdminWipLabelRowViewModel>();
+
     public string? StatusMessage { get; init; }
 
     public string? ErrorMessage { get; init; }
@@ -41,6 +43,25 @@ public class AdminWipBalanceRowViewModel
     public IReadOnlyList<string> LabelNumbers { get; init; } = Array.Empty<string>();
 }
 
+public class AdminWipLabelRowViewModel
+{
+    public Guid LabelId { get; init; }
+
+    public string Number { get; init; } = string.Empty;
+
+    public string PartDisplay { get; init; } = string.Empty;
+
+    public string? CurrentSectionDisplay { get; init; }
+
+    public string? CurrentOpNumber { get; init; }
+
+    public string Status { get; init; } = string.Empty;
+
+    public decimal Quantity { get; init; }
+
+    public decimal RemainingQuantity { get; init; }
+}
+
 public class AdminWipAdjustmentInputModel
 {
     [Required]
@@ -51,6 +72,18 @@ public class AdminWipAdjustmentInputModel
 
     [MaxLength(512)]
     public string? Comment { get; set; }
+
+    public Guid? FilterPartId { get; set; }
+
+    public Guid? FilterSectionId { get; set; }
+
+    public string? FilterOpNumber { get; set; }
+}
+
+public class AdminWipDeleteLabelInputModel
+{
+    [Required]
+    public Guid LabelId { get; set; }
 
     public Guid? FilterPartId { get; set; }
 
