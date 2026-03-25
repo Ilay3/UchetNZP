@@ -17,7 +17,7 @@ public static class NameWithCodeFormatter
         }
         else if (HasDistinctCode(ret, code))
         {
-            ret = $"{ret} ({code})";
+            ret = $"{ret} / {code}";
         }
 
         return ret;
@@ -58,6 +58,6 @@ public static class NameWithCodeFormatter
     {
         string normalized = NormalizeValue(value);
 
-        return Regex.Replace(normalized, @"[\s()._-]+", string.Empty);
+        return Regex.Replace(normalized, @"[\s()/.\\_-]+", string.Empty);
     }
 }

@@ -15,7 +15,7 @@
                 result = normalizedCode;
             }
             else if (normalizedCode && !result.toLowerCase().includes(normalizedCode.toLowerCase())) {
-                result = `${result} (${normalizedCode})`;
+                result = `${result} / ${normalizedCode}`;
             }
 
             return result;
