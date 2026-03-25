@@ -28,7 +28,6 @@ public class AdminWipController : Controller
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _adminWipService = adminWipService ?? throw new ArgumentNullException(nameof(adminWipService));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
-        _wipLabelService = wipLabelService ?? throw new ArgumentNullException(nameof(wipLabelService));
     }
 
     [HttpGet("")]
