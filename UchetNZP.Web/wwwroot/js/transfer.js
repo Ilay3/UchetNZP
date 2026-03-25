@@ -233,17 +233,26 @@
         await refreshPreview();
     }
 
-    partLookup.inputElement?.addEventListener("lookup:selected", event => {
-        const part = event.detail;
-        if (part && part.id) {
-            resetLabels();
-            void loadOperations(part.id);
+    function resolvePartFromLookupState() {
+        const selectedPart = partLookup.getSelected();
+        if (selectedPart?.id) {
+            return selectedPart;
         }
-        updateFormState();
-        saveDraft();
-    });
 
-    partLookup.inputElement?.addEventListener("input", () => {
+        const hiddenPartId = partLookup.hiddenInput?.value?.trim();
+        if (!hiddenPartId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(hiddenPartId)) {
+            return null;
+        }
+
+        const displayValue = partLookup.inputElement?.value?.trim() ?? "";
+        if (!displayValue.length) {
+            return null;
+        }
+
+        return { id: hiddenPartId, name: displayValue, code: "" };
+    }
+
+    function resetOperationsSelection() {
         selectedFromOperation = null;
         selectedToOperation = null;
         fromOperationInput.value = "";
@@ -256,6 +265,35 @@
         updateFromOperationsDatalist();
         updateToOperationsDatalist();
         updateBalanceLabels();
+    }
+
+    partLookup.inputElement?.addEventListener("lookup:selected", event => {
+        const part = event.detail;
+        if (part && part.id) {
+            resetLabels();
+            void loadOperations(part.id);
+        }
+        updateFormState();
+        saveDraft();
+    });
+
+    partLookup.inputElement?.addEventListener("change", () => {
+        const part = resolvePartFromLookupState();
+        if (part?.id && currentOperationsPartId !== part.id) {
+            resetLabels();
+            void loadOperations(part.id);
+        }
+    });
+
+    partLookup.inputElement?.addEventListener("input", () => {
+        const part = resolvePartFromLookupState();
+        if (part?.id) {
+            updateFormState();
+            saveDraft();
+            return;
+        }
+
+        resetOperationsSelection();
         updateFormState();
         void refreshPreview();
         saveDraft();
