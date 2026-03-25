@@ -736,6 +736,42 @@ public class WipTransfersController : Controller
             }
         }
 
+        var locationLabels = await _dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x =>
+                partIds.Contains(x.PartId) &&
+                x.CurrentSectionId.HasValue &&
+                x.CurrentOpNumber.HasValue &&
+                sectionIds.Contains(x.CurrentSectionId.Value) &&
+                opNumbers.Contains(x.CurrentOpNumber.Value) &&
+                x.RemainingQuantity > 0m &&
+                x.Status == WipLabelStatus.Active)
+            .Select(x => new
+            {
+                x.PartId,
+                SectionId = x.CurrentSectionId!.Value,
+                OpNumber = x.CurrentOpNumber!.Value,
+                LabelId = x.Id,
+                Quantity = x.RemainingQuantity,
+            })
+            .ToListAsync(in_cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var label in locationLabels)
+        {
+            var operationKey = (label.PartId, label.SectionId, label.OpNumber);
+            if (!requestedKeys.Contains(operationKey))
+            {
+                continue;
+            }
+
+            var key = (label.PartId, label.SectionId, label.OpNumber, label.LabelId);
+            if (!byKey.ContainsKey(key))
+            {
+                byKey[key] = label.Quantity;
+            }
+        }
+
         var buffer = new Dictionary<(Guid, Guid, int), List<TransferOperationLabelBalanceViewModel>>();
 
         foreach (var pair in byKey.Where(x => x.Value > 0m))
