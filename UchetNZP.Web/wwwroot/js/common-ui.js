@@ -30,7 +30,7 @@
             result = normalizedCode;
         }
         else if (normalizedCode && !isCodePartOfName(result, normalizedCode)) {
-            result = `${result} (${normalizedCode})`;
+            result = `${result} / ${normalizedCode}`;
         }
 
         return result;
@@ -374,6 +374,7 @@
         let lastItems = [];
         let selectedItem = null;
         const customItems = [];
+        let requestSequence = 0;
 
         function getAllItems() {
             return [...customItems, ...lastItems];
@@ -443,6 +444,7 @@
         }
 
         async function request(term) {
+            const requestId = ++requestSequence;
             try {
                 const url = new URL(fetchUrl, window.location.origin);
                 if (term) {
@@ -454,13 +456,24 @@
                     throw new Error(`Ошибка загрузки данных (${response.status})`);
                 }
 
-                lastItems = await response.json();
+                const items = await response.json();
+                if (requestId !== requestSequence) {
+                    return;
+                }
+
+                lastItems = items;
                 render(lastItems);
                 if (typeof term === "string" && term.trim().length > 0) {
-                    updateSelectionFromValue(term);
+                    const currentInputValue = input.value.trim();
+                    if (currentInputValue.localeCompare(term.trim(), undefined, { sensitivity: "accent" }) === 0) {
+                        updateSelectionFromValue(currentInputValue);
+                    }
                 }
             }
             catch (error) {
+                if (requestId !== requestSequence) {
+                    return;
+                }
                 console.error(error);
             }
         }
