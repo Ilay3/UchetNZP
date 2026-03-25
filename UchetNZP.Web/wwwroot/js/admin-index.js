@@ -462,6 +462,75 @@
             onCreate(null);
         });
 
+        $('.admin-quick-merge-code').on('click', async function () {
+            const entity = getActiveEntity();
+            if (entity !== 'parts') {
+                showErrors(['Действие доступно только в разделе «Детали».']);
+                showToast('Откройте раздел «Детали».', 'danger');
+                return;
+            }
+
+            const rows = getSelectedRows('parts');
+            if (!rows.length) {
+                showErrors(['Выберите хотя бы одну деталь.']);
+                showToast('Выберите хотя бы одну деталь.', 'danger');
+                return;
+            }
+
+            const candidates = rows.filter((row) => (row.code || '').trim());
+            if (!candidates.length) {
+                showErrors(['У выбранных деталей поле «Код» уже пустое.']);
+                showToast('Нет деталей с заполненным кодом.', 'danger');
+                return;
+            }
+
+            const triggerButton = this;
+            setButtonLoading(triggerButton, true);
+
+            let successCount = 0;
+            let failedCount = 0;
+
+            for (const row of candidates) {
+                const code = (row.code || '').trim();
+                const name = (row.name || '').trim();
+                const mergedName = name.toLowerCase().includes(code.toLowerCase())
+                    ? name
+                    : `${name} ${code}`.trim();
+
+                try {
+                    const response = await fetch(`/admin/api/parts/${row.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            RequestVerificationToken: requestVerificationToken
+                        },
+                        body: JSON.stringify({
+                            name: mergedName,
+                            code: ''
+                        })
+                    });
+
+                    if (response.ok) {
+                        successCount += 1;
+                    } else {
+                        failedCount += 1;
+                    }
+                } catch (e) {
+                    failedCount += 1;
+                }
+            }
+
+            setButtonLoading(triggerButton, false);
+            refreshTable(entityConfig.parts.tableId);
+
+            if (failedCount) {
+                showToast(`Обновлено: ${successCount}. Ошибок: ${failedCount}.`, successCount ? 'warning' : 'danger');
+                return;
+            }
+
+            showToast(`Код перенесён в название для ${successCount} деталей.`, 'success');
+        });
+
         $('.admin-quick-delete').on('click', async function () {
             const entity = getActiveEntity();
             if (!entity) {
