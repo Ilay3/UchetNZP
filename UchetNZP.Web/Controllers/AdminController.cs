@@ -1157,7 +1157,7 @@ public class AdminController : Controller
             return name;
         }
 
-        return string.Format(CultureInfo.CurrentCulture, "{0} ({1})", name, code);
+        return string.Format(CultureInfo.CurrentCulture, "{0} / {1}", name, code);
     }
 
     private static int ParseOperationNumber(string value, string parameterName)

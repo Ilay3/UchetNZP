@@ -33,7 +33,7 @@
         }
 
         if (normalizedCode && !normalizedName.toLowerCase().includes(normalizedCode.toLowerCase())) {
-            return `${normalizedName} (${normalizedCode})`;
+            return `${normalizedName} / ${normalizedCode}`;
         }
 
         return normalizedName;

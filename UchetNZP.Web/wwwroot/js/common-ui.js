@@ -30,7 +30,7 @@
             result = normalizedCode;
         }
         else if (normalizedCode && !isCodePartOfName(result, normalizedCode)) {
-            result = `${result} (${normalizedCode})`;
+            result = `${result} / ${normalizedCode}`;
         }
 
         return result;

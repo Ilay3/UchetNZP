@@ -15,7 +15,7 @@
                 result = normalizedCode;
             }
             else if (normalizedCode && !result.toLowerCase().includes(normalizedCode.toLowerCase())) {
-                result = `${result} (${normalizedCode})`;
+                result = `${result} / ${normalizedCode}`;
             }
 
             return result;
@@ -393,6 +393,12 @@
     });
 
     residualLabelNumberInput?.addEventListener("input", () => { updateResidualLabelHint(); void refreshPreview(); saveDraft(); });
+    residualLabelNumberInput?.addEventListener("blur", () => {
+        const parsed = parseResidualLabelBaseNumber(residualLabelNumberInput.value);
+        if (Number.isInteger(parsed) && parsed > 0) {
+            residualLabelNumberInput.value = String(parsed);
+        }
+    });
 
     labelNumberInput?.addEventListener("change", () => { void lookupLabelByNumber(); saveDraft(); });
     createResidualCheckbox?.addEventListener("change", () => {
@@ -1356,6 +1362,20 @@
         }
     }
 
+    function parseResidualLabelBaseNumber(value) {
+        const normalized = typeof value === "string" ? value.trim() : "";
+        if (!normalized) {
+            return null;
+        }
+
+        const match = normalized.match(/^(\d{1,5})(?:\/\d{1,5})?$/);
+        if (!match) {
+            return Number.NaN;
+        }
+
+        return Number(match[1]);
+    }
+
     async function lookupLabelByNumber() {
         const part = partLookup.getSelected();
         const value = labelNumberInput?.value?.trim() ?? "";
@@ -1515,9 +1535,9 @@
         const residualLabelNumberRaw = residualLabelNumberInput?.value?.trim() ?? "";
         let residualLabelNumber = null;
         if (createResidualLabel && residualLabelNumberRaw.length > 0) {
-            const parsedResidual = Number(residualLabelNumberRaw);
+            const parsedResidual = parseResidualLabelBaseNumber(residualLabelNumberRaw);
             if (!Number.isInteger(parsedResidual) || parsedResidual <= 0) {
-                alert("Номер ярлыка остатка должен быть целым числом больше 0.");
+                alert("Номер остаточного ярлыка должен быть в формате 103 или 103/1.");
                 return;
             }
 
