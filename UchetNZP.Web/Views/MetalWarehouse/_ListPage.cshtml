@@ -1,0 +1,55 @@
+@model MetalWarehouseListPageViewModel
+
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">@Model.Title</h1>
+    <p class="lead mb-0">@Model.Description</p>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Index">На главную модуля</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Receipts">Приход</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Stock">Остатки</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Requirements">Требования</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Movements">Движения</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">@Model.Title</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        @foreach (var header in Model.Headers)
+                        {
+                            <th>@header</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Rows.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="@Model.Headers.Count" class="py-4">
+                                <div class="fw-semibold">@Model.EmptyStateTitle</div>
+                                <div class="text-muted">@Model.EmptyStateDescription</div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var row in Model.Rows)
+                        {
+                            <tr>
+                                @foreach (var cell in row)
+                                {
+                                    <td>@cell</td>
+                                }
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
