@@ -57,7 +57,7 @@ public class MetalReceiptUnitInputViewModel
     public int ItemIndex { get; set; }
 
     [Required(ErrorMessage = "Размер обязателен.")]
-    [Range(typeof(decimal), "0.000001", "999999999999", ErrorMessage = "Размер должен быть больше 0.")]
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Размер должен быть больше 0.")]
     public decimal? SizeValue { get; set; }
 }
 
@@ -73,7 +73,7 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     [Required(ErrorMessage = "Материал обязателен.")]
     public Guid? MetalMaterialId { get; set; }
 
-    [Range(typeof(decimal), "0.000001", "999999999999", ErrorMessage = "Вес должен быть больше 0.")]
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Вес должен быть больше 0.")]
     public decimal? TotalWeightKg { get; set; }
 
     [Range(1, 9999, ErrorMessage = "Количество должно быть больше 0.")]
