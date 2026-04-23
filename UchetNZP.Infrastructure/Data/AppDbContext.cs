@@ -60,6 +60,12 @@ public class AppDbContext : DbContext
 
     public DbSet<WipBatchInventoryDocument> WipBatchInventoryDocuments => Set<WipBatchInventoryDocument>();
 
+    public DbSet<MetalMaterial> MetalMaterials => Set<MetalMaterial>();
+
+    public DbSet<MetalReceipt> MetalReceipts => Set<MetalReceipt>();
+
+    public DbSet<MetalReceiptItem> MetalReceiptItems => Set<MetalReceiptItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

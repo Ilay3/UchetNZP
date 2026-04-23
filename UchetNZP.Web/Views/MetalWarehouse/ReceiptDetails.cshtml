@@ -1,0 +1,55 @@
+@model MetalReceiptDetailsViewModel
+@{
+    ViewData["Title"] = "Карточка прихода";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Карточка прихода @Model.ReceiptNumber</h1>
+    <p class="lead mb-0">Детали документа поступления металла.</p>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Receipts">К списку приходов</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Шапка документа</div>
+    <div class="card-body row g-3">
+        <div class="col-md-3"><strong>Номер:</strong> @Model.ReceiptNumber</div>
+        <div class="col-md-3"><strong>Дата:</strong> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div>
+        <div class="col-md-6"><strong>Источник:</strong> @(string.IsNullOrWhiteSpace(Model.SupplierOrSource) ? "—" : Model.SupplierOrSource)</div>
+        <div class="col-md-6"><strong>Материал:</strong> @Model.MaterialName</div>
+        <div class="col-md-3"><strong>Вес, кг:</strong> @Model.TotalWeightKg.ToString("0.###")</div>
+        <div class="col-md-3"><strong>Количество:</strong> @Model.Quantity</div>
+        <div class="col-12"><strong>Комментарий:</strong> @(string.IsNullOrWhiteSpace(Model.Comment) ? "—" : Model.Comment)</div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Единицы металла</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>№</th>
+                        <th>Размер</th>
+                        <th>Ед. изм.</th>
+                        <th>Код</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>@item.ItemIndex</td>
+                            <td>@item.SizeValue.ToString("0.###")</td>
+                            <td>@item.SizeUnitText</td>
+                            <td class="fw-semibold">@item.GeneratedCode</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

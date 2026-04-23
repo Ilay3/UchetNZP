@@ -66,10 +66,12 @@ using (var scope = app.Services.CreateScope())
         db.Database.Migrate();
         await EnsureTransferAuditResidualColumnsAsync(db, CancellationToken.None);
         await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
+        await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
     }
     else
     {
         await db.Database.EnsureCreatedAsync(CancellationToken.None);
+        await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
     }
 }
 
@@ -107,6 +109,50 @@ static async Task EnsureTransferAuditResidualColumnsAsync(AppDbContext in_db, Ca
             ADD COLUMN IF NOT EXISTS "ResidualLabelNumber" character varying(64);
         """,
         in_cancellationToken);
+}
+
+static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    if (await in_db.MetalMaterials.AnyAsync(in_cancellationToken))
+    {
+        return;
+    }
+
+    in_db.MetalMaterials.AddRange(
+        new UchetNZP.Domain.Entities.MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = "Лист ст.35 t=6 ГОСТ19903-74/1577-93",
+            Code = "LIST35T6",
+            UnitKind = "SquareMeter",
+            IsActive = true,
+        },
+        new UchetNZP.Domain.Entities.MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = "Пруток 20Г",
+            Code = "PRUT20G",
+            UnitKind = "Meter",
+            IsActive = true,
+        },
+        new UchetNZP.Domain.Entities.MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = "Круг 45",
+            Code = "KRUG45",
+            UnitKind = "Meter",
+            IsActive = true,
+        },
+        new UchetNZP.Domain.Entities.MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = "Лист 09Г2С t=4",
+            Code = "LIST09G2S4",
+            UnitKind = "SquareMeter",
+            IsActive = true,
+        });
+
+    await in_db.SaveChangesAsync(in_cancellationToken);
 }
 
 public partial class Program
