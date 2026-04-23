@@ -1,6 +1,70 @@
-@model MetalWarehouseListPageViewModel
+@model MetalReceiptListViewModel
 @{
     ViewData["Title"] = "Приход металла";
 }
 
-<partial name="_ListPage" model="Model" />
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Приход металла</h1>
+    <p class="lead mb-0">Журнал поступлений металла в складской модуль.</p>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Index">На главную модуля</a>
+    <a class="btn btn-primary" asp-controller="MetalWarehouse" asp-action="CreateReceipt">Добавить приход</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Stock">Остатки</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Requirements">Требования</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Movements">Движения</a>
+</div>
+
+@if (TempData["MetalReceiptSuccess"] is string successMessage)
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Приходы</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Номер</th>
+                        <th>Дата</th>
+                        <th>Источник</th>
+                        <th>Позиций</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Receipts.Count == 0)
+                    {
+                        <tr>
+                            <td colspan="5" class="py-4">
+                                <div class="fw-semibold">Поступлений пока нет</div>
+                                <div class="text-muted">Когда вы добавите первый приход металла, он появится в этой таблице.</div>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var receipt in Model.Receipts)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@receipt.ReceiptNumber</td>
+                                <td>@receipt.ReceiptDate.ToString("dd.MM.yyyy")</td>
+                                <td>@(string.IsNullOrWhiteSpace(receipt.SupplierOrSource) ? "—" : receipt.SupplierOrSource)</td>
+                                <td>@receipt.PositionsCount</td>
+                                <td>
+                                    <a class="btn btn-sm btn-outline-primary"
+                                       asp-controller="MetalWarehouse"
+                                       asp-action="ReceiptDetails"
+                                       asp-route-id="@receipt.Id">Открыть</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
