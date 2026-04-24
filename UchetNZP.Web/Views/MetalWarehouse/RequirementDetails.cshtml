@@ -6,7 +6,11 @@
 <div class="page-header mb-4">
     <h1 class="display-6 fw-semibold">Требование @Model.RequirementNumber</h1>
     <p class="lead">Документ в режиме read-only. Фактическое списание металла не выполняется.</p>
-    <a class="btn btn-outline-secondary btn-sm" asp-controller="MetalWarehouse" asp-action="CuttingMaps">Открыть карты раскроя</a>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary btn-sm" asp-controller="MetalWarehouse" asp-action="CuttingMaps">Открыть карты раскроя</a>
+        <a class="btn btn-outline-primary btn-sm" asp-controller="MetalWarehouse" asp-action="RequirementPrintWarehouse" asp-route-id="@Model.Id" target="_blank">Печать для склада</a>
+        <a class="btn btn-outline-primary btn-sm" asp-controller="MetalWarehouse" asp-action="RequirementPrintMaster" asp-route-id="@Model.Id" target="_blank">Печать для мастера цеха</a>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-4">
@@ -32,6 +36,18 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Итоги по документу</div>
+    <div class="card-body row g-3">
+        <div class="col-md-2"><div class="text-muted small">Итого, кг</div><div class="fw-semibold">@Model.Aggregates.TotalKg.ToString("0.###")</div></div>
+        <div class="col-md-2"><div class="text-muted small">Итого, м</div><div class="fw-semibold">@Model.Aggregates.TotalMeters.ToString("0.###")</div></div>
+        <div class="col-md-2"><div class="text-muted small">Итого, м²</div><div class="fw-semibold">@Model.Aggregates.TotalSquareMeters.ToString("0.###")</div></div>
+        <div class="col-md-2"><div class="text-muted small">Прогноз отхода</div><div class="fw-semibold">@Model.Aggregates.ForecastWastePercent.ToString("0.###")%</div></div>
+        <div class="col-md-2"><div class="text-muted small">Деловой остаток</div><div class="fw-semibold">@Model.Aggregates.ForecastBusinessResidual.ToString("0.###")</div></div>
+        <div class="col-md-2"><div class="text-muted small">Лом</div><div class="fw-semibold">@Model.Aggregates.ForecastScrapResidual.ToString("0.###")</div></div>
+    </div>
+</div>
+
 <div class="card shadow-sm">
     <div class="card-header bg-light fw-semibold">Позиции требования и расчет потребности</div>
     <div class="card-body">
@@ -40,12 +56,13 @@
                 <thead class="table-light">
                     <tr>
                         <th>Материал</th>
-                        <th>Норма на 1 деталь</th>
-                        <th>Итого требуется</th>
-                        <th>Ед. изм.</th>
-                        <th>Итого вес, кг</th>
-                        <th>Обратный пересчёт</th>
-                        <th>Формула / входные данные</th>
+                        <th>Артикул</th>
+                        <th>Исходная заготовка</th>
+                        <th>Потребность нетто</th>
+                        <th>Техпотери / коэфф.</th>
+                        <th>К выдаче со склада</th>
+                        <th>Ожидаемый остаток (деловой / лом)</th>
+                        <th>Источник расчета</th>
                         <th>Текущий остаток</th>
                         <th>Разница</th>
                         <th>Источник выбора</th>
@@ -57,17 +74,25 @@
                     {
                         <tr>
                             <td>@item.MaterialDisplay</td>
-                            <td>@item.NormPerUnit.ToString("0.###")</td>
-                            <td>@item.TotalRequiredQty.ToString("0.###")</td>
-                            <td>@item.Unit</td>
-                            <td>@(item.TotalRequiredWeightKg.HasValue ? item.TotalRequiredWeightKg.Value.ToString("0.###") : "—")</td>
-                            <td>@item.BackCalculatedMeters.ToString("0.###") м; @item.BackCalculatedSquareMeters.ToString("0.###") м²</td>
+                            <td>@item.MaterialArticle</td>
+                            <td>@item.SourceBlankDisplay</td>
+                            <td>@item.NetRequirementQty.ToString("0.###") @item.Unit</td>
+                            <td>@item.LossFactor.ToString("0.###")</td>
+                            <td>@item.QtyToIssueFromStock.ToString("0.###") @item.Unit</td>
+                            <td>@item.ExpectedBusinessResidual.ToString("0.###") / @item.ExpectedScrapResidual.ToString("0.###")</td>
                             <td>
+                                @if (item.CuttingPlanId.HasValue)
+                                {
+                                    <div>
+                                        <a asp-controller="MetalWarehouse" asp-action="CuttingMaps">cutting_plan @item.CuttingPlanId.Value</a>
+                                    </div>
+                                }
                                 <div><code>@(string.IsNullOrWhiteSpace(item.CalculationFormula) ? "—" : item.CalculationFormula)</code></div>
                                 @if (!string.IsNullOrWhiteSpace(item.CalculationInput))
                                 {
                                     <div class="small text-muted">@item.CalculationInput</div>
                                 }
+                                <div class="small text-muted">Пересчёт: @item.BackCalculatedMeters.ToString("0.###") м; @item.BackCalculatedSquareMeters.ToString("0.###") м²</div>
                             </td>
                             <td>@item.StockQty.ToString("0.###") @item.Unit</td>
                             <td>

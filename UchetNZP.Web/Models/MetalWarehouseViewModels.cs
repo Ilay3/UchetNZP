@@ -264,6 +264,8 @@ public class MetalRequirementDetailsItemViewModel
 {
     public string MaterialDisplay { get; init; } = string.Empty;
 
+    public string MaterialArticle { get; init; } = string.Empty;
+
     public decimal NormPerUnit { get; init; }
 
     public decimal TotalRequiredQty { get; init; }
@@ -271,6 +273,22 @@ public class MetalRequirementDetailsItemViewModel
     public string Unit { get; init; } = string.Empty;
 
     public decimal? TotalRequiredWeightKg { get; init; }
+
+    public decimal NetRequirementQty { get; init; }
+
+    public decimal LossFactor { get; init; }
+
+    public decimal QtyToIssueFromStock { get; init; }
+
+    public decimal ExpectedBusinessResidual { get; init; }
+
+    public decimal ExpectedScrapResidual { get; init; }
+
+    public decimal ExpectedStockAfterIssue => StockQty - QtyToIssueFromStock;
+
+    public string SourceBlankDisplay { get; init; } = string.Empty;
+
+    public Guid? CuttingPlanId { get; init; }
 
     public string? CalculationFormula { get; init; }
 
@@ -286,13 +304,51 @@ public class MetalRequirementDetailsItemViewModel
 
     public string? CandidateMaterials { get; init; }
 
-    public decimal DifferenceQty => StockQty - TotalRequiredQty;
+    public decimal DifferenceQty => StockQty - QtyToIssueFromStock;
 
     public bool IsEnough => DifferenceQty >= 0m;
 
     public decimal BackCalculatedMeters { get; init; }
 
     public decimal BackCalculatedSquareMeters { get; init; }
+}
+
+public class MetalRequirementAggregateViewModel
+{
+    public decimal TotalKg { get; init; }
+
+    public decimal TotalMeters { get; init; }
+
+    public decimal TotalSquareMeters { get; init; }
+
+    public decimal ForecastWastePercent { get; init; }
+
+    public decimal ForecastBusinessResidual { get; init; }
+
+    public decimal ForecastScrapResidual { get; init; }
+}
+
+public class MetalRequirementCutDetailViewModel
+{
+    public int StockIndex { get; init; }
+
+    public int Sequence { get; init; }
+
+    public string ItemType { get; init; } = string.Empty;
+
+    public decimal? Length { get; init; }
+
+    public decimal? Width { get; init; }
+
+    public decimal? Height { get; init; }
+
+    public decimal? PositionX { get; init; }
+
+    public decimal? PositionY { get; init; }
+
+    public bool Rotated { get; init; }
+
+    public int Quantity { get; init; }
 }
 
 public class MetalRequirementDetailsViewModel
@@ -314,6 +370,14 @@ public class MetalRequirementDetailsViewModel
     public DateTime? LaunchDate { get; init; }
 
     public string? Comment { get; init; }
+
+    public string SourceBlankDisplay { get; init; } = string.Empty;
+
+    public Guid? CurrentCuttingPlanId { get; init; }
+
+    public MetalRequirementAggregateViewModel Aggregates { get; init; } = new();
+
+    public IReadOnlyCollection<MetalRequirementCutDetailViewModel> CutDetails { get; init; } = Array.Empty<MetalRequirementCutDetailViewModel>();
 
     public IReadOnlyCollection<MetalRequirementDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalRequirementDetailsItemViewModel>();
 }
