@@ -501,6 +501,47 @@
     function renderSummary(result) {
         const errors = Array.isArray(result.errors) ? result.errors : [];
         const hasErrorFile = !!result.errorFileContent;
+        const parseRows = Array.isArray(result.parsePreviewRows) ? result.parsePreviewRows : [];
+        const parseRowsHtml = parseRows.length === 0
+            ? ""
+            : `<hr />
+                <div class="mb-2"><strong>Как распознано (первые ${parseRows.length} из ${result.parsePreviewTotal || parseRows.length}):</strong></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Обозначение</th>
+                                <th>Размер</th>
+                                <th>Shape</th>
+                                <th>D</th>
+                                <th>T</th>
+                                <th>W</th>
+                                <th>L</th>
+                                <th>Unit</th>
+                                <th>Value</th>
+                                <th>Status</th>
+                                <th>Ошибка</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${parseRows.map(row => `<tr>
+                                <td>${row.rowIndex}</td>
+                                <td>${escapeHtml(row.code || "")}</td>
+                                <td>${escapeHtml(row.sizeRaw || "")}</td>
+                                <td>${escapeHtml(row.shapeType || "unknown")}</td>
+                                <td>${formatNumber(row.diameterMm)}</td>
+                                <td>${formatNumber(row.thicknessMm)}</td>
+                                <td>${formatNumber(row.widthMm)}</td>
+                                <td>${formatNumber(row.lengthMm)}</td>
+                                <td>${escapeHtml(row.unitNorm || "")}</td>
+                                <td>${formatNumber(row.valueNorm)}</td>
+                                <td>${escapeHtml(row.parseStatus || "")}</td>
+                                <td>${escapeHtml(row.parseError || "")}</td>
+                            </tr>`).join("")}
+                        </tbody>
+                    </table>
+                </div>`;
         summary.innerHTML = `
             <div class="alert ${result.dryRun ? "alert-info" : "alert-success"}">
                 <div><strong>${result.dryRun ? "Dry-run" : "Импорт"}:</strong> ${result.sourceFileName}</div>
@@ -509,6 +550,7 @@
                 <div>Норм создано: <strong>${result.normsCreated}</strong>, обновлено: <strong>${result.normsUpdated}</strong></div>
                 <div>Строк пропущено: <strong>${result.rowsSkipped}</strong></div>
                 ${errors.length === 0 ? "" : `<hr /><div><strong>Ошибки:</strong><ul>${errors.slice(0, 30).map(e => `<li>[${e.sheet} #${e.rowIndex}] ${e.message}</li>`).join("")}</ul>${errors.length > 30 ? `<div class="small text-muted">Показаны первые 30 ошибок из ${errors.length}. Полный список — в Excel-файле.</div>` : ""}</div>`}
+                ${parseRowsHtml}
                 ${hasErrorFile ? `<div class="mt-3"><button type="button" class="btn btn-outline-danger" id="metalDownloadErrorsButton">Скачать ошибки в Excel</button></div>` : ""}
             </div>`;
 
@@ -548,5 +590,21 @@
         catch (error) {
             console.error("Не удалось скачать файл ошибок", error);
         }
+    }
+
+    function formatNumber(value) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) {
+            return "";
+        }
+
+        return Number(value).toString();
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;");
     }
 })();

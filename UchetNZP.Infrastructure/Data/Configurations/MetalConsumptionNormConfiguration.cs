@@ -15,6 +15,36 @@ public class MetalConsumptionNormConfiguration : IEntityTypeConfiguration<MetalC
         builder.Property(x => x.SizeRaw)
             .HasMaxLength(128);
 
+        builder.Property(x => x.ShapeType)
+            .IsRequired()
+            .HasMaxLength(16);
+
+        builder.Property(x => x.DiameterMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.ThicknessMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.WidthMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.LengthMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.UnitNorm)
+            .IsRequired()
+            .HasMaxLength(8);
+
+        builder.Property(x => x.ValueNorm)
+            .HasPrecision(12, 6);
+
+        builder.Property(x => x.ParseStatus)
+            .IsRequired()
+            .HasMaxLength(16);
+
+        builder.Property(x => x.ParseError)
+            .HasMaxLength(512);
+
         builder.Property(x => x.BaseConsumptionQty)
             .HasPrecision(12, 6)
             .IsRequired();

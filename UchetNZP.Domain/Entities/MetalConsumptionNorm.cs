@@ -10,6 +10,24 @@ public class MetalConsumptionNorm
 
     public string? SizeRaw { get; set; }
 
+    public string ShapeType { get; set; } = "unknown";
+
+    public decimal? DiameterMm { get; set; }
+
+    public decimal? ThicknessMm { get; set; }
+
+    public decimal? WidthMm { get; set; }
+
+    public decimal? LengthMm { get; set; }
+
+    public string UnitNorm { get; set; } = "pcs";
+
+    public decimal? ValueNorm { get; set; }
+
+    public string ParseStatus { get; set; } = "failed";
+
+    public string? ParseError { get; set; }
+
     public decimal BaseConsumptionQty { get; set; }
 
     public string ConsumptionUnit { get; set; } = string.Empty;
