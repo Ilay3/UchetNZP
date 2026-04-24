@@ -1,6 +1,54 @@
-@model MetalWarehouseListPageViewModel
+@model UchetNZP.Web.Models.MetalRequirementListViewModel
 @{
     ViewData["Title"] = "Требования производства";
 }
 
-<partial name="_ListPage" model="Model" />
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Требования производства</h1>
+    <p class="lead">Черновики требований на склад металла, сформированные из запусков партий.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        @if (Model.Items.Count == 0)
+        {
+            <div class="alert alert-light border mb-0">Требования пока не создавались.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Номер</th>
+                            <th>Дата</th>
+                            <th>Деталь</th>
+                            <th>Количество</th>
+                            <th>Материал</th>
+                            <th>Требуется</th>
+                            <th>Статус</th>
+                            <th class="text-end">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Items)
+                        {
+                            <tr>
+                                <td>@item.RequirementNumber</td>
+                                <td>@item.RequirementDate.ToString("dd.MM.yyyy HH:mm")</td>
+                                <td>@item.PartDisplay</td>
+                                <td>@item.Quantity.ToString("0.###")</td>
+                                <td>@item.MaterialDisplay</td>
+                                <td>@item.RequiredQty.ToString("0.###") @item.Unit</td>
+                                <td><span class="badge bg-secondary">@item.Status</span></td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-primary" asp-action="RequirementDetails" asp-route-id="@item.Id">Открыть</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>

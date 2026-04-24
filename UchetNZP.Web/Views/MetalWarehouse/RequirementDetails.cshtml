@@ -1,0 +1,76 @@
+@model UchetNZP.Web.Models.MetalRequirementDetailsViewModel
+@{
+    ViewData["Title"] = $"Требование {Model.RequirementNumber}";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Требование @Model.RequirementNumber</h1>
+    <p class="lead">Документ в режиме read-only. Фактическое списание металла не выполняется.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body row g-3">
+        <div class="col-md-3"><div class="text-muted small">Дата</div><div class="fw-semibold">@Model.RequirementDate.ToString("dd.MM.yyyy HH:mm")</div></div>
+        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge bg-secondary">@Model.Status</span></div></div>
+        <div class="col-md-6"><div class="text-muted small">Деталь</div><div class="fw-semibold">@Model.PartDisplay</div></div>
+        <div class="col-md-3"><div class="text-muted small">Количество деталей</div><div class="fw-semibold">@Model.Quantity.ToString("0.###")</div></div>
+        <div class="col-md-9">
+            <div class="text-muted small">Связанный запуск</div>
+            <div>
+                <a asp-controller="WipLaunches" asp-action="History">@Model.WipLaunchId</a>
+                @if (Model.LaunchDate.HasValue)
+                {
+                    <span class="text-muted">(@Model.LaunchDate.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm"))</span>
+                }
+            </div>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.Comment))
+        {
+            <div class="col-12"><div class="text-muted small">Комментарий</div><div>@Model.Comment</div></div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Позиции требования и расчет потребности</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Материал</th>
+                        <th>Норма на 1 деталь</th>
+                        <th>Итого требуется</th>
+                        <th>Ед. изм.</th>
+                        <th>Итого вес, кг</th>
+                        <th>Текущий остаток</th>
+                        <th>Разница</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td>@item.MaterialDisplay</td>
+                            <td>@item.NormPerUnit.ToString("0.###")</td>
+                            <td>@item.TotalRequiredQty.ToString("0.###")</td>
+                            <td>@item.Unit</td>
+                            <td>@(item.TotalRequiredWeightKg.HasValue ? item.TotalRequiredWeightKg.Value.ToString("0.###") : "—")</td>
+                            <td>@item.StockQty.ToString("0.###") @item.Unit</td>
+                            <td>
+                                @if (item.IsEnough)
+                                {
+                                    <span class="text-success">Хватает (+@item.DifferenceQty.ToString("0.###"))</span>
+                                }
+                                else
+                                {
+                                    <span class="text-danger">Не хватает (@item.DifferenceQty.ToString("0.###"))</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

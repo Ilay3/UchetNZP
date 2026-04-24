@@ -23,4 +23,8 @@ public class Part
     public virtual ICollection<WarehouseItem> WarehouseItems { get; set; } = new List<WarehouseItem>();
 
     public virtual ICollection<WipLabel> WipLabels { get; set; } = new List<WipLabel>();
+
+    public virtual ICollection<MetalConsumptionNorm> MetalConsumptionNorms { get; set; } = new List<MetalConsumptionNorm>();
+
+    public virtual ICollection<MetalRequirement> MetalRequirements { get; set; } = new List<MetalRequirement>();
 }

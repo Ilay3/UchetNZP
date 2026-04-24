@@ -66,6 +66,12 @@ public class AppDbContext : DbContext
 
     public DbSet<MetalReceiptItem> MetalReceiptItems => Set<MetalReceiptItem>();
 
+    public DbSet<MetalConsumptionNorm> MetalConsumptionNorms => Set<MetalConsumptionNorm>();
+
+    public DbSet<MetalRequirement> MetalRequirements => Set<MetalRequirement>();
+
+    public DbSet<MetalRequirementItem> MetalRequirementItems => Set<MetalRequirementItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
