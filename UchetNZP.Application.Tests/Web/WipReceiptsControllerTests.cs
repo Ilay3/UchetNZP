@@ -110,7 +110,7 @@ public class WipReceiptsControllerTests
         var receiptDate = DateTime.SpecifyKind(new DateTime(2024, 6, 1), DateTimeKind.Unspecified);
 
         var saveResult = await service.AddReceiptsBatchAsync(
-            new[] { new Application.Contracts.Wip.ReceiptItemDto(partId, opNumber, sectionId, receiptDate, quantity, null, labelId, labelNumber, true) },
+            new[] { new Application.Contracts.Wip.ReceiptItemDto(partId, opNumber, sectionId, null, receiptDate, quantity, null, labelId, labelNumber, true) },
             CancellationToken.None);
 
         var receiptInfo = Assert.Single(saveResult.Items);

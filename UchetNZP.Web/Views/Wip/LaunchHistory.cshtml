@@ -151,10 +151,12 @@
                                                                     <th>Норма на 1 деталь</th>
                                                                     <th>Ед. изм.</th>
                                                                     <th>Количество деталей</th>
-                                                                    <th>Итого требуется</th>
-                                                                    <th>Вес 1 м/1 м², кг</th>
+                                                                    <th>Потребность (м / м² / шт)</th>
+                                                                    <th>Масса на ед. (кг/м; кг/м²)</th>
                                                                     <th>Коэффициент</th>
                                                                     <th>Итого кг</th>
+                                                                    <th>Обратный пересчет</th>
+                                                                    <th>Формула</th>
                                                                     <th>Остаток на складе</th>
                                                                     <th>Хватает / не хватает</th>
                                                                 </tr>
@@ -168,10 +170,12 @@
                                                                         <td>@need.NormPerUnit.ToString("0.###")</td>
                                                                         <td>@need.Unit</td>
                                                                         <td>@need.Quantity.ToString("0.###")</td>
-                                                                        <td>@need.TotalRequiredQty.ToString("0.###")</td>
-                                                                        <td>@(need.WeightPerUnitKg.HasValue ? need.WeightPerUnitKg.Value.ToString("0.###") : "—")</td>
+                                                                        <td>@need.NeedM.ToString("0.###") / @need.NeedM2.ToString("0.###") / @need.NeedPcs.ToString("0.###")</td>
+                                                                        <td>@need.MassPerMeterKg.ToString("0.###") ; @need.MassPerSquareMeterKg.ToString("0.###")</td>
                                                                         <td>@need.Coefficient.ToString("0.###")</td>
                                                                         <td>@need.TotalRequiredWeightKg.ToString("0.###")</td>
+                                                                        <td>@need.MetersFromKg.ToString("0.###") м; @need.SquareMetersFromKg.ToString("0.###") м²</td>
+                                                                        <td><code>@need.Formula</code></td>
                                                                         <td>@need.StockWeightKg.ToString("0.###") кг</td>
                                                                         <td>
                                                                             @if (need.IsEnough)

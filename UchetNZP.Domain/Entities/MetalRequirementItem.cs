@@ -16,6 +16,10 @@ public class MetalRequirementItem
 
     public decimal? TotalRequiredWeightKg { get; set; }
 
+    public string? CalculationFormula { get; set; }
+
+    public string? CalculationInput { get; set; }
+
     public virtual MetalRequirement? MetalRequirement { get; set; }
 
     public virtual MetalMaterial? MetalMaterial { get; set; }
