@@ -1288,16 +1288,16 @@ public class MetalWarehouseController : Controller
                 x.Comment,
                 MaterialName = x.MetalMaterial != null ? x.MetalMaterial.Name : "—",
                 MaterialCode = x.MetalMaterial != null ? x.MetalMaterial.Code : null,
-                Items = x.Items.Select(i => new
+                Items = x.Items.Select(i => new RequirementDetailsItemProjection
                 {
-                    i.MetalMaterialId,
-                    i.ConsumptionPerUnit,
-                    i.ConsumptionUnit,
-                    i.Unit,
-                    i.RequiredQty,
-                    i.RequiredWeightKg,
-                    i.SizeRaw,
-                    i.Comment,
+                    MetalMaterialId = i.MetalMaterialId,
+                    ConsumptionPerUnit = i.ConsumptionPerUnit,
+                    ConsumptionUnit = i.ConsumptionUnit,
+                    Unit = i.Unit,
+                    RequiredQty = i.RequiredQty,
+                    RequiredWeightKg = i.RequiredWeightKg,
+                    SizeRaw = i.SizeRaw,
+                    Comment = i.Comment,
                     MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : "—",
                     MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : null,
                 }).ToList(),
@@ -1697,4 +1697,27 @@ public class MetalWarehouseController : Controller
             .ToArray());
         return string.IsNullOrWhiteSpace(letters) ? "METAL" : letters;
     }
+}
+
+internal sealed class RequirementDetailsItemProjection
+{
+    public Guid MetalMaterialId { get; init; }
+
+    public decimal ConsumptionPerUnit { get; init; }
+
+    public string ConsumptionUnit { get; init; } = string.Empty;
+
+    public string Unit { get; init; } = string.Empty;
+
+    public decimal RequiredQty { get; init; }
+
+    public decimal? RequiredWeightKg { get; init; }
+
+    public string? SizeRaw { get; init; }
+
+    public string? Comment { get; init; }
+
+    public string MaterialName { get; init; } = string.Empty;
+
+    public string? MaterialCode { get; init; }
 }
