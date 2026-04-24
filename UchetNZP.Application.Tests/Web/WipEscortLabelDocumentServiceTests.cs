@@ -34,6 +34,31 @@ public class WipEscortLabelDocumentServiceTests
         Assert.DoesNotContain(operationRows, row => GetCellText(row[2]).Length > 0);
     }
 
+
+    [Fact]
+    public async Task BuildAsync_WhenOperationPlaceholdersSplitAcrossRuns_FillsOperationNumberAndName()
+    {
+        var (dbContext, receiptId, contentRootPath) = await CreateContextWithReceiptAsync(operationsCount: 2);
+        CreateTemplate(contentRootPath, splitOperationTokensAcrossRuns: true);
+        var service = new WipEscortLabelDocumentService(dbContext, new TestWebHostEnvironment(contentRootPath));
+
+        var bytes = await service.BuildAsync(receiptId);
+
+        using var stream = new MemoryStream(bytes);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var table = document.MainDocumentPart!.Document.Body!.Descendants<Table>().First();
+        var operationRows = table.Descendants<TableRow>()
+            .Skip(1)
+            .Select(row => row.Elements<TableCell>().ToList())
+            .ToList();
+
+        Assert.Equal(2, operationRows.Count);
+        Assert.Equal("10", GetCellText(operationRows[0][0]));
+        Assert.Equal("Операция 1", GetCellText(operationRows[0][1]));
+        Assert.Equal("20", GetCellText(operationRows[1][0]));
+        Assert.Equal("Операция 2", GetCellText(operationRows[1][1]));
+    }
+
     [Fact]
     public async Task BuildAsync_UsesLabelNumberFromReceipt()
     {
@@ -55,7 +80,7 @@ public class WipEscortLabelDocumentServiceTests
         return string.Concat(cell.Descendants<Text>().Select(x => x.Text)).Trim();
     }
 
-    private static void CreateTemplate(string contentRootPath)
+    private static void CreateTemplate(string contentRootPath, bool splitOperationTokensAcrossRuns = false)
     {
         var documentDir = Path.Combine(contentRootPath, "Templates", "Documents");
         Directory.CreateDirectory(documentDir);
@@ -72,8 +97,8 @@ public class WipEscortLabelDocumentServiceTests
                     CreateCell("Колонка 3"),
                     CreateCell("Колонка 4")),
                 new TableRow(
-                    CreateCell("{{OP_NO}}"),
-                    CreateCell("{{OP_NAME}}"),
+                    splitOperationTokensAcrossRuns ? CreateCellFromRuns("{{OP_", "NO}}") : CreateCell("{{OP_NO}}"),
+                    splitOperationTokensAcrossRuns ? CreateCellFromRuns("{{OP_", "NAME}}") : CreateCell("{{OP_NAME}}"),
                     CreateCell("ДОЛЖНО_БЫТЬ_ПУСТО"),
                     CreateCell(string.Empty))));
         main.Document = new Document(body);
@@ -83,6 +108,17 @@ public class WipEscortLabelDocumentServiceTests
     private static TableCell CreateCell(string text)
     {
         return new TableCell(new Paragraph(new Run(new Text(text))));
+    }
+
+    private static TableCell CreateCellFromRuns(params string[] runs)
+    {
+        var paragraph = new Paragraph();
+        foreach (var runText in runs)
+        {
+            paragraph.Append(new Run(new Text(runText)));
+        }
+
+        return new TableCell(paragraph);
     }
 
     private static async Task<(AppDbContext DbContext, Guid ReceiptId, string ContentRootPath)> CreateContextWithReceiptAsync(int operationsCount, string labelNumber = "LBL-001")

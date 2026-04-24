@@ -119,32 +119,48 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
         foreach (var operation in operations)
         {
             var row = (TableRow)templateRow.CloneNode(true);
-            ReplaceToken(row, "{{OP_NO}}", operation.Number);
-            ReplaceToken(row, "{{OP_NAME}}", operation.Name);
-            ClearNonOperationCells(row);
+            FillOperationRow(row, operation);
             templateRow.Parent!.InsertBefore(row, templateRow);
         }
 
         templateRow.Remove();
     }
 
-    private static void ClearNonOperationCells(TableRow row)
+    private static void FillOperationRow(TableRow row, EscortLabelOperationRow operation)
     {
-        foreach (var cell in row.Elements<TableCell>())
+        var cells = row.Elements<TableCell>().ToList();
+        if (cells.Count == 0)
         {
-            var containsOperationToken = cell.Descendants<Text>().Any(text =>
-                text.Text.Contains("{{OP_NO}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{OP_NAME}}", StringComparison.Ordinal));
+            return;
+        }
 
-            if (containsOperationToken)
-            {
-                continue;
-            }
+        SetCellText(cells[0], operation.Number);
 
-            foreach (var text in cell.Descendants<Text>())
-            {
-                text.Text = string.Empty;
-            }
+        if (cells.Count > 1)
+        {
+            SetCellText(cells[1], operation.Name);
+        }
+
+        for (var i = 2; i < cells.Count; i++)
+        {
+            SetCellText(cells[i], string.Empty);
+        }
+    }
+
+    private static void SetCellText(TableCell cell, string value)
+    {
+        var texts = cell.Descendants<Text>().ToList();
+        if (texts.Count == 0)
+        {
+            cell.RemoveAllChildren<Paragraph>();
+            cell.Append(new Paragraph(new Run(new Text(value))));
+            return;
+        }
+
+        texts[0].Text = value;
+        for (var i = 1; i < texts.Count; i++)
+        {
+            texts[i].Text = string.Empty;
         }
     }
 

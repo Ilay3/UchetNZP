@@ -117,7 +117,7 @@ public class MetalWarehouseController : Controller
         {
             Id = Guid.NewGuid(),
             ReceiptNumber = nextNumber,
-            ReceiptDate = model.ReceiptDate!.Value.Date,
+            ReceiptDate = ToUtcDate(model.ReceiptDate!.Value),
             SupplierOrSource = model.SupplierOrSource?.Trim(),
             Comment = model.Comment?.Trim(),
             CreatedAt = now,
@@ -493,6 +493,17 @@ public class MetalWarehouseController : Controller
         return View(model);
     }
 
+
+    private static DateTime ToUtcDate(DateTime value)
+    {
+        var dateOnly = value.Date;
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => dateOnly,
+            DateTimeKind.Local => dateOnly.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(dateOnly, DateTimeKind.Utc),
+        };
+    }
     private async Task PopulateMaterialsAsync(MetalReceiptCreateViewModel model, CancellationToken cancellationToken)
     {
         model.Materials = await _dbContext.MetalMaterials
