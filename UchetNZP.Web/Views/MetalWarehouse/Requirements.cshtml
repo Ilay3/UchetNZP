@@ -26,6 +26,7 @@
                             <th>Количество</th>
                             <th>Материал</th>
                             <th>Требуется</th>
+                            <th>Ед. изм.</th>
                             <th>Статус</th>
                             <th class="text-end">Действия</th>
                         </tr>
@@ -39,7 +40,8 @@
                                 <td>@item.PartDisplay</td>
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@item.MaterialDisplay</td>
-                                <td>@item.RequiredQty.ToString("0.###") @item.Unit</td>
+                                <td>@item.RequiredQty.ToString("0.###")</td>
+                                <td>@item.Unit</td>
                                 <td><span class="badge bg-secondary">@item.Status</span></td>
                                 <td class="text-end">
                                     <a class="btn btn-sm btn-outline-primary" asp-action="RequirementDetails" asp-route-id="@item.Id">Открыть</a>

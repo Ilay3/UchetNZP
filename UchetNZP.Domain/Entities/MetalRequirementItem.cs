@@ -8,6 +8,18 @@ public class MetalRequirementItem
 
     public Guid MetalMaterialId { get; set; }
 
+    public decimal ConsumptionPerUnit { get; set; }
+
+    public string ConsumptionUnit { get; set; } = string.Empty;
+
+    public decimal RequiredQty { get; set; }
+
+    public decimal? RequiredWeightKg { get; set; }
+
+    public string? SizeRaw { get; set; }
+
+    public string? Comment { get; set; }
+
     public decimal NormPerUnit { get; set; }
 
     public decimal TotalRequiredQty { get; set; }

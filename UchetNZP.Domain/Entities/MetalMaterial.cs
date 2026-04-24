@@ -33,4 +33,6 @@ public class MetalMaterial
     public virtual ICollection<MetalConsumptionNorm> ConsumptionNorms { get; set; } = new List<MetalConsumptionNorm>();
 
     public virtual ICollection<MetalRequirementItem> RequirementItems { get; set; } = new List<MetalRequirementItem>();
+
+    public virtual ICollection<MetalRequirement> Requirements { get; set; } = new List<MetalRequirement>();
 }
