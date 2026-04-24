@@ -411,99 +411,37 @@ public class MetalWarehouseController : Controller
     [HttpGet("Requirements/Details/{id:guid}")]
     public async Task<IActionResult> RequirementDetails(Guid id, CancellationToken cancellationToken)
     {
-        var requirement = await _dbContext.MetalRequirements
-            .AsNoTracking()
-            .Where(x => x.Id == id)
-            .Select(x => new
-            {
-                x.Id,
-                x.RequirementNumber,
-                x.RequirementDate,
-                x.Status,
-                x.PartId,
-                PartName = x.Part != null ? x.Part.Name : string.Empty,
-                PartCode = x.Part != null ? x.Part.Code : null,
-                x.Quantity,
-                x.WipLaunchId,
-                LaunchDate = x.WipLaunch != null ? x.WipLaunch.LaunchDate : (DateTime?)null,
-                x.Comment,
-                Items = x.Items.Select(i => new
-                {
-                    i.NormPerUnit,
-                    i.TotalRequiredQty,
-                    i.Unit,
-                    i.TotalRequiredWeightKg,
-                    i.CalculationFormula,
-                    i.CalculationInput,
-                    MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : "—",
-                    MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : null,
-                    i.MetalMaterialId,
-                    MassPerMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerMeterKg : 0m,
-                    MassPerSquareMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerSquareMeterKg : 0m,
-                    CoefConsumption = i.MetalMaterial != null ? i.MetalMaterial.CoefConsumption : 1m,
-                    i.SelectionSource,
-                    i.SelectionReason,
-                    i.CandidateMaterials,
-                }).ToList(),
-            })
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (requirement is null)
+        var model = await BuildRequirementDetailsModelAsync(id, cancellationToken);
+        if (model is null)
         {
             return NotFound();
         }
 
-        var stockLookup = await _dbContext.MetalReceiptItems
-            .AsNoTracking()
-            .Where(x => requirement.Items.Select(i => i.MetalMaterialId).Contains(x.MetalMaterialId))
-            .GroupBy(x => x.MetalMaterialId)
-            .Select(x => new
-            {
-                MaterialId = x.Key,
-                Qty = x.Sum(i => i.SizeValue),
-                WeightKg = x.Sum(i => i.Quantity > 0 ? i.TotalWeightKg / i.Quantity : i.TotalWeightKg),
-            })
-            .ToDictionaryAsync(x => x.MaterialId, cancellationToken);
-
-        var model = new MetalRequirementDetailsViewModel
-        {
-            Id = requirement.Id,
-            RequirementNumber = requirement.RequirementNumber,
-            RequirementDate = requirement.RequirementDate,
-            Status = requirement.Status,
-            PartDisplay = string.IsNullOrWhiteSpace(requirement.PartCode) ? requirement.PartName : $"{requirement.PartName} ({requirement.PartCode})",
-            Quantity = requirement.Quantity,
-            WipLaunchId = requirement.WipLaunchId,
-            LaunchDate = requirement.LaunchDate,
-            Comment = requirement.Comment,
-            Items = requirement.Items.Select(i =>
-            {
-                stockLookup.TryGetValue(i.MetalMaterialId, out var stock);
-                return new MetalRequirementDetailsItemViewModel
-                {
-                    MaterialDisplay = string.IsNullOrWhiteSpace(i.MaterialCode) ? i.MaterialName : $"{i.MaterialName} ({i.MaterialCode})",
-                    NormPerUnit = i.NormPerUnit,
-                    TotalRequiredQty = i.TotalRequiredQty,
-                    Unit = i.Unit,
-                    TotalRequiredWeightKg = i.TotalRequiredWeightKg,
-                    CalculationFormula = i.CalculationFormula,
-                    CalculationInput = i.CalculationInput,
-                    BackCalculatedMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerMeterKg > 0m
-                        ? i.TotalRequiredWeightKg.Value / (i.MassPerMeterKg * i.CoefConsumption)
-                        : 0m,
-                    BackCalculatedSquareMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerSquareMeterKg > 0m
-                        ? i.TotalRequiredWeightKg.Value / (i.MassPerSquareMeterKg * i.CoefConsumption)
-                        : 0m,
-                    StockQty = stock?.Qty ?? 0m,
-                    StockWeightKg = stock?.WeightKg ?? 0m,
-                    SelectionSource = i.SelectionSource,
-                    SelectionReason = i.SelectionReason,
-                    CandidateMaterials = i.CandidateMaterials,
-                };
-            }).ToList(),
-        };
-
         return View("~/Views/MetalWarehouse/RequirementDetails.cshtml", model);
+    }
+
+    [HttpGet("Requirements/Details/{id:guid}/print/warehouse")]
+    public async Task<IActionResult> RequirementPrintWarehouse(Guid id, CancellationToken cancellationToken)
+    {
+        var model = await BuildRequirementDetailsModelAsync(id, cancellationToken);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/MetalWarehouse/RequirementPrintWarehouse.cshtml", model);
+    }
+
+    [HttpGet("Requirements/Details/{id:guid}/print/master")]
+    public async Task<IActionResult> RequirementPrintMaster(Guid id, CancellationToken cancellationToken)
+    {
+        var model = await BuildRequirementDetailsModelAsync(id, cancellationToken);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/MetalWarehouse/RequirementPrintMaster.cshtml", model);
     }
 
     [HttpGet("CuttingMaps")]
@@ -600,6 +538,159 @@ public class MetalWarehouseController : Controller
                 .ThenInclude(x => x!.Part)
             .FirstOrDefaultAsync(cancellationToken);
         return plan is null ? null : MapCuttingPlan(plan);
+    }
+
+    private async Task<MetalRequirementDetailsViewModel?> BuildRequirementDetailsModelAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var requirement = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.RequirementNumber,
+                x.RequirementDate,
+                x.Status,
+                PartName = x.Part != null ? x.Part.Name : string.Empty,
+                PartCode = x.Part != null ? x.Part.Code : null,
+                x.Quantity,
+                x.WipLaunchId,
+                LaunchDate = x.WipLaunch != null ? x.WipLaunch.LaunchDate : (DateTime?)null,
+                x.Comment,
+                Items = x.Items.Select(i => new
+                {
+                    i.NormPerUnit,
+                    i.TotalRequiredQty,
+                    i.Unit,
+                    i.TotalRequiredWeightKg,
+                    i.CalculationFormula,
+                    i.CalculationInput,
+                    MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : "—",
+                    MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : null,
+                    i.MetalMaterialId,
+                    MassPerMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerMeterKg : 0m,
+                    MassPerSquareMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerSquareMeterKg : 0m,
+                    CoefConsumption = i.MetalMaterial != null ? i.MetalMaterial.CoefConsumption : 1m,
+                    i.SelectionSource,
+                    i.SelectionReason,
+                    i.CandidateMaterials,
+                }).ToList(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (requirement is null)
+        {
+            return null;
+        }
+
+        var currentPlan = await _dbContext.CuttingPlans
+            .AsNoTracking()
+            .Where(x => x.MetalRequirementId == requirement.Id && x.IsCurrent)
+            .Include(x => x.Items)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var materialIds = requirement.Items.Select(i => i.MetalMaterialId).Distinct().ToList();
+        var stockLookup = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => materialIds.Contains(x.MetalMaterialId))
+            .GroupBy(x => x.MetalMaterialId)
+            .Select(x => new
+            {
+                MaterialId = x.Key,
+                Qty = x.Sum(i => i.SizeValue),
+                WeightKg = x.Sum(i => i.Quantity > 0 ? i.TotalWeightKg / i.Quantity : i.TotalWeightKg),
+            })
+            .ToDictionaryAsync(x => x.MaterialId, cancellationToken);
+
+        var sourceBlank = currentPlan is null
+            ? "—"
+            : (ReadDecimalFromJson(currentPlan.ParametersJson, "Linear", "StockLength") is decimal stockLength
+                ? $"{stockLength:0.###} мм"
+                : $"{ReadDecimalFromJson(currentPlan.ParametersJson, "Sheet", "StockWidth"):0.###} x {ReadDecimalFromJson(currentPlan.ParametersJson, "Sheet", "StockHeight"):0.###} мм");
+
+        var items = requirement.Items.Select(i =>
+        {
+            stockLookup.TryGetValue(i.MetalMaterialId, out var stock);
+            var lossFactor = i.CoefConsumption <= 0m ? 1m : i.CoefConsumption;
+            var qtyToIssue = i.TotalRequiredQty * lossFactor;
+            var backMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerMeterKg > 0m
+                ? i.TotalRequiredWeightKg.Value / (i.MassPerMeterKg * lossFactor)
+                : 0m;
+            var backSquareMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerSquareMeterKg > 0m
+                ? i.TotalRequiredWeightKg.Value / (i.MassPerSquareMeterKg * lossFactor)
+                : 0m;
+
+            return new MetalRequirementDetailsItemViewModel
+            {
+                MaterialDisplay = string.IsNullOrWhiteSpace(i.MaterialCode) ? i.MaterialName : $"{i.MaterialName} ({i.MaterialCode})",
+                MaterialArticle = !string.IsNullOrWhiteSpace(i.MaterialCode) && i.MaterialCode.StartsWith("06.")
+                    ? i.MaterialCode
+                    : "—",
+                NormPerUnit = i.NormPerUnit,
+                TotalRequiredQty = i.TotalRequiredQty,
+                Unit = i.Unit,
+                TotalRequiredWeightKg = i.TotalRequiredWeightKg,
+                NetRequirementQty = i.TotalRequiredQty,
+                LossFactor = lossFactor,
+                QtyToIssueFromStock = qtyToIssue,
+                ExpectedBusinessResidual = currentPlan?.BusinessResidual ?? 0m,
+                ExpectedScrapResidual = currentPlan?.ScrapResidual ?? 0m,
+                SourceBlankDisplay = sourceBlank,
+                CuttingPlanId = currentPlan?.Id,
+                CalculationFormula = i.CalculationFormula,
+                CalculationInput = i.CalculationInput,
+                BackCalculatedMeters = backMeters,
+                BackCalculatedSquareMeters = backSquareMeters,
+                StockQty = stock?.Qty ?? 0m,
+                StockWeightKg = stock?.WeightKg ?? 0m,
+                SelectionSource = i.SelectionSource,
+                SelectionReason = i.SelectionReason,
+                CandidateMaterials = i.CandidateMaterials,
+            };
+        }).ToList();
+
+        return new MetalRequirementDetailsViewModel
+        {
+            Id = requirement.Id,
+            RequirementNumber = requirement.RequirementNumber,
+            RequirementDate = requirement.RequirementDate,
+            Status = requirement.Status,
+            PartDisplay = string.IsNullOrWhiteSpace(requirement.PartCode) ? requirement.PartName : $"{requirement.PartName} ({requirement.PartCode})",
+            Quantity = requirement.Quantity,
+            WipLaunchId = requirement.WipLaunchId,
+            LaunchDate = requirement.LaunchDate,
+            Comment = requirement.Comment,
+            SourceBlankDisplay = sourceBlank,
+            CurrentCuttingPlanId = currentPlan?.Id,
+            Aggregates = new MetalRequirementAggregateViewModel
+            {
+                TotalKg = items.Sum(x => x.TotalRequiredWeightKg ?? 0m),
+                TotalMeters = items.Sum(x => x.BackCalculatedMeters),
+                TotalSquareMeters = items.Sum(x => x.BackCalculatedSquareMeters),
+                ForecastWastePercent = currentPlan?.WastePercent ?? 0m,
+                ForecastBusinessResidual = currentPlan?.BusinessResidual ?? 0m,
+                ForecastScrapResidual = currentPlan?.ScrapResidual ?? 0m,
+            },
+            CutDetails = currentPlan?.Items
+                .OrderBy(x => x.StockIndex)
+                .ThenBy(x => x.Sequence)
+                .Select(x => new MetalRequirementCutDetailViewModel
+                {
+                    StockIndex = x.StockIndex,
+                    Sequence = x.Sequence,
+                    ItemType = x.ItemType,
+                    Length = x.Length,
+                    Width = x.Width,
+                    Height = x.Height,
+                    PositionX = x.PositionX,
+                    PositionY = x.PositionY,
+                    Rotated = x.Rotated,
+                    Quantity = x.Quantity,
+                })
+                .ToList() ?? [],
+            Items = items,
+        };
     }
 
     private static CuttingMapCardViewModel MapCuttingPlan(CuttingPlan plan)

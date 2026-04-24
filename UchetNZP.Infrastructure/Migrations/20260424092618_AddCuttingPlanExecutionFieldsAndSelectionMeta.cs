@@ -10,27 +10,20 @@ namespace UchetNZP.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "CandidateMaterials",
-                table: "MetalRequirementItems",
-                type: "character varying(2048)",
-                maxLength: 2048,
-                nullable: true);
+            migrationBuilder.Sql("""
+                ALTER TABLE "MetalRequirementItems"
+                ADD COLUMN IF NOT EXISTS "CandidateMaterials" character varying(2048);
+                """);
 
-            migrationBuilder.AddColumn<string>(
-                name: "SelectionReason",
-                table: "MetalRequirementItems",
-                type: "character varying(512)",
-                maxLength: 512,
-                nullable: true);
+            migrationBuilder.Sql("""
+                ALTER TABLE "MetalRequirementItems"
+                ADD COLUMN IF NOT EXISTS "SelectionReason" character varying(512);
+                """);
 
-            migrationBuilder.AddColumn<string>(
-                name: "SelectionSource",
-                table: "MetalRequirementItems",
-                type: "character varying(32)",
-                maxLength: 32,
-                nullable: false,
-                defaultValue: "");
+            migrationBuilder.Sql("""
+                ALTER TABLE "MetalRequirementItems"
+                ADD COLUMN IF NOT EXISTS "SelectionSource" character varying(32) NOT NULL DEFAULT '';
+                """);
 
             migrationBuilder.AddColumn<decimal>(
                 name: "ActualResidual",
@@ -52,17 +45,9 @@ namespace UchetNZP.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "CandidateMaterials",
-                table: "MetalRequirementItems");
-
-            migrationBuilder.DropColumn(
-                name: "SelectionReason",
-                table: "MetalRequirementItems");
-
-            migrationBuilder.DropColumn(
-                name: "SelectionSource",
-                table: "MetalRequirementItems");
+            migrationBuilder.Sql("""ALTER TABLE "MetalRequirementItems" DROP COLUMN IF EXISTS "CandidateMaterials";""");
+            migrationBuilder.Sql("""ALTER TABLE "MetalRequirementItems" DROP COLUMN IF EXISTS "SelectionReason";""");
+            migrationBuilder.Sql("""ALTER TABLE "MetalRequirementItems" DROP COLUMN IF EXISTS "SelectionSource";""");
 
             migrationBuilder.DropColumn(
                 name: "ActualResidual",

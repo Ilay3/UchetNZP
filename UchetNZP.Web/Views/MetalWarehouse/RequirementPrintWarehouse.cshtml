@@ -1,0 +1,53 @@
+@model UchetNZP.Web.Models.MetalRequirementDetailsViewModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>Требование @Model.RequirementNumber — склад</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
+        h1 { margin: 0 0 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #444; padding: 4px 6px; vertical-align: top; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Требование @Model.RequirementNumber (форма склада)</h1>
+    <div>Дата: @Model.RequirementDate.ToString("dd.MM.yyyy HH:mm")</div>
+    <div>Деталь: @Model.PartDisplay</div>
+    <div>Карта раскроя: @(Model.CurrentCuttingPlanId?.ToString() ?? "—")</div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Материал</th>
+                <th>Артикул</th>
+                <th>К выдаче со склада</th>
+                <th>Ед.</th>
+                <th>Ожидаемый остаток (деловой/лом)</th>
+                <th>Остаток после выдачи</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td>@item.MaterialDisplay</td>
+                    <td>@item.MaterialArticle</td>
+                    <td>@item.QtyToIssueFromStock.ToString("0.###")</td>
+                    <td>@item.Unit</td>
+                    <td>@item.ExpectedBusinessResidual.ToString("0.###") / @item.ExpectedScrapResidual.ToString("0.###")</td>
+                    <td>@item.ExpectedStockAfterIssue.ToString("0.###") @item.Unit</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <p>Итого: @Model.Aggregates.TotalKg.ToString("0.###") кг, @Model.Aggregates.TotalMeters.ToString("0.###") м, @Model.Aggregates.TotalSquareMeters.ToString("0.###") м².</p>
+    <script>window.print();</script>
+</body>
+</html>

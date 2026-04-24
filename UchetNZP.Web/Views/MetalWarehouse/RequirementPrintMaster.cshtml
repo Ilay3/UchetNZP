@@ -1,0 +1,87 @@
+@model UchetNZP.Web.Models.MetalRequirementDetailsViewModel
+@{
+    Layout = null;
+}
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>Требование @Model.RequirementNumber — мастер цеха</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
+        h1 { margin: 0 0 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { border: 1px solid #444; padding: 4px 6px; vertical-align: top; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+    <h1>Требование @Model.RequirementNumber (форма мастера цеха)</h1>
+    <div>Дата: @Model.RequirementDate.ToString("dd.MM.yyyy HH:mm")</div>
+    <div>Деталь: @Model.PartDisplay</div>
+    <div>Источник заготовки: @Model.SourceBlankDisplay</div>
+
+    <h3>Позиции</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Материал</th>
+                <th>Потребность нетто</th>
+                <th>Техпотери/коэфф.</th>
+                <th>К выдаче</th>
+                <th>Формула</th>
+                <th>Источник расчета</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td>@item.MaterialDisplay</td>
+                    <td>@item.NetRequirementQty.ToString("0.###") @item.Unit</td>
+                    <td>@item.LossFactor.ToString("0.###")</td>
+                    <td>@item.QtyToIssueFromStock.ToString("0.###") @item.Unit</td>
+                    <td>@item.CalculationFormula</td>
+                    <td>cutting_plan @(item.CuttingPlanId?.ToString() ?? "—")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h3>Детализация резов</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Заготовка</th>
+                <th>Шаг</th>
+                <th>Тип</th>
+                <th>L</th>
+                <th>W</th>
+                <th>H</th>
+                <th>X</th>
+                <th>Y</th>
+                <th>Поворот</th>
+                <th>Кол-во</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var cut in Model.CutDetails)
+            {
+                <tr>
+                    <td>#@(cut.StockIndex + 1)</td>
+                    <td>@cut.Sequence</td>
+                    <td>@cut.ItemType</td>
+                    <td>@(cut.Length?.ToString("0.###") ?? "—")</td>
+                    <td>@(cut.Width?.ToString("0.###") ?? "—")</td>
+                    <td>@(cut.Height?.ToString("0.###") ?? "—")</td>
+                    <td>@(cut.PositionX?.ToString("0.###") ?? "—")</td>
+                    <td>@(cut.PositionY?.ToString("0.###") ?? "—")</td>
+                    <td>@(cut.Rotated ? "Да" : "Нет")</td>
+                    <td>@cut.Quantity</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <script>window.print();</script>
+</body>
+</html>
