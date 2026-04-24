@@ -67,8 +67,6 @@ public class MetalStockItemViewModel
 
     public DateTime ReceiptDate { get; init; }
 
-    public string BatchNumber { get; init; } = string.Empty;
-
     public string StockCategory { get; init; } = string.Empty;
 
     public string Status { get; init; } = "В наличии";
@@ -118,8 +116,6 @@ public class MetalStockItemDetailsViewModel
 
     public DateTime ReceiptDate { get; init; }
 
-    public string Source { get; init; } = string.Empty;
-
     public string? ReceiptComment { get; init; }
 
     public string Status { get; init; } = "В наличии";
@@ -134,8 +130,6 @@ public class MetalReceiptListItemViewModel
     public string ReceiptNumber { get; init; } = string.Empty;
 
     public DateTime ReceiptDate { get; init; }
-
-    public string SupplierOrSource { get; init; } = string.Empty;
 
     public int PositionsCount { get; init; }
 }
@@ -158,9 +152,6 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     [DataType(DataType.Date)]
     public DateTime? ReceiptDate { get; set; }
 
-    [StringLength(256, ErrorMessage = "Источник не должен превышать 256 символов.")]
-    public string? SupplierOrSource { get; set; }
-
     [Required(ErrorMessage = "Материал обязателен.")]
     public Guid? MetalMaterialId { get; set; }
 
@@ -173,9 +164,6 @@ public class MetalReceiptCreateViewModel : IValidatableObject
         set => PassportWeightKg = value;
     }
 
-    [Range(0.000001d, 999999999999d, ErrorMessage = "Фактический вес должен быть больше 0.")]
-    public decimal? ActualWeightKg { get; set; }
-
     [Range(1, 9999, ErrorMessage = "Количество должно быть больше 0.")]
     public int? Quantity { get; set; }
 
@@ -183,9 +171,6 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     public string? Comment { get; set; }
 
     public List<MetalReceiptUnitInputViewModel> Units { get; set; } = new();
-
-    [StringLength(32, ErrorMessage = "Номер партии не должен превышать 32 символа.")]
-    public string? BatchNumber { get; set; }
 
     public string ProfileType { get; set; } = "sheet";
 
@@ -220,11 +205,6 @@ public class MetalReceiptCreateViewModel : IValidatableObject
         if (!PassportWeightKg.HasValue || PassportWeightKg.Value <= 0m)
         {
             yield return new ValidationResult("Паспортная масса обязательна.", new[] { nameof(PassportWeightKg) });
-        }
-
-        if (!ActualWeightKg.HasValue || ActualWeightKg.Value <= 0m)
-        {
-            yield return new ValidationResult("Фактическая масса обязательна.", new[] { nameof(ActualWeightKg) });
         }
 
         if (profile == "sheet")
@@ -288,21 +268,15 @@ public class MetalReceiptDetailsViewModel
 
     public DateTime ReceiptDate { get; init; }
 
-    public string SupplierOrSource { get; init; } = string.Empty;
-
     public string? Comment { get; init; }
 
     public string MaterialName { get; init; } = string.Empty;
 
     public decimal PassportWeightKg { get; init; }
 
-    public decimal ActualWeightKg { get; init; }
-
     public decimal CalculatedWeightKg { get; init; }
 
     public decimal WeightDeviationKg { get; init; }
-
-    public string BatchNumber { get; init; } = string.Empty;
 
     public string ProfileTypeDisplay { get; init; } = string.Empty;
 

@@ -24,7 +24,6 @@
             <div class="col-md-6"><div><span class="text-muted">Вес:</span> @Model.WeightKg.ToString("0.###") кг</div></div>
             <div class="col-md-6"><div><span class="text-muted">Номер прихода:</span> @Model.ReceiptNumber</div></div>
             <div class="col-md-6"><div><span class="text-muted">Дата прихода:</span> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div></div>
-            <div class="col-md-6"><div><span class="text-muted">Источник:</span> @Model.Source</div></div>
             <div class="col-md-12"><div><span class="text-muted">Комментарий прихода:</span> @(string.IsNullOrWhiteSpace(Model.ReceiptComment) ? "—" : Model.ReceiptComment)</div></div>
             <div class="col-md-12"><div><span class="text-muted">Статус:</span> <span class="badge bg-success-subtle text-success-emphasis">@Model.Status</span></div></div>
         </div>

@@ -1,0 +1,116 @@
+@model AdminMetalMaterialsPageViewModel
+@{
+    ViewData["Title"] = "Админ: материалы металла";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Администрирование материалов металла</h1>
+    <p class="lead mb-0">Добавляйте материалы через интерфейс, без ручных правок в базе данных.</p>
+</div>
+
+@if (TempData["AdminMetalMaterialsStatus"] is string successMessage)
+{
+    <div class="alert alert-success" role="alert">@successMessage</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light fw-semibold">Новый материал</div>
+            <div class="card-body">
+                <form method="post" asp-action="Create" asp-controller="AdminMetalMaterials">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="CreateModel.Name" class="form-label">Название</label>
+                        <input asp-for="CreateModel.Name" class="form-control" />
+                        <span asp-validation-for="CreateModel.Name" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="CreateModel.Code" class="form-label">Код</label>
+                        <input asp-for="CreateModel.Code" class="form-control" />
+                        <span asp-validation-for="CreateModel.Code" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="CreateModel.ProfileType" class="form-label">Тип проката</label>
+                        <select asp-for="CreateModel.ProfileType" class="form-select">
+                            <option value="sheet">Лист</option>
+                            <option value="rod">Круг/пруток</option>
+                            <option value="pipe">Труба</option>
+                        </select>
+                        <span asp-validation-for="CreateModel.ProfileType" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="CreateModel.MassPerUnitKg" class="form-label">Масса на единицу, кг</label>
+                        <input asp-for="CreateModel.MassPerUnitKg" class="form-control" type="number" min="0.001" step="0.001" />
+                        <span asp-validation-for="CreateModel.MassPerUnitKg" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input asp-for="CreateModel.IsActive" class="form-check-input" />
+                        <label asp-for="CreateModel.IsActive" class="form-check-label">Активный материал</label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">Добавить материал</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light fw-semibold">Справочник материалов</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Название</th>
+                                <th>Код</th>
+                                <th>Тип</th>
+                                <th>Масса</th>
+                                <th>Ед. хранения</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Materials.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-muted">Материалы пока не добавлены.</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var material in Model.Materials)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@material.Name</td>
+                                        <td>@(string.IsNullOrWhiteSpace(material.Code) ? "—" : material.Code)</td>
+                                        <td>@material.ProfileType</td>
+                                        <td>@material.MassPerUnitKg.ToString("0.###")</td>
+                                        <td>@material.UnitKind</td>
+                                        <td>
+                                            <span class="badge @(material.IsActive ? "bg-success-subtle text-success-emphasis" : "bg-secondary-subtle text-secondary-emphasis")">
+                                                @(material.IsActive ? "Активен" : "Отключен")
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <partial name="_ValidationScriptsPartial" />
+}

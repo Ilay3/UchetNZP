@@ -65,7 +65,6 @@ public class MetalWarehouseController : Controller
                 Id = x.Id,
                 ReceiptNumber = x.ReceiptNumber,
                 ReceiptDate = x.ReceiptDate,
-                SupplierOrSource = x.SupplierOrSource ?? string.Empty,
                 PositionsCount = x.Items.Count,
             })
             .ToListAsync(cancellationToken);
@@ -141,7 +140,6 @@ public class MetalWarehouseController : Controller
             Id = Guid.NewGuid(),
             ReceiptNumber = nextNumber,
             ReceiptDate = ToUtcDate(model.ReceiptDate!.Value),
-            SupplierOrSource = model.SupplierOrSource?.Trim(),
             Comment = model.Comment?.Trim(),
             CreatedAt = now,
         };
@@ -150,14 +148,9 @@ public class MetalWarehouseController : Controller
         var materialCode = BuildMaterialCode(material);
         var quantity = model.Quantity!.Value;
         var passportWeight = model.PassportWeightKg!.Value;
-        var actualWeight = model.ActualWeightKg!.Value;
+        var actualWeight = passportWeight;
         var calculatedWeight = CalculateWeightKg(profileType, model, quantity, material);
-        var batchNumber = string.IsNullOrWhiteSpace(model.BatchNumber) ? nextNumber : model.BatchNumber.Trim();
         var deviation = actualWeight - passportWeight;
-        if (Math.Abs(deviation) > Math.Max(0.5m, passportWeight * 0.02m))
-        {
-            ModelState.AddModelError(nameof(model.ActualWeightKg), $"Расхождение между паспортной и фактической массой превышает допуск: {deviation:0.###} кг.");
-        }
 
         if (!ModelState.IsValid)
         {
@@ -165,7 +158,7 @@ public class MetalWarehouseController : Controller
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
 
-        receipt.BatchNumber = batchNumber;
+        receipt.BatchNumber = string.Empty;
         for (var i = 0; i < quantity; i++)
         {
             var unit = model.Units[i];
@@ -218,8 +211,6 @@ public class MetalWarehouseController : Controller
                 x.Id,
                 x.ReceiptNumber,
                 x.ReceiptDate,
-                x.SupplierOrSource,
-                x.BatchNumber,
                 x.Comment,
                 Item = x.Items
                     .OrderBy(i => i.ItemIndex)
@@ -252,14 +243,11 @@ public class MetalWarehouseController : Controller
             Id = receipt.Id,
             ReceiptNumber = receipt.ReceiptNumber,
             ReceiptDate = receipt.ReceiptDate,
-            SupplierOrSource = receipt.SupplierOrSource ?? string.Empty,
             Comment = receipt.Comment,
             MaterialName = first.MaterialName,
             PassportWeightKg = first.PassportWeightKg,
-            ActualWeightKg = first.ActualWeightKg,
             CalculatedWeightKg = first.CalculatedWeightKg,
             WeightDeviationKg = first.WeightDeviationKg,
-            BatchNumber = receipt.BatchNumber,
             ProfileTypeDisplay = ToProfileCaption(first.ProfileType),
             Quantity = (int)first.Quantity,
             Items = receipt.Item
@@ -294,7 +282,6 @@ public class MetalWarehouseController : Controller
                 WeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
                 ReceiptNumber = x.MetalReceipt != null ? x.MetalReceipt.ReceiptNumber : string.Empty,
                 ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
-                BatchNumber = x.MetalReceipt != null ? x.MetalReceipt.BatchNumber : string.Empty,
                 x.IsConsumed,
             });
 
@@ -371,7 +358,6 @@ public class MetalWarehouseController : Controller
                 WeightKg = x.WeightKg,
                 ReceiptNumber = x.ReceiptNumber,
                 ReceiptDate = x.ReceiptDate,
-                BatchNumber = x.BatchNumber,
                 StockCategory = x.StockCategory,
                 Status = x.IsConsumed ? "Израсходовано" : ToStockCategoryCaption(x.StockCategory),
             }).ToList(),
@@ -599,7 +585,6 @@ public class MetalWarehouseController : Controller
                 WeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
                 ReceiptNumber = x.MetalReceipt != null ? x.MetalReceipt.ReceiptNumber : string.Empty,
                 ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
-                Source = x.MetalReceipt != null ? x.MetalReceipt.SupplierOrSource : null,
                 Comment = x.MetalReceipt != null ? x.MetalReceipt.Comment : null,
                 CreatedAt = x.CreatedAt,
                 x.IsConsumed,
@@ -660,7 +645,6 @@ public class MetalWarehouseController : Controller
             WeightKg = item.WeightKg,
             ReceiptNumber = item.ReceiptNumber,
             ReceiptDate = item.ReceiptDate,
-            Source = item.Source ?? "Не указан",
             ReceiptComment = item.Comment,
             Status = item.IsConsumed ? "Израсходовано" : "В наличии",
             History = history,
@@ -1517,7 +1501,7 @@ public class MetalWarehouseController : Controller
                 Math.Round(0.000006165m * model.DiameterMm.Value * model.DiameterMm.Value * model.LengthMm.Value * quantity, 3),
             "pipe" when model.DiameterMm.HasValue && model.WallThicknessMm.HasValue && model.LengthMm.HasValue =>
                 Math.Round(0.00002466m * model.WallThicknessMm.Value * (model.DiameterMm.Value - model.WallThicknessMm.Value) * model.LengthMm.Value * quantity, 3),
-            _ => Math.Round((model.ActualWeightKg ?? 0m) * (material.Coefficient <= 0m ? 1m : material.Coefficient), 3),
+            _ => Math.Round((model.PassportWeightKg ?? 0m) * (material.Coefficient <= 0m ? 1m : material.Coefficient), 3),
         };
     }
 
