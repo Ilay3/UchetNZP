@@ -44,6 +44,7 @@
                     <div class="fw-semibold mb-2">Единица ${i} → Размер в ${unitText}</div>
                     <input type="hidden" name="Units[${i - 1}].ItemIndex" value="${i}" />
                     <input type="number"
+                           id="Units_${i - 1}__SizeValue"
                            class="form-control"
                            name="Units[${i - 1}].SizeValue"
                            data-index="${i}"
@@ -51,8 +52,20 @@
                            step="0.001"
                            value="${values.get(i) ?? ""}"
                            required />
+                    <span class="text-danger field-validation-valid"
+                          data-valmsg-for="Units[${i - 1}].SizeValue"
+                          data-valmsg-replace="true"></span>
                 </div>`;
             unitsContainer.appendChild(col);
+        }
+
+        if (window.jQuery && window.jQuery.validator && window.jQuery.validator.unobtrusive) {
+            const form = document.getElementById("metalReceiptForm");
+            if (form) {
+                window.jQuery(form).removeData("validator");
+                window.jQuery(form).removeData("unobtrusiveValidation");
+                window.jQuery.validator.unobtrusive.parse(form);
+            }
         }
     }
 

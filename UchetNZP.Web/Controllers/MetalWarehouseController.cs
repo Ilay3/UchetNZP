@@ -85,6 +85,15 @@ public class MetalWarehouseController : Controller
                 .ToList();
         }
 
+        var hasActiveMaterials = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .AnyAsync(x => x.IsActive, cancellationToken);
+
+        if (!hasActiveMaterials)
+        {
+            ModelState.AddModelError(string.Empty, "Справочник материалов пуст. Обратитесь к администратору.");
+        }
+
         var material = model.MetalMaterialId.HasValue
             ? await _dbContext.MetalMaterials.AsNoTracking().FirstOrDefaultAsync(x => x.Id == model.MetalMaterialId.Value && x.IsActive, cancellationToken)
             : null;
@@ -100,10 +109,7 @@ public class MetalWarehouseController : Controller
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
 
-        if (material is null)
-        {
-            return BadRequest("Материал не найден.");
-        }
+        ArgumentNullException.ThrowIfNull(material);
 
         var now = DateTime.UtcNow;
         var nextNumber = await GetNextReceiptNumberAsync(cancellationToken);
@@ -140,11 +146,14 @@ public class MetalWarehouseController : Controller
             });
         }
 
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         _dbContext.MetalReceipts.Add(receipt);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        TempData["MetalReceiptSuccess"] = $"Приход {receipt.ReceiptNumber} успешно создан.";
+        await transaction.CommitAsync(cancellationToken);
 
-        return RedirectToAction(nameof(Receipts));
+        TempData["MetalReceiptSuccess"] = "Приход металла успешно создан";
+
+        return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
     }
 
     [HttpGet("Receipts/Details/{id:guid}")]
@@ -398,11 +407,17 @@ public class MetalWarehouseController : Controller
                 Selected = model.MetalMaterialId.HasValue && model.MetalMaterialId.Value == x.Id,
             })
             .ToListAsync(cancellationToken);
+
+        if (model.Materials.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Нет доступных материалов для прихода. Добавьте материалы в справочник.");
+        }
     }
 
     private async Task EnsureMetalMaterialsSeededAsync(CancellationToken cancellationToken)
     {
-        if (await _dbContext.MetalMaterials.AnyAsync(cancellationToken))
+        var hasActiveMaterials = await _dbContext.MetalMaterials.AnyAsync(x => x.IsActive, cancellationToken);
+        if (hasActiveMaterials)
         {
             return;
         }

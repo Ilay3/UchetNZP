@@ -18,6 +18,15 @@
             @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
+            @if (Model.Materials.Count == 0)
+            {
+                <div class="col-12">
+                    <div class="alert alert-warning mb-0" role="alert">
+                        Нет доступных материалов. Добавьте материалы в справочник, чтобы создать приход.
+                    </div>
+                </div>
+            }
+
             <div class="col-md-4">
                 <label asp-for="ReceiptDate" class="form-label"></label>
                 <input asp-for="ReceiptDate" class="form-control" type="date" />
@@ -60,7 +69,21 @@
                 <div class="card bg-light border-0">
                     <div class="card-body">
                         <h2 class="h5 mb-3">Поштучные размеры</h2>
-                        <div id="unitsContainer" class="row g-3"></div>
+                        <div id="unitsContainer" class="row g-3">
+                            @for (var i = 0; i < Model.Units.Count; i++)
+                            {
+                                var itemIndex = Model.Units[i].ItemIndex > 0 ? Model.Units[i].ItemIndex : i + 1;
+                                <div class="col-md-6">
+                                    <div class="border rounded p-3 bg-white">
+                                        <div class="fw-semibold mb-2">Единица @itemIndex</div>
+                                        <input asp-for="Units[i].ItemIndex" type="hidden" value="@itemIndex" />
+                                        <input asp-for="Units[i].SizeValue" class="form-control" type="number" min="0.001" step="0.001" data-index="@itemIndex" />
+                                        <span asp-validation-for="Units[i].SizeValue" class="text-danger"></span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <span asp-validation-for="Units" class="text-danger"></span>
                     </div>
                 </div>
             </div>
