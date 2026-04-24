@@ -115,6 +115,7 @@
                             <th>Ед. изм.</th>
                             <th>Вес, кг</th>
                             <th>Документ прихода</th>
+                            <th>Партия</th>
                             <th>Дата прихода</th>
                             <th>Статус</th>
                             <th class="text-end">Действия</th>
@@ -130,6 +131,7 @@
                             <td>@item.SizeUnitText</td>
                             <td>@item.WeightKg.ToString("0.###")</td>
                             <td>@item.ReceiptNumber</td>
+                            <td>@item.BatchNumber</td>
                             <td>@item.ReceiptDate.ToString("dd.MM.yyyy")</td>
                             <td><span class="badge bg-success-subtle text-success-emphasis">@item.Status</span></td>
                             <td class="text-end">

@@ -12,6 +12,8 @@ public class MetalReceipt
 
     public string? SupplierOrSource { get; set; }
 
+    public string BatchNumber { get; set; } = string.Empty;
+
     public string? Comment { get; set; }
 
     public DateTime CreatedAt { get; set; }

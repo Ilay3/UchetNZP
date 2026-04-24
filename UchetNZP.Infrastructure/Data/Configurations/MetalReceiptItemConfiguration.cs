@@ -31,6 +31,45 @@ public class MetalReceiptItemConfiguration : IEntityTypeConfiguration<MetalRecei
             .IsRequired()
             .HasMaxLength(16);
 
+        builder.Property(x => x.ProfileType)
+            .IsRequired()
+            .HasMaxLength(16);
+
+        builder.Property(x => x.ThicknessMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.WidthMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.LengthMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.DiameterMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.WallThicknessMm)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.PassportWeightKg)
+            .HasPrecision(12, 3)
+            .IsRequired();
+
+        builder.Property(x => x.ActualWeightKg)
+            .HasPrecision(12, 3)
+            .IsRequired();
+
+        builder.Property(x => x.CalculatedWeightKg)
+            .HasPrecision(12, 3)
+            .IsRequired();
+
+        builder.Property(x => x.WeightDeviationKg)
+            .HasPrecision(12, 3)
+            .IsRequired();
+
+        builder.Property(x => x.StockCategory)
+            .IsRequired()
+            .HasMaxLength(24);
+
         builder.Property(x => x.GeneratedCode)
             .IsRequired()
             .HasMaxLength(64);
