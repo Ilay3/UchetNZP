@@ -33,7 +33,7 @@ public class MetalWarehouseController : Controller
         {
             MaterialsInCatalog = await _dbContext.Parts.AsNoTracking().CountAsync(cancellationToken),
             MetalUnitsInStock = await _dbContext.WarehouseItems.AsNoTracking().SumAsync(x => (decimal?)x.Quantity, cancellationToken) ?? 0m,
-            OpenRequirements = await _dbContext.MetalRequirements.AsNoTracking().CountAsync(x => x.Status == "Создано", cancellationToken),
+            OpenRequirements = await _dbContext.MetalRequirements.AsNoTracking().CountAsync(x => x.Status == "Created", cancellationToken),
             MovementsToday = 0,
         };
 
@@ -630,26 +630,24 @@ public class MetalWarehouseController : Controller
             .AsNoTracking()
             .OrderByDescending(x => x.RequirementDate)
             .ThenByDescending(x => x.CreatedAt)
-            .SelectMany(
-                x => x.Items.DefaultIfEmpty(),
-                (requirement, item) => new MetalRequirementListItemViewModel
-                {
-                    Id = requirement.Id,
-                    RequirementNumber = requirement.RequirementNumber,
-                    RequirementDate = requirement.RequirementDate,
-                    PartDisplay = requirement.Part != null
-                        ? (string.IsNullOrWhiteSpace(requirement.Part.Code) ? requirement.Part.Name : $"{requirement.Part.Name} ({requirement.Part.Code})")
-                        : string.Empty,
-                    Quantity = requirement.Quantity,
-                    MaterialDisplay = item != null
-                        ? (item.MetalMaterial != null && !string.IsNullOrWhiteSpace(item.MetalMaterial.Code)
-                            ? $"{item.MetalMaterial.Name} ({item.MetalMaterial.Code})"
-                            : (item.MetalMaterial != null ? item.MetalMaterial.Name : "—"))
-                        : "—",
-                    RequiredQty = item != null ? item.TotalRequiredQty : 0m,
-                    Unit = item != null ? item.Unit : string.Empty,
-                    Status = requirement.Status,
-                })
+            .Select(x => new MetalRequirementListItemViewModel
+            {
+                Id = x.Id,
+                RequirementNumber = x.RequirementNumber,
+                RequirementDate = x.RequirementDate,
+                PartDisplay = string.IsNullOrWhiteSpace(x.PartCode)
+                    ? x.PartName
+                    : $"{x.PartName} ({x.PartCode})",
+                Quantity = x.Quantity,
+                MaterialDisplay = x.MetalMaterial != null
+                    ? (string.IsNullOrWhiteSpace(x.MetalMaterial.Code)
+                        ? x.MetalMaterial.Name
+                        : $"{x.MetalMaterial.Name} ({x.MetalMaterial.Code})")
+                    : "—",
+                RequiredQty = x.Items.Select(i => (decimal?)i.RequiredQty).FirstOrDefault() ?? 0m,
+                Unit = x.Items.Select(i => i.ConsumptionUnit).FirstOrDefault() ?? string.Empty,
+                Status = x.Status,
+            })
             .ToListAsync(cancellationToken);
 
         return View(model: new MetalRequirementListViewModel
@@ -821,29 +819,24 @@ public class MetalWarehouseController : Controller
                 x.RequirementNumber,
                 x.RequirementDate,
                 x.Status,
-                PartName = x.Part != null ? x.Part.Name : string.Empty,
-                PartCode = x.Part != null ? x.Part.Code : null,
+                x.PartCode,
+                x.PartName,
                 x.Quantity,
                 x.WipLaunchId,
                 LaunchDate = x.WipLaunch != null ? x.WipLaunch.LaunchDate : (DateTime?)null,
                 x.Comment,
+                MaterialName = x.MetalMaterial != null ? x.MetalMaterial.Name : "—",
+                MaterialCode = x.MetalMaterial != null ? x.MetalMaterial.Code : null,
                 Items = x.Items.Select(i => new
                 {
-                    i.NormPerUnit,
-                    i.TotalRequiredQty,
-                    i.Unit,
-                    i.TotalRequiredWeightKg,
-                    i.CalculationFormula,
-                    i.CalculationInput,
+                    i.ConsumptionPerUnit,
+                    i.ConsumptionUnit,
+                    i.RequiredQty,
+                    i.RequiredWeightKg,
+                    i.SizeRaw,
+                    i.Comment,
                     MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : "—",
                     MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : null,
-                    i.MetalMaterialId,
-                    MassPerMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerMeterKg : 0m,
-                    MassPerSquareMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerSquareMeterKg : 0m,
-                    CoefConsumption = i.MetalMaterial != null ? i.MetalMaterial.CoefConsumption : 1m,
-                    i.SelectionSource,
-                    i.SelectionReason,
-                    i.CandidateMaterials,
                 }).ToList(),
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -853,71 +846,15 @@ public class MetalWarehouseController : Controller
             return null;
         }
 
-        var currentPlan = await _dbContext.CuttingPlans
-            .AsNoTracking()
-            .Where(x => x.MetalRequirementId == requirement.Id && x.IsCurrent)
-            .Include(x => x.Items)
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var materialIds = requirement.Items.Select(i => i.MetalMaterialId).Distinct().ToList();
-        var stockLookup = await _dbContext.MetalReceiptItems
-            .AsNoTracking()
-            .Where(x => materialIds.Contains(x.MetalMaterialId))
-            .GroupBy(x => x.MetalMaterialId)
-            .Select(x => new
-            {
-                MaterialId = x.Key,
-                Qty = x.Sum(i => i.SizeValue),
-                WeightKg = x.Sum(i => i.Quantity > 0 ? i.TotalWeightKg / i.Quantity : i.TotalWeightKg),
-            })
-            .ToDictionaryAsync(x => x.MaterialId, cancellationToken);
-
-        var sourceBlank = currentPlan is null
-            ? "—"
-            : (ReadDecimalFromJson(currentPlan.ParametersJson, "Linear", "StockLength") is decimal stockLength
-                ? $"{stockLength:0.###} мм"
-                : $"{ReadDecimalFromJson(currentPlan.ParametersJson, "Sheet", "StockWidth"):0.###} x {ReadDecimalFromJson(currentPlan.ParametersJson, "Sheet", "StockHeight"):0.###} мм");
-
-        var items = requirement.Items.Select(i =>
+        var items = requirement.Items.Select(i => new MetalRequirementDetailsItemViewModel
         {
-            stockLookup.TryGetValue(i.MetalMaterialId, out var stock);
-            var lossFactor = i.CoefConsumption <= 0m ? 1m : i.CoefConsumption;
-            var qtyToIssue = i.TotalRequiredQty * lossFactor;
-            var backMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerMeterKg > 0m
-                ? i.TotalRequiredWeightKg.Value / (i.MassPerMeterKg * lossFactor)
-                : 0m;
-            var backSquareMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerSquareMeterKg > 0m
-                ? i.TotalRequiredWeightKg.Value / (i.MassPerSquareMeterKg * lossFactor)
-                : 0m;
-
-            return new MetalRequirementDetailsItemViewModel
-            {
-                MaterialDisplay = string.IsNullOrWhiteSpace(i.MaterialCode) ? i.MaterialName : $"{i.MaterialName} ({i.MaterialCode})",
-                MaterialArticle = !string.IsNullOrWhiteSpace(i.MaterialCode) && i.MaterialCode.StartsWith("06.")
-                    ? i.MaterialCode
-                    : "—",
-                NormPerUnit = i.NormPerUnit,
-                TotalRequiredQty = i.TotalRequiredQty,
-                Unit = i.Unit,
-                TotalRequiredWeightKg = i.TotalRequiredWeightKg,
-                NetRequirementQty = i.TotalRequiredQty,
-                LossFactor = lossFactor,
-                QtyToIssueFromStock = qtyToIssue,
-                ExpectedBusinessResidual = currentPlan?.BusinessResidual ?? 0m,
-                ExpectedScrapResidual = currentPlan?.ScrapResidual ?? 0m,
-                SourceBlankDisplay = sourceBlank,
-                CuttingPlanId = currentPlan?.Id,
-                CalculationFormula = i.CalculationFormula,
-                CalculationInput = i.CalculationInput,
-                BackCalculatedMeters = backMeters,
-                BackCalculatedSquareMeters = backSquareMeters,
-                StockQty = stock?.Qty ?? 0m,
-                StockWeightKg = stock?.WeightKg ?? 0m,
-                SelectionSource = i.SelectionSource,
-                SelectionReason = i.SelectionReason,
-                CandidateMaterials = i.CandidateMaterials,
-            };
+            MaterialDisplay = string.IsNullOrWhiteSpace(i.MaterialCode) ? i.MaterialName : $"{i.MaterialName} ({i.MaterialCode})",
+            NormPerUnit = i.ConsumptionPerUnit,
+            Unit = i.ConsumptionUnit,
+            TotalRequiredQty = i.RequiredQty,
+            TotalRequiredWeightKg = i.RequiredWeightKg,
+            SourceBlankDisplay = string.IsNullOrWhiteSpace(i.SizeRaw) ? "—" : i.SizeRaw,
+            SelectionReason = i.Comment,
         }).ToList();
 
         return new MetalRequirementDetailsViewModel
@@ -931,35 +868,18 @@ public class MetalWarehouseController : Controller
             WipLaunchId = requirement.WipLaunchId,
             LaunchDate = requirement.LaunchDate,
             Comment = requirement.Comment,
-            SourceBlankDisplay = sourceBlank,
-            CurrentCuttingPlanId = currentPlan?.Id,
+            SourceBlankDisplay = string.IsNullOrWhiteSpace(requirement.MaterialCode) ? requirement.MaterialName : $"{requirement.MaterialName} ({requirement.MaterialCode})",
+            Items = items,
             Aggregates = new MetalRequirementAggregateViewModel
             {
                 TotalKg = items.Sum(x => x.TotalRequiredWeightKg ?? 0m),
-                TotalMeters = items.Sum(x => x.BackCalculatedMeters),
-                TotalSquareMeters = items.Sum(x => x.BackCalculatedSquareMeters),
-                ForecastWastePercent = currentPlan?.WastePercent ?? 0m,
-                ForecastBusinessResidual = currentPlan?.BusinessResidual ?? 0m,
-                ForecastScrapResidual = currentPlan?.ScrapResidual ?? 0m,
+                TotalMeters = 0m,
+                TotalSquareMeters = 0m,
+                ForecastWastePercent = 0m,
+                ForecastBusinessResidual = 0m,
+                ForecastScrapResidual = 0m,
             },
-            CutDetails = currentPlan?.Items
-                .OrderBy(x => x.StockIndex)
-                .ThenBy(x => x.Sequence)
-                .Select(x => new MetalRequirementCutDetailViewModel
-                {
-                    StockIndex = x.StockIndex,
-                    Sequence = x.Sequence,
-                    ItemType = x.ItemType,
-                    Length = x.Length,
-                    Width = x.Width,
-                    Height = x.Height,
-                    PositionX = x.PositionX,
-                    PositionY = x.PositionY,
-                    Rotated = x.Rotated,
-                    Quantity = x.Quantity,
-                })
-                .ToList() ?? [],
-            Items = items,
+            CutDetails = [],
         };
     }
 

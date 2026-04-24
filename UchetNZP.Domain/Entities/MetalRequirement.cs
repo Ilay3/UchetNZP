@@ -10,21 +10,35 @@ public class MetalRequirement
 
     public DateTime RequirementDate { get; set; }
 
+    public string Status { get; set; } = string.Empty;
+
+    public Guid? WipReceiptId { get; set; }
+
     public Guid WipLaunchId { get; set; }
 
     public Guid PartId { get; set; }
 
+    public string PartCode { get; set; } = string.Empty;
+
+    public string PartName { get; set; } = string.Empty;
+
     public decimal Quantity { get; set; }
 
-    public string Status { get; set; } = string.Empty;
+    public Guid MetalMaterialId { get; set; }
+
+    public string? Comment { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
-    public string? Comment { get; set; }
+    public string CreatedBy { get; set; } = string.Empty;
+
+    public DateTime UpdatedAt { get; set; }
 
     public virtual WipLaunch? WipLaunch { get; set; }
 
     public virtual Part? Part { get; set; }
+
+    public virtual MetalMaterial? MetalMaterial { get; set; }
 
     public virtual ICollection<MetalRequirementItem> Items { get; set; } = new List<MetalRequirementItem>();
 

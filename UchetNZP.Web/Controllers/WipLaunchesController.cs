@@ -469,8 +469,8 @@ public class WipLaunchesController : Controller
 
         if (existing is not null)
         {
-            TempData["LaunchMetalRequirementMessage"] = "Требование уже было создано для этого запуска.";
-            return RedirectToAction(nameof(History));
+            TempData["LaunchMetalRequirementMessage"] = "Требование уже создано.";
+            return RedirectToAction("RequirementDetails", "MetalWarehouse", new { id = existing.Id });
         }
 
         var activeMaterials = await _dbContext.MetalMaterials
@@ -491,12 +491,6 @@ public class WipLaunchesController : Controller
             .Where(x => x.IsActive && x.PartId == launch.PartId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        var rules = await _dbContext.PartToMaterialRules
-            .AsNoTracking()
-            .Where(x => x.IsActive)
-            .OrderByDescending(x => x.Priority)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
 
         if (norms.Count == 0)
         {
@@ -504,32 +498,22 @@ public class WipLaunchesController : Controller
             return RedirectToAction(nameof(History));
         }
 
-        var requirementItems = new List<MetalRequirementItem>(norms.Count);
-        foreach (var norm in norms)
+        var selectedMaterialId = manualMaterialId;
+        if (!selectedMaterialId.HasValue || selectedMaterialId == Guid.Empty)
         {
-            var selection = ResolveMaterialSelection(launch, norm, rules, activeMaterials, manualMaterialId);
-            if (!selection.IsResolved || selection.Material is null)
-            {
-                TempData["LaunchMetalRequirementError"] = selection.Reason ?? "Не удалось подобрать материал для требования.";
-                return RedirectToAction(nameof(History));
-            }
-
-            var calculation = MetalConsumptionCalculator.Calculate(norm, launch.Quantity, selection.Material);
-            requirementItems.Add(new MetalRequirementItem
-            {
-                Id = Guid.NewGuid(),
-                MetalMaterialId = selection.Material.Id,
-                NormPerUnit = norm.BaseConsumptionQty,
-                TotalRequiredQty = norm.BaseConsumptionQty * launch.Quantity,
-                Unit = norm.ConsumptionUnit,
-                TotalRequiredWeightKg = calculation.NeedKg,
-                CalculationFormula = calculation.Formula,
-                CalculationInput = calculation.FormulaInput,
-                SelectionSource = selection.Source ?? "fallback",
-                SelectionReason = selection.Reason,
-                CandidateMaterials = selection.CandidatesDisplay,
-            });
+            selectedMaterialId = norms.Select(x => x.MetalMaterialId).FirstOrDefault(x => x != Guid.Empty);
         }
+
+        var norm = norms.FirstOrDefault(x => x.MetalMaterialId == selectedMaterialId) ?? norms[0];
+        var material = activeMaterials.FirstOrDefault(x => x.Id == norm.MetalMaterialId);
+        if (material is null)
+        {
+            TempData["LaunchMetalRequirementError"] = "Выбранный материал не найден или неактивен.";
+            return RedirectToAction(nameof(History));
+        }
+
+        var calculation = MetalConsumptionCalculator.Calculate(norm, launch.Quantity, material);
+        var requiredQty = norm.BaseConsumptionQty * launch.Quantity;
 
         var requirement = new MetalRequirement
         {
@@ -538,11 +522,38 @@ public class WipLaunchesController : Controller
             RequirementDate = DateTime.UtcNow,
             WipLaunchId = launch.Id,
             PartId = launch.PartId,
+            PartCode = launch.Part?.Code ?? string.Empty,
+            PartName = launch.Part?.Name ?? string.Empty,
             Quantity = launch.Quantity,
-            Status = "Создано",
+            MetalMaterialId = material.Id,
+            Status = "Created",
             CreatedAt = DateTime.UtcNow,
-            Comment = "Черновик создан автоматически из запуска партии.",
-            Items = requirementItems,
+            CreatedBy = User?.Identity?.Name ?? "system",
+            UpdatedAt = DateTime.UtcNow,
+            Comment = "Документ создан в электронном виде из запуска партии.",
+            Items = new List<MetalRequirementItem>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid(),
+                    MetalMaterialId = material.Id,
+                    ConsumptionPerUnit = norm.BaseConsumptionQty,
+                    ConsumptionUnit = norm.ConsumptionUnit,
+                    RequiredQty = requiredQty,
+                    RequiredWeightKg = calculation.NeedKg,
+                    SizeRaw = norm.SizeRaw,
+                    Comment = "Строка создана автоматически из расчета потребности.",
+                    NormPerUnit = norm.BaseConsumptionQty,
+                    TotalRequiredQty = requiredQty,
+                    Unit = norm.ConsumptionUnit,
+                    TotalRequiredWeightKg = calculation.NeedKg,
+                    CalculationFormula = calculation.Formula,
+                    CalculationInput = calculation.FormulaInput,
+                    SelectionSource = "manual_or_norm",
+                    SelectionReason = "Выбор по материалу в запуске/норме расхода.",
+                    CandidateMaterials = null,
+                },
+            },
         };
 
         _dbContext.MetalRequirements.Add(requirement);
@@ -550,7 +561,7 @@ public class WipLaunchesController : Controller
 
         TempData["LaunchMetalRequirementMessage"] = $"Создано требование {requirement.RequirementNumber}.";
 
-        return RedirectToAction(nameof(History));
+        return RedirectToAction("RequirementDetails", "MetalWarehouse", new { id = requirement.Id });
     }
 
     public record LaunchSaveRequest(IReadOnlyList<LaunchSaveItem> Items);
@@ -564,21 +575,28 @@ public class WipLaunchesController : Controller
 
     private async Task<string> GetNextRequirementNumberAsync(CancellationToken cancellationToken)
     {
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"MR-{year}-";
+
         var lastNumber = await _dbContext.MetalRequirements
             .AsNoTracking()
-            .Where(x => x.RequirementNumber.StartsWith("MREQ-"))
+            .Where(x => x.RequirementNumber.StartsWith(prefix))
             .OrderByDescending(x => x.RequirementNumber)
             .Select(x => x.RequirementNumber)
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var numericPart = 0;
-        if (!string.IsNullOrWhiteSpace(lastNumber) && lastNumber.Length > 5)
+        var nextSequence = 1;
+        if (!string.IsNullOrWhiteSpace(lastNumber))
         {
-            _ = int.TryParse(lastNumber[5..], out numericPart);
+            var chunk = lastNumber[prefix.Length..];
+            if (int.TryParse(chunk, out var parsed))
+            {
+                nextSequence = parsed + 1;
+            }
         }
 
-        return $"MREQ-{(numericPart + 1):D6}";
+        return $"{prefix}{nextSequence:D6}";
     }
 
     private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)
