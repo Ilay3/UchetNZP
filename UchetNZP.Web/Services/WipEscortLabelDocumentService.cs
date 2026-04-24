@@ -112,8 +112,7 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
 
         if (operations.Count == 0)
         {
-            ReplaceToken(templateRow, "{{OP_NO}}", string.Empty);
-            ReplaceToken(templateRow, "{{OP_NAME}}", string.Empty);
+            templateRow.Remove();
             return;
         }
 
@@ -122,10 +121,31 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
             var row = (TableRow)templateRow.CloneNode(true);
             ReplaceToken(row, "{{OP_NO}}", operation.Number);
             ReplaceToken(row, "{{OP_NAME}}", operation.Name);
+            ClearNonOperationCells(row);
             templateRow.Parent!.InsertBefore(row, templateRow);
         }
 
         templateRow.Remove();
+    }
+
+    private static void ClearNonOperationCells(TableRow row)
+    {
+        foreach (var cell in row.Elements<TableCell>())
+        {
+            var containsOperationToken = cell.Descendants<Text>().Any(text =>
+                text.Text.Contains("{{OP_NO}}", StringComparison.Ordinal) ||
+                text.Text.Contains("{{OP_NAME}}", StringComparison.Ordinal));
+
+            if (containsOperationToken)
+            {
+                continue;
+            }
+
+            foreach (var text in cell.Descendants<Text>())
+            {
+                text.Text = string.Empty;
+            }
+        }
     }
 
     private static void ReplaceToken(OpenXmlElement root, string token, string value)
