@@ -43,6 +43,8 @@
                         <th>Итого требуется</th>
                         <th>Ед. изм.</th>
                         <th>Итого вес, кг</th>
+                        <th>Обратный пересчёт</th>
+                        <th>Формула / входные данные</th>
                         <th>Текущий остаток</th>
                         <th>Разница</th>
                         <th>Источник выбора</th>
@@ -58,6 +60,14 @@
                             <td>@item.TotalRequiredQty.ToString("0.###")</td>
                             <td>@item.Unit</td>
                             <td>@(item.TotalRequiredWeightKg.HasValue ? item.TotalRequiredWeightKg.Value.ToString("0.###") : "—")</td>
+                            <td>@item.BackCalculatedMeters.ToString("0.###") м; @item.BackCalculatedSquareMeters.ToString("0.###") м²</td>
+                            <td>
+                                <div><code>@(string.IsNullOrWhiteSpace(item.CalculationFormula) ? "—" : item.CalculationFormula)</code></div>
+                                @if (!string.IsNullOrWhiteSpace(item.CalculationInput))
+                                {
+                                    <div class="small text-muted">@item.CalculationInput</div>
+                                }
+                            </td>
                             <td>@item.StockQty.ToString("0.###") @item.Unit</td>
                             <td>
                                 @if (item.IsEnough)

@@ -424,12 +424,14 @@ public class MetalWarehouseController : Controller
                     i.TotalRequiredQty,
                     i.Unit,
                     i.TotalRequiredWeightKg,
-                    i.SelectionSource,
-                    i.SelectionReason,
-                    i.CandidateMaterials,
+                    i.CalculationFormula,
+                    i.CalculationInput,
                     MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : "—",
                     MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : null,
                     i.MetalMaterialId,
+                    MassPerMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerMeterKg : 0m,
+                    MassPerSquareMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerSquareMeterKg : 0m,
+                    CoefConsumption = i.MetalMaterial != null ? i.MetalMaterial.CoefConsumption : 1m,
                 }).ToList(),
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -472,6 +474,14 @@ public class MetalWarehouseController : Controller
                     TotalRequiredQty = i.TotalRequiredQty,
                     Unit = i.Unit,
                     TotalRequiredWeightKg = i.TotalRequiredWeightKg,
+                    CalculationFormula = i.CalculationFormula,
+                    CalculationInput = i.CalculationInput,
+                    BackCalculatedMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerMeterKg > 0m
+                        ? i.TotalRequiredWeightKg.Value / (i.MassPerMeterKg * i.CoefConsumption)
+                        : 0m,
+                    BackCalculatedSquareMeters = i.TotalRequiredWeightKg.HasValue && i.MassPerSquareMeterKg > 0m
+                        ? i.TotalRequiredWeightKg.Value / (i.MassPerSquareMeterKg * i.CoefConsumption)
+                        : 0m,
                     StockQty = stock?.Qty ?? 0m,
                     StockWeightKg = stock?.WeightKg ?? 0m,
                     SelectionSource = i.SelectionSource,
@@ -540,10 +550,10 @@ public class MetalWarehouseController : Controller
 
         var seed = new[]
         {
-            new MetalMaterial { Id = Guid.NewGuid(), Name = "Лист ст.35 t=6 ГОСТ19903-74/1577-93", Code = "LIST35T6", UnitKind = "SquareMeter", IsActive = true },
-            new MetalMaterial { Id = Guid.NewGuid(), Name = "Пруток 20Г", Code = "PRUT20G", UnitKind = "Meter", IsActive = true },
-            new MetalMaterial { Id = Guid.NewGuid(), Name = "Круг 45", Code = "KRUG45", UnitKind = "Meter", IsActive = true },
-            new MetalMaterial { Id = Guid.NewGuid(), Name = "Лист 09Г2С t=4", Code = "LIST09G2S4", UnitKind = "SquareMeter", IsActive = true },
+            new MetalMaterial { Id = Guid.NewGuid(), Name = "Лист ст.35 t=6 ГОСТ19903-74/1577-93", Code = "LIST35T6", UnitKind = "SquareMeter", MassPerSquareMeterKg = 1.5m, CoefConsumption = 1m, StockUnit = "m2", WeightPerUnitKg = 1.5m, Coefficient = 1m, IsActive = true },
+            new MetalMaterial { Id = Guid.NewGuid(), Name = "Пруток 20Г", Code = "PRUT20G", UnitKind = "Meter", MassPerMeterKg = 0.8m, CoefConsumption = 1m, StockUnit = "m", WeightPerUnitKg = 0.8m, Coefficient = 1m, IsActive = true },
+            new MetalMaterial { Id = Guid.NewGuid(), Name = "Круг 45", Code = "KRUG45", UnitKind = "Meter", MassPerMeterKg = 0.9m, CoefConsumption = 1m, StockUnit = "m", WeightPerUnitKg = 0.9m, Coefficient = 1m, IsActive = true },
+            new MetalMaterial { Id = Guid.NewGuid(), Name = "Лист 09Г2С t=4", Code = "LIST09G2S4", UnitKind = "SquareMeter", MassPerSquareMeterKg = 1.2m, CoefConsumption = 1m, StockUnit = "m2", WeightPerUnitKg = 1.2m, Coefficient = 1m, IsActive = true },
         };
 
         _dbContext.MetalMaterials.AddRange(seed);

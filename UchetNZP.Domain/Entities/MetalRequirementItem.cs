@@ -16,11 +16,9 @@ public class MetalRequirementItem
 
     public decimal? TotalRequiredWeightKg { get; set; }
 
-    public string SelectionSource { get; set; } = "fallback";
+    public string? CalculationFormula { get; set; }
 
-    public string? SelectionReason { get; set; }
-
-    public string? CandidateMaterials { get; set; }
+    public string? CalculationInput { get; set; }
 
     public virtual MetalRequirement? MetalRequirement { get; set; }
 

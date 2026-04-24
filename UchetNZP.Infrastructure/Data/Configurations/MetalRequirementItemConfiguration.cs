@@ -27,14 +27,10 @@ public class MetalRequirementItemConfiguration : IEntityTypeConfiguration<MetalR
         builder.Property(x => x.TotalRequiredWeightKg)
             .HasPrecision(12, 3);
 
-        builder.Property(x => x.SelectionSource)
-            .IsRequired()
-            .HasMaxLength(32);
-
-        builder.Property(x => x.SelectionReason)
+        builder.Property(x => x.CalculationFormula)
             .HasMaxLength(512);
 
-        builder.Property(x => x.CandidateMaterials)
+        builder.Property(x => x.CalculationInput)
             .HasMaxLength(2048);
 
         builder.HasOne(x => x.MetalRequirement)

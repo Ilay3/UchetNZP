@@ -347,9 +347,11 @@ public class ImportService : IImportService
                 var rowNumber = row.RowNumber();
                 var code = row.Cell(2).GetString().Trim();
                 var name = row.Cell(3).GetString().Trim();
-                var weight = TryParseDecimalCell(row.Cell(4), out var weightValue) ? weightValue : (decimal?)null;
-                var coefficient = TryParseDecimalCell(row.Cell(5), out var coeffValue) ? coeffValue : 1m;
-                var displayName = row.Cell(6).GetString().Trim();
+                var hasMassPerMeter = TryParseDecimalCell(row.Cell(4), out var massPerMeter);
+                var hasMassPerM2 = TryParseDecimalCell(row.Cell(5), out var massPerM2);
+                var hasCoef = TryParseDecimalCell(row.Cell(6), out var coefConsumption);
+                var stockUnit = row.Cell(7).GetString().Trim();
+                var displayName = row.Cell(8).GetString().Trim();
 
                 if (string.IsNullOrWhiteSpace(name))
                 {
@@ -362,6 +364,27 @@ public class ImportService : IImportService
                 {
                     rowsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина полей (Code/Name/DisplayName)."));
+                    continue;
+                }
+
+                if (!hasMassPerMeter && !hasMassPerM2)
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Должно быть заполнено обязательное поле mass_per_meter или mass_per_m2."));
+                    continue;
+                }
+
+                if (!hasCoef)
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле coef_consumption."));
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(stockUnit))
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле stock_unit (кг/м/м2/шт)."));
                     continue;
                 }
 
@@ -392,8 +415,12 @@ public class ImportService : IImportService
                 }
 
                 entity.Name = name;
-                entity.WeightPerUnitKg = weight;
-                entity.Coefficient = coefficient == 0m ? 1m : coefficient;
+                entity.MassPerMeterKg = hasMassPerMeter ? massPerMeter : 0m;
+                entity.MassPerSquareMeterKg = hasMassPerM2 ? massPerM2 : 0m;
+                entity.CoefConsumption = coefConsumption == 0m ? 1m : coefConsumption;
+                entity.StockUnit = stockUnit.ToLowerInvariant();
+                entity.WeightPerUnitKg = hasMassPerMeter ? massPerMeter : (hasMassPerM2 ? massPerM2 : null);
+                entity.Coefficient = entity.CoefConsumption;
                 entity.DisplayName = string.IsNullOrWhiteSpace(displayName) ? name : displayName;
                 entity.IsActive = true;
                 materialsImported++;

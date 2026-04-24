@@ -14,6 +14,7 @@ public class MetalSizeParserTests
         yield return Case("Штырь", "Ф20х3000", "rod", "ok", 20m, null, null, 3000m, "pcs");
         yield return Case("Штырь", "Ø18,5x1200", "rod", "ok", 18.5m, null, null, 1200m, "pcs");
         yield return Case("Штырь", "Ø22.25х600", "rod", "ok", 22.25m, null, null, 600m, "pcs");
+        yield return Case("Штырь", "Ø8x23", "rod", "ok", 8m, null, null, 23m, "pcs");
 
         yield return Case("Бирка", "1x25x50", "plate", "ok", null, 1m, 25m, 50m, "pcs");
         yield return Case("Бирка", "1,5х30х80", "plate", "ok", null, 1.5m, 30m, 80m, "pcs");
@@ -22,6 +23,7 @@ public class MetalSizeParserTests
         yield return Case("Бирка", "3х100х200", "plate", "ok", null, 3m, 100m, 200m, "pcs");
         yield return Case("Бирка", "4*120*240", "plate", "ok", null, 4m, 120m, 240m, "pcs");
         yield return Case("Бирка", "5.5х150х300", "plate", "ok", null, 5.5m, 150m, 300m, "pcs");
+        yield return Case("Бирка", "1,5x38x90", "plate", "ok", null, 1.5m, 38m, 90m, "pcs");
 
         yield return Case("Наконечник", "20x40", "sheet", "ok", null, null, 20m, 40m, "pcs");
         yield return Case("Наконечник", "25х50", "sheet", "ok", null, null, 25m, 50m, "pcs");
@@ -29,6 +31,7 @@ public class MetalSizeParserTests
         yield return Case("Наконечник", "12,5 x 55", "sheet", "ok", null, null, 12.5m, 55m, "pcs");
         yield return Case("Наконечник", "14.2х75", "sheet", "ok", null, null, 14.2m, 75m, "pcs");
         yield return Case("Наконечник", "80*120", "sheet", "ok", null, null, 80m, 120m, "pcs");
+        yield return Case("Наконечник", "15x25", "sheet", "ok", null, null, 15m, 25m, "pcs");
 
         yield return Case("Корпус", "5кг", "unknown", "ok", null, null, null, null, "kg", 5m);
         yield return Case("Корпус", "7,5 кг", "unknown", "ok", null, null, null, null, "kg", 7.5m);

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UchetNZP.Infrastructure.Data;
@@ -11,9 +12,11 @@ using UchetNZP.Infrastructure.Data;
 namespace UchetNZP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424085103_AddMaterialMassAndRequirementFormula")]
+    partial class AddMaterialMassAndRequirementFormula
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -438,15 +441,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
 
-                    b.Property<string>("SelectionReason")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("SelectionSource")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
                     b.Property<decimal>("TotalRequiredQty")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
@@ -548,57 +542,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("PartRoutes", (string)null);
-                });
-
-            modelBuilder.Entity("UchetNZP.Domain.Entities.PartToMaterialRule", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("GeometryType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("MaterialArticle")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<string>("MaterialGradePattern")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<string>("PartNamePattern")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
-
-                    b.Property<int>("Priority")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RolledType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
-
-                    b.Property<decimal?>("SizeFromMm")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<decimal?>("SizeToMm")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IsActive", "Priority");
-
-                    b.ToTable("part_to_material_rule", (string)null);
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.ReceiptAudit", b =>

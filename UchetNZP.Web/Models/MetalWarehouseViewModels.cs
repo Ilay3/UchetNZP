@@ -272,6 +272,10 @@ public class MetalRequirementDetailsItemViewModel
 
     public decimal? TotalRequiredWeightKg { get; init; }
 
+    public string? CalculationFormula { get; init; }
+
+    public string? CalculationInput { get; init; }
+
     public decimal StockQty { get; init; }
 
     public decimal StockWeightKg { get; init; }
@@ -285,6 +289,10 @@ public class MetalRequirementDetailsItemViewModel
     public decimal DifferenceQty => StockQty - TotalRequiredQty;
 
     public bool IsEnough => DifferenceQty >= 0m;
+
+    public decimal BackCalculatedMeters { get; init; }
+
+    public decimal BackCalculatedSquareMeters { get; init; }
 }
 
 public class MetalRequirementDetailsViewModel
