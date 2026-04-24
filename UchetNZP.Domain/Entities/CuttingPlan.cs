@@ -30,6 +30,10 @@ public class CuttingPlan
 
     public bool IsCurrent { get; set; }
 
+    public string ExecutionStatus { get; set; } = "Не выполнено";
+
+    public decimal? ActualResidual { get; set; }
+
     public virtual MetalRequirement? MetalRequirement { get; set; }
 
     public virtual ICollection<CuttingPlanItem> Items { get; set; } = new List<CuttingPlanItem>();

@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
+using System.Text.Json;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -10,10 +12,17 @@ namespace UchetNZP.Web.Controllers;
 public class MetalWarehouseController : Controller
 {
     private readonly AppDbContext _dbContext;
+    private readonly ICuttingMapExcelExporter _cuttingMapExcelExporter;
+    private readonly ICuttingMapPdfExporter _cuttingMapPdfExporter;
 
-    public MetalWarehouseController(AppDbContext dbContext)
+    public MetalWarehouseController(
+        AppDbContext dbContext,
+        ICuttingMapExcelExporter cuttingMapExcelExporter,
+        ICuttingMapPdfExporter cuttingMapPdfExporter)
     {
         _dbContext = dbContext;
+        _cuttingMapExcelExporter = cuttingMapExcelExporter;
+        _cuttingMapPdfExporter = cuttingMapPdfExporter;
     }
 
     [HttpGet("")]
@@ -432,6 +441,9 @@ public class MetalWarehouseController : Controller
                     MassPerMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerMeterKg : 0m,
                     MassPerSquareMeterKg = i.MetalMaterial != null ? i.MetalMaterial.MassPerSquareMeterKg : 0m,
                     CoefConsumption = i.MetalMaterial != null ? i.MetalMaterial.CoefConsumption : 1m,
+                    i.SelectionSource,
+                    i.SelectionReason,
+                    i.CandidateMaterials,
                 }).ToList(),
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -494,6 +506,75 @@ public class MetalWarehouseController : Controller
         return View("~/Views/MetalWarehouse/RequirementDetails.cshtml", model);
     }
 
+    [HttpGet("CuttingMaps")]
+    public async Task<IActionResult> CuttingMaps(CancellationToken cancellationToken)
+    {
+        var plans = await _dbContext.CuttingPlans
+            .AsNoTracking()
+            .Where(x => x.IsCurrent)
+            .Include(x => x.Items)
+            .Include(x => x.MetalRequirement)
+                .ThenInclude(x => x!.Part)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var model = new CuttingMapListViewModel
+        {
+            Maps = plans.Select(MapCuttingPlan).ToList(),
+        };
+
+        return View("~/Views/MetalWarehouse/CuttingMaps.cshtml", model);
+    }
+
+    [HttpPost("CuttingMaps/{planId:guid}/execution")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateCuttingMapExecution(Guid planId, string executionStatus, decimal? actualResidual, CancellationToken cancellationToken)
+    {
+        var plan = await _dbContext.CuttingPlans.FirstOrDefaultAsync(x => x.Id == planId, cancellationToken);
+        if (plan is null)
+        {
+            return NotFound();
+        }
+
+        var normalizedStatus = (executionStatus ?? string.Empty).Trim();
+        if (normalizedStatus != "выполнено" && normalizedStatus != "частично")
+        {
+            normalizedStatus = "частично";
+        }
+
+        plan.ExecutionStatus = normalizedStatus;
+        plan.ActualResidual = actualResidual;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return RedirectToAction(nameof(CuttingMaps));
+    }
+
+    [HttpGet("CuttingMaps/{planId:guid}/export/excel")]
+    public async Task<IActionResult> ExportCuttingMapExcel(Guid planId, CancellationToken cancellationToken)
+    {
+        var map = await BuildCuttingMapAsync(planId, cancellationToken);
+        if (map is null)
+        {
+            return NotFound();
+        }
+
+        var file = _cuttingMapExcelExporter.Export(map);
+        return File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"Карта_раскроя_{map.RequirementNumber}_v{map.Version}.xlsx");
+    }
+
+    [HttpGet("CuttingMaps/{planId:guid}/export/pdf")]
+    public async Task<IActionResult> ExportCuttingMapPdf(Guid planId, CancellationToken cancellationToken)
+    {
+        var map = await BuildCuttingMapAsync(planId, cancellationToken);
+        if (map is null)
+        {
+            return NotFound();
+        }
+
+        var file = _cuttingMapPdfExporter.Export(map);
+        return File(file, "application/pdf", $"Карта_раскроя_{map.RequirementNumber}_v{map.Version}.pdf");
+    }
+
     [HttpGet("Movements")]
     public IActionResult Movements()
     {
@@ -507,6 +588,103 @@ public class MetalWarehouseController : Controller
         };
 
         return View(model);
+    }
+
+    private async Task<CuttingMapCardViewModel?> BuildCuttingMapAsync(Guid planId, CancellationToken cancellationToken)
+    {
+        var plan = await _dbContext.CuttingPlans
+            .AsNoTracking()
+            .Where(x => x.Id == planId)
+            .Include(x => x.Items)
+            .Include(x => x.MetalRequirement)
+                .ThenInclude(x => x!.Part)
+            .FirstOrDefaultAsync(cancellationToken);
+        return plan is null ? null : MapCuttingPlan(plan);
+    }
+
+    private static CuttingMapCardViewModel MapCuttingPlan(CuttingPlan plan)
+    {
+        var stockLength = ReadDecimalFromJson(plan.ParametersJson, "Linear", "StockLength");
+        var stockWidth = ReadDecimalFromJson(plan.ParametersJson, "Sheet", "StockWidth");
+        var stockHeight = ReadDecimalFromJson(plan.ParametersJson, "Sheet", "StockHeight");
+
+        var stocks = plan.Items
+            .GroupBy(x => x.StockIndex)
+            .OrderBy(x => x.Key)
+            .Select(g =>
+            {
+                var placements = g.OrderBy(x => x.Sequence).ToList();
+                var parts = placements.Where(x => x.ItemType == "part" && x.Length.HasValue).Select(x => x.Length!.Value.ToString("0.###")).ToList();
+                var residual = placements.FirstOrDefault(x => x.ItemType != "part");
+                var stepText = stockLength.HasValue
+                    ? $"Хлыст #{g.Key + 1}: {stockLength.Value:0.###} -> {string.Join(" + ", parts)} + остаток {(residual?.Length ?? 0m):0.###} мм"
+                    : $"Лист #{g.Key + 1}: {stockWidth:0.###} x {stockHeight:0.###}";
+
+                return new CuttingMapStockViewModel
+                {
+                    StockIndex = g.Key,
+                    StepDescription = stepText,
+                    Placements = placements.Select(p => new CuttingMapPlacementViewModel
+                    {
+                        ItemType = p.ItemType,
+                        Length = p.Length,
+                        Width = p.Width,
+                        Height = p.Height,
+                        PositionX = p.PositionX,
+                        PositionY = p.PositionY,
+                        Rotated = p.Rotated,
+                    }).ToList(),
+                };
+            })
+            .ToList();
+
+        var requirement = plan.MetalRequirement;
+        var partDisplay = requirement?.Part is null
+            ? "—"
+            : (string.IsNullOrWhiteSpace(requirement.Part.Code) ? requirement.Part.Name : $"{requirement.Part.Name} ({requirement.Part.Code})");
+
+        return new CuttingMapCardViewModel
+        {
+            PlanId = plan.Id,
+            RequirementId = plan.MetalRequirementId,
+            RequirementNumber = requirement?.RequirementNumber ?? "—",
+            PartDisplay = partDisplay,
+            Kind = plan.Kind == CuttingPlanKind.OneDimensional ? "1D" : "2D",
+            Version = plan.Version,
+            CreatedAt = plan.CreatedAt,
+            UtilizationPercent = plan.UtilizationPercent,
+            WastePercent = plan.WastePercent,
+            CutCount = plan.CutCount,
+            BusinessResidual = plan.BusinessResidual,
+            ScrapResidual = plan.ScrapResidual,
+            ExecutionStatus = string.IsNullOrWhiteSpace(plan.ExecutionStatus) ? "Не выполнено" : plan.ExecutionStatus,
+            ActualResidual = plan.ActualResidual,
+            StockCaption = stockLength.HasValue
+                ? $"Исходная длина хлыста: {stockLength:0.###} мм"
+                : $"Исходный лист: {stockWidth:0.###} x {stockHeight:0.###} мм",
+            Stocks = stocks,
+        };
+    }
+
+    private static decimal? ReadDecimalFromJson(string json, string root, string property)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty(root, out var rootElement) || rootElement.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (!rootElement.TryGetProperty(property, out var valueElement))
+        {
+            return null;
+        }
+
+        return valueElement.TryGetDecimal(out var value) ? value : null;
     }
 
 

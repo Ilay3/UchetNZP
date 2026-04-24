@@ -504,24 +504,32 @@ public class WipLaunchesController : Controller
             return RedirectToAction(nameof(History));
         }
 
-        var requirementItems = norms.Select(norm =>
+        var requirementItems = new List<MetalRequirementItem>(norms.Count);
+        foreach (var norm in norms)
         {
-            var calculation = selectedMaterial is null
-                ? null
-                : MetalConsumptionCalculator.Calculate(norm, launch.Quantity, selectedMaterial);
+            var selection = ResolveMaterialSelection(launch, norm, rules, activeMaterials, manualMaterialId);
+            if (!selection.IsResolved || selection.Material is null)
+            {
+                TempData["LaunchMetalRequirementError"] = selection.Reason ?? "Не удалось подобрать материал для требования.";
+                return RedirectToAction(nameof(History));
+            }
 
-            return new MetalRequirementItem
+            var calculation = MetalConsumptionCalculator.Calculate(norm, launch.Quantity, selection.Material);
+            requirementItems.Add(new MetalRequirementItem
             {
                 Id = Guid.NewGuid(),
-                MetalMaterialId = selectedMaterialId.Value,
+                MetalMaterialId = selection.Material.Id,
                 NormPerUnit = norm.BaseConsumptionQty,
                 TotalRequiredQty = norm.BaseConsumptionQty * launch.Quantity,
                 Unit = norm.ConsumptionUnit,
-                TotalRequiredWeightKg = calculation?.NeedKg ?? 0m,
-                CalculationFormula = calculation?.Formula,
-                CalculationInput = calculation?.FormulaInput,
-            };
-        }).ToList();
+                TotalRequiredWeightKg = calculation.NeedKg,
+                CalculationFormula = calculation.Formula,
+                CalculationInput = calculation.FormulaInput,
+                SelectionSource = selection.Source ?? "fallback",
+                SelectionReason = selection.Reason,
+                CandidateMaterials = selection.CandidatesDisplay,
+            });
+        }
 
         var requirement = new MetalRequirement
         {
