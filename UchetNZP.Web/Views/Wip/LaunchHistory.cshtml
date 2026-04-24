@@ -200,6 +200,16 @@
                                                     {
                                                         <form method="post" asp-action="CreateMetalRequirement" asp-route-id="@launch.Id" class="d-inline">
                                                             @Html.AntiForgeryToken()
+                                                            <div class="mb-2">
+                                                                <select name="manualMaterialId" class="form-select form-select-sm">
+                                                                    <option value="">Автовыбор материала</option>
+                                                                    @foreach (var material in Model.Filter.MaterialOptions)
+                                                                    {
+                                                                        var isSelected = Model.Filter.MetalMaterialId.HasValue && Model.Filter.MetalMaterialId.Value == material.Id;
+                                                                        <option value="@material.Id" selected="@isSelected">@(string.IsNullOrWhiteSpace(material.Code) ? material.Name : $"{material.Name} ({material.Code})")</option>
+                                                                    }
+                                                                </select>
+                                                            </div>
                                                             <button type="submit" class="btn btn-outline-primary btn-sm">Создать требование на склад</button>
                                                         </form>
                                                     }

@@ -424,6 +424,9 @@ public class MetalWarehouseController : Controller
                     i.TotalRequiredQty,
                     i.Unit,
                     i.TotalRequiredWeightKg,
+                    i.SelectionSource,
+                    i.SelectionReason,
+                    i.CandidateMaterials,
                     MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : "—",
                     MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : null,
                     i.MetalMaterialId,
@@ -471,6 +474,9 @@ public class MetalWarehouseController : Controller
                     TotalRequiredWeightKg = i.TotalRequiredWeightKg,
                     StockQty = stock?.Qty ?? 0m,
                     StockWeightKg = stock?.WeightKg ?? 0m,
+                    SelectionSource = i.SelectionSource,
+                    SelectionReason = i.SelectionReason,
+                    CandidateMaterials = i.CandidateMaterials,
                 };
             }).ToList(),
         };
