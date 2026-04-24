@@ -336,7 +336,9 @@ public class ImportService : IImportService
 
         if (mode is MetalImportMode.Materials or MetalImportMode.All)
         {
-            var sheet = workbook.Worksheet("Материалы и коэф. металлов");
+            var sheet = FindWorksheetOrThrow(
+                workbook,
+                ["Материалы и коэф. металлов", "Материалы и коэф металлов", "Материалы"]);
             foreach (var row in (sheet.RangeUsed()?.RowsUsed().Skip(1) ?? []).Where(x => !x.IsEmpty()))
             {
                 var rowNumber = row.RowNumber();
@@ -380,7 +382,10 @@ public class ImportService : IImportService
 
         if (mode is MetalImportMode.Norms or MetalImportMode.All)
         {
-            var sheet = workbook.Worksheet("Детали - Размеры - Нормы");
+            var sheet = FindWorksheetOrThrow(
+                workbook,
+                ["Детали - Размеры - Нормы", "Детали-Размеры-Нормы", "Детали Размеры Нормы", "Детали"],
+                ["Обозначение", "На деталь", "Материал"]);
             foreach (var row in (sheet.RangeUsed()?.RowsUsed().Skip(1) ?? []).Where(x => !x.IsEmpty()))
             {
                 var rowNumber = row.RowNumber();
@@ -649,5 +654,84 @@ public class ImportService : IImportService
         }
 
         return TryParseDecimal(cell.GetString().Trim(), out result);
+    }
+
+    private static IXLWorksheet FindWorksheetOrThrow(
+        XLWorkbook workbook,
+        IReadOnlyCollection<string> expectedNames,
+        IReadOnlyCollection<string>? requiredHeaderParts = null)
+    {
+        foreach (var worksheet in workbook.Worksheets)
+        {
+            if (expectedNames.Any(name => SheetNameEquals(worksheet.Name, name)))
+            {
+                return worksheet;
+            }
+        }
+
+        if (requiredHeaderParts is { Count: > 0 })
+        {
+            var normalizedHeaderParts = requiredHeaderParts.Select(NormalizeToken).Where(x => x.Length > 0).ToArray();
+            foreach (var worksheet in workbook.Worksheets)
+            {
+                var headerRowText = GetHeaderProbeText(worksheet);
+                if (normalizedHeaderParts.All(headerRowText.Contains))
+                {
+                    return worksheet;
+                }
+            }
+        }
+
+        var availableSheets = string.Join(", ", workbook.Worksheets.Select(x => $"'{x.Name}'"));
+        var expected = string.Join(", ", expectedNames.Select(x => $"'{x}'"));
+        throw new InvalidOperationException(
+            $"Не найден лист Excel. Ожидался один из: {expected}. Доступные листы: {availableSheets}.");
+    }
+
+    private static string GetHeaderProbeText(IXLWorksheet worksheet)
+    {
+        var firstUsedRow = worksheet.FirstRowUsed();
+        if (firstUsedRow is null)
+        {
+            return string.Empty;
+        }
+
+        return NormalizeToken(firstUsedRow.CellsUsed().Select(c => c.GetString()).Aggregate(string.Empty, (a, b) => $"{a} {b}"));
+    }
+
+    private static bool SheetNameEquals(string actualName, string expectedName)
+    {
+        if (string.Equals(actualName.Trim(), expectedName.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(NormalizeToken(actualName), NormalizeToken(expectedName), StringComparison.Ordinal);
+    }
+
+    private static string NormalizeToken(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Trim().ToUpperInvariant();
+        normalized = normalized
+            .Replace("Ё", "Е", StringComparison.Ordinal)
+            .Replace('–', '-')
+            .Replace('—', '-');
+
+        var buffer = new char[normalized.Length];
+        var index = 0;
+        foreach (var ch in normalized)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                buffer[index++] = ch;
+            }
+        }
+
+        return new string(buffer, 0, index);
     }
 }
