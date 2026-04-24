@@ -20,6 +20,12 @@ public class MetalRequirementItem
 
     public string? CalculationInput { get; set; }
 
+    public string SelectionSource { get; set; } = string.Empty;
+
+    public string? SelectionReason { get; set; }
+
+    public string? CandidateMaterials { get; set; }
+
     public virtual MetalRequirement? MetalRequirement { get; set; }
 
     public virtual MetalMaterial? MetalMaterial { get; set; }

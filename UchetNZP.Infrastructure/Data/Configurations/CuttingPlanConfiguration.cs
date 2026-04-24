@@ -50,6 +50,13 @@ public class CuttingPlanConfiguration : IEntityTypeConfiguration<CuttingPlan>
         builder.Property(x => x.IsCurrent)
             .IsRequired();
 
+        builder.Property(x => x.ExecutionStatus)
+            .HasMaxLength(32)
+            .IsRequired();
+
+        builder.Property(x => x.ActualResidual)
+            .HasPrecision(12, 3);
+
         builder.HasOne(x => x.MetalRequirement)
             .WithMany(x => x.CuttingPlans)
             .HasForeignKey(x => x.MetalRequirementId)

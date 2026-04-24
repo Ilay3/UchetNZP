@@ -1,0 +1,89 @@
+@model UchetNZP.Web.Models.CuttingMapListViewModel
+@{
+    ViewData["Title"] = "Карты раскроя";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Карта раскроя</h1>
+    <p class="lead mb-0">1D: пошаговый раскрой хлыстов. 2D: схема раскладки по координатам и повороту.</p>
+</div>
+
+@if (Model.Maps.Count == 0)
+{
+    <div class="alert alert-light border">Нет актуальных карт раскроя.</div>
+}
+
+@foreach (var map in Model.Maps)
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <div class="fw-semibold">@map.RequirementNumber · @map.Kind · версия @map.Version</div>
+                <div class="small text-muted">@map.PartDisplay · @map.StockCaption</div>
+            </div>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-secondary btn-sm" asp-action="ExportCuttingMapPdf" asp-route-planId="@map.PlanId">PDF</a>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="ExportCuttingMapExcel" asp-route-planId="@map.PlanId">Excel</a>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 mb-3 small">
+                <div class="col-md-2">Использование: <strong>@map.UtilizationPercent.ToString("0.###")%</strong></div>
+                <div class="col-md-2">Отход: <strong>@map.WastePercent.ToString("0.###")%</strong></div>
+                <div class="col-md-2">Резов: <strong>@map.CutCount</strong></div>
+                <div class="col-md-3">Деловой остаток: <strong>@map.BusinessResidual.ToString("0.###")</strong></div>
+                <div class="col-md-3">Техн. остаток: <strong>@map.ScrapResidual.ToString("0.###")</strong></div>
+            </div>
+
+            @foreach (var stock in map.Stocks)
+            {
+                <div class="border rounded p-2 mb-2">
+                    <div class="fw-semibold">@stock.StepDescription</div>
+                    <div class="table-responsive mt-2">
+                        <table class="table table-sm table-bordered align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Тип</th>
+                                    <th>Размер</th>
+                                    <th>X</th>
+                                    <th>Y</th>
+                                    <th>Поворот</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var p in stock.Placements)
+                            {
+                                <tr>
+                                    <td>@p.ItemType</td>
+                                    <td>@(p.Length.HasValue ? $"L={p.Length:0.###}" : $"W={p.Width:0.###}; H={p.Height:0.###}")</td>
+                                    <td>@(p.PositionX?.ToString("0.###") ?? "—")</td>
+                                    <td>@(p.PositionY?.ToString("0.###") ?? "—")</td>
+                                    <td>@(p.Rotated ? "Да" : "Нет")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            <form asp-action="UpdateCuttingMapExecution" asp-route-planId="@map.PlanId" method="post" class="row g-2 align-items-end mt-1">
+                @Html.AntiForgeryToken()
+                <div class="col-md-3">
+                    <label class="form-label">Статус выполнения</label>
+                    <select class="form-select" name="executionStatus">
+                        <option value="выполнено" selected="@(map.ExecutionStatus == "выполнено")">выполнено</option>
+                        <option value="частично" selected="@(map.ExecutionStatus == "частично")">частично</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Фактический остаток</label>
+                    <input type="number" step="0.001" class="form-control" name="actualResidual" value="@map.ActualResidual" />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

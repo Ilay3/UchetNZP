@@ -317,3 +317,46 @@ public class MetalRequirementDetailsViewModel
 
     public IReadOnlyCollection<MetalRequirementDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalRequirementDetailsItemViewModel>();
 }
+
+public class CuttingMapListViewModel
+{
+    public IReadOnlyCollection<CuttingMapCardViewModel> Maps { get; init; } = Array.Empty<CuttingMapCardViewModel>();
+}
+
+public class CuttingMapCardViewModel
+{
+    public Guid PlanId { get; init; }
+    public Guid RequirementId { get; init; }
+    public string RequirementNumber { get; init; } = string.Empty;
+    public string PartDisplay { get; init; } = string.Empty;
+    public string Kind { get; init; } = string.Empty;
+    public int Version { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public decimal UtilizationPercent { get; init; }
+    public decimal WastePercent { get; init; }
+    public int CutCount { get; init; }
+    public decimal BusinessResidual { get; init; }
+    public decimal ScrapResidual { get; init; }
+    public string ExecutionStatus { get; init; } = "Не выполнено";
+    public decimal? ActualResidual { get; init; }
+    public string StockCaption { get; init; } = string.Empty;
+    public IReadOnlyCollection<CuttingMapStockViewModel> Stocks { get; init; } = Array.Empty<CuttingMapStockViewModel>();
+}
+
+public class CuttingMapStockViewModel
+{
+    public int StockIndex { get; init; }
+    public string StepDescription { get; init; } = string.Empty;
+    public IReadOnlyCollection<CuttingMapPlacementViewModel> Placements { get; init; } = Array.Empty<CuttingMapPlacementViewModel>();
+}
+
+public class CuttingMapPlacementViewModel
+{
+    public string ItemType { get; init; } = string.Empty;
+    public decimal? Length { get; init; }
+    public decimal? Width { get; init; }
+    public decimal? Height { get; init; }
+    public decimal? PositionX { get; init; }
+    public decimal? PositionY { get; init; }
+    public bool Rotated { get; init; }
+}

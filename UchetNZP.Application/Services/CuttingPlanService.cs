@@ -69,6 +69,7 @@ public class CuttingPlanService(AppDbContext dbContext) : ICuttingPlanService
             ScrapResidual = computed.ScrapResidual,
             CreatedAt = DateTime.UtcNow,
             IsCurrent = true,
+            ExecutionStatus = "Не выполнено",
             Items = computed.Items,
         };
 

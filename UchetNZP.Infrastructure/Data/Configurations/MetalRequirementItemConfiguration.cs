@@ -33,6 +33,16 @@ public class MetalRequirementItemConfiguration : IEntityTypeConfiguration<MetalR
         builder.Property(x => x.CalculationInput)
             .HasMaxLength(2048);
 
+        builder.Property(x => x.SelectionSource)
+            .HasMaxLength(32)
+            .IsRequired();
+
+        builder.Property(x => x.SelectionReason)
+            .HasMaxLength(512);
+
+        builder.Property(x => x.CandidateMaterials)
+            .HasMaxLength(2048);
+
         builder.HasOne(x => x.MetalRequirement)
             .WithMany(x => x.Items)
             .HasForeignKey(x => x.MetalRequirementId)
