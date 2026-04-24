@@ -72,6 +72,7 @@ using (var scope = app.Services.CreateScope())
     {
         db.Database.Migrate();
         await EnsureTransferAuditResidualColumnsAsync(db, CancellationToken.None);
+        await EnsureMetalReceiptItemConsumptionColumnsAsync(db, CancellationToken.None);
         await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
@@ -116,6 +117,25 @@ static async Task EnsureTransferAuditResidualColumnsAsync(AppDbContext in_db, Ca
 
         ALTER TABLE "TransferAudits"
             ADD COLUMN IF NOT EXISTS "ResidualLabelNumber" character varying(64);
+        """,
+        in_cancellationToken);
+}
+
+static async Task EnsureMetalReceiptItemConsumptionColumnsAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    await in_db.Database.ExecuteSqlRawAsync(
+        """
+        ALTER TABLE "MetalReceiptItems"
+            ADD COLUMN IF NOT EXISTS "ConsumedAt" timestamp with time zone;
+
+        ALTER TABLE "MetalReceiptItems"
+            ADD COLUMN IF NOT EXISTS "ConsumedByCuttingReportId" uuid;
+
+        ALTER TABLE "MetalReceiptItems"
+            ADD COLUMN IF NOT EXISTS "IsConsumed" boolean NOT NULL DEFAULT FALSE;
+
+        CREATE INDEX IF NOT EXISTS "IX_MetalReceiptItems_IsConsumed"
+            ON "MetalReceiptItems" ("IsConsumed");
         """,
         in_cancellationToken);
 }
