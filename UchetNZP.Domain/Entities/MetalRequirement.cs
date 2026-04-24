@@ -27,4 +27,6 @@ public class MetalRequirement
     public virtual Part? Part { get; set; }
 
     public virtual ICollection<MetalRequirementItem> Items { get; set; } = new List<MetalRequirementItem>();
+
+    public virtual ICollection<CuttingPlan> CuttingPlans { get; set; } = new List<CuttingPlan>();
 }
