@@ -18,6 +18,28 @@ public class MetalReceiptItem
 
     public string SizeUnitText { get; set; } = string.Empty;
 
+    public string ProfileType { get; set; } = string.Empty;
+
+    public decimal? ThicknessMm { get; set; }
+
+    public decimal? WidthMm { get; set; }
+
+    public decimal? LengthMm { get; set; }
+
+    public decimal? DiameterMm { get; set; }
+
+    public decimal? WallThicknessMm { get; set; }
+
+    public decimal PassportWeightKg { get; set; }
+
+    public decimal ActualWeightKg { get; set; }
+
+    public decimal CalculatedWeightKg { get; set; }
+
+    public decimal WeightDeviationKg { get; set; }
+
+    public string StockCategory { get; set; } = "whole";
+
     public string GeneratedCode { get; set; } = string.Empty;
 
     public DateTime CreatedAt { get; set; }

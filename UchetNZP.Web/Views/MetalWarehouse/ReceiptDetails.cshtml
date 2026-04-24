@@ -18,8 +18,13 @@
         <div class="col-md-3"><strong>Номер:</strong> @Model.ReceiptNumber</div>
         <div class="col-md-3"><strong>Дата:</strong> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div>
         <div class="col-md-6"><strong>Источник:</strong> @(string.IsNullOrWhiteSpace(Model.SupplierOrSource) ? "—" : Model.SupplierOrSource)</div>
+        <div class="col-md-3"><strong>Партия:</strong> @Model.BatchNumber</div>
+        <div class="col-md-3"><strong>Тип проката:</strong> @Model.ProfileTypeDisplay</div>
         <div class="col-md-6"><strong>Материал:</strong> @Model.MaterialName</div>
-        <div class="col-md-3"><strong>Вес, кг:</strong> @Model.TotalWeightKg.ToString("0.###")</div>
+        <div class="col-md-3"><strong>Паспортная масса, кг:</strong> @Model.PassportWeightKg.ToString("0.###")</div>
+        <div class="col-md-3"><strong>Фактическая масса, кг:</strong> @Model.ActualWeightKg.ToString("0.###")</div>
+        <div class="col-md-3"><strong>Расчётная масса, кг:</strong> @Model.CalculatedWeightKg.ToString("0.###")</div>
+        <div class="col-md-3"><strong>Отклонение, кг:</strong> @Model.WeightDeviationKg.ToString("0.###")</div>
         <div class="col-md-3"><strong>Количество:</strong> @Model.Quantity</div>
         <div class="col-12"><strong>Комментарий:</strong> @(string.IsNullOrWhiteSpace(Model.Comment) ? "—" : Model.Comment)</div>
     </div>

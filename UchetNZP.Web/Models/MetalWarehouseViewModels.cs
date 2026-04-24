@@ -67,6 +67,10 @@ public class MetalStockItemViewModel
 
     public DateTime ReceiptDate { get; init; }
 
+    public string BatchNumber { get; init; } = string.Empty;
+
+    public string StockCategory { get; init; } = string.Empty;
+
     public string Status { get; init; } = "В наличии";
 }
 
@@ -145,8 +149,6 @@ public class MetalReceiptUnitInputViewModel
 {
     public int ItemIndex { get; set; }
 
-    [Required(ErrorMessage = "Размер обязателен.")]
-    [Range(0.000001d, 999999999999d, ErrorMessage = "Размер должен быть больше 0.")]
     public decimal? SizeValue { get; set; }
 }
 
@@ -163,7 +165,16 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     public Guid? MetalMaterialId { get; set; }
 
     [Range(0.000001d, 999999999999d, ErrorMessage = "Вес должен быть больше 0.")]
-    public decimal? TotalWeightKg { get; set; }
+    public decimal? PassportWeightKg { get; set; }
+
+    public decimal? TotalWeightKg
+    {
+        get => PassportWeightKg;
+        set => PassportWeightKg = value;
+    }
+
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Фактический вес должен быть больше 0.")]
+    public decimal? ActualWeightKg { get; set; }
 
     [Range(1, 9999, ErrorMessage = "Количество должно быть больше 0.")]
     public int? Quantity { get; set; }
@@ -173,6 +184,23 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
     public List<MetalReceiptUnitInputViewModel> Units { get; set; } = new();
 
+    [StringLength(32, ErrorMessage = "Номер партии не должен превышать 32 символа.")]
+    public string? BatchNumber { get; set; }
+
+    public string ProfileType { get; set; } = "sheet";
+
+    public decimal? ThicknessMm { get; set; }
+
+    public decimal? WidthMm { get; set; }
+
+    public decimal? LengthMm { get; set; }
+
+    public decimal? DiameterMm { get; set; }
+
+    public decimal? WallThicknessMm { get; set; }
+
+    public IReadOnlyDictionary<Guid, string> MaterialProfileTypes { get; set; } = new Dictionary<Guid, string>();
+
     public IReadOnlyCollection<SelectListItem> Materials { get; set; } = Array.Empty<SelectListItem>();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -180,6 +208,45 @@ public class MetalReceiptCreateViewModel : IValidatableObject
         if (!Quantity.HasValue || Quantity.Value <= 0)
         {
             yield break;
+        }
+
+        var profile = (ProfileType ?? string.Empty).Trim().ToLowerInvariant();
+        if (profile != "sheet" && profile != "rod" && profile != "pipe")
+        {
+            yield return new ValidationResult("Не указан корректный тип проката.", new[] { nameof(ProfileType) });
+            yield break;
+        }
+
+        if (!PassportWeightKg.HasValue || PassportWeightKg.Value <= 0m)
+        {
+            yield return new ValidationResult("Паспортная масса обязательна.", new[] { nameof(PassportWeightKg) });
+        }
+
+        if (!ActualWeightKg.HasValue || ActualWeightKg.Value <= 0m)
+        {
+            yield return new ValidationResult("Фактическая масса обязательна.", new[] { nameof(ActualWeightKg) });
+        }
+
+        if (profile == "sheet")
+        {
+            if (!ThicknessMm.HasValue || ThicknessMm.Value <= 0m || !WidthMm.HasValue || WidthMm.Value <= 0m || !LengthMm.HasValue || LengthMm.Value <= 0m)
+            {
+                yield return new ValidationResult("Для листа обязательны толщина, ширина и длина.", new[] { nameof(ThicknessMm), nameof(WidthMm), nameof(LengthMm) });
+            }
+        }
+        else if (profile == "rod")
+        {
+            if (!DiameterMm.HasValue || DiameterMm.Value <= 0m || !LengthMm.HasValue || LengthMm.Value <= 0m)
+            {
+                yield return new ValidationResult("Для круга/прутка обязательны диаметр и длина хлыста.", new[] { nameof(DiameterMm), nameof(LengthMm) });
+            }
+        }
+        else if (profile == "pipe")
+        {
+            if (!DiameterMm.HasValue || DiameterMm.Value <= 0m || !WallThicknessMm.HasValue || WallThicknessMm.Value <= 0m || !LengthMm.HasValue || LengthMm.Value <= 0m)
+            {
+                yield return new ValidationResult("Для трубы обязательны диаметр, стенка и длина.", new[] { nameof(DiameterMm), nameof(WallThicknessMm), nameof(LengthMm) });
+            }
         }
 
         if (Units.Count != Quantity.Value)
@@ -227,7 +294,17 @@ public class MetalReceiptDetailsViewModel
 
     public string MaterialName { get; init; } = string.Empty;
 
-    public decimal TotalWeightKg { get; init; }
+    public decimal PassportWeightKg { get; init; }
+
+    public decimal ActualWeightKg { get; init; }
+
+    public decimal CalculatedWeightKg { get; init; }
+
+    public decimal WeightDeviationKg { get; init; }
+
+    public string BatchNumber { get; init; } = string.Empty;
+
+    public string ProfileTypeDisplay { get; init; } = string.Empty;
 
     public int Quantity { get; init; }
 

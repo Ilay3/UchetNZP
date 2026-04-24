@@ -2,14 +2,35 @@
     const quantityInput = document.getElementById("quantityInput");
     const unitsContainer = document.getElementById("unitsContainer");
     const materialSelect = document.getElementById("materialSelect");
+    const profileTypeSelect = document.getElementById("profileTypeSelect");
+    const materialProfileMapRaw = document.getElementById("materialProfileMap")?.textContent ?? "{}";
+    let materialProfileMap = {};
+    try {
+        materialProfileMap = JSON.parse(materialProfileMapRaw);
+    } catch {
+        materialProfileMap = {};
+    }
 
-    if (!quantityInput || !unitsContainer || !materialSelect) {
+    if (!quantityInput || !unitsContainer || !materialSelect || !profileTypeSelect) {
         return;
     }
 
+    function syncProfileVisibility() {
+        const type = profileTypeSelect.value;
+        document.querySelectorAll(".profile-sheet").forEach(el => {
+            el.classList.toggle("d-none", type !== "sheet");
+        });
+        document.querySelectorAll(".profile-rod").forEach(el => {
+            el.classList.toggle("d-none", type !== "rod");
+        });
+        document.querySelectorAll(".profile-pipe").forEach(el => {
+            el.classList.toggle("d-none", type !== "pipe");
+        });
+    }
+
     function getUnitText() {
-        const optionText = materialSelect.options[materialSelect.selectedIndex]?.text?.toLowerCase() ?? "";
-        return optionText.includes("лист") ? "м2" : "м";
+        const profileType = profileTypeSelect.value;
+        return profileType === "sheet" ? "м2" : "м";
     }
 
     function currentUnitValues() {
@@ -70,6 +91,19 @@
     }
 
     quantityInput.addEventListener("input", renderUnitInputs);
-    materialSelect.addEventListener("change", renderUnitInputs);
+    materialSelect.addEventListener("change", () => {
+        const materialId = materialSelect.value;
+        const profile = materialProfileMap[materialId];
+        if (profile) {
+            profileTypeSelect.value = profile;
+        }
+        syncProfileVisibility();
+        renderUnitInputs();
+    });
+    profileTypeSelect.addEventListener("change", () => {
+        syncProfileVisibility();
+        renderUnitInputs();
+    });
+    syncProfileVisibility();
     renderUnitInputs();
 })();

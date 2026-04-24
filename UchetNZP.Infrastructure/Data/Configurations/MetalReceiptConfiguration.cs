@@ -22,6 +22,10 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
         builder.Property(x => x.SupplierOrSource)
             .HasMaxLength(256);
 
+        builder.Property(x => x.BatchNumber)
+            .IsRequired()
+            .HasMaxLength(32);
+
         builder.Property(x => x.Comment)
             .HasMaxLength(256);
 

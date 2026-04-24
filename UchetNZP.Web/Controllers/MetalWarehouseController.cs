@@ -132,24 +132,52 @@ public class MetalWarehouseController : Controller
             CreatedAt = now,
         };
 
+        var profileType = ResolveProfileType(material.Name, model.ProfileType);
         var materialCode = BuildMaterialCode(material);
         var quantity = model.Quantity!.Value;
-        var totalWeight = model.TotalWeightKg!.Value;
+        var passportWeight = model.PassportWeightKg!.Value;
+        var actualWeight = model.ActualWeightKg!.Value;
+        var calculatedWeight = CalculateWeightKg(profileType, model, quantity, material);
+        var batchNumber = string.IsNullOrWhiteSpace(model.BatchNumber) ? nextNumber : model.BatchNumber.Trim();
+        var deviation = actualWeight - passportWeight;
+        if (Math.Abs(deviation) > Math.Max(0.5m, passportWeight * 0.02m))
+        {
+            ModelState.AddModelError(nameof(model.ActualWeightKg), $"Расхождение между паспортной и фактической массой превышает допуск: {deviation:0.###} кг.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateMaterialsAsync(model, cancellationToken);
+            return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
+        }
+
+        receipt.BatchNumber = batchNumber;
         for (var i = 0; i < quantity; i++)
         {
             var unit = model.Units[i];
             var suffix = (i + 1).ToString("D3");
-            var sizeUnitText = material.UnitKind == "SquareMeter" ? "м2" : "м";
-            var sizePart = unit.SizeValue!.Value.ToString("0.###").Replace('.', '_');
+            var (sizeValue, sizeUnitText) = ResolveSizeFromInputOrMass(profileType, unit.SizeValue, model, material, quantity, actualWeight);
+            var sizePart = sizeValue.ToString("0.###").Replace('.', '_');
             receipt.Items.Add(new MetalReceiptItem
             {
                 Id = Guid.NewGuid(),
                 MetalMaterialId = material.Id,
                 Quantity = quantity,
-                TotalWeightKg = totalWeight,
+                TotalWeightKg = actualWeight,
                 ItemIndex = i + 1,
-                SizeValue = unit.SizeValue!.Value,
+                SizeValue = sizeValue,
                 SizeUnitText = sizeUnitText,
+                ProfileType = profileType,
+                ThicknessMm = model.ThicknessMm,
+                WidthMm = model.WidthMm,
+                LengthMm = model.LengthMm,
+                DiameterMm = model.DiameterMm,
+                WallThicknessMm = model.WallThicknessMm,
+                PassportWeightKg = passportWeight,
+                ActualWeightKg = actualWeight,
+                CalculatedWeightKg = calculatedWeight,
+                WeightDeviationKg = deviation,
+                StockCategory = ResolveStockCategory(profileType, sizeValue),
                 GeneratedCode = $"{materialCode}-{sizePart}-{(sizeUnitText == "м2" ? "M2" : "M")}-{suffix}",
                 CreatedAt = now,
             });
@@ -177,6 +205,7 @@ public class MetalWarehouseController : Controller
                 x.ReceiptNumber,
                 x.ReceiptDate,
                 x.SupplierOrSource,
+                x.BatchNumber,
                 x.Comment,
                 Item = x.Items
                     .OrderBy(i => i.ItemIndex)
@@ -186,7 +215,11 @@ public class MetalWarehouseController : Controller
                         i.SizeValue,
                         i.SizeUnitText,
                         i.GeneratedCode,
-                        i.TotalWeightKg,
+                        i.PassportWeightKg,
+                        i.ActualWeightKg,
+                        i.CalculatedWeightKg,
+                        i.WeightDeviationKg,
+                        i.ProfileType,
                         i.Quantity,
                         MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty,
                     })
@@ -208,7 +241,12 @@ public class MetalWarehouseController : Controller
             SupplierOrSource = receipt.SupplierOrSource ?? string.Empty,
             Comment = receipt.Comment,
             MaterialName = first.MaterialName,
-            TotalWeightKg = first.TotalWeightKg,
+            PassportWeightKg = first.PassportWeightKg,
+            ActualWeightKg = first.ActualWeightKg,
+            CalculatedWeightKg = first.CalculatedWeightKg,
+            WeightDeviationKg = first.WeightDeviationKg,
+            BatchNumber = receipt.BatchNumber,
+            ProfileTypeDisplay = ToProfileCaption(first.ProfileType),
             Quantity = (int)first.Quantity,
             Items = receipt.Item
                 .Select(i => new MetalReceiptDetailsItemViewModel
@@ -237,9 +275,11 @@ public class MetalWarehouseController : Controller
                 x.GeneratedCode,
                 x.SizeValue,
                 x.SizeUnitText,
+                x.StockCategory,
                 WeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
                 ReceiptNumber = x.MetalReceipt != null ? x.MetalReceipt.ReceiptNumber : string.Empty,
                 ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
+                BatchNumber = x.MetalReceipt != null ? x.MetalReceipt.BatchNumber : string.Empty,
             });
 
         if (filter.MaterialId.HasValue)
@@ -260,7 +300,7 @@ public class MetalWarehouseController : Controller
         }
 
         var stockRows = await stockQuery
-            .OrderByDescending(x => x.ReceiptDate)
+            .OrderBy(x => x.ReceiptDate)
             .ThenBy(x => x.GeneratedCode)
             .ToListAsync(cancellationToken);
 
@@ -310,6 +350,9 @@ public class MetalWarehouseController : Controller
                 WeightKg = x.WeightKg,
                 ReceiptNumber = x.ReceiptNumber,
                 ReceiptDate = x.ReceiptDate,
+                BatchNumber = x.BatchNumber,
+                StockCategory = x.StockCategory,
+                Status = ToStockCategoryCaption(x.StockCategory),
             }).ToList(),
             TotalUnitsCount = stockRows.Count,
             TotalMaterialsCount = stockRows.Select(x => x.MetalMaterialId).Distinct().Count(),
@@ -778,6 +821,107 @@ public class MetalWarehouseController : Controller
         return valueElement.TryGetDecimal(out var value) ? value : null;
     }
 
+    private static decimal CalculateWeightKg(string profileType, MetalReceiptCreateViewModel model, int quantity, MetalMaterial material)
+    {
+        return profileType switch
+        {
+            "sheet" when model.ThicknessMm.HasValue && model.WidthMm.HasValue && model.LengthMm.HasValue =>
+                Math.Round(0.00000785m * model.ThicknessMm.Value * model.WidthMm.Value * model.LengthMm.Value * quantity, 3),
+            "rod" when model.DiameterMm.HasValue && model.LengthMm.HasValue =>
+                Math.Round(0.000006165m * model.DiameterMm.Value * model.DiameterMm.Value * model.LengthMm.Value * quantity, 3),
+            "pipe" when model.DiameterMm.HasValue && model.WallThicknessMm.HasValue && model.LengthMm.HasValue =>
+                Math.Round(0.00002466m * model.WallThicknessMm.Value * (model.DiameterMm.Value - model.WallThicknessMm.Value) * model.LengthMm.Value * quantity, 3),
+            _ => Math.Round((model.ActualWeightKg ?? 0m) * (material.Coefficient <= 0m ? 1m : material.Coefficient), 3),
+        };
+    }
+
+    private static (decimal SizeValue, string UnitText) ResolveSizeFromInputOrMass(string profileType, decimal? sizeValue, MetalReceiptCreateViewModel model, MetalMaterial material, int quantity, decimal actualWeight)
+    {
+        if (sizeValue.HasValue && sizeValue.Value > 0m)
+        {
+            return (sizeValue.Value, profileType == "sheet" ? "м2" : "м");
+        }
+
+        var perItemWeight = quantity <= 0 ? 0m : actualWeight / quantity;
+        if (profileType == "sheet")
+        {
+            if (material.MassPerSquareMeterKg > 0m)
+            {
+                return (Math.Round(perItemWeight / material.MassPerSquareMeterKg, 3), "м2");
+            }
+
+            if (model.ThicknessMm.HasValue)
+            {
+                var areaM2 = (model.ThicknessMm.Value * 7.85m) > 0m ? perItemWeight / (model.ThicknessMm.Value * 7.85m) : 0m;
+                return (Math.Round(areaM2, 3), "м2");
+            }
+        }
+
+        if (material.MassPerMeterKg > 0m)
+        {
+            return (Math.Round(perItemWeight / material.MassPerMeterKg, 3), "м");
+        }
+
+        var fromLength = (model.LengthMm ?? 0m) / 1000m;
+        return (Math.Round(fromLength, 3), "м");
+    }
+
+    private static string ResolveStockCategory(string profileType, decimal sizeValue)
+    {
+        if (sizeValue <= 0m)
+        {
+            return "scrap";
+        }
+
+        return profileType switch
+        {
+            "sheet" when sizeValue >= 1m => "whole",
+            "rod" or "pipe" when sizeValue >= 3m => "whole",
+            _ when sizeValue >= 0.25m => "business",
+            _ => "scrap",
+        };
+    }
+
+    private static string ResolveProfileType(string materialName, string? selectedType)
+    {
+        var explicitType = (selectedType ?? string.Empty).Trim().ToLowerInvariant();
+        if (explicitType is "sheet" or "rod" or "pipe")
+        {
+            return explicitType;
+        }
+
+        var haystack = materialName.ToLowerInvariant();
+        if (haystack.Contains("труб"))
+        {
+            return "pipe";
+        }
+
+        if (haystack.Contains("круг") || haystack.Contains("прут"))
+        {
+            return "rod";
+        }
+
+        return "sheet";
+    }
+
+    private static string ToProfileCaption(string profileType) =>
+        profileType switch
+        {
+            "sheet" => "Лист",
+            "rod" => "Круг/пруток",
+            "pipe" => "Труба",
+            _ => profileType,
+        };
+
+    private static string ToStockCategoryCaption(string stockCategory) =>
+        stockCategory switch
+        {
+            "whole" => "Целая заготовка",
+            "business" => "Деловой остаток",
+            "scrap" => "Лом",
+            _ => "В наличии",
+        };
+
 
     private static DateTime ToUtcDate(DateTime value)
     {
@@ -802,6 +946,12 @@ public class MetalWarehouseController : Controller
                 Selected = model.MetalMaterialId.HasValue && model.MetalMaterialId.Value == x.Id,
             })
             .ToListAsync(cancellationToken);
+
+        model.MaterialProfileTypes = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.Name })
+            .ToDictionaryAsync(x => x.Id, x => ResolveProfileType(x.Name, null), cancellationToken);
 
         if (model.Materials.Count == 0)
         {
