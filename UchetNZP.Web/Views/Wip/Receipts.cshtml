@@ -4,20 +4,13 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Запуск партии НЗП</h1>
-    <p class="lead">Заполните поля по порядку: вид работ, деталь, операция, ярлык и количество.</p>
+    <p class="lead">Заполните поля по порядку: деталь, операция, материал, ярлык и количество.</p>
 </div>
 
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-light fw-semibold">Шаг 1. Параметры запуска</div>
     <div class="card-body">
         <form id="receiptForm" class="row g-4" autocomplete="off">
-            <div class="col-lg-4">
-                <label class="form-label" for="receiptSectionInput">Вид работ</label>
-                <input id="receiptSectionInput" class="form-control form-control-lg" type="text" list="receiptSectionOptions" placeholder="Начните вводить название вида работ" autocomplete="off" />
-                <datalist id="receiptSectionOptions"></datalist>
-                <input type="hidden" id="receiptSectionId" />
-                <div class="form-text">Введите минимум 2 символа для поиска вида работ.</div>
-            </div>
             <div class="col-lg-4">
                 <label class="form-label" for="receiptPartInput">Деталь</label>
                 <input id="receiptPartInput" class="form-control form-control-lg" type="text" list="receiptPartOptions" placeholder="Начните вводить деталь" autocomplete="off" />
@@ -38,7 +31,7 @@
                 <div class="form-text">Дата прихода устанавливается автоматически на сегодня и может быть изменена.</div>
             </div>
             <div class="col-lg-4">
-                <label class="form-label" for="receiptQuantityInput">Пришло (шт)</label>
+                <label class="form-label" for="receiptQuantityInput">Количество деталей</label>
                 <input id="receiptQuantityInput" class="form-control form-control-lg" type="number" min="1" step="1" />
                 <div class="form-text">Количество должно быть не меньше 1.</div>
             </div>
@@ -49,12 +42,75 @@
             </div>
             <div class="col-lg-4 d-flex align-items-end">
                 <div>
-                    <div class="fw-semibold text-uppercase small text-muted">Текущий остаток по виду работ</div>
+                    <div class="fw-semibold text-uppercase small text-muted">Текущий остаток по операции</div>
                     <div class="display-6" id="receiptBalanceLabel">0 шт</div>
                     <div class="form-text">Остаток обновляется при выборе операции.</div>
                 </div>
             </div>
         </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Материал заготовки</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-xl-5">
+                <label class="form-label" for="receiptMaterialSelect">Материал</label>
+                <select id="receiptMaterialSelect" class="form-select form-select-lg">
+                    <option value="">Выберите материал</option>
+                </select>
+                <div class="form-text">Список берётся из активных материалов склада металла.</div>
+            </div>
+            <div class="col-sm-6 col-xl-2">
+                <label class="form-label" for="receiptMaterialUnitInput">Ед. изм.</label>
+                <input id="receiptMaterialUnitInput" type="text" class="form-control form-control-lg" value="—" readonly />
+            </div>
+            <div class="col-sm-6 col-xl-2">
+                <div class="small text-muted text-uppercase">Доступно на складе</div>
+                <div class="fs-5 fw-semibold" id="receiptMaterialAvailableLabel">—</div>
+            </div>
+            <div class="col-sm-6 col-xl-1">
+                <div class="small text-muted text-uppercase">Количество единиц</div>
+                <div class="fs-5 fw-semibold" id="receiptMaterialUnitsCountLabel">0</div>
+            </div>
+            <div class="col-sm-6 col-xl-1">
+                <div class="small text-muted text-uppercase">Суммарный размер</div>
+                <div class="fs-5 fw-semibold" id="receiptMaterialTotalSizeLabel">0</div>
+            </div>
+            <div class="col-sm-6 col-xl-1">
+                <div class="small text-muted text-uppercase">Суммарный вес, кг</div>
+                <div class="fs-5 fw-semibold" id="receiptMaterialTotalWeightLabel">0</div>
+            </div>
+        </div>
+        <div id="receiptMaterialEmptyState" class="alert alert-light border mt-3 mb-0">
+            <div class="fw-semibold">Материал не выбран</div>
+            <div class="text-muted">Выберите материал, чтобы увидеть сводку склада и доступные единицы металла.</div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Доступные единицы металла</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="receiptMaterialUnitsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">Код</th>
+                        <th scope="col">Размер</th>
+                        <th scope="col">Ед. изм.</th>
+                        <th scope="col">Вес, кг</th>
+                        <th scope="col">Дата прихода</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Выберите материал, чтобы увидеть доступные единицы.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -114,6 +170,7 @@
                         <th scope="col">Вид работ</th>
                         <th scope="col">Деталь</th>
                         <th scope="col">Операция</th>
+                        <th scope="col">Материал</th>
                         <th scope="col">Ярлык</th>
                         <th scope="col">Было</th>
                         <th scope="col">Пришло</th>
@@ -124,7 +181,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="10" class="text-center text-muted">Добавьте операции в корзину для сохранения.</td>
+                        <td colspan="11" class="text-center text-muted">Добавьте операции в корзину для сохранения.</td>
                     </tr>
                 </tbody>
             </table>
@@ -147,6 +204,7 @@
                         <th scope="col">Вид работ</th>
                         <th scope="col">Деталь</th>
                         <th scope="col">Операция</th>
+                        <th scope="col">Материал</th>
                         <th scope="col">Ярлык</th>
                         <th scope="col">Пришло</th>
                         <th scope="col">Остаток после</th>
@@ -155,7 +213,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="8" class="text-center text-muted">Сохранённые приходы появятся здесь.</td>
+                        <td colspan="9" class="text-center text-muted">Сохранённые приходы появятся здесь.</td>
                     </tr>
                 </tbody>
             </table>

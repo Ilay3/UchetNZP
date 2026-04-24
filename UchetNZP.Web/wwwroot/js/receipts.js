@@ -29,14 +29,6 @@
     const balanceLabel = document.getElementById("receiptBalanceLabel");
     const historyTableBody = document.querySelector("#receiptHistoryTable tbody");
 
-    const sectionLookup = namespace.initSearchableInput({
-        input: document.getElementById("receiptSectionInput"),
-        datalist: document.getElementById("receiptSectionOptions"),
-        hiddenInput: document.getElementById("receiptSectionId"),
-        fetchUrl: "/wip/receipts/sections",
-        minLength: 2,
-    });
-
     const partLookup = namespace.initSearchableInput({
         input: document.getElementById("receiptPartInput"),
         datalist: document.getElementById("receiptPartOptions"),
@@ -58,6 +50,14 @@
     const bulkModalElement = document.getElementById("receiptBulkModal");
     const bulkLabelsInput = document.getElementById("receiptBulkLabelsInput");
     const bulkConfirmButton = document.getElementById("receiptBulkConfirmButton");
+    const materialSelect = document.getElementById("receiptMaterialSelect");
+    const materialUnitInput = document.getElementById("receiptMaterialUnitInput");
+    const materialAvailableLabel = document.getElementById("receiptMaterialAvailableLabel");
+    const materialUnitsCountLabel = document.getElementById("receiptMaterialUnitsCountLabel");
+    const materialTotalSizeLabel = document.getElementById("receiptMaterialTotalSizeLabel");
+    const materialTotalWeightLabel = document.getElementById("receiptMaterialTotalWeightLabel");
+    const materialEmptyState = document.getElementById("receiptMaterialEmptyState");
+    const materialUnitsTableBody = document.querySelector("#receiptMaterialUnitsTable tbody");
 
     dateInput.value = new Date().toISOString().slice(0, 10);
 
@@ -80,6 +80,7 @@
     let selectedLabel = null;
     let labelExistsInSystem = false;
     let labelCheckRequestId = 0;
+    let currentMaterialStockSummary = "";
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
@@ -92,11 +93,11 @@
     function collectDraftState() {
         return {
             part: partLookup.getSelected(),
-            section: sectionLookup.getSelected(),
             date: dateInput.value || "",
             quantity: quantityInput.value || "",
             comment: commentInput.value || "",
             labelNumber: labelSearchInput?.value || "",
+            metalMaterialId: materialSelect?.value || "",
             cart,
         };
     }
@@ -115,10 +116,6 @@
             await loadOperations(state.part.id);
         }
 
-        if (state.section?.id) {
-            sectionLookup.setSelected({ id: state.section.id, name: state.section.name, code: null });
-        }
-
         if (typeof state.date === "string" && state.date) {
             dateInput.value = state.date;
         }
@@ -130,6 +127,10 @@
         }
         if (labelSearchInput && typeof state.labelNumber === "string") {
             labelSearchInput.value = state.labelNumber;
+        }
+        if (materialSelect && typeof state.metalMaterialId === "string") {
+            materialSelect.value = state.metalMaterialId;
+            await loadMaterialStock(state.metalMaterialId);
         }
 
         if (Array.isArray(state.cart)) {
@@ -181,13 +182,6 @@
         saveDraft();
     });
 
-    sectionLookup.inputElement?.addEventListener("lookup:selected", () => {
-        renderOperations();
-        updateBalanceLabel();
-        updateFormState();
-        saveDraft();
-    });
-
     partLookup.inputElement?.addEventListener("input", () => {
         operations = [];
         selectedOperation = null;
@@ -197,9 +191,8 @@
         saveDraft();
     });
 
-    sectionLookup.inputElement?.addEventListener("input", () => {
-        renderOperations();
-        updateBalanceLabel();
+    materialSelect?.addEventListener("change", async () => {
+        await loadMaterialStock(materialSelect.value || "");
         updateFormState();
         saveDraft();
     });
@@ -225,13 +218,11 @@
 
     function canAddToCart() {
         const part = partLookup.getSelected();
-        const section = sectionLookup.getSelected();
-
-        if (!part || !part.id || !section || !section.id) {
+        if (!part || !part.id) {
             return false;
         }
 
-        if (!selectedOperation || selectedOperation.sectionId !== section.id) {
+        if (!selectedOperation) {
             return false;
         }
 
@@ -274,12 +265,11 @@
 
     function canOpenBulkAdd() {
         const part = partLookup.getSelected();
-        const section = sectionLookup.getSelected();
-        if (!part || !part.id || !section || !section.id) {
+        if (!part || !part.id) {
             return false;
         }
 
-        if (!selectedOperation || selectedOperation.sectionId !== section.id) {
+        if (!selectedOperation) {
             return false;
         }
 
@@ -300,6 +290,128 @@
         saveButton.disabled = cart.length === 0;
         updateLabelControlsState();
         updateLabelAvailabilityMessage();
+    }
+
+    function resetMaterialStockView() {
+        currentMaterialStockSummary = "";
+        if (materialUnitInput) {
+            materialUnitInput.value = "—";
+        }
+        if (materialAvailableLabel) {
+            materialAvailableLabel.textContent = "—";
+        }
+        if (materialUnitsCountLabel) {
+            materialUnitsCountLabel.textContent = "0";
+        }
+        if (materialTotalSizeLabel) {
+            materialTotalSizeLabel.textContent = "0";
+        }
+        if (materialTotalWeightLabel) {
+            materialTotalWeightLabel.textContent = "0";
+        }
+        if (materialUnitsTableBody) {
+            materialUnitsTableBody.innerHTML = "<tr><td colspan=\"5\" class=\"text-center text-muted\">Выберите материал, чтобы увидеть доступные единицы.</td></tr>";
+        }
+    }
+
+    async function loadMaterials() {
+        if (!materialSelect) {
+            return;
+        }
+
+        try {
+            const response = await fetch("/wip/receipts/materials");
+            if (!response.ok) {
+                throw new Error("Не удалось загрузить материалы.");
+            }
+
+            const materials = await response.json();
+            materialSelect.innerHTML = "<option value=\"\">Выберите материал</option>";
+            (Array.isArray(materials) ? materials : []).forEach(item => {
+                const option = document.createElement("option");
+                option.value = item.id;
+                option.textContent = formatNameWithCode(item.name ?? "", item.code ?? "");
+                materialSelect.appendChild(option);
+            });
+        }
+        catch (error) {
+            console.error(error);
+            materialSelect.innerHTML = "<option value=\"\">Материалы недоступны</option>";
+        }
+    }
+
+    async function loadMaterialStock(materialId) {
+        if (!materialId) {
+            resetMaterialStockView();
+            materialEmptyState?.classList.remove("d-none");
+            return;
+        }
+
+        if (materialUnitsTableBody) {
+            materialUnitsTableBody.innerHTML = "<tr><td colspan=\"5\" class=\"text-center text-muted\">Загрузка...</td></tr>";
+        }
+
+        try {
+            const response = await fetch(`/wip/receipts/material-stock?materialId=${encodeURIComponent(materialId)}`);
+            if (!response.ok) {
+                throw new Error("Не удалось загрузить складскую сводку.");
+            }
+
+            const payload = await response.json();
+            const summary = payload?.summary;
+            const units = Array.isArray(payload?.units) ? payload.units : [];
+
+            if (!summary) {
+                resetMaterialStockView();
+                materialEmptyState?.classList.remove("d-none");
+                return;
+            }
+
+            materialEmptyState?.classList.add("d-none");
+            if (materialUnitInput) {
+                materialUnitInput.value = summary.unitOfMeasure ?? "—";
+            }
+            if (materialAvailableLabel) {
+                materialAvailableLabel.textContent = summary.availableInStock ?? "Нет";
+            }
+            if (materialUnitsCountLabel) {
+                materialUnitsCountLabel.textContent = Number(summary.unitsCount ?? 0).toLocaleString("ru-RU");
+            }
+            if (materialTotalSizeLabel) {
+                materialTotalSizeLabel.textContent = Number(summary.totalSize ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 3 });
+            }
+            if (materialTotalWeightLabel) {
+                materialTotalWeightLabel.textContent = Number(summary.totalWeightKg ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 3 });
+            }
+            currentMaterialStockSummary = `ед.: ${Number(summary.unitsCount ?? 0).toLocaleString("ru-RU")}, вес: ${Number(summary.totalWeightKg ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 3 })} кг`;
+
+            if (materialUnitsTableBody) {
+                if (!units.length) {
+                    materialUnitsTableBody.innerHTML = "<tr><td colspan=\"5\" class=\"text-center text-muted\">По выбранному материалу пока нет единиц на складе.</td></tr>";
+                }
+                else {
+                    materialUnitsTableBody.innerHTML = "";
+                    units.forEach(unit => {
+                        const row = document.createElement("tr");
+                        const date = unit.receiptDate ? new Date(unit.receiptDate).toLocaleDateString("ru-RU") : "—";
+                        row.innerHTML = `
+                            <td>${unit.code ?? ""}</td>
+                            <td>${Number(unit.size ?? 0).toFixed(3)}</td>
+                            <td>${unit.unitOfMeasure ?? ""}</td>
+                            <td>${Number(unit.weightKg ?? 0).toFixed(3)}</td>
+                            <td>${date}</td>`;
+                        materialUnitsTableBody.appendChild(row);
+                    });
+                }
+            }
+        }
+        catch (error) {
+            console.error(error);
+            resetMaterialStockView();
+            if (materialUnitsTableBody) {
+                materialUnitsTableBody.innerHTML = "<tr><td colspan=\"5\" class=\"text-danger text-center\">Не удалось загрузить данные склада по материалу.</td></tr>";
+            }
+        }
     }
 
     function showLabelMessage(text, type = "warning")
@@ -478,24 +590,9 @@
             return;
         }
 
-        const selectedSectionId = sectionLookup.hiddenInput?.value || "";
-        const normalizedSectionId = selectedSectionId.length ? selectedSectionId : null;
-
-        if (selectedOperation && normalizedSectionId && selectedOperation.sectionId !== normalizedSectionId) {
-            selectedOperation = null;
-        }
-
         operationsTableBody.innerHTML = "";
         operations.forEach(operation => {
             const row = document.createElement("tr");
-            const belongsToSection = !normalizedSectionId || normalizedSectionId === operation.sectionId;
-            if (!belongsToSection) {
-                row.classList.add("table-warning");
-            }
-
-            if (!belongsToSection && selectedOperation && selectedOperation.opNumber === operation.opNumber) {
-                selectedOperation = null;
-            }
 
             const choiceCell = document.createElement("td");
             choiceCell.classList.add("text-center");
@@ -505,16 +602,8 @@
             radio.classList.add("form-check-input", "fs-4");
             radio.setAttribute("aria-label", `Выбрать операцию ${operation.opNumber}`);
             radio.dataset.opNumber = String(operation.opNumber);
-            radio.disabled = !belongsToSection;
-            if (!belongsToSection) {
-                radio.setAttribute("title", "Операция относится к другому виду работ");
-            }
 
             radio.addEventListener("change", () => {
-                if (radio.disabled) {
-                    return;
-                }
-
                 selectedOperation = operation;
                 void updateBalanceLabel();
                 updateFormState();
@@ -589,17 +678,8 @@
     async function updateBalanceLabel() {
         const requestId = ++balanceRequestId;
         const part = partLookup.getSelected();
-        const section = sectionLookup.getSelected();
-
-        if (!part || !part.id || !section || !section.id || !selectedOperation) {
+        if (!part || !part.id || !selectedOperation) {
             balanceLabel.textContent = "0 шт";
-            isLoadingBalance = false;
-            updateFormState();
-            return;
-        }
-
-        if (selectedOperation.sectionId !== section.id) {
-            balanceLabel.textContent = "—";
             isLoadingBalance = false;
             updateFormState();
             return;
@@ -608,21 +688,20 @@
         isLoadingBalance = true;
         updateFormState();
 
-        const key = getBalanceKey(part.id, section.id, selectedOperation.opNumber);
+        const key = getBalanceKey(part.id, selectedOperation.sectionId, selectedOperation.opNumber);
         try {
-            const base = await ensureBalanceLoaded(part.id, section.id, selectedOperation.opNumber);
+            const base = await ensureBalanceLoaded(part.id, selectedOperation.sectionId, selectedOperation.opNumber);
             if (requestId !== balanceRequestId) {
                 return;
             }
 
             const partAfterAwait = partLookup.getSelected();
-            const sectionAfterAwait = sectionLookup.getSelected();
             const operationAfterAwait = selectedOperation;
-            if (!partAfterAwait || !partAfterAwait.id || !sectionAfterAwait || !sectionAfterAwait.id || !operationAfterAwait) {
+            if (!partAfterAwait || !partAfterAwait.id || !operationAfterAwait) {
                 return;
             }
 
-            const currentKey = getBalanceKey(partAfterAwait.id, sectionAfterAwait.id, operationAfterAwait.opNumber);
+            const currentKey = getBalanceKey(partAfterAwait.id, operationAfterAwait.sectionId, operationAfterAwait.opNumber);
             if (currentKey !== key) {
                 return;
             }
@@ -702,7 +781,7 @@
 
     function renderCart() {
         if (!cart.length) {
-            cartTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
+            cartTableBody.innerHTML = "<tr><td colspan=\"11\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
             updateFormState();
             return;
         }
@@ -716,6 +795,7 @@
                 <td>${item.sectionName}</td>
                 <td>${item.partDisplay}</td>
                 <td>${item.operationDisplay}</td>
+                <td>${item.materialDisplay ?? "—"}<div class="small text-muted">${item.materialStockSummary ?? ""}</div></td>
                 <td>${item.isAssigned && item.labelNumber ? item.labelNumber : ""}</td>
                 <td>${item.was.toFixed(3)}</td>
                 <td>${item.quantity.toFixed(3)}</td>
@@ -737,7 +817,7 @@
         }
 
         if (!history.length) {
-            historyTableBody.innerHTML = "<tr><td colspan=\"8\" class=\"text-center text-muted\">Сохранённые приходы появятся здесь.</td></tr>";
+            historyTableBody.innerHTML = "<tr><td colspan=\"9\" class=\"text-center text-muted\">Сохранённые приходы появятся здесь.</td></tr>";
             return;
         }
 
@@ -749,6 +829,7 @@
                 <td>${item.sectionName}</td>
                 <td>${item.partDisplay}</td>
                 <td>${item.operationDisplay}</td>
+                <td>${item.materialDisplay ?? "—"}<div class="small text-muted">${item.materialStockSummary ?? ""}</div></td>
                 <td>${item.isAssigned && item.labelNumber ? item.labelNumber : ""}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>
@@ -835,10 +916,13 @@
         }
 
         partLookup.setSelected({ id: item.partId, name: item.partName, code: item.partCode });
-        sectionLookup.setSelected({ id: item.sectionId, name: item.sectionName, code: null });
         quantityInput.value = item.quantity;
         commentInput.value = item.comment ?? "";
         dateInput.value = item.date;
+        if (materialSelect) {
+            materialSelect.value = item.metalMaterialId ?? "";
+            await loadMaterialStock(materialSelect.value);
+        }
 
         if (labelSearchInput) {
             labelSearchInput.value = typeof item.labelNumber === "string" ? item.labelNumber : "";
@@ -889,7 +973,7 @@
             return;
         }
 
-        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending } = state;
+        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay } = state;
         const manualLabelNumber = getManualLabelNumber();
         if (manualLabelNumber && isLabelAlreadyInCart(manualLabelNumber)) {
             alert("Этот ярлык уже есть в корзине. Дублирование ярлыков запрещено.");
@@ -928,6 +1012,9 @@
             wipLabelId: labelId,
             labelNumber,
             isAssigned: labelIsAssigned,
+            metalMaterialId,
+            materialDisplay,
+            materialStockSummary: currentMaterialStockSummary,
         };
 
         cart.push(item);
@@ -944,15 +1031,9 @@
 
     async function collectReceiptState() {
         const part = partLookup.getSelected();
-        const section = sectionLookup.getSelected();
 
         if (!part || !part.id) {
             alert("Выберите деталь.");
-            return null;
-        }
-
-        if (!section || !section.id) {
-            alert("Выберите вид работ.");
             return null;
         }
 
@@ -960,11 +1041,7 @@
             alert("Выберите операцию детали.");
             return null;
         }
-
-        if (selectedOperation.sectionId !== section.id) {
-            alert("Выбранная операция относится к другому виду работ. Выберите корректный вид работ.");
-            return null;
-        }
+        const section = { id: selectedOperation.sectionId, name: selectedOperation.sectionName || "-" };
 
         const quantity = Number(quantityInput.value);
         if (!quantity || quantity < 1) {
@@ -978,13 +1055,15 @@
             return null;
         }
 
-        const key = getBalanceKey(part.id, section.id, selectedOperation.opNumber);
-        const base = await ensureBalanceLoaded(part.id, section.id, selectedOperation.opNumber);
+        const key = getBalanceKey(part.id, selectedOperation.sectionId, selectedOperation.opNumber);
+        const base = await ensureBalanceLoaded(part.id, selectedOperation.sectionId, selectedOperation.opNumber);
         const pending = pendingAdjustments.get(key) ?? 0;
         const partDisplay = formatNameWithCode(part.name, part.code);
         const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
+        const metalMaterialId = materialSelect?.value || null;
+        const materialDisplay = materialSelect?.selectedOptions?.[0]?.textContent?.trim() || "—";
 
-        return { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending };
+        return { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay };
     }
 
     function openBulkModal() {
@@ -1044,7 +1123,7 @@
             return;
         }
 
-        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending } = state;
+        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay } = state;
         const duplicateLabels = parsedLabels.filter(labelNumber => isLabelAlreadyInCart(labelNumber));
         if (duplicateLabels.length > 0) {
             alert(`Следующие ярлыки уже есть в корзине: ${duplicateLabels.join(", ")}. Удалите дубликаты и повторите.`);
@@ -1081,6 +1160,9 @@
                 wipLabelId: null,
                 labelNumber,
                 isAssigned: true,
+                metalMaterialId,
+                materialDisplay,
+                materialStockSummary: currentMaterialStockSummary,
             });
         });
 
@@ -1136,6 +1218,7 @@
                 partId: item.partId,
                 sectionId: item.sectionId,
                 opNumber: item.opNumber,
+                metalMaterialId: item.metalMaterialId,
                 receiptDate: item.date,
                 quantity: item.quantity,
                 comment: item.comment,
@@ -1217,6 +1300,8 @@
             const partDisplay = snapshot ? snapshot.partDisplay : item.partId;
             const sectionName = snapshot ? snapshot.sectionName : "";
             const operationDisplay = snapshot ? snapshot.operationDisplay : item.opNumber;
+            const materialDisplay = snapshot ? snapshot.materialDisplay : "—";
+            const materialStockSummary = snapshot ? snapshot.materialStockSummary : "";
             const date = snapshot ? snapshot.date : new Date().toISOString().slice(0, 10);
             const quantity = typeof item.quantity === "number" ? item.quantity : Number(item.quantity ?? 0);
             const become = typeof item.become === "number" ? item.become : Number(item.become ?? 0);
@@ -1231,6 +1316,8 @@
                 sectionName,
                 partDisplay,
                 operationDisplay,
+                materialDisplay,
+                materialStockSummary,
                 quantity: isNaN(quantity) ? 0 : quantity,
                 become: isNaN(become) ? 0 : become,
                 wipLabelId: item.wipLabelId ?? null,
@@ -1324,6 +1411,8 @@
     }
 
     void checkLabelExistsInSystem();
+    resetMaterialStockView();
+    void loadMaterials();
     updateFormState();
     renderHistory();
 
