@@ -357,6 +357,13 @@ public class ImportService : IImportService
                     continue;
                 }
 
+                if (code.Length > 64 || name.Length > 256 || (!string.IsNullOrWhiteSpace(displayName) && displayName.Length > 256))
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина полей (Code/Name/DisplayName)."));
+                    continue;
+                }
+
                 if (!materialCache.TryGetValue(code, out var entity))
                 {
                     entity = await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
@@ -405,6 +412,20 @@ public class ImportService : IImportService
                 {
                     rowsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущены обязательные поля Обозначение/BaseConsumptionQty."));
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(unit))
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле Unit (единица измерения)."));
+                    continue;
+                }
+
+                if (code.Length > 64 || name.Length > 256 || sizeRaw.Length > 128 || unit.Length > 16)
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина полей (Code/Name/Size/Unit)."));
                     continue;
                 }
 
@@ -463,12 +484,20 @@ public class ImportService : IImportService
                     normsUpdated++;
                 }
 
+                var comment = row.Cell(4).GetString().Trim();
+                if (comment.Length > 256)
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина поля Comment."));
+                    continue;
+                }
+
                 norm.SizeRaw = sizeRaw;
                 norm.BaseConsumptionQty = baseQty;
                 norm.ConsumptionUnit = unit;
-                norm.SourceFile = sourceFileName;
+                norm.SourceFile = sourceFileName.Length > 256 ? sourceFileName[..256] : sourceFileName;
                 norm.MetalMaterialId = null;
-                norm.Comment = row.Cell(4).GetString().Trim();
+                norm.Comment = comment;
                 norm.IsActive = true;
             }
         }
@@ -493,6 +522,17 @@ public class ImportService : IImportService
             }
         }
 
+        byte[]? errorFileContent = null;
+        string? errorFileName = null;
+        if (errors.Count > 0)
+        {
+            using var errorWorkbook = BuildMetalImportErrorWorkbook(errors);
+            using var errorStream = new MemoryStream();
+            errorWorkbook.SaveAs(errorStream);
+            errorFileContent = errorStream.ToArray();
+            errorFileName = $"{Path.GetFileNameWithoutExtension(sourceFileName)}_Ошибки.xlsx";
+        }
+
         return new MetalDataImportSummaryDto(
             sourceFileName,
             dryRun,
@@ -502,7 +542,9 @@ public class ImportService : IImportService
             normsCreated,
             normsUpdated,
             rowsSkipped,
-            errors);
+            errors,
+            errorFileName,
+            errorFileContent);
     }
 
     private static ImportJobItem CreateJobItem(Guid jobId, int rowIndex, string status, string? message)
@@ -761,5 +803,27 @@ public class ImportService : IImportService
         }
 
         return new string(buffer, 0, index);
+    }
+
+    private static XLWorkbook BuildMetalImportErrorWorkbook(IReadOnlyCollection<MetalDataImportErrorDto> errors)
+    {
+        var workbook = new XLWorkbook();
+        var worksheet = workbook.Worksheets.Add("Ошибки");
+
+        worksheet.Cell(1, 1).Value = "Лист";
+        worksheet.Cell(1, 2).Value = "Номер строки";
+        worksheet.Cell(1, 3).Value = "Описание ошибки";
+
+        var rowIndex = 2;
+        foreach (var error in errors)
+        {
+            worksheet.Cell(rowIndex, 1).Value = error.Sheet;
+            worksheet.Cell(rowIndex, 2).Value = error.RowIndex;
+            worksheet.Cell(rowIndex, 3).Value = error.Message;
+            rowIndex++;
+        }
+
+        worksheet.Columns().AdjustToContents();
+        return workbook;
     }
 }
