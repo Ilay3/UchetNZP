@@ -1,6 +1,148 @@
-@model MetalWarehouseListPageViewModel
+@model MetalStockPageViewModel
 @{
     ViewData["Title"] = "Остатки металла";
 }
 
-<partial name="_ListPage" model="Model" />
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Остатки металла</h1>
+    <p class="lead mb-0">Текущие остатки поштучного металла на складе на основе приходов.</p>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Index">На главную модуля</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Receipts">Приход</a>
+    <a class="btn btn-outline-secondary active" asp-controller="MetalWarehouse" asp-action="Stock">Остатки</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Requirements">Требования</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Movements">Движения</a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Всего единиц металла</div>
+                <div class="display-6 fw-semibold mb-0">@Model.TotalUnitsCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Всего материалов</div>
+                <div class="display-6 fw-semibold mb-0">@Model.TotalMaterialsCount</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Суммарный вес, кг</div>
+                <div class="display-6 fw-semibold mb-0">@Model.TotalWeightKg.ToString("0.###")</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Суммарный размер</div>
+                <div class="display-6 fw-semibold mb-0">@Model.TotalSize.ToString("0.###")</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Фильтры</div>
+    <div class="card-body">
+        <form method="get" asp-action="Stock" asp-controller="MetalWarehouse" class="row g-3 align-items-end">
+            <div class="col-12 col-lg-4">
+                <label class="form-label">Материал</label>
+                <select class="form-select" name="MaterialId">
+                    <option value="">Все материалы</option>
+                    @foreach (var material in Model.Filters.Materials)
+                    {
+                        <option value="@material.Value" selected="@material.Selected">@material.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-3">
+                <label class="form-label">Код/номер единицы</label>
+                <input type="text" name="UnitCodeOrNumber" class="form-control" value="@Model.Filters.UnitCodeOrNumber" placeholder="Например, LIST35T6" />
+            </div>
+            <div class="col-12 col-lg-2">
+                <label class="form-label">Ед. изм.</label>
+                <select class="form-select" name="UnitOfMeasure">
+                    <option value="">Все</option>
+                    @foreach (var unit in Model.Filters.UnitOfMeasures)
+                    {
+                        <option value="@unit.Value" selected="@unit.Selected">@unit.Text</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-lg-2">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" name="ActiveOnly" value="true" id="activeOnly" checked="@Model.Filters.ActiveOnly" />
+                    <label class="form-check-label" for="activeOnly">Только активные остатки</label>
+                </div>
+            </div>
+            <div class="col-12 col-lg-1 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100">Найти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Складские остатки</div>
+    <div class="card-body">
+        @if (!Model.HasItems)
+        {
+            <div class="border rounded p-4 bg-light-subtle">
+                <h2 class="h5 fw-semibold">Пока нет сохранённых приходов металла</h2>
+                <p class="text-muted mb-3">Создайте первый приход, чтобы склад начал учитывать металл поштучно.</p>
+                <a class="btn btn-primary" asp-controller="MetalWarehouse" asp-action="CreateReceipt">Создать приход</a>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Код</th>
+                            <th>Материал</th>
+                            <th>Размер</th>
+                            <th>Ед. изм.</th>
+                            <th>Вес, кг</th>
+                            <th>Документ прихода</th>
+                            <th>Дата прихода</th>
+                            <th>Статус</th>
+                            <th class="text-end">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var item in Model.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@item.GeneratedCode</td>
+                            <td>@item.MaterialName</td>
+                            <td>@item.SizeValue.ToString("0.###")</td>
+                            <td>@item.SizeUnitText</td>
+                            <td>@item.WeightKg.ToString("0.###")</td>
+                            <td>@item.ReceiptNumber</td>
+                            <td>@item.ReceiptDate.ToString("dd.MM.yyyy")</td>
+                            <td><span class="badge bg-success-subtle text-success-emphasis">@item.Status</span></td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-primary"
+                                   asp-controller="MetalWarehouse"
+                                   asp-action="StockItem"
+                                   asp-route-id="@item.Id">Открыть</a>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
