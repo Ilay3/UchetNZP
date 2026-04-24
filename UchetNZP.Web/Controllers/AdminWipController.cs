@@ -18,7 +18,6 @@ public class AdminWipController : Controller
     private readonly AppDbContext _dbContext;
     private readonly IAdminWipService _adminWipService;
     private readonly IWipLabelLookupService _labelLookupService;
-    private readonly IWipLabelService _wipLabelService;
 
     public AdminWipController(
         AppDbContext dbContext,
