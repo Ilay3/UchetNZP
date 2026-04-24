@@ -333,6 +333,7 @@ public class ImportService : IImportService
         var normsCreated = 0;
         var normsUpdated = 0;
         var rowsSkipped = 0;
+        var parsePreviewRows = new List<MetalDataParsePreviewRowDto>();
         var materialCache = new Dictionary<string, MetalMaterial>(StringComparer.OrdinalIgnoreCase);
         var partCache = new Dictionary<string, Part>(StringComparer.OrdinalIgnoreCase);
 
@@ -407,6 +408,21 @@ public class ImportService : IImportService
                 var name = row.Cell(2).GetString().Trim();
                 var sizeRaw = row.Cell(3).GetString().Trim();
                 var unit = row.Cell(6).GetString().Trim();
+                var parseResult = MetalSizeParser.Parse(sizeRaw, unit, null);
+                parsePreviewRows.Add(new MetalDataParsePreviewRowDto(
+                    rowNumber,
+                    code,
+                    string.IsNullOrWhiteSpace(name) ? null : name,
+                    string.IsNullOrWhiteSpace(sizeRaw) ? null : sizeRaw,
+                    parseResult.ShapeType,
+                    parseResult.DiameterMm,
+                    parseResult.ThicknessMm,
+                    parseResult.WidthMm,
+                    parseResult.LengthMm,
+                    parseResult.UnitNorm,
+                    parseResult.ValueNorm,
+                    parseResult.ParseStatus,
+                    parseResult.ParseError));
 
                 if (string.IsNullOrWhiteSpace(code) || !TryParseDecimalCell(row.Cell(5), out var baseQty))
                 {
@@ -493,6 +509,15 @@ public class ImportService : IImportService
                 }
 
                 norm.SizeRaw = sizeRaw;
+                norm.ShapeType = parseResult.ShapeType;
+                norm.DiameterMm = parseResult.DiameterMm;
+                norm.ThicknessMm = parseResult.ThicknessMm;
+                norm.WidthMm = parseResult.WidthMm;
+                norm.LengthMm = parseResult.LengthMm;
+                norm.UnitNorm = parseResult.UnitNorm;
+                norm.ValueNorm = parseResult.ValueNorm ?? baseQty;
+                norm.ParseStatus = parseResult.ParseStatus;
+                norm.ParseError = parseResult.ParseError;
                 norm.BaseConsumptionQty = baseQty;
                 norm.ConsumptionUnit = unit;
                 norm.SourceFile = sourceFileName.Length > 256 ? sourceFileName[..256] : sourceFileName;
@@ -542,6 +567,8 @@ public class ImportService : IImportService
             normsCreated,
             normsUpdated,
             rowsSkipped,
+            parsePreviewRows.Count,
+            parsePreviewRows,
             errors,
             errorFileName,
             errorFileContent);
