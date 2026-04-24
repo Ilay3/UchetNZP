@@ -1,0 +1,73 @@
+@model UchetNZP.Web.Models.MetalIssueDetailsViewModel
+@{
+    ViewData["Title"] = $"Выдача {Model.IssueNumber}";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Выдача @Model.IssueNumber</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-primary btn-sm" asp-controller="MetalWarehouse" asp-action="Issues">К списку выдач</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-controller="MetalWarehouse" asp-action="RequirementDetails" asp-route-id="@Model.RequirementId">К требованию</a>
+    </div>
+</div>
+
+@if (TempData["MetalIssueError"] is string issueError && !string.IsNullOrWhiteSpace(issueError))
+{
+    <div class="alert alert-danger">@issueError</div>
+}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body row g-3">
+        <div class="col-md-3"><div class="text-muted small">Номер выдачи</div><div class="fw-semibold">@Model.IssueNumber</div></div>
+        <div class="col-md-3"><div class="text-muted small">Дата</div><div class="fw-semibold">@Model.IssueDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
+        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge bg-secondary">@Model.Status</span></div></div>
+        <div class="col-md-3"><div class="text-muted small">Требование</div><div class="fw-semibold">@Model.RequirementNumber</div></div>
+        <div class="col-md-6"><div class="text-muted small">Деталь</div><div class="fw-semibold">@Model.PartDisplay</div></div>
+        <div class="col-md-6"><div class="text-muted small">Материал</div><div class="fw-semibold">@Model.MaterialDisplay</div></div>
+        @if (!string.IsNullOrWhiteSpace(Model.Comment))
+        {
+            <div class="col-12"><div class="text-muted small">Комментарий</div><div>@Model.Comment</div></div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">Строки выдачи</div>
+    <div class="card-body">
+        <div class="table-responsive mb-3">
+            <table class="table table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Код единицы</th>
+                        <th>Было</th>
+                        <th>К выдаче</th>
+                        <th>Остаток после</th>
+                        <th>Ед. изм.</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in Model.Items)
+                    {
+                        <tr>
+                            <td>@line.SourceCode</td>
+                            <td>@line.SourceQtyBefore.ToString("0.###")</td>
+                            <td>@line.IssuedQty.ToString("0.###")</td>
+                            <td>@line.RemainingQtyAfter.ToString("0.###")</td>
+                            <td>@line.Unit</td>
+                            <td><span class="badge bg-secondary">@line.LineStatus</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model.CanComplete)
+        {
+            <form method="post" asp-controller="MetalWarehouse" asp-action="CompleteIssue" asp-route-id="@Model.Id">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-success">Подтвердить выполнение</button>
+            </form>
+        }
+    </div>
+</div>

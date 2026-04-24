@@ -35,4 +35,6 @@ public class MetalMaterial
     public virtual ICollection<MetalRequirementItem> RequirementItems { get; set; } = new List<MetalRequirementItem>();
 
     public virtual ICollection<MetalRequirement> Requirements { get; set; } = new List<MetalRequirement>();
+
+    public virtual ICollection<MetalStockMovement> StockMovements { get; set; } = new List<MetalStockMovement>();
 }
