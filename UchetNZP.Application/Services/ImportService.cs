@@ -350,29 +350,34 @@ public class ImportService : IImportService
                 var coefficient = TryParseDecimalCell(row.Cell(5), out var coeffValue) ? coeffValue : 1m;
                 var displayName = row.Cell(6).GetString().Trim();
 
-                if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
+                if (string.IsNullOrWhiteSpace(name))
                 {
                     rowsSkipped++;
-                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущены обязательные поля Code/Name."));
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле Name."));
                     continue;
                 }
 
-                if (code.Length > 64 || name.Length > 256 || (!string.IsNullOrWhiteSpace(displayName) && displayName.Length > 256))
+                if ((!string.IsNullOrWhiteSpace(code) && code.Length > 64) || name.Length > 256 || (!string.IsNullOrWhiteSpace(displayName) && displayName.Length > 256))
                 {
                     rowsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина полей (Code/Name/DisplayName)."));
                     continue;
                 }
 
-                if (!materialCache.TryGetValue(code, out var entity))
+                var materialKey = !string.IsNullOrWhiteSpace(code)
+                    ? $"CODE:{code}"
+                    : $"NAME:{name.ToUpperInvariant()}";
+                if (!materialCache.TryGetValue(materialKey, out var entity))
                 {
-                    entity = await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
+                    entity = !string.IsNullOrWhiteSpace(code)
+                        ? await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false)
+                        : await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == null && x.Name == name, cancellationToken).ConfigureAwait(false);
                     if (entity is null)
                     {
                         entity = new MetalMaterial
                         {
                             Id = Guid.NewGuid(),
-                            Code = code,
+                            Code = string.IsNullOrWhiteSpace(code) ? null : code,
                             UnitKind = "Unknown",
                         };
 
@@ -382,7 +387,7 @@ public class ImportService : IImportService
                         }
                     }
 
-                    materialCache[code] = entity;
+                    materialCache[materialKey] = entity;
                 }
 
                 entity.Name = name;
@@ -408,10 +413,10 @@ public class ImportService : IImportService
                 var sizeRaw = row.Cell(3).GetString().Trim();
                 var unit = row.Cell(6).GetString().Trim();
 
-                if (string.IsNullOrWhiteSpace(code) || !TryParseDecimalCell(row.Cell(5), out var baseQty))
+                if (!TryParseDecimalCell(row.Cell(5), out var baseQty) || (string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(name)))
                 {
                     rowsSkipped++;
-                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущены обязательные поля Обозначение/BaseConsumptionQty."));
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущены обязательные поля Обозначение/Наименование/BaseConsumptionQty."));
                     continue;
                 }
 
@@ -422,23 +427,28 @@ public class ImportService : IImportService
                     continue;
                 }
 
-                if (code.Length > 64 || name.Length > 256 || sizeRaw.Length > 128 || unit.Length > 16)
+                if ((!string.IsNullOrWhiteSpace(code) && code.Length > 64) || (!string.IsNullOrWhiteSpace(name) && name.Length > 256) || sizeRaw.Length > 128 || unit.Length > 16)
                 {
                     rowsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина полей (Code/Name/Size/Unit)."));
                     continue;
                 }
 
-                if (!partCache.TryGetValue(code, out var part))
+                var partKey = !string.IsNullOrWhiteSpace(code)
+                    ? $"CODE:{code}"
+                    : $"NAME:{name.ToUpperInvariant()}";
+                if (!partCache.TryGetValue(partKey, out var part))
                 {
-                    part = await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
+                    part = !string.IsNullOrWhiteSpace(code)
+                        ? await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false)
+                        : await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == null && x.Name == name, cancellationToken).ConfigureAwait(false);
                     if (part is null)
                     {
                         partsCreated++;
                         part = new Part
                         {
                             Id = Guid.NewGuid(),
-                            Code = code,
+                            Code = string.IsNullOrWhiteSpace(code) ? null : code,
                             Name = string.IsNullOrWhiteSpace(name) ? code : name,
                         };
 
@@ -452,7 +462,7 @@ public class ImportService : IImportService
                         partsFound++;
                     }
 
-                    partCache[code] = part;
+                    partCache[partKey] = part;
                 }
 
                 if (!string.IsNullOrWhiteSpace(name))
