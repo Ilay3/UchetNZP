@@ -501,3 +501,78 @@ public class CuttingMapPlacementViewModel
     public decimal? PositionY { get; init; }
     public bool Rotated { get; init; }
 }
+
+public class CuttingReportCreateViewModel
+{
+    [Required]
+    public Guid CuttingPlanId { get; set; }
+
+    [Required]
+    public Guid SourceMetalReceiptItemId { get; set; }
+
+    [Required]
+    [StringLength(128)]
+    public string Workshop { get; set; } = string.Empty;
+
+    [Required]
+    [StringLength(64)]
+    public string Shift { get; set; } = string.Empty;
+
+    [Range(0, 999999999)]
+    public decimal ActualProducedSize { get; set; }
+
+    [Range(0, 999999999)]
+    public decimal ActualProducedMassKg { get; set; }
+
+    [Range(0, 999999999)]
+    public decimal BusinessResidualSize { get; set; }
+
+    [Range(0, 999999999)]
+    public decimal BusinessResidualMassKg { get; set; }
+
+    [Range(0, 999999999)]
+    public decimal ScrapSize { get; set; }
+
+    [Range(0, 999999999)]
+    public decimal ScrapMassKg { get; set; }
+}
+
+public class CuttingReportListItemViewModel
+{
+    public Guid Id { get; init; }
+    public string ReportNumber { get; init; } = string.Empty;
+    public DateTime ReportDate { get; init; }
+    public string RequirementNumber { get; init; } = string.Empty;
+    public string MaterialName { get; init; } = string.Empty;
+    public string SourceCode { get; init; } = string.Empty;
+    public string Workshop { get; init; } = string.Empty;
+    public string Shift { get; init; } = string.Empty;
+    public decimal PlannedSize { get; init; }
+    public decimal ActualProducedSize { get; init; }
+    public decimal SizeDeviation => ActualProducedSize - PlannedSize;
+    public decimal PlannedMassKg { get; init; }
+    public decimal ActualProducedMassKg { get; init; }
+    public decimal MassDeviation => ActualProducedMassKg - PlannedMassKg;
+    public decimal PlannedWaste { get; init; }
+    public decimal ActualWaste { get; init; }
+    public decimal WasteDeviation => ActualWaste - PlannedWaste;
+}
+
+public class CuttingAnalyticsItemViewModel
+{
+    public string Workshop { get; init; } = string.Empty;
+    public string Shift { get; init; } = string.Empty;
+    public string MaterialName { get; init; } = string.Empty;
+    public int ReportsCount { get; init; }
+    public decimal AvgWasteDeviation { get; init; }
+    public decimal TotalScrapMassKg { get; init; }
+}
+
+public class CuttingReportPageViewModel
+{
+    public CuttingReportCreateViewModel CreateModel { get; init; } = new();
+    public IReadOnlyCollection<SelectListItem> PlanOptions { get; init; } = Array.Empty<SelectListItem>();
+    public IReadOnlyCollection<SelectListItem> SourceOptions { get; init; } = Array.Empty<SelectListItem>();
+    public IReadOnlyCollection<CuttingReportListItemViewModel> Reports { get; init; } = Array.Empty<CuttingReportListItemViewModel>();
+    public IReadOnlyCollection<CuttingAnalyticsItemViewModel> Analytics { get; init; } = Array.Empty<CuttingAnalyticsItemViewModel>();
+}

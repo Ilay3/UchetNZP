@@ -42,6 +42,14 @@ public class MetalReceiptItem
 
     public string GeneratedCode { get; set; } = string.Empty;
 
+    public bool IsConsumed { get; set; }
+
+    public DateTime? ConsumedAt { get; set; }
+
+    public Guid? ConsumedByCuttingReportId { get; set; }
+
+    public Guid? SourceCuttingReportId { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public virtual MetalReceipt? MetalReceipt { get; set; }
