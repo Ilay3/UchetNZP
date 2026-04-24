@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace UchetNZP.Domain.Entities;
 
 public class MetalReceiptItem
@@ -55,4 +57,6 @@ public class MetalReceiptItem
     public virtual MetalReceipt? MetalReceipt { get; set; }
 
     public virtual MetalMaterial? MetalMaterial { get; set; }
+
+    public virtual ICollection<MetalRequirementPlanItem> RequirementPlanItems { get; set; } = new List<MetalRequirementPlanItem>();
 }
