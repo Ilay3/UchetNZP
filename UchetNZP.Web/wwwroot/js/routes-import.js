@@ -500,6 +500,7 @@
 
     function renderSummary(result) {
         const errors = Array.isArray(result.errors) ? result.errors : [];
+        const hasErrorFile = !!result.errorFileContent;
         summary.innerHTML = `
             <div class="alert ${result.dryRun ? "alert-info" : "alert-success"}">
                 <div><strong>${result.dryRun ? "Dry-run" : "Импорт"}:</strong> ${result.sourceFileName}</div>
@@ -507,7 +508,45 @@
                 <div>Деталей найдено: <strong>${result.partsFound}</strong>, создано: <strong>${result.partsCreated}</strong></div>
                 <div>Норм создано: <strong>${result.normsCreated}</strong>, обновлено: <strong>${result.normsUpdated}</strong></div>
                 <div>Строк пропущено: <strong>${result.rowsSkipped}</strong></div>
-                ${errors.length === 0 ? "" : `<hr /><div><strong>Ошибки:</strong><ul>${errors.map(e => `<li>[${e.sheet} #${e.rowIndex}] ${e.message}</li>`).join("")}</ul></div>`}
+                ${errors.length === 0 ? "" : `<hr /><div><strong>Ошибки:</strong><ul>${errors.slice(0, 30).map(e => `<li>[${e.sheet} #${e.rowIndex}] ${e.message}</li>`).join("")}</ul>${errors.length > 30 ? `<div class="small text-muted">Показаны первые 30 ошибок из ${errors.length}. Полный список — в Excel-файле.</div>` : ""}</div>`}
+                ${hasErrorFile ? `<div class="mt-3"><button type="button" class="btn btn-outline-danger" id="metalDownloadErrorsButton">Скачать ошибки в Excel</button></div>` : ""}
             </div>`;
+
+        if (hasErrorFile) {
+            const downloadButton = document.getElementById("metalDownloadErrorsButton");
+            downloadButton?.addEventListener("click", () => downloadErrorReport(result));
+        }
+    }
+
+    function downloadErrorReport(summaryResult) {
+        if (!summaryResult || !summaryResult.errorFileContent) {
+            return;
+        }
+
+        try {
+            const binary = atob(summaryResult.errorFileContent);
+            const length = binary.length;
+            const bytes = new Uint8Array(length);
+            for (let i = 0; i < length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+
+            const blob = new Blob([bytes], {
+                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = summaryResult.errorFileName || `Ошибки_${summaryResult.sourceFileName || "import"}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            requestAnimationFrame(() => {
+                URL.revokeObjectURL(url);
+                link.remove();
+            });
+        }
+        catch (error) {
+            console.error("Не удалось скачать файл ошибок", error);
+        }
     }
 })();

@@ -24,5 +24,7 @@ public record MetalDataImportSummaryDto(
     int NormsCreated,
     int NormsUpdated,
     int RowsSkipped,
-    IReadOnlyList<MetalDataImportErrorDto> Errors
+    IReadOnlyList<MetalDataImportErrorDto> Errors,
+    string? ErrorFileName,
+    byte[]? ErrorFileContent
 );
