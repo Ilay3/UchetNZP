@@ -333,6 +333,7 @@ public class ImportService : IImportService
         var normsCreated = 0;
         var normsUpdated = 0;
         var rowsSkipped = 0;
+        var materialCache = new Dictionary<string, MetalMaterial>(StringComparer.OrdinalIgnoreCase);
 
         if (mode is MetalImportMode.Materials or MetalImportMode.All)
         {
@@ -355,20 +356,25 @@ public class ImportService : IImportService
                     continue;
                 }
 
-                var entity = await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
-                if (entity is null)
+                if (!materialCache.TryGetValue(code, out var entity))
                 {
-                    entity = new MetalMaterial
+                    entity = await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
+                    if (entity is null)
                     {
-                        Id = Guid.NewGuid(),
-                        Code = code,
-                        UnitKind = "Unknown",
-                    };
+                        entity = new MetalMaterial
+                        {
+                            Id = Guid.NewGuid(),
+                            Code = code,
+                            UnitKind = "Unknown",
+                        };
 
-                    if (!dryRun)
-                    {
-                        await _dbContext.MetalMaterials.AddAsync(entity, cancellationToken).ConfigureAwait(false);
+                        if (!dryRun)
+                        {
+                            await _dbContext.MetalMaterials.AddAsync(entity, cancellationToken).ConfigureAwait(false);
+                        }
                     }
+
+                    materialCache[code] = entity;
                 }
 
                 entity.Name = name;
