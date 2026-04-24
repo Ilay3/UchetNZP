@@ -454,6 +454,12 @@ public class MetalRequirementDetailsViewModel
 
     public MetalRequirementPlanViewModel? RequirementPlan { get; init; }
 
+    public Guid? ExistingIssueId { get; init; }
+
+    public string? ExistingIssueStatus { get; init; }
+
+    public bool CanCreateIssueFromPlan { get; init; }
+
     public MetalRequirementAggregateViewModel Aggregates { get; init; } = new();
 
     public IReadOnlyCollection<MetalRequirementCutDetailViewModel> CutDetails { get; init; } = Array.Empty<MetalRequirementCutDetailViewModel>();
@@ -479,6 +485,7 @@ public class MetalRequirementPlanViewModel
 
 public class MetalRequirementPlanItemViewModel
 {
+    public Guid? MetalReceiptItemId { get; init; }
     public string SourceCode { get; init; } = string.Empty;
     public decimal SourceSize { get; init; }
     public string SourceUnit { get; init; } = string.Empty;
@@ -486,6 +493,50 @@ public class MetalRequirementPlanItemViewModel
     public decimal RemainingAfterQty { get; init; }
     public string LineStatus { get; init; } = string.Empty;
     public DateTime? ReceiptDate { get; init; }
+}
+
+public class MetalIssueListViewModel
+{
+    public IReadOnlyCollection<MetalIssueListItemViewModel> Items { get; init; } = Array.Empty<MetalIssueListItemViewModel>();
+}
+
+public class MetalIssueListItemViewModel
+{
+    public Guid Id { get; init; }
+    public string IssueNumber { get; init; } = string.Empty;
+    public DateTime IssueDate { get; init; }
+    public string RequirementNumber { get; init; } = string.Empty;
+    public string MaterialDisplay { get; init; } = string.Empty;
+    public string Status { get; init; } = string.Empty;
+}
+
+public class MetalIssueDetailsViewModel
+{
+    public Guid Id { get; init; }
+    public string IssueNumber { get; init; } = string.Empty;
+    public DateTime IssueDate { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public string RequirementNumber { get; init; } = string.Empty;
+    public Guid RequirementId { get; init; }
+    public string PartDisplay { get; init; } = string.Empty;
+    public string MaterialDisplay { get; init; } = string.Empty;
+    public string? Comment { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public string CreatedBy { get; init; } = string.Empty;
+    public DateTime? CompletedAt { get; init; }
+    public string? CompletedBy { get; init; }
+    public bool CanComplete { get; init; }
+    public IReadOnlyCollection<MetalIssueDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalIssueDetailsItemViewModel>();
+}
+
+public class MetalIssueDetailsItemViewModel
+{
+    public string SourceCode { get; init; } = string.Empty;
+    public decimal SourceQtyBefore { get; init; }
+    public decimal IssuedQty { get; init; }
+    public decimal RemainingQtyAfter { get; init; }
+    public string Unit { get; init; } = string.Empty;
+    public string LineStatus { get; init; } = string.Empty;
 }
 
 public class CuttingMapListViewModel

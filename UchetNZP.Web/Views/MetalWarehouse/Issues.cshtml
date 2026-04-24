@@ -1,24 +1,24 @@
-@model UchetNZP.Web.Models.MetalRequirementListViewModel
+@model UchetNZP.Web.Models.MetalIssueListViewModel
 @{
-    ViewData["Title"] = "Требования производства";
+    ViewData["Title"] = "Выдачи металла";
 }
 
 <div class="page-header mb-4">
-    <h1 class="display-5 fw-semibold">Требования производства</h1>
-    <p class="lead">Черновики требований на склад металла, сформированные из запусков партий.</p>
+    <h1 class="display-5 fw-semibold">Выдачи металла</h1>
+    <p class="lead">Электронные документы фактической выдачи по требованиям.</p>
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Index">На главную модуля</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Requirements">Требования</a>
     <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Stock">Остатки</a>
-    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Issues">Выдачи</a>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="card shadow-sm">
     <div class="card-body">
         @if (Model.Items.Count == 0)
         {
-            <div class="alert alert-light border mb-0">Требования пока не создавались.</div>
+            <div class="alert alert-light border mb-0">Выдач пока нет.</div>
         }
         else
         {
@@ -28,11 +28,8 @@
                         <tr>
                             <th>Номер</th>
                             <th>Дата</th>
-                            <th>Деталь</th>
-                            <th>Количество</th>
+                            <th>Требование</th>
                             <th>Материал</th>
-                            <th>Требуется</th>
-                            <th>Ед. изм.</th>
                             <th>Статус</th>
                             <th class="text-end">Действия</th>
                         </tr>
@@ -41,16 +38,13 @@
                         @foreach (var item in Model.Items)
                         {
                             <tr>
+                                <td>@item.IssueNumber</td>
+                                <td>@item.IssueDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                                 <td>@item.RequirementNumber</td>
-                                <td>@item.RequirementDate.ToString("dd.MM.yyyy HH:mm")</td>
-                                <td>@item.PartDisplay</td>
-                                <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@item.MaterialDisplay</td>
-                                <td>@item.RequiredQty.ToString("0.###")</td>
-                                <td>@item.Unit</td>
                                 <td><span class="badge bg-secondary">@item.Status</span></td>
                                 <td class="text-end">
-                                    <a class="btn btn-sm btn-outline-primary" asp-action="RequirementDetails" asp-route-id="@item.Id">Открыть</a>
+                                    <a class="btn btn-sm btn-outline-primary" asp-controller="MetalWarehouse" asp-action="IssueDetails" asp-route-id="@item.Id">Открыть</a>
                                 </td>
                             </tr>
                         }

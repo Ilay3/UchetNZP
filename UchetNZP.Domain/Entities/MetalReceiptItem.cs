@@ -59,4 +59,8 @@ public class MetalReceiptItem
     public virtual MetalMaterial? MetalMaterial { get; set; }
 
     public virtual ICollection<MetalRequirementPlanItem> RequirementPlanItems { get; set; } = new List<MetalRequirementPlanItem>();
+
+    public virtual ICollection<MetalIssueItem> IssueItems { get; set; } = new List<MetalIssueItem>();
+
+    public virtual ICollection<MetalStockMovement> StockMovements { get; set; } = new List<MetalStockMovement>();
 }

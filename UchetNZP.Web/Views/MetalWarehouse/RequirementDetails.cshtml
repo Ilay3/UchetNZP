@@ -10,6 +10,11 @@
     </div>
 </div>
 
+@if (TempData["MetalRequirementError"] is string requirementError && !string.IsNullOrWhiteSpace(requirementError))
+{
+    <div class="alert alert-danger">@requirementError</div>
+}
+
 <div class="card shadow-sm mb-4">
     <div class="card-body row g-3">
         <div class="col-md-3"><div class="text-muted small">Дата</div><div class="fw-semibold">@Model.RequirementDate.ToString("dd.MM.yyyy HH:mm")</div></div>
@@ -21,6 +26,34 @@
         @if (!string.IsNullOrWhiteSpace(Model.Comment))
         {
             <div class="col-12"><div class="text-muted small">Комментарий</div><div>@Model.Comment</div></div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Исполнение требования</div>
+    <div class="card-body">
+        @if (Model.ExistingIssueId.HasValue)
+        {
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <div>
+                    <div class="text-muted small">По требованию уже оформлена выдача</div>
+                    <div class="fw-semibold">Статус: @Model.ExistingIssueStatus</div>
+                </div>
+                <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="IssueDetails" asp-route-id="@Model.ExistingIssueId.Value">Открыть выдачу</a>
+            </div>
+        }
+        else if (Model.CanCreateIssueFromPlan)
+        {
+            <div class="text-muted mb-3">План рассчитан. Можно оформить электронную выдачу по рассчитанным строкам.</div>
+            <form method="post" asp-controller="MetalWarehouse" asp-action="CreateIssueFromPlan" asp-route-id="@Model.Id">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Оформить выдачу по плану</button>
+            </form>
+        }
+        else
+        {
+            <div class="text-muted">Оформление выдачи пока недоступно. Сначала рассчитайте план подбора или проверьте статус требования.</div>
         }
     </div>
 </div>
