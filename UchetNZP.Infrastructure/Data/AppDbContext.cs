@@ -74,6 +74,10 @@ public class AppDbContext : DbContext
 
     public DbSet<PartToMaterialRule> PartToMaterialRules => Set<PartToMaterialRule>();
 
+    public DbSet<CuttingPlan> CuttingPlans => Set<CuttingPlan>();
+
+    public DbSet<CuttingPlanItem> CuttingPlanItems => Set<CuttingPlanItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
