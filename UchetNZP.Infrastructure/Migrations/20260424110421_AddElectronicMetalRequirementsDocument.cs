@@ -118,69 +118,50 @@ namespace UchetNZP.Infrastructure.Migrations
                 maxLength: 128,
                 nullable: true);
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "ConsumedAt",
-                table: "MetalReceiptItems",
-                type: "timestamp with time zone",
-                nullable: true);
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE "MetalReceiptItems"
+                    ADD COLUMN IF NOT EXISTS "ConsumedAt" timestamp with time zone;
 
-            migrationBuilder.AddColumn<Guid>(
-                name: "ConsumedByCuttingReportId",
-                table: "MetalReceiptItems",
-                type: "uuid",
-                nullable: true);
+                ALTER TABLE "MetalReceiptItems"
+                    ADD COLUMN IF NOT EXISTS "ConsumedByCuttingReportId" uuid;
 
-            migrationBuilder.AddColumn<bool>(
-                name: "IsConsumed",
-                table: "MetalReceiptItems",
-                type: "boolean",
-                nullable: false,
-                defaultValue: false);
+                ALTER TABLE "MetalReceiptItems"
+                    ADD COLUMN IF NOT EXISTS "IsConsumed" boolean NOT NULL DEFAULT FALSE;
 
-            migrationBuilder.AddColumn<Guid>(
-                name: "SourceCuttingReportId",
-                table: "MetalReceiptItems",
-                type: "uuid",
-                nullable: true);
+                ALTER TABLE "MetalReceiptItems"
+                    ADD COLUMN IF NOT EXISTS "SourceCuttingReportId" uuid;
+                """);
 
-            migrationBuilder.CreateTable(
-                name: "CuttingReports",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    ReportNumber = table.Column<string>(type: "text", nullable: false),
-                    ReportDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    CuttingPlanId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SourceMetalReceiptItemId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Workshop = table.Column<string>(type: "text", nullable: false),
-                    Shift = table.Column<string>(type: "text", nullable: false),
-                    PlannedSize = table.Column<decimal>(type: "numeric", nullable: false),
-                    ActualProducedSize = table.Column<decimal>(type: "numeric", nullable: false),
-                    PlannedMassKg = table.Column<decimal>(type: "numeric", nullable: false),
-                    ActualProducedMassKg = table.Column<decimal>(type: "numeric", nullable: false),
-                    PlannedWaste = table.Column<decimal>(type: "numeric", nullable: false),
-                    ActualWaste = table.Column<decimal>(type: "numeric", nullable: false),
-                    BusinessResidual = table.Column<decimal>(type: "numeric", nullable: false),
-                    ScrapSize = table.Column<decimal>(type: "numeric", nullable: false),
-                    ScrapMassKg = table.Column<decimal>(type: "numeric", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_CuttingReports", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_CuttingReports_MetalReceiptItems_SourceMetalReceiptItemId",
-                        column: x => x.SourceMetalReceiptItemId,
-                        principalTable: "MetalReceiptItems",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_CuttingReports_cutting_plan_CuttingPlanId",
-                        column: x => x.CuttingPlanId,
-                        principalTable: "cutting_plan",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
+            migrationBuilder.Sql(
+                """
+                CREATE TABLE IF NOT EXISTS "CuttingReports" (
+                    "Id" uuid NOT NULL,
+                    "ReportNumber" text NOT NULL,
+                    "ReportDate" timestamp with time zone NOT NULL,
+                    "CuttingPlanId" uuid NOT NULL,
+                    "SourceMetalReceiptItemId" uuid NOT NULL,
+                    "Workshop" text NOT NULL,
+                    "Shift" text NOT NULL,
+                    "PlannedSize" numeric NOT NULL,
+                    "ActualProducedSize" numeric NOT NULL,
+                    "PlannedMassKg" numeric NOT NULL,
+                    "ActualProducedMassKg" numeric NOT NULL,
+                    "PlannedWaste" numeric NOT NULL,
+                    "ActualWaste" numeric NOT NULL,
+                    "BusinessResidual" numeric NOT NULL,
+                    "ScrapSize" numeric NOT NULL,
+                    "ScrapMassKg" numeric NOT NULL,
+                    "CreatedAt" timestamp with time zone NOT NULL,
+                    CONSTRAINT "PK_CuttingReports" PRIMARY KEY ("Id"),
+                    CONSTRAINT "FK_CuttingReports_MetalReceiptItems_SourceMetalReceiptItemId"
+                        FOREIGN KEY ("SourceMetalReceiptItemId")
+                        REFERENCES "MetalReceiptItems" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_CuttingReports_cutting_plan_CuttingPlanId"
+                        FOREIGN KEY ("CuttingPlanId")
+                        REFERENCES "cutting_plan" ("Id") ON DELETE CASCADE
+                );
+                """);
 
             migrationBuilder.CreateIndex(
                 name: "IX_MetalRequirements_MetalMaterialId",
@@ -193,15 +174,14 @@ namespace UchetNZP.Infrastructure.Migrations
                 column: "WipLaunchId",
                 unique: true);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_CuttingReports_CuttingPlanId",
-                table: "CuttingReports",
-                column: "CuttingPlanId");
+            migrationBuilder.Sql(
+                """
+                CREATE INDEX IF NOT EXISTS "IX_CuttingReports_CuttingPlanId"
+                    ON "CuttingReports" ("CuttingPlanId");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_CuttingReports_SourceMetalReceiptItemId",
-                table: "CuttingReports",
-                column: "SourceMetalReceiptItemId");
+                CREATE INDEX IF NOT EXISTS "IX_CuttingReports_SourceMetalReceiptItemId"
+                    ON "CuttingReports" ("SourceMetalReceiptItemId");
+                """);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_MetalRequirements_MetalMaterials_MetalMaterialId",
