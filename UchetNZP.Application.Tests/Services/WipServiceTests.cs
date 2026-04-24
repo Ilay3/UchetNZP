@@ -83,6 +83,7 @@ public class WipServiceTests
             partId,
             opNumber,
             sectionId,
+            null,
             receiptDate,
             receiptQuantity,
             "Примечание",
@@ -170,6 +171,7 @@ public class WipServiceTests
             partId,
             opNumber,
             sectionId,
+            null,
             receiptDate,
             receiptQuantity,
             null,
@@ -242,7 +244,7 @@ public class WipServiceTests
         var saveResult = await service.AddReceiptsBatchAsync(
             new[]
             {
-                new ReceiptItemDto(partId, opNumber, sectionId, receiptDate, receiptQuantity, null, labelId, labelNumber, true),
+                new ReceiptItemDto(partId, opNumber, sectionId, null, receiptDate, receiptQuantity, null, labelId, labelNumber, true),
             });
 
         var versionId = Assert.Single(saveResult.Items).VersionId;
@@ -311,7 +313,7 @@ public class WipServiceTests
         var saveResult = await service.AddReceiptsBatchAsync(
             new[]
             {
-                new ReceiptItemDto(partId, opNumber, sectionId, receiptDate, receiptQuantity, null, null, "00003", true),
+                new ReceiptItemDto(partId, opNumber, sectionId, null, receiptDate, receiptQuantity, null, null, "00003", true),
             });
 
         var receiptId = Assert.Single(saveResult.Items).ReceiptId;
@@ -380,7 +382,7 @@ public class WipServiceTests
         var result = await service.AddReceiptsBatchAsync(
             new[]
             {
-                new ReceiptItemDto(partId, opNumber, sectionId, receiptDate, receiptQuantity, null, null, "00004", true),
+                new ReceiptItemDto(partId, opNumber, sectionId, null, receiptDate, receiptQuantity, null, null, "00004", true),
             });
 
         var receiptId = Assert.Single(result.Items).ReceiptId;

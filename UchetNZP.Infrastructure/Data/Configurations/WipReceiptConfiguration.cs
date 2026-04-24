@@ -46,5 +46,10 @@ public class WipReceiptConfiguration : IEntityTypeConfiguration<WipReceipt>
             .WithOne(x => x.WipReceipt)
             .HasForeignKey<WipReceipt>(x => x.WipLabelId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(x => x.MetalMaterial)
+            .WithMany()
+            .HasForeignKey(x => x.MetalMaterialId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

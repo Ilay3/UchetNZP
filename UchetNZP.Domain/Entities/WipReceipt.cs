@@ -22,9 +22,13 @@ public class WipReceipt
 
     public Guid? WipLabelId { get; set; }
 
+    public Guid? MetalMaterialId { get; set; }
+
     public virtual Part? Part { get; set; }
 
     public virtual Section? Section { get; set; }
 
     public virtual WipLabel? WipLabel { get; set; }
+
+    public virtual MetalMaterial? MetalMaterial { get; set; }
 }

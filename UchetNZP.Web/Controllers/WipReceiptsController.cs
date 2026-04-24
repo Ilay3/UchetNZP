@@ -65,6 +65,20 @@ public class WipReceiptsController : Controller
         return Ok(items);
     }
 
+    [HttpGet("materials")]
+    public async Task<IActionResult> GetMaterials(CancellationToken cancellationToken)
+    {
+        var items = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items);
+    }
+
     [HttpGet("operations")]
     public async Task<IActionResult> GetOperations([FromQuery] Guid partId, CancellationToken cancellationToken)
     {
@@ -145,6 +159,59 @@ public class WipReceiptsController : Controller
         return Ok(new { exists });
     }
 
+    [HttpGet("material-stock")]
+    public async Task<IActionResult> GetMaterialStock([FromQuery] Guid? materialId, CancellationToken cancellationToken)
+    {
+        if (!materialId.HasValue || materialId.Value == Guid.Empty)
+        {
+            return Ok(new MaterialStockResponseViewModel());
+        }
+
+        var material = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.Id == materialId.Value && x.IsActive)
+            .Select(x => new { x.Id, x.UnitKind })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (material is null)
+        {
+            return Ok(new MaterialStockResponseViewModel());
+        }
+
+        var unitText = material.UnitKind == "SquareMeter" ? "м2" : "м";
+
+        var baseQuery = _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => x.MetalMaterialId == material.Id);
+
+        var unitsCount = await baseQuery.CountAsync(cancellationToken).ConfigureAwait(false);
+        var sumSize = await baseQuery.SumAsync(x => (decimal?)x.SizeValue, cancellationToken).ConfigureAwait(false) ?? 0m;
+        var sumWeight = await baseQuery.SumAsync(x => (decimal?)(x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg), cancellationToken).ConfigureAwait(false) ?? 0m;
+
+        var sample = await baseQuery
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenBy(x => x.ItemIndex)
+            .Take(20)
+            .Select(x => new MaterialStockUnitItemViewModel(
+                x.GeneratedCode,
+                x.SizeValue,
+                string.IsNullOrWhiteSpace(x.SizeUnitText) ? unitText : x.SizeUnitText,
+                x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
+                x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var summary = new MaterialStockSummaryViewModel(
+            unitText,
+            unitsCount > 0 ? "Да" : "Нет",
+            unitsCount,
+            sumSize,
+            sumWeight);
+
+        return Ok(new MaterialStockResponseViewModel(summary, sample));
+    }
+
     [HttpPost("save")]
     public async Task<IActionResult> Save([FromBody] ReceiptSaveRequest? request, CancellationToken cancellationToken)
     {
@@ -160,6 +227,7 @@ public class WipReceiptsController : Controller
                 x.PartId,
                 OperationNumber.Parse(x.OpNumber, nameof(ReceiptSaveItem.OpNumber)),
                 x.SectionId,
+                x.MetalMaterialId,
                 x.ReceiptDate,
                 x.Quantity,
                 x.Comment,
@@ -343,6 +411,7 @@ public class WipReceiptsController : Controller
         Guid PartId,
         Guid SectionId,
         string OpNumber,
+        Guid? MetalMaterialId,
         DateTime ReceiptDate,
         decimal Quantity,
         string? Comment,

@@ -188,3 +188,29 @@ public record LaunchDeleteResponseModel(
     decimal Remaining,
     string Message
 );
+
+public record MaterialStockSummaryViewModel(
+    string UnitOfMeasure,
+    string AvailableInStock,
+    int UnitsCount,
+    decimal TotalSize,
+    decimal TotalWeightKg
+);
+
+public record MaterialStockUnitItemViewModel(
+    string Code,
+    decimal Size,
+    string UnitOfMeasure,
+    decimal WeightKg,
+    DateTime ReceiptDate
+);
+
+public record MaterialStockResponseViewModel(
+    MaterialStockSummaryViewModel? Summary = null,
+    IReadOnlyList<MaterialStockUnitItemViewModel>? Units = null
+)
+{
+    public MaterialStockSummaryViewModel? Summary { get; init; } = Summary;
+
+    public IReadOnlyList<MaterialStockUnitItemViewModel> Units { get; init; } = Units ?? Array.Empty<MaterialStockUnitItemViewModel>();
+}

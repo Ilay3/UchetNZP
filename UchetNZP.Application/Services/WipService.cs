@@ -132,6 +132,7 @@ public class WipService : IWipService
                     PartId = item.PartId,
                     SectionId = item.SectionId,
                     OpNumber = item.OpNumber,
+                    MetalMaterialId = item.MetalMaterialId,
                     ReceiptDate = receiptDate,
                     CreatedAt = now,
                     Quantity = item.Quantity,
