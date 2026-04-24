@@ -442,7 +442,7 @@ public class WipLaunchesController : Controller
 
     [HttpPost("{id:guid}/metal-requirements")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateMetalRequirement(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateMetalRequirement(Guid id, Guid? manualMaterialId, CancellationToken cancellationToken)
     {
         if (id == Guid.Empty)
         {
@@ -451,6 +451,7 @@ public class WipLaunchesController : Controller
 
         var launch = await _dbContext.WipLaunches
             .AsNoTracking()
+            .Include(x => x.Part)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
             .ConfigureAwait(false);
 
@@ -472,17 +473,28 @@ public class WipLaunchesController : Controller
             return RedirectToAction(nameof(History));
         }
 
-        var selectedMaterialId = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        if (!selectedMaterialId.HasValue)
+        var activeMaterials = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (activeMaterials.Count == 0)
         {
             TempData["LaunchMetalRequirementError"] = "Не найден активный материал.";
             return RedirectToAction(nameof(History));
         }
 
-        var selectedMaterial = await _dbContext.MetalMaterials.AsNoTracking().FirstOrDefaultAsync(x => x.Id == selectedMaterialId.Value, cancellationToken).ConfigureAwait(false);
         var norms = await _dbContext.MetalConsumptionNorms
             .AsNoTracking()
             .Where(x => x.IsActive && x.PartId == launch.PartId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var rules = await _dbContext.PartToMaterialRules
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderByDescending(x => x.Priority)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -603,5 +615,179 @@ public class WipLaunchesController : Controller
         }
 
         return ret;
+    }
+
+    private static MaterialSelectionResult ResolveMaterialSelection(
+        WipLaunch launch,
+        MetalConsumptionNorm norm,
+        IReadOnlyCollection<PartToMaterialRule> rules,
+        IReadOnlyCollection<MetalMaterial> activeMaterials,
+        Guid? manualMaterialId)
+    {
+        if (manualMaterialId.HasValue && manualMaterialId.Value != Guid.Empty)
+        {
+            var manualMaterial = activeMaterials.FirstOrDefault(x => x.Id == manualMaterialId.Value);
+            if (manualMaterial is not null)
+            {
+                return MaterialSelectionResult.Resolved(
+                    manualMaterial,
+                    "manual",
+                    "Материал выбран пользователем вручную.",
+                    []);
+            }
+        }
+
+        var partName = launch.Part?.Name ?? string.Empty;
+        var exactCandidates = rules
+            .Where(rule => IsPatternMatch(partName, rule.PartNamePattern))
+            .Where(rule => string.Equals(rule.GeometryType, norm.ShapeType, StringComparison.OrdinalIgnoreCase))
+            .Where(rule => IsRuleSizeMatch(rule, norm))
+            .OrderByDescending(rule => rule.Priority)
+            .Select(rule =>
+            {
+                var material = activeMaterials.FirstOrDefault(m =>
+                    string.Equals(m.Code, rule.MaterialArticle, StringComparison.OrdinalIgnoreCase)
+                    || m.Name.Contains(rule.MaterialArticle, StringComparison.OrdinalIgnoreCase));
+                return new { Rule = rule, Material = material };
+            })
+            .Where(x => x.Material is not null)
+            .ToList();
+
+        if (exactCandidates.Count > 0)
+        {
+            var winner = exactCandidates[0];
+            var candidateTexts = exactCandidates
+                .Take(3)
+                .Select(x => $"{x.Material!.Name} ({x.Material.Code ?? "без артикула"}): правило #{x.Rule.Priority}")
+                .ToList();
+            return MaterialSelectionResult.Resolved(
+                winner.Material!,
+                "auto_rule",
+                $"Подобрано по точному правилу: {winner.Rule.PartNamePattern}/{winner.Rule.GeometryType}, приоритет {winner.Rule.Priority}.",
+                candidateTexts);
+        }
+
+        var rolledType = DetectRolledType(norm, partName);
+        var fallbackCandidates = activeMaterials
+            .Select(material => new
+            {
+                Material = material,
+                Score = CalculateFallbackScore(material, rolledType, norm),
+            })
+            .Where(x => x.Score > 0)
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.Material.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        if (fallbackCandidates.Count == 0)
+        {
+            return MaterialSelectionResult.Unresolved("Не удалось автоматически подобрать материал. Выберите материал вручную.");
+        }
+
+        var topScore = fallbackCandidates[0].Score;
+        var ambiguous = fallbackCandidates.Count > 1 && fallbackCandidates[1].Score == topScore;
+        var fallbackTexts = fallbackCandidates
+            .Take(3)
+            .Select(x => $"{x.Material.Name} ({x.Material.Code ?? "без артикула"}): score {x.Score}")
+            .ToList();
+
+        if (ambiguous)
+        {
+            return MaterialSelectionResult.Unresolved($"Найдено несколько равнозначных кандидатов ({string.Join("; ", fallbackTexts)}). Укажите материал вручную.");
+        }
+
+        return MaterialSelectionResult.Resolved(
+            fallbackCandidates[0].Material,
+            "fallback",
+            $"Выбор по fallback для типа проката '{rolledType}'.",
+            fallbackTexts);
+    }
+
+    private static bool IsPatternMatch(string partName, string pattern)
+    {
+        var normalizedPattern = (pattern ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(normalizedPattern))
+        {
+            return true;
+        }
+
+        return partName.Contains(normalizedPattern, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsRuleSizeMatch(PartToMaterialRule rule, MetalConsumptionNorm norm)
+    {
+        var size = norm.DiameterMm ?? norm.ThicknessMm ?? norm.WidthMm;
+        if (!size.HasValue)
+        {
+            return true;
+        }
+
+        var from = rule.SizeFromMm ?? decimal.MinValue;
+        var to = rule.SizeToMm ?? decimal.MaxValue;
+        return size.Value >= from && size.Value <= to;
+    }
+
+    private static string DetectRolledType(MetalConsumptionNorm norm, string partName)
+    {
+        if (string.Equals(norm.ShapeType, "rod", StringComparison.OrdinalIgnoreCase) || partName.Contains("штыр", StringComparison.OrdinalIgnoreCase))
+        {
+            return "rod";
+        }
+
+        if (string.Equals(norm.ShapeType, "sheet", StringComparison.OrdinalIgnoreCase) || partName.Contains("бирк", StringComparison.OrdinalIgnoreCase))
+        {
+            return "sheet";
+        }
+
+        return norm.ShapeType switch
+        {
+            "pipe" => "pipe",
+            _ => "sheet",
+        };
+    }
+
+    private static int CalculateFallbackScore(MetalMaterial material, string rolledType, MetalConsumptionNorm norm)
+    {
+        var score = 0;
+        var haystack = $"{material.Name} {material.Code}".ToLowerInvariant();
+
+        if (rolledType == "rod" && (haystack.Contains("круг") || haystack.Contains("прут")))
+        {
+            score += 10;
+        }
+        else if (rolledType == "sheet" && haystack.Contains("лист"))
+        {
+            score += 10;
+        }
+        else if (rolledType == "pipe" && haystack.Contains("труб"))
+        {
+            score += 10;
+        }
+
+        var target = norm.DiameterMm ?? norm.ThicknessMm ?? norm.WidthMm;
+        if (target.HasValue)
+        {
+            var marker = target.Value.ToString("0.###").Replace(',', '.');
+            if (haystack.Contains(marker, StringComparison.OrdinalIgnoreCase))
+            {
+                score += 3;
+            }
+        }
+
+        return score;
+    }
+
+    private sealed record MaterialSelectionResult(bool IsResolved, MetalMaterial? Material, string Source, string Reason, string? CandidatesDisplay)
+    {
+        public static MaterialSelectionResult Resolved(MetalMaterial material, string source, string reason, IReadOnlyCollection<string> candidates)
+        {
+            var candidateString = candidates.Count == 0 ? null : string.Join("; ", candidates);
+            return new MaterialSelectionResult(true, material, source, reason, candidateString);
+        }
+
+        public static MaterialSelectionResult Unresolved(string reason)
+        {
+            return new MaterialSelectionResult(false, null, "manual", reason, null);
+        }
     }
 }

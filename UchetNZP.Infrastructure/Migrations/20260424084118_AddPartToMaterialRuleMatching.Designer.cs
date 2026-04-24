@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UchetNZP.Infrastructure.Data;
@@ -11,9 +12,11 @@ using UchetNZP.Infrastructure.Data;
 namespace UchetNZP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424084118_AddPartToMaterialRuleMatching")]
+    partial class AddPartToMaterialRuleMatching
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -221,12 +224,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<decimal>("CoefConsumption")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(12, 6)
-                        .HasColumnType("numeric(12,6)")
-                        .HasDefaultValue(1m);
-
                     b.Property<decimal>("Coefficient")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(12, 6)
@@ -240,27 +237,10 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
-                    b.Property<decimal>("MassPerMeterKg")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(12, 6)
-                        .HasColumnType("numeric(12,6)")
-                        .HasDefaultValue(0m);
-
-                    b.Property<decimal>("MassPerSquareMeterKg")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(12, 6)
-                        .HasColumnType("numeric(12,6)")
-                        .HasDefaultValue(0m);
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
-
-                    b.Property<string>("StockUnit")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
 
                     b.Property<string>("UnitKind")
                         .IsRequired()
@@ -420,11 +400,7 @@ namespace UchetNZP.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("CalculationFormula")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<string>("CalculationInput")
+                    b.Property<string>("CandidateMaterials")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 

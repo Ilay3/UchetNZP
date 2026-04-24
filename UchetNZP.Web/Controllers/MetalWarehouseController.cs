@@ -484,6 +484,9 @@ public class MetalWarehouseController : Controller
                         : 0m,
                     StockQty = stock?.Qty ?? 0m,
                     StockWeightKg = stock?.WeightKg ?? 0m,
+                    SelectionSource = i.SelectionSource,
+                    SelectionReason = i.SelectionReason,
+                    CandidateMaterials = i.CandidateMaterials,
                 };
             }).ToList(),
         };

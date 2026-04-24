@@ -280,6 +280,12 @@ public class MetalRequirementDetailsItemViewModel
 
     public decimal StockWeightKg { get; init; }
 
+    public string SelectionSource { get; init; } = string.Empty;
+
+    public string? SelectionReason { get; init; }
+
+    public string? CandidateMaterials { get; init; }
+
     public decimal DifferenceQty => StockQty - TotalRequiredQty;
 
     public bool IsEnough => DifferenceQty >= 0m;
