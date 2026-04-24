@@ -72,6 +72,8 @@ public class AppDbContext : DbContext
 
     public DbSet<MetalRequirementItem> MetalRequirementItems => Set<MetalRequirementItem>();
 
+    public DbSet<PartToMaterialRule> PartToMaterialRules => Set<PartToMaterialRule>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

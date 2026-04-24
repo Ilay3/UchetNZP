@@ -47,6 +47,8 @@
                         <th>Формула / входные данные</th>
                         <th>Текущий остаток</th>
                         <th>Разница</th>
+                        <th>Источник выбора</th>
+                        <th>Обоснование / кандидаты</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -75,6 +77,17 @@
                                 else
                                 {
                                     <span class="text-danger">Не хватает (@item.DifferenceQty.ToString("0.###"))</span>
+                                }
+                            </td>
+                            <td><span class="badge bg-light text-dark border">@item.SelectionSource</span></td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(item.SelectionReason))
+                                {
+                                    <div>@item.SelectionReason</div>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(item.CandidateMaterials))
+                                {
+                                    <div class="small text-muted mt-1">@item.CandidateMaterials</div>
                                 }
                             </td>
                         </tr>
