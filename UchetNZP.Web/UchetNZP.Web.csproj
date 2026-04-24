@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -26,6 +26,10 @@
     <ProjectReference Include="..\UchetNZP.Domain\UchetNZP.Domain.csproj" />
     <ProjectReference Include="..\UchetNZP.Infrastructure\UchetNZP.Infrastructure.csproj" />
     <ProjectReference Include="..\UchetNZP.Shared\UchetNZP.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Templates\Documents\" />
   </ItemGroup>
 
 </Project>
