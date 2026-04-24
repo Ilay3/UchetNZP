@@ -1,3 +1,4 @@
+using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Hosting;
@@ -27,11 +28,11 @@ public class WipEscortLabelDocumentServiceTests
         var operationRows = table.Descendants<TableRow>()
             .Skip(1)
             .Select(row => row.Elements<TableCell>().ToList())
-            .Where(cells => cells.Count >= 2 && !string.IsNullOrWhiteSpace(GetCellText(cells[0])) && !string.IsNullOrWhiteSpace(GetCellText(cells[1])))
+            .Where(cells => cells.Count >= 3 && !string.IsNullOrWhiteSpace(GetCellText(cells[1])) && !string.IsNullOrWhiteSpace(GetCellText(cells[2])))
             .ToList();
 
         Assert.Equal(4, operationRows.Count);
-        Assert.DoesNotContain(operationRows, row => GetCellText(row[2]).Length > 0);
+        Assert.DoesNotContain(operationRows, row => GetCellText(row[0]).Length > 0);
     }
 
 
@@ -53,10 +54,10 @@ public class WipEscortLabelDocumentServiceTests
             .ToList();
 
         Assert.Equal(2, operationRows.Count);
-        Assert.Equal("10", GetCellText(operationRows[0][0]));
-        Assert.Equal("Операция 1", GetCellText(operationRows[0][1]));
-        Assert.Equal("20", GetCellText(operationRows[1][0]));
-        Assert.Equal("Операция 2", GetCellText(operationRows[1][1]));
+        Assert.Equal("10", GetCellText(operationRows[0][1]));
+        Assert.Equal("Операция 1", GetCellText(operationRows[0][2]));
+        Assert.Equal("20", GetCellText(operationRows[1][1]));
+        Assert.Equal("Операция 2", GetCellText(operationRows[1][2]));
     }
 
     [Fact]
@@ -75,12 +76,30 @@ public class WipEscortLabelDocumentServiceTests
         Assert.Contains("LBL-DETAIL-77", documentText);
     }
 
+    [Fact]
+    public async Task BuildAsync_WhenMaterialSizeExists_FillsSizeInsteadOfMaterialCode()
+    {
+        var (dbContext, receiptId, contentRootPath) = await CreateContextWithReceiptAsync(operationsCount: 1, materialCode: "LIST35T6");
+        await AddMetalReceiptItemAsync(dbContext, sizeValue: 74m, sizeUnit: "мм");
+        CreateTemplate(contentRootPath, includeMaterialSizeToken: true);
+        var service = new WipEscortLabelDocumentService(dbContext, new TestWebHostEnvironment(contentRootPath));
+
+        var bytes = await service.BuildAsync(receiptId);
+
+        using var stream = new MemoryStream(bytes);
+        using var document = WordprocessingDocument.Open(stream, false);
+        var documentText = string.Concat(document.MainDocumentPart!.Document.Body!.Descendants<Text>().Select(x => x.Text));
+
+        Assert.Contains("Размер: 74 мм", documentText);
+        Assert.DoesNotContain("LIST35T6", documentText);
+    }
+
     private static string GetCellText(TableCell cell)
     {
         return string.Concat(cell.Descendants<Text>().Select(x => x.Text)).Trim();
     }
 
-    private static void CreateTemplate(string contentRootPath, bool splitOperationTokensAcrossRuns = false)
+    private static void CreateTemplate(string contentRootPath, bool splitOperationTokensAcrossRuns = false, bool includeMaterialSizeToken = false)
     {
         var documentDir = Path.Combine(contentRootPath, "Templates", "Documents");
         Directory.CreateDirectory(documentDir);
@@ -88,19 +107,29 @@ public class WipEscortLabelDocumentServiceTests
 
         using var document = WordprocessingDocument.Create(templatePath, DocumentFormat.OpenXml.WordprocessingDocumentType.Document);
         var main = document.AddMainDocumentPart();
-        var body = new Body(
+        var bodyChildren = new List<OpenXmlElement>
+        {
             new Paragraph(new Run(new Text("Ярлык: {{LBL}}"))),
             new Table(
                 new TableRow(
+                    CreateCell("Подразделение"),
                     CreateCell("№"),
                     CreateCell("Операция"),
-                    CreateCell("Колонка 3"),
                     CreateCell("Колонка 4")),
                 new TableRow(
+                    CreateCell("ПУСТО"),
                     splitOperationTokensAcrossRuns ? CreateCellFromRuns("{{OP_", "NO}}") : CreateCell("{{OP_NO}}"),
                     splitOperationTokensAcrossRuns ? CreateCellFromRuns("{{OP_", "NAME}}") : CreateCell("{{OP_NAME}}"),
                     CreateCell("ДОЛЖНО_БЫТЬ_ПУСТО"),
-                    CreateCell(string.Empty))));
+                    CreateCell(string.Empty)))
+        };
+
+        if (includeMaterialSizeToken)
+        {
+            bodyChildren.Add(new Paragraph(new Run(new Text("Размер: {{MAT_SIZE}}"))));
+        }
+
+        var body = new Body(bodyChildren);
         main.Document = new Document(body);
         main.Document.Save();
     }
@@ -121,7 +150,7 @@ public class WipEscortLabelDocumentServiceTests
         return new TableCell(paragraph);
     }
 
-    private static async Task<(AppDbContext DbContext, Guid ReceiptId, string ContentRootPath)> CreateContextWithReceiptAsync(int operationsCount, string labelNumber = "LBL-001")
+    private static async Task<(AppDbContext DbContext, Guid ReceiptId, string ContentRootPath)> CreateContextWithReceiptAsync(int operationsCount, string labelNumber = "LBL-001", string? materialCode = null)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
@@ -149,7 +178,7 @@ public class WipEscortLabelDocumentServiceTests
             RootNumber = labelNumber,
             Suffix = 0,
         });
-        dbContext.MetalMaterials.Add(new MetalMaterial { Id = materialId, Name = "Сталь", UnitKind = "Meter", IsActive = true });
+        dbContext.MetalMaterials.Add(new MetalMaterial { Id = materialId, Name = "Сталь", Code = materialCode, UnitKind = "Meter", IsActive = true });
         dbContext.WipReceipts.Add(new WipReceipt
         {
             Id = receiptId,
@@ -184,6 +213,41 @@ public class WipEscortLabelDocumentServiceTests
         var contentRootPath = Path.Combine(Path.GetTempPath(), "escort-label-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(contentRootPath);
         return (dbContext, receiptId, contentRootPath);
+    }
+
+    private static async Task AddMetalReceiptItemAsync(AppDbContext dbContext, decimal sizeValue, string sizeUnit)
+    {
+        var materialId = await dbContext.WipReceipts
+            .Select(x => x.MetalMaterialId)
+            .FirstAsync();
+        if (!materialId.HasValue)
+        {
+            return;
+        }
+
+        var metalReceiptId = Guid.NewGuid();
+        dbContext.MetalReceipts.Add(new MetalReceipt
+        {
+            Id = metalReceiptId,
+            ReceiptNumber = "MR-001",
+            ReceiptDate = new DateTime(2026, 1, 2),
+            CreatedAt = new DateTime(2026, 1, 2),
+        });
+        dbContext.MetalReceiptItems.Add(new MetalReceiptItem
+        {
+            Id = Guid.NewGuid(),
+            MetalReceiptId = metalReceiptId,
+            MetalMaterialId = materialId.Value,
+            Quantity = 1,
+            TotalWeightKg = 1,
+            ItemIndex = 1,
+            SizeValue = sizeValue,
+            SizeUnitText = sizeUnit,
+            GeneratedCode = "GEN",
+            CreatedAt = new DateTime(2026, 1, 2),
+        });
+
+        await dbContext.SaveChangesAsync();
     }
 
     private sealed class TestWebHostEnvironment : IWebHostEnvironment

@@ -51,6 +51,9 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var materialSizeText = await ResolveMaterialSizeTextAsync(receipt.MetalMaterialId, cancellationToken)
+            .ConfigureAwait(false);
+
         var templatePath = Path.Combine(_environment.ContentRootPath, TemplateRelativePath);
         if (!File.Exists(templatePath))
         {
@@ -66,7 +69,7 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
             ["{{QTY}}"] = receipt.Quantity.ToString("0.###"),
             ["{{MAT}}"] = receipt.MetalMaterial?.Name ?? string.Empty,
             ["{{MAT_QTY}}"] = receipt.Quantity.ToString("0.###"),
-            ["{{MAT_SIZE}}"] = receipt.MetalMaterial?.Code ?? string.Empty,
+            ["{{MAT_SIZE}}"] = materialSizeText,
             ["{{CERT}}"] = string.Empty,
             ["{{COMP_NO}}"] = string.Empty,
             ["{{COMP_QTY}}"] = string.Empty,
@@ -91,6 +94,7 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
             }
 
             FillOperationsTable(body, operations);
+            ApplyTimesNewRoman8(body);
             document.MainDocumentPart!.Document.Save();
         }
 
@@ -134,15 +138,21 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
             return;
         }
 
-        SetCellText(cells[0], operation.Number);
-
-        if (cells.Count > 1)
+        var numberColumnIndex = cells.Count >= 3 ? 1 : 0;
+        var nameColumnIndex = cells.Count >= 3 ? 2 : 1;
+        SetCellText(cells[numberColumnIndex], operation.Number);
+        if (cells.Count > nameColumnIndex)
         {
-            SetCellText(cells[1], operation.Name);
+            SetCellText(cells[nameColumnIndex], operation.Name);
         }
 
-        for (var i = 2; i < cells.Count; i++)
+        for (var i = 0; i < cells.Count; i++)
         {
+            if (i == numberColumnIndex || i == nameColumnIndex)
+            {
+                continue;
+            }
+
             SetCellText(cells[i], string.Empty);
         }
     }
@@ -164,6 +174,37 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
         }
     }
 
+    private async Task<string> ResolveMaterialSizeTextAsync(Guid? metalMaterialId, CancellationToken cancellationToken)
+    {
+        if (!metalMaterialId.HasValue)
+        {
+            return string.Empty;
+        }
+
+        var materialSize = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => x.MetalMaterialId == metalMaterialId.Value)
+            .OrderByDescending(x => x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : DateTime.MinValue)
+            .ThenByDescending(x => x.ItemIndex)
+            .Select(x => new
+            {
+                x.SizeValue,
+                x.SizeUnitText,
+            })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (materialSize is null)
+        {
+            return string.Empty;
+        }
+
+        var sizeValueText = materialSize.SizeValue.ToString("0.###");
+        return string.IsNullOrWhiteSpace(materialSize.SizeUnitText)
+            ? sizeValueText
+            : $"{sizeValueText} {materialSize.SizeUnitText}";
+    }
+
     private static void ReplaceToken(OpenXmlElement root, string token, string value)
     {
         foreach (var text in root.Descendants<Text>())
@@ -172,6 +213,28 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
             {
                 text.Text = text.Text.Replace(token, value ?? string.Empty, StringComparison.Ordinal);
             }
+        }
+    }
+
+    private static void ApplyTimesNewRoman8(OpenXmlElement root)
+    {
+        foreach (var run in root.Descendants<Run>())
+        {
+            var runProperties = run.GetFirstChild<RunProperties>();
+            if (runProperties is null)
+            {
+                runProperties = new RunProperties();
+                run.PrependChild(runProperties);
+            }
+
+            runProperties.RunFonts = new RunFonts
+            {
+                Ascii = "Times New Roman",
+                HighAnsi = "Times New Roman",
+                ComplexScript = "Times New Roman",
+            };
+            runProperties.FontSize = new FontSize { Val = "16" };
+            runProperties.FontSizeComplexScript = new FontSizeComplexScript { Val = "16" };
         }
     }
 
