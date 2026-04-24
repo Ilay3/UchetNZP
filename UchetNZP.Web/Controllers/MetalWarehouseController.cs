@@ -12,6 +12,13 @@ namespace UchetNZP.Web.Controllers;
 [Route("MetalWarehouse")]
 public class MetalWarehouseController : Controller
 {
+    private const string PlanDraftStatus = "Draft";
+    private const string PlanCalculatedStatus = "Calculated";
+    private const string LineStatusFullUse = "FullUse";
+    private const string LineStatusPartialCut = "PartialCut";
+    private const string LineStatusReserveCandidate = "ReserveCandidate";
+    private const string LineStatusDeficit = "Deficit";
+
     private readonly AppDbContext _dbContext;
     private readonly ICuttingMapExcelExporter _cuttingMapExcelExporter;
     private readonly ICuttingMapPdfExporter _cuttingMapPdfExporter;
@@ -668,6 +675,139 @@ public class MetalWarehouseController : Controller
         return View("~/Views/MetalWarehouse/RequirementDetails.cshtml", model);
     }
 
+    [HttpPost("Requirements/Details/{id:guid}/plan/calculate")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CalculateRequirementPlan(Guid id, CancellationToken cancellationToken)
+    {
+        var requirement = await _dbContext.MetalRequirements
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (requirement is null)
+        {
+            return NotFound();
+        }
+
+        var existingPlan = await _dbContext.MetalRequirementPlans
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.MetalRequirementId == id, cancellationToken);
+
+        var now = DateTime.UtcNow;
+        var userName = User?.Identity?.Name ?? "system";
+        var unit = requirement.Items.FirstOrDefault()?.Unit ?? "мм";
+        var requiredQty = requirement.Items.Sum(x => x.TotalRequiredQty);
+
+        var receiptItems = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => requirement.Items.Select(i => i.MetalMaterialId).Contains(x.MetalMaterialId) && !x.IsConsumed)
+            .Select(x => new
+            {
+                x.Id,
+                x.GeneratedCode,
+                x.SizeValue,
+                x.SizeUnitText,
+                UnitWeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
+                ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
+            })
+            .ToListAsync(cancellationToken);
+
+        var sortedSources = receiptItems
+            .OrderBy(x => Math.Abs(x.SizeValue - requiredQty))
+            .ThenBy(x => x.ReceiptDate)
+            .ToList();
+
+        var remainingRequired = requiredQty;
+        var planItems = new List<MetalRequirementPlanItem>();
+        var order = 1;
+
+        foreach (var source in sortedSources)
+        {
+            if (remainingRequired <= 0m)
+            {
+                planItems.Add(new MetalRequirementPlanItem
+                {
+                    Id = Guid.NewGuid(),
+                    MetalReceiptItemId = source.Id,
+                    SourceCode = source.GeneratedCode,
+                    SourceSize = source.SizeValue,
+                    SourceUnit = source.SizeUnitText,
+                    SourceWeightKg = source.UnitWeightKg,
+                    PlannedUseQty = 0m,
+                    RemainingAfterQty = source.SizeValue,
+                    LineStatus = LineStatusReserveCandidate,
+                    SortOrder = order++,
+                });
+                continue;
+            }
+
+            var plannedUse = Math.Min(source.SizeValue, remainingRequired);
+            var remainingAfter = source.SizeValue - plannedUse;
+            planItems.Add(new MetalRequirementPlanItem
+            {
+                Id = Guid.NewGuid(),
+                MetalReceiptItemId = source.Id,
+                SourceCode = source.GeneratedCode,
+                SourceSize = source.SizeValue,
+                SourceUnit = source.SizeUnitText,
+                SourceWeightKg = source.UnitWeightKg,
+                PlannedUseQty = plannedUse,
+                RemainingAfterQty = remainingAfter,
+                LineStatus = remainingAfter > 0m ? LineStatusPartialCut : LineStatusFullUse,
+                SortOrder = order++,
+            });
+
+            remainingRequired -= plannedUse;
+        }
+
+        if (remainingRequired > 0m)
+        {
+            planItems.Add(new MetalRequirementPlanItem
+            {
+                Id = Guid.NewGuid(),
+                MetalReceiptItemId = null,
+                SourceCode = "Дефицит",
+                SourceSize = 0m,
+                SourceUnit = unit,
+                PlannedUseQty = remainingRequired,
+                RemainingAfterQty = 0m,
+                LineStatus = LineStatusDeficit,
+                SortOrder = order,
+            });
+        }
+
+        var plannedQty = planItems.Where(x => x.LineStatus != LineStatusReserveCandidate && x.LineStatus != LineStatusDeficit).Sum(x => x.PlannedUseQty);
+        var deficitQty = Math.Max(0m, requiredQty - plannedQty);
+
+        if (existingPlan is null)
+        {
+            existingPlan = new MetalRequirementPlan
+            {
+                Id = Guid.NewGuid(),
+                MetalRequirementId = id,
+                CreatedAt = now,
+                CreatedBy = userName,
+            };
+            _dbContext.MetalRequirementPlans.Add(existingPlan);
+        }
+        else
+        {
+            _dbContext.MetalRequirementPlanItems.RemoveRange(existingPlan.Items);
+            existingPlan.RecalculatedAt = now;
+            existingPlan.RecalculatedBy = userName;
+        }
+
+        existingPlan.Status = PlanCalculatedStatus;
+        existingPlan.RequiredQty = requiredQty;
+        existingPlan.PlannedQty = plannedQty;
+        existingPlan.DeficitQty = deficitQty;
+        existingPlan.CalculationComment = deficitQty > 0m
+            ? $"Не хватает {deficitQty:0.###} {unit}."
+            : "План рассчитан без дефицита.";
+        existingPlan.Items = planItems;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return RedirectToAction(nameof(RequirementDetails), new { id });
+    }
+
     [HttpGet("Requirements/Details/{id:guid}/print/warehouse")]
     public async Task<IActionResult> RequirementPrintWarehouse(Guid id, CancellationToken cancellationToken)
     {
@@ -846,7 +986,41 @@ public class MetalWarehouseController : Controller
             return null;
         }
 
-        var items = requirement.Items.Select(i => new MetalRequirementDetailsItemViewModel
+        var currentPlan = await _dbContext.CuttingPlans
+            .AsNoTracking()
+            .Where(x => x.MetalRequirementId == requirement.Id && x.IsCurrent)
+            .Include(x => x.Items)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var requirementPlan = await _dbContext.MetalRequirementPlans
+            .AsNoTracking()
+            .Where(x => x.MetalRequirementId == id)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.MetalReceiptItem)
+                    .ThenInclude(x => x!.MetalReceipt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var materialIds = requirement.Items.Select(i => i.MetalMaterialId).Distinct().ToList();
+        var stockLookup = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => materialIds.Contains(x.MetalMaterialId))
+            .GroupBy(x => x.MetalMaterialId)
+            .Select(x => new
+            {
+                MaterialId = x.Key,
+                Qty = x.Sum(i => i.SizeValue),
+                WeightKg = x.Sum(i => i.Quantity > 0 ? i.TotalWeightKg / i.Quantity : i.TotalWeightKg),
+            })
+            .ToDictionaryAsync(x => x.MaterialId, cancellationToken);
+
+        var sourceBlank = currentPlan is null
+            ? "—"
+            : (ReadDecimalFromJson(currentPlan.ParametersJson, "Linear", "StockLength") is decimal stockLength
+                ? $"{stockLength:0.###} мм"
+                : $"{ReadDecimalFromJson(currentPlan.ParametersJson, "Sheet", "StockWidth"):0.###} x {ReadDecimalFromJson(currentPlan.ParametersJson, "Sheet", "StockHeight"):0.###} мм");
+
+        var items = requirement.Items.Select(i =>
         {
             MaterialDisplay = string.IsNullOrWhiteSpace(i.MaterialCode) ? i.MaterialName : $"{i.MaterialName} ({i.MaterialCode})",
             NormPerUnit = i.ConsumptionPerUnit,
@@ -868,8 +1042,37 @@ public class MetalWarehouseController : Controller
             WipLaunchId = requirement.WipLaunchId,
             LaunchDate = requirement.LaunchDate,
             Comment = requirement.Comment,
-            SourceBlankDisplay = string.IsNullOrWhiteSpace(requirement.MaterialCode) ? requirement.MaterialName : $"{requirement.MaterialName} ({requirement.MaterialCode})",
-            Items = items,
+            SourceBlankDisplay = sourceBlank,
+            CurrentCuttingPlanId = currentPlan?.Id,
+            RequirementPlan = requirementPlan is null
+                ? null
+                : new MetalRequirementPlanViewModel
+                {
+                    Id = requirementPlan.Id,
+                    Status = requirementPlan.Status,
+                    RequiredQty = requirementPlan.RequiredQty,
+                    PlannedQty = requirementPlan.PlannedQty,
+                    DeficitQty = requirementPlan.DeficitQty,
+                    Unit = requirement.Items.FirstOrDefault()?.Unit ?? "мм",
+                    CalculationComment = requirementPlan.CalculationComment,
+                    CreatedAt = requirementPlan.CreatedAt,
+                    CreatedBy = requirementPlan.CreatedBy,
+                    RecalculatedAt = requirementPlan.RecalculatedAt,
+                    RecalculatedBy = requirementPlan.RecalculatedBy,
+                    Items = requirementPlan.Items
+                        .OrderBy(x => x.SortOrder)
+                        .Select(x => new MetalRequirementPlanItemViewModel
+                        {
+                            SourceCode = x.SourceCode,
+                            SourceSize = x.SourceSize,
+                            SourceUnit = x.SourceUnit,
+                            PlannedUseQty = x.PlannedUseQty,
+                            RemainingAfterQty = x.RemainingAfterQty,
+                            LineStatus = x.LineStatus,
+                            ReceiptDate = x.MetalReceiptItem?.MetalReceipt?.ReceiptDate,
+                        })
+                        .ToList(),
+                },
             Aggregates = new MetalRequirementAggregateViewModel
             {
                 TotalKg = items.Sum(x => x.TotalRequiredWeightKg ?? 0m),

@@ -452,11 +452,40 @@ public class MetalRequirementDetailsViewModel
 
     public Guid? CurrentCuttingPlanId { get; init; }
 
+    public MetalRequirementPlanViewModel? RequirementPlan { get; init; }
+
     public MetalRequirementAggregateViewModel Aggregates { get; init; } = new();
 
     public IReadOnlyCollection<MetalRequirementCutDetailViewModel> CutDetails { get; init; } = Array.Empty<MetalRequirementCutDetailViewModel>();
 
     public IReadOnlyCollection<MetalRequirementDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalRequirementDetailsItemViewModel>();
+}
+
+public class MetalRequirementPlanViewModel
+{
+    public Guid Id { get; init; }
+    public string Status { get; init; } = string.Empty;
+    public decimal RequiredQty { get; init; }
+    public decimal PlannedQty { get; init; }
+    public decimal DeficitQty { get; init; }
+    public string Unit { get; init; } = string.Empty;
+    public string? CalculationComment { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public string CreatedBy { get; init; } = string.Empty;
+    public DateTime? RecalculatedAt { get; init; }
+    public string? RecalculatedBy { get; init; }
+    public IReadOnlyCollection<MetalRequirementPlanItemViewModel> Items { get; init; } = Array.Empty<MetalRequirementPlanItemViewModel>();
+}
+
+public class MetalRequirementPlanItemViewModel
+{
+    public string SourceCode { get; init; } = string.Empty;
+    public decimal SourceSize { get; init; }
+    public string SourceUnit { get; init; } = string.Empty;
+    public decimal PlannedUseQty { get; init; }
+    public decimal RemainingAfterQty { get; init; }
+    public string LineStatus { get; init; } = string.Empty;
+    public DateTime? ReceiptDate { get; init; }
 }
 
 public class CuttingMapListViewModel

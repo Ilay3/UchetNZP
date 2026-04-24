@@ -43,4 +43,6 @@ public class MetalRequirement
     public virtual ICollection<MetalRequirementItem> Items { get; set; } = new List<MetalRequirementItem>();
 
     public virtual ICollection<CuttingPlan> CuttingPlans { get; set; } = new List<CuttingPlan>();
+
+    public virtual ICollection<MetalRequirementPlan> RequirementPlans { get; set; } = new List<MetalRequirementPlan>();
 }

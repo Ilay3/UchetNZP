@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UchetNZP.Infrastructure.Data;
@@ -11,9 +12,11 @@ using UchetNZP.Infrastructure.Data;
 namespace UchetNZP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424111757_AddMetalRequirementPlans")]
+    partial class AddMetalRequirementPlans
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -624,32 +627,14 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("Comment")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<Guid>("MetalMaterialId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("PartCode")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
                     b.Property<Guid>("PartId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("PartName")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 3)
@@ -668,18 +653,10 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<Guid>("WipLaunchId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("WipReceiptId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("MetalMaterialId");
 
                     b.HasIndex("PartId");
 
@@ -688,8 +665,7 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.HasIndex("RequirementNumber")
                         .IsUnique();
 
-                    b.HasIndex("WipLaunchId")
-                        .IsUnique();
+                    b.HasIndex("WipLaunchId");
 
                     b.ToTable("MetalRequirements", (string)null);
                 });
@@ -712,19 +688,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
-                    b.Property<string>("Comment")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<decimal>("ConsumptionPerUnit")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<string>("ConsumptionUnit")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
                     b.Property<Guid>("MetalMaterialId")
                         .HasColumnType("uuid");
 
@@ -732,14 +695,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("NormPerUnit")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<decimal>("RequiredQty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<decimal?>("RequiredWeightKg")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
 
@@ -751,10 +706,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
-
-                    b.Property<string>("SizeRaw")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
 
                     b.Property<decimal>("TotalRequiredQty")
                         .HasPrecision(12, 3)
@@ -2045,12 +1996,6 @@ namespace UchetNZP.Infrastructure.Migrations
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.MetalRequirement", b =>
                 {
-                    b.HasOne("UchetNZP.Domain.Entities.MetalMaterial", "MetalMaterial")
-                        .WithMany("Requirements")
-                        .HasForeignKey("MetalMaterialId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
                     b.HasOne("UchetNZP.Domain.Entities.Part", "Part")
                         .WithMany("MetalRequirements")
                         .HasForeignKey("PartId")
@@ -2062,8 +2007,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .HasForeignKey("WipLaunchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("MetalMaterial");
 
                     b.Navigation("Part");
 
@@ -2456,8 +2399,6 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Navigation("ReceiptItems");
 
                     b.Navigation("RequirementItems");
-
-                    b.Navigation("Requirements");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.MetalReceipt", b =>

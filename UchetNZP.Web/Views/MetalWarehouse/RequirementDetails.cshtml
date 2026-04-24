@@ -58,6 +58,101 @@
     </div>
 </div>
 
-<div class="alert alert-info mb-0">
-    Документ создан в электронном виде. Печать и списание пока не выполняются.
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">План подбора</span>
+        <div class="d-flex gap-2">
+            @if (Model.RequirementPlan is null)
+            {
+                <form method="post" asp-controller="MetalWarehouse" asp-action="CalculateRequirementPlan" asp-route-id="@Model.Id">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary btn-sm">Рассчитать план</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" asp-controller="MetalWarehouse" asp-action="CalculateRequirementPlan" asp-route-id="@Model.Id">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Пересчитать</button>
+                </form>
+            }
+        </div>
+    </div>
+    <div class="card-body">
+        @if (Model.RequirementPlan is null)
+        {
+            <div class="text-center py-4 border rounded bg-light-subtle">
+                <div class="fw-semibold mb-2">План подбора еще не рассчитан</div>
+                <div class="text-muted mb-3">Нажмите «Рассчитать план», чтобы сформировать электронный подбор металла без расхода склада.</div>
+                <form method="post" asp-controller="MetalWarehouse" asp-action="CalculateRequirementPlan" asp-route-id="@Model.Id">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary">Рассчитать план</button>
+                </form>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3 mb-3">
+                <div class="col-md-2"><div class="text-muted small">Требуется всего</div><div class="fw-semibold">@Model.RequirementPlan.RequiredQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
+                <div class="col-md-2"><div class="text-muted small">Подобрано</div><div class="fw-semibold">@Model.RequirementPlan.PlannedQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
+                <div class="col-md-2"><div class="text-muted small">Дефицит</div><div class="fw-semibold @(Model.RequirementPlan.DeficitQty > 0 ? "text-danger" : "text-success")">@Model.RequirementPlan.DeficitQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
+                <div class="col-md-2"><div class="text-muted small">Статус</div><div><span class="badge bg-secondary">@Model.RequirementPlan.Status</span></div></div>
+                <div class="col-md-4">
+                    <div class="text-muted small">Расчет</div>
+                    <div class="small">
+                        @Model.RequirementPlan.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), @Model.RequirementPlan.CreatedBy
+                        @if (Model.RequirementPlan.RecalculatedAt.HasValue)
+                        {
+                            <span class="d-block">Пересчет: @Model.RequirementPlan.RecalculatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), @(string.IsNullOrWhiteSpace(Model.RequirementPlan.RecalculatedBy) ? "—" : Model.RequirementPlan.RecalculatedBy)</span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @if (Model.RequirementPlan.DeficitQty > 0)
+            {
+                <div class="alert alert-danger py-2">
+                    Не хватает: <strong>@Model.RequirementPlan.DeficitQty.ToString("0.###") @Model.RequirementPlan.Unit</strong>
+                </div>
+            }
+
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Код единицы</th>
+                            <th>Размер исходный</th>
+                            <th>Ед. изм.</th>
+                            <th>Будет использовано</th>
+                            <th>Остаток после использования</th>
+                            <th>Статус</th>
+                            <th>Дата прихода</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var line in Model.RequirementPlan.Items)
+                        {
+                            var badgeClass = line.LineStatus switch
+                            {
+                                "FullUse" => "bg-success",
+                                "PartialCut" => "bg-warning text-dark",
+                                "ReserveCandidate" => "bg-info text-dark",
+                                "Deficit" => "bg-danger",
+                                _ => "bg-secondary",
+                            };
+                            <tr>
+                                <td>@line.SourceCode</td>
+                                <td>@line.SourceSize.ToString("0.###")</td>
+                                <td>@line.SourceUnit</td>
+                                <td>@line.PlannedUseQty.ToString("0.###")</td>
+                                <td>@line.RemainingAfterQty.ToString("0.###")</td>
+                                <td><span class="badge @badgeClass">@line.LineStatus</span></td>
+                                <td>@(line.ReceiptDate.HasValue ? line.ReceiptDate.Value.ToLocalTime().ToString("dd.MM.yyyy") : "—")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
 </div>
