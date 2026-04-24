@@ -334,6 +334,7 @@ public class ImportService : IImportService
         var normsUpdated = 0;
         var rowsSkipped = 0;
         var materialCache = new Dictionary<string, MetalMaterial>(StringComparer.OrdinalIgnoreCase);
+        var partCache = new Dictionary<string, Part>(StringComparer.OrdinalIgnoreCase);
 
         if (mode is MetalImportMode.Materials or MetalImportMode.All)
         {
@@ -407,29 +408,35 @@ public class ImportService : IImportService
                     continue;
                 }
 
-                var part = await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
-                if (part is null)
+                if (!partCache.TryGetValue(code, out var part))
                 {
-                    partsCreated++;
-                    part = new Part
+                    part = await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
+                    if (part is null)
                     {
-                        Id = Guid.NewGuid(),
-                        Code = code,
-                        Name = string.IsNullOrWhiteSpace(name) ? code : name,
-                    };
+                        partsCreated++;
+                        part = new Part
+                        {
+                            Id = Guid.NewGuid(),
+                            Code = code,
+                            Name = string.IsNullOrWhiteSpace(name) ? code : name,
+                        };
 
-                    if (!dryRun)
-                    {
-                        await _dbContext.Parts.AddAsync(part, cancellationToken).ConfigureAwait(false);
+                        if (!dryRun)
+                        {
+                            await _dbContext.Parts.AddAsync(part, cancellationToken).ConfigureAwait(false);
+                        }
                     }
+                    else
+                    {
+                        partsFound++;
+                    }
+
+                    partCache[code] = part;
                 }
-                else
+
+                if (!string.IsNullOrWhiteSpace(name))
                 {
-                    partsFound++;
-                    if (!string.IsNullOrWhiteSpace(name))
-                    {
-                        part.Name = name;
-                    }
+                    part.Name = name;
                 }
 
                 var norm = await _dbContext.MetalConsumptionNorms
@@ -468,7 +475,22 @@ public class ImportService : IImportService
 
         if (!dryRun)
         {
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (DbUpdateException ex)
+            {
+                var baseMessage = ex.InnerException?.Message ?? ex.Message;
+                var friendlyReason = baseMessage.Contains("IX_Parts_Code", StringComparison.OrdinalIgnoreCase)
+                    ? "Найдены повторяющиеся значения поля 'Обозначение' (Code) для деталей."
+                    : baseMessage.Contains("IX_MetalMaterials_Code", StringComparison.OrdinalIgnoreCase)
+                        ? "Найдены повторяющиеся значения поля 'артикул' (Code) для материалов."
+                        : "Ошибка сохранения данных в БД. Проверьте файл на дубли и обязательные поля.";
+
+                rowsSkipped++;
+                errors.Add(new MetalDataImportErrorDto(0, "Database", friendlyReason));
+            }
         }
 
         return new MetalDataImportSummaryDto(
