@@ -12,16 +12,19 @@ public class MetalConsumptionNormConfiguration : IEntityTypeConfiguration<MetalC
 
         builder.HasKey(x => x.Id);
 
-        builder.Property(x => x.ConsumptionQty)
-            .HasPrecision(12, 3)
+        builder.Property(x => x.SizeRaw)
+            .HasMaxLength(128);
+
+        builder.Property(x => x.BaseConsumptionQty)
+            .HasPrecision(12, 6)
             .IsRequired();
 
         builder.Property(x => x.ConsumptionUnit)
             .IsRequired()
             .HasMaxLength(16);
 
-        builder.Property(x => x.WeightPerUnitKg)
-            .HasPrecision(12, 3);
+        builder.Property(x => x.SourceFile)
+            .HasMaxLength(256);
 
         builder.Property(x => x.Comment)
             .HasMaxLength(256);
@@ -39,6 +42,6 @@ public class MetalConsumptionNormConfiguration : IEntityTypeConfiguration<MetalC
             .HasForeignKey(x => x.MetalMaterialId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => new { x.PartId, x.MetalMaterialId, x.IsActive });
+        builder.HasIndex(x => new { x.PartId, x.IsActive });
     }
 }

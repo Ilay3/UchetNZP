@@ -100,6 +100,21 @@ public class WipLaunchesController : Controller
 
         var normsByPart = norms.GroupBy(x => x.PartId).ToDictionary(x => x.Key, x => x.ToList());
 
+        var selectedMaterialId = query?.MetalMaterialId;
+        if (!selectedMaterialId.HasValue || selectedMaterialId == Guid.Empty)
+        {
+            selectedMaterialId = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        MetalMaterial? selectedMaterial = null;
+        if (selectedMaterialId.HasValue)
+        {
+            selectedMaterial = await _dbContext.MetalMaterials.AsNoTracking().FirstOrDefaultAsync(x => x.Id == selectedMaterialId.Value, cancellationToken).ConfigureAwait(false);
+        }
+
+        var materialOptions = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code)).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+
         var items = launches
             .Select(x =>
             {
@@ -107,22 +122,32 @@ public class WipLaunchesController : Controller
                 var needs = (launchNorms ?? [])
                     .Select(norm =>
                     {
-                        stockByMaterial.TryGetValue(norm.MetalMaterialId, out var stock);
-                        var requiredQty = norm.ConsumptionQty * x.Quantity;
-                        var requiredWeight = norm.WeightPerUnitKg.HasValue ? norm.WeightPerUnitKg.Value * x.Quantity : (decimal?)null;
+                        if (selectedMaterial is null)
+                        {
+                            return null;
+                        }
+
+                        stockByMaterial.TryGetValue(selectedMaterial.Id, out var stock);
+                        var requiredQty = norm.BaseConsumptionQty * x.Quantity;
+                        var totalWeightKg = CalculateTotalWeightKg(requiredQty, norm.ConsumptionUnit, selectedMaterial.WeightPerUnitKg, selectedMaterial.Coefficient);
 
                         return new LaunchMetalNeedItemViewModel(
-                            norm.MetalMaterialId,
-                            norm.MetalMaterial?.Name ?? "Материал не указан",
-                            norm.MetalMaterial?.Code,
-                            norm.ConsumptionQty,
+                            selectedMaterial.Id,
+                            selectedMaterial.Name,
+                            selectedMaterial.Code,
+                            norm.BaseConsumptionQty,
+                            norm.SizeRaw,
                             x.Quantity,
                             requiredQty,
                             norm.ConsumptionUnit,
-                            requiredWeight,
+                            selectedMaterial.WeightPerUnitKg,
+                            selectedMaterial.Coefficient,
+                            totalWeightKg,
                             stock?.Qty ?? 0m,
                             stock?.WeightKg ?? 0m);
                     })
+                    .Where(x => x is not null)
+                    .Cast<LaunchMetalNeedItemViewModel>()
                     .ToList();
 
                 requirementsByLaunch.TryGetValue(x.Id, out var requirement);
@@ -181,6 +206,8 @@ public class WipLaunchesController : Controller
         {
             From = DateTime.SpecifyKind(fromDate, DateTimeKind.Unspecified),
             To = DateTime.SpecifyKind(toDate, DateTimeKind.Unspecified),
+            MetalMaterialId = selectedMaterialId,
+            MaterialOptions = materialOptions,
         };
 
         var model = new LaunchHistoryViewModel(filter, grouped);
@@ -438,6 +465,14 @@ public class WipLaunchesController : Controller
             return RedirectToAction(nameof(History));
         }
 
+        var selectedMaterialId = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (!selectedMaterialId.HasValue)
+        {
+            TempData["LaunchMetalRequirementError"] = "Не найден активный материал.";
+            return RedirectToAction(nameof(History));
+        }
+
+        var selectedMaterial = await _dbContext.MetalMaterials.AsNoTracking().FirstOrDefaultAsync(x => x.Id == selectedMaterialId.Value, cancellationToken).ConfigureAwait(false);
         var norms = await _dbContext.MetalConsumptionNorms
             .AsNoTracking()
             .Where(x => x.IsActive && x.PartId == launch.PartId)
@@ -464,11 +499,11 @@ public class WipLaunchesController : Controller
             Items = norms.Select(norm => new MetalRequirementItem
             {
                 Id = Guid.NewGuid(),
-                MetalMaterialId = norm.MetalMaterialId,
-                NormPerUnit = norm.ConsumptionQty,
-                TotalRequiredQty = norm.ConsumptionQty * launch.Quantity,
+                MetalMaterialId = selectedMaterialId.Value,
+                NormPerUnit = norm.BaseConsumptionQty,
+                TotalRequiredQty = norm.BaseConsumptionQty * launch.Quantity,
                 Unit = norm.ConsumptionUnit,
-                TotalRequiredWeightKg = norm.WeightPerUnitKg.HasValue ? norm.WeightPerUnitKg.Value * launch.Quantity : null,
+                TotalRequiredWeightKg = CalculateTotalWeightKg(norm.BaseConsumptionQty * launch.Quantity, norm.ConsumptionUnit, selectedMaterial?.WeightPerUnitKg, selectedMaterial?.Coefficient ?? 1m),
             }).ToList(),
         };
 
@@ -506,6 +541,19 @@ public class WipLaunchesController : Controller
         }
 
         return $"MREQ-{(numericPart + 1):D6}";
+    }
+
+
+    private static decimal CalculateTotalWeightKg(decimal requiredQty, string unit, decimal? weightPerUnitKg, decimal coefficient)
+    {
+        var normalizedUnit = (unit ?? string.Empty).Trim().ToLowerInvariant();
+        return normalizedUnit switch
+        {
+            "м" or "m" or "м2" or "m2" or "м²" => requiredQty * (weightPerUnitKg ?? 0m) * coefficient,
+            "кг" or "kg" => requiredQty * coefficient,
+            "г" or "g" => (requiredQty / 1000m) * coefficient,
+            _ => requiredQty * coefficient,
+        };
     }
 
     private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)

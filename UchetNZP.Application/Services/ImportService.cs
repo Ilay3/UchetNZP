@@ -317,6 +317,161 @@ public class ImportService : IImportService
         }
     }
 
+    public async Task<MetalDataImportSummaryDto> ImportMetalDataExcelAsync(
+        Stream stream,
+        string fileName,
+        MetalImportMode mode,
+        bool dryRun,
+        CancellationToken cancellationToken = default)
+    {
+        using var workbook = new XLWorkbook(stream);
+        var sourceFileName = Path.GetFileName(fileName.Trim());
+        var errors = new List<MetalDataImportErrorDto>();
+        var materialsImported = 0;
+        var partsFound = 0;
+        var partsCreated = 0;
+        var normsCreated = 0;
+        var normsUpdated = 0;
+        var rowsSkipped = 0;
+
+        if (mode is MetalImportMode.Materials or MetalImportMode.All)
+        {
+            var sheet = workbook.Worksheet("Материалы и коэф. металлов");
+            foreach (var row in (sheet.RangeUsed()?.RowsUsed().Skip(1) ?? []).Where(x => !x.IsEmpty()))
+            {
+                var rowNumber = row.RowNumber();
+                var code = row.Cell(2).GetString().Trim();
+                var name = row.Cell(3).GetString().Trim();
+                var weight = TryParseDecimalCell(row.Cell(4), out var weightValue) ? weightValue : (decimal?)null;
+                var coefficient = TryParseDecimalCell(row.Cell(5), out var coeffValue) ? coeffValue : 1m;
+                var displayName = row.Cell(6).GetString().Trim();
+
+                if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущены обязательные поля Code/Name."));
+                    continue;
+                }
+
+                var entity = await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
+                if (entity is null)
+                {
+                    entity = new MetalMaterial
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = code,
+                        UnitKind = "Unknown",
+                    };
+
+                    if (!dryRun)
+                    {
+                        await _dbContext.MetalMaterials.AddAsync(entity, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+
+                entity.Name = name;
+                entity.WeightPerUnitKg = weight;
+                entity.Coefficient = coefficient == 0m ? 1m : coefficient;
+                entity.DisplayName = string.IsNullOrWhiteSpace(displayName) ? name : displayName;
+                entity.IsActive = true;
+                materialsImported++;
+            }
+        }
+
+        if (mode is MetalImportMode.Norms or MetalImportMode.All)
+        {
+            var sheet = workbook.Worksheet("Детали - Размеры - Нормы");
+            foreach (var row in (sheet.RangeUsed()?.RowsUsed().Skip(1) ?? []).Where(x => !x.IsEmpty()))
+            {
+                var rowNumber = row.RowNumber();
+                var code = row.Cell(1).GetString().Trim();
+                var name = row.Cell(2).GetString().Trim();
+                var sizeRaw = row.Cell(3).GetString().Trim();
+                var unit = row.Cell(6).GetString().Trim();
+
+                if (string.IsNullOrWhiteSpace(code) || !TryParseDecimalCell(row.Cell(5), out var baseQty))
+                {
+                    rowsSkipped++;
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущены обязательные поля Обозначение/BaseConsumptionQty."));
+                    continue;
+                }
+
+                var part = await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false);
+                if (part is null)
+                {
+                    partsCreated++;
+                    part = new Part
+                    {
+                        Id = Guid.NewGuid(),
+                        Code = code,
+                        Name = string.IsNullOrWhiteSpace(name) ? code : name,
+                    };
+
+                    if (!dryRun)
+                    {
+                        await _dbContext.Parts.AddAsync(part, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    partsFound++;
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        part.Name = name;
+                    }
+                }
+
+                var norm = await _dbContext.MetalConsumptionNorms
+                    .FirstOrDefaultAsync(x => x.PartId == part.Id && x.IsActive, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (norm is null)
+                {
+                    normsCreated++;
+                    norm = new MetalConsumptionNorm
+                    {
+                        Id = Guid.NewGuid(),
+                        PartId = part.Id,
+                        IsActive = true,
+                    };
+
+                    if (!dryRun)
+                    {
+                        await _dbContext.MetalConsumptionNorms.AddAsync(norm, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    normsUpdated++;
+                }
+
+                norm.SizeRaw = sizeRaw;
+                norm.BaseConsumptionQty = baseQty;
+                norm.ConsumptionUnit = unit;
+                norm.SourceFile = sourceFileName;
+                norm.MetalMaterialId = null;
+                norm.Comment = row.Cell(4).GetString().Trim();
+                norm.IsActive = true;
+            }
+        }
+
+        if (!dryRun)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        return new MetalDataImportSummaryDto(
+            sourceFileName,
+            dryRun,
+            materialsImported,
+            partsFound,
+            partsCreated,
+            normsCreated,
+            normsUpdated,
+            rowsSkipped,
+            errors);
+    }
+
     private static ImportJobItem CreateJobItem(Guid jobId, int rowIndex, string status, string? message)
     {
         return new ImportJobItem
@@ -483,5 +638,16 @@ public class ImportService : IImportService
     {
         var normalized = value.Replace(" ", string.Empty).Replace(',', '.');
         return decimal.TryParse(normalized, NumberStyles.Float, CultureInfo.InvariantCulture, out result);
+    }
+
+    private static bool TryParseDecimalCell(IXLCell cell, out decimal result)
+    {
+        if (cell.DataType == XLDataType.Number)
+        {
+            result = Convert.ToDecimal(cell.GetDouble(), CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        return TryParseDecimal(cell.GetString().Trim(), out result);
     }
 }

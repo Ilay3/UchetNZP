@@ -452,3 +452,62 @@
         }
     }
 })();
+
+(function () {
+    const fileInput = document.getElementById("metalFileInput");
+    const modeSelect = document.getElementById("metalImportMode");
+    const summary = document.getElementById("metalImportSummary");
+    const previewButton = document.getElementById("metalPreviewButton");
+    const importMaterialsButton = document.getElementById("metalImportMaterialsButton");
+    const importNormsButton = document.getElementById("metalImportNormsButton");
+    const importAllButton = document.getElementById("metalImportAllButton");
+
+    if (!fileInput || !summary) {
+        return;
+    }
+
+    previewButton?.addEventListener("click", () => runMetalImport(true, modeSelect?.value || "all"));
+    importMaterialsButton?.addEventListener("click", () => runMetalImport(false, "materials"));
+    importNormsButton?.addEventListener("click", () => runMetalImport(false, "norms"));
+    importAllButton?.addEventListener("click", () => runMetalImport(false, "all"));
+
+    async function runMetalImport(dryRun, mode) {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+            alert("Выберите Excel-файл для импорта.");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("mode", mode);
+
+        try {
+            const endpoint = dryRun ? "/routes/import/metal-data/preview" : "/routes/import/metal-data/execute";
+            const response = await fetch(endpoint, { method: "POST", body: formData });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || "Ошибка импорта металла.");
+            }
+
+            const result = await response.json();
+            renderSummary(result);
+        }
+        catch (error) {
+            summary.innerHTML = `<div class="alert alert-danger">${error?.message || "Ошибка импорта металла."}</div>`;
+        }
+    }
+
+    function renderSummary(result) {
+        const errors = Array.isArray(result.errors) ? result.errors : [];
+        summary.innerHTML = `
+            <div class="alert ${result.dryRun ? "alert-info" : "alert-success"}">
+                <div><strong>${result.dryRun ? "Dry-run" : "Импорт"}:</strong> ${result.sourceFileName}</div>
+                <div>Материалов импортировано: <strong>${result.materialsImported}</strong></div>
+                <div>Деталей найдено: <strong>${result.partsFound}</strong>, создано: <strong>${result.partsCreated}</strong></div>
+                <div>Норм создано: <strong>${result.normsCreated}</strong>, обновлено: <strong>${result.normsUpdated}</strong></div>
+                <div>Строк пропущено: <strong>${result.rowsSkipped}</strong></div>
+                ${errors.length === 0 ? "" : `<hr /><div><strong>Ошибки:</strong><ul>${errors.map(e => `<li>[${e.sheet} #${e.rowIndex}] ${e.message}</li>`).join("")}</ul></div>`}
+            </div>`;
+    }
+})();
