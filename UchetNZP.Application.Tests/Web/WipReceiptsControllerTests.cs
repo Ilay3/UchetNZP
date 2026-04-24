@@ -10,6 +10,7 @@ using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Controllers;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
 using Xunit;
 
 namespace UchetNZP.Application.Tests.Web;
@@ -36,7 +37,10 @@ public class WipReceiptsControllerTests
 
         await dbContext.SaveChangesAsync();
 
-        var controller = new WipReceiptsController(dbContext, new WipService(dbContext, new TestCurrentUserService()));
+        var controller = new WipReceiptsController(
+            dbContext,
+            new WipService(dbContext, new TestCurrentUserService()),
+            new StubEscortLabelDocumentService());
 
         var actionResult = await controller.LabelExists("12", new DateTime(2026, 3, 6), CancellationToken.None);
 
@@ -113,7 +117,7 @@ public class WipReceiptsControllerTests
 
         await service.DeleteReceiptAsync(receiptInfo.ReceiptId);
 
-        var controller = new WipReceiptsController(dbContext, service);
+        var controller = new WipReceiptsController(dbContext, service, new StubEscortLabelDocumentService());
 
         var actionResult = await controller.Revert(receiptInfo.ReceiptId, new WipReceiptsController.ReceiptRevertRequest(receiptInfo.VersionId), CancellationToken.None);
 
@@ -122,6 +126,37 @@ public class WipReceiptsControllerTests
 
         Assert.Equal(quantity, viewModel.TargetQuantity);
         Assert.NotEqual(Guid.Empty, viewModel.VersionId);
+    }
+
+    [Fact]
+    public async Task DownloadEscortLabel_ReturnsDocxFile()
+    {
+        await using var dbContext = CreateContext();
+        var receiptId = Guid.NewGuid();
+
+        dbContext.WipReceipts.Add(new WipReceipt
+        {
+            Id = receiptId,
+            PartId = Guid.NewGuid(),
+            SectionId = Guid.NewGuid(),
+            OpNumber = 10,
+            Quantity = 3m,
+            ReceiptDate = DateTime.SpecifyKind(new DateTime(2026, 4, 24), DateTimeKind.Unspecified),
+            CreatedAt = DateTime.SpecifyKind(new DateTime(2026, 4, 24), DateTimeKind.Utc),
+            UserId = Guid.NewGuid(),
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var controller = new WipReceiptsController(
+            dbContext,
+            new WipService(dbContext, new TestCurrentUserService()),
+            new StubEscortLabelDocumentService());
+
+        var result = await controller.DownloadEscortLabel(receiptId, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", file.ContentType);
     }
 
     private static AppDbContext CreateContext()
@@ -137,5 +172,11 @@ public class WipReceiptsControllerTests
     private sealed class TestCurrentUserService : ICurrentUserService
     {
         public Guid UserId { get; } = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    }
+
+    private sealed class StubEscortLabelDocumentService : IWipEscortLabelDocumentService
+    {
+        public Task<byte[]> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
+            => Task.FromResult(Array.Empty<byte>());
     }
 }

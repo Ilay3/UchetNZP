@@ -817,7 +817,7 @@
         }
 
         if (!history.length) {
-            historyTableBody.innerHTML = "<tr><td colspan=\"9\" class=\"text-center text-muted\">Сохранённые приходы появятся здесь.</td></tr>";
+            historyTableBody.innerHTML = "<tr><td colspan=\"10\" class=\"text-center text-muted\">Сохранённые приходы появятся здесь.</td></tr>";
             return;
         }
 
@@ -833,6 +833,9 @@
                 <td>${item.isAssigned && item.labelNumber ? item.labelNumber : ""}</td>
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>
+                <td>
+                    <a class="btn btn-outline-secondary btn-sm" href="/wip/receipts/${encodeURIComponent(item.receiptId)}/escort-label">Скачать сопроводительный ярлык</a>
+                </td>
                 <td class="text-center">
                     <button type="button" class="btn btn-link text-danger text-decoration-none" data-action="cancel" data-receipt-id="${item.receiptId}">Отменить</button>
                 </td>`;
