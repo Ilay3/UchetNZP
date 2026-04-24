@@ -9,6 +9,7 @@ using UchetNZP.Application.Contracts.Wip;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Services;
 using UchetNZP.Shared;
 
 namespace UchetNZP.Web.Controllers;
@@ -18,11 +19,16 @@ public class WipReceiptsController : Controller
 {
     private readonly AppDbContext _dbContext;
     private readonly IWipService _wipService;
+    private readonly IWipEscortLabelDocumentService _escortLabelDocumentService;
 
-    public WipReceiptsController(AppDbContext dbContext, IWipService wipService)
+    public WipReceiptsController(
+        AppDbContext dbContext,
+        IWipService wipService,
+        IWipEscortLabelDocumentService escortLabelDocumentService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _wipService = wipService ?? throw new ArgumentNullException(nameof(wipService));
+        _escortLabelDocumentService = escortLabelDocumentService ?? throw new ArgumentNullException(nameof(escortLabelDocumentService));
     }
 
     [HttpGet("")]
@@ -157,6 +163,26 @@ public class WipReceiptsController : Controller
             .ConfigureAwait(false);
 
         return Ok(new { exists });
+    }
+
+    [HttpGet("{id:guid}/escort-label")]
+    public async Task<IActionResult> DownloadEscortLabel([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор прихода.");
+        }
+
+        try
+        {
+            var content = await _escortLabelDocumentService.BuildAsync(id, cancellationToken).ConfigureAwait(false);
+            var fileName = $"Сопроводительный ярлык {id:N}.docx";
+            return File(content, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", fileName);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound("Приход не найден.");
+        }
     }
 
     [HttpGet("material-stock")]
