@@ -207,18 +207,152 @@ public class MetalWarehouseController : Controller
     }
 
     [HttpGet("Stock")]
-    public IActionResult Stock()
+    public async Task<IActionResult> Stock([FromQuery] MetalStockFilterViewModel filter, CancellationToken cancellationToken)
     {
-        var model = new MetalWarehouseListPageViewModel
+        var stockQuery = _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Select(x => new
+            {
+                x.Id,
+                x.MetalMaterialId,
+                MaterialName = x.MetalMaterial != null ? x.MetalMaterial.Name : "-",
+                x.GeneratedCode,
+                x.SizeValue,
+                x.SizeUnitText,
+                WeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
+                ReceiptNumber = x.MetalReceipt != null ? x.MetalReceipt.ReceiptNumber : string.Empty,
+                ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
+            });
+
+        if (filter.MaterialId.HasValue)
         {
-            Title = "Остатки металла",
-            Description = "Текущая сводка по количеству металла на складе.",
-            Headers = new[] { "Материал", "Марка", "Ед. изм.", "Количество", "Обновлено" },
-            EmptyStateTitle = "Остатков пока нет",
-            EmptyStateDescription = "Остатки будут отображаться после загрузки или прихода металла.",
+            stockQuery = stockQuery.Where(x => x.MetalMaterialId == filter.MaterialId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.UnitCodeOrNumber))
+        {
+            var codeFilter = filter.UnitCodeOrNumber.Trim();
+            stockQuery = stockQuery.Where(x => x.GeneratedCode.Contains(codeFilter));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.UnitOfMeasure))
+        {
+            var unitFilter = filter.UnitOfMeasure.Trim();
+            stockQuery = stockQuery.Where(x => x.SizeUnitText == unitFilter);
+        }
+
+        var stockRows = await stockQuery
+            .OrderByDescending(x => x.ReceiptDate)
+            .ThenBy(x => x.GeneratedCode)
+            .ToListAsync(cancellationToken);
+
+        var materialOptions = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .Select(x => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem
+            {
+                Value = x.Id.ToString(),
+                Text = string.IsNullOrWhiteSpace(x.Code) ? x.Name : $"{x.Name} ({x.Code})",
+                Selected = filter.MaterialId.HasValue && filter.MaterialId.Value == x.Id,
+            })
+            .ToListAsync(cancellationToken);
+
+        var unitOptions = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Select(x => x.SizeUnitText)
+            .Distinct()
+            .OrderBy(x => x)
+            .Select(x => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem
+            {
+                Value = x,
+                Text = x,
+                Selected = filter.UnitOfMeasure == x,
+            })
+            .ToListAsync(cancellationToken);
+
+        var model = new MetalStockPageViewModel
+        {
+            Filters = new MetalStockFilterViewModel
+            {
+                MaterialId = filter.MaterialId,
+                UnitCodeOrNumber = filter.UnitCodeOrNumber,
+                UnitOfMeasure = filter.UnitOfMeasure,
+                ActiveOnly = filter.ActiveOnly,
+                Materials = materialOptions,
+                UnitOfMeasures = unitOptions,
+            },
+            Items = stockRows.Select(x => new MetalStockItemViewModel
+            {
+                Id = x.Id,
+                GeneratedCode = x.GeneratedCode,
+                MaterialName = x.MaterialName,
+                SizeValue = x.SizeValue,
+                SizeUnitText = x.SizeUnitText,
+                WeightKg = x.WeightKg,
+                ReceiptNumber = x.ReceiptNumber,
+                ReceiptDate = x.ReceiptDate,
+            }).ToList(),
+            TotalUnitsCount = stockRows.Count,
+            TotalMaterialsCount = stockRows.Select(x => x.MetalMaterialId).Distinct().Count(),
+            TotalWeightKg = stockRows.Sum(x => x.WeightKg),
+            TotalSize = stockRows.Sum(x => x.SizeValue),
         };
 
         return View(model);
+    }
+
+    [HttpGet("Stock/Item/{id:guid}")]
+    public async Task<IActionResult> StockItem(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.GeneratedCode,
+                MaterialName = x.MetalMaterial != null ? x.MetalMaterial.Name : "-",
+                x.SizeValue,
+                x.SizeUnitText,
+                WeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
+                ReceiptNumber = x.MetalReceipt != null ? x.MetalReceipt.ReceiptNumber : string.Empty,
+                ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
+                Source = x.MetalReceipt != null ? x.MetalReceipt.SupplierOrSource : null,
+                Comment = x.MetalReceipt != null ? x.MetalReceipt.Comment : null,
+                CreatedAt = x.CreatedAt,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound();
+        }
+
+        var model = new MetalStockItemDetailsViewModel
+        {
+            Id = item.Id,
+            GeneratedCode = item.GeneratedCode,
+            MaterialName = item.MaterialName,
+            SizeValue = item.SizeValue,
+            SizeUnitText = item.SizeUnitText,
+            WeightKg = item.WeightKg,
+            ReceiptNumber = item.ReceiptNumber,
+            ReceiptDate = item.ReceiptDate,
+            Source = item.Source ?? "Не указан",
+            ReceiptComment = item.Comment,
+            History =
+            [
+                new MetalStockItemHistoryEntryViewModel
+                {
+                    Timestamp = item.CreatedAt,
+                    EventName = "Приход",
+                    Description = $"Единица добавлена по документу {item.ReceiptNumber}.",
+                },
+            ],
+        };
+
+        return View("~/Views/MetalWarehouse/StockItem.cshtml", model);
     }
 
     [HttpGet("Requirements")]

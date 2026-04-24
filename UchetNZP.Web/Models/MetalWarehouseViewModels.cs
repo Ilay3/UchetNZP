@@ -34,6 +34,95 @@ public class MetalWarehouseListPageViewModel
     public string EmptyStateDescription { get; init; } = "Данные появятся после запуска следующих этапов модуля.";
 }
 
+public class MetalStockFilterViewModel
+{
+    public Guid? MaterialId { get; init; }
+
+    public string? UnitCodeOrNumber { get; init; }
+
+    public string? UnitOfMeasure { get; init; }
+
+    public bool ActiveOnly { get; init; }
+
+    public IReadOnlyCollection<SelectListItem> Materials { get; init; } = Array.Empty<SelectListItem>();
+
+    public IReadOnlyCollection<SelectListItem> UnitOfMeasures { get; init; } = Array.Empty<SelectListItem>();
+}
+
+public class MetalStockItemViewModel
+{
+    public Guid Id { get; init; }
+
+    public string GeneratedCode { get; init; } = string.Empty;
+
+    public string MaterialName { get; init; } = string.Empty;
+
+    public decimal SizeValue { get; init; }
+
+    public string SizeUnitText { get; init; } = string.Empty;
+
+    public decimal WeightKg { get; init; }
+
+    public string ReceiptNumber { get; init; } = string.Empty;
+
+    public DateTime ReceiptDate { get; init; }
+
+    public string Status { get; init; } = "В наличии";
+}
+
+public class MetalStockPageViewModel
+{
+    public MetalStockFilterViewModel Filters { get; init; } = new();
+
+    public IReadOnlyCollection<MetalStockItemViewModel> Items { get; init; } = Array.Empty<MetalStockItemViewModel>();
+
+    public int TotalUnitsCount { get; init; }
+
+    public int TotalMaterialsCount { get; init; }
+
+    public decimal TotalWeightKg { get; init; }
+
+    public decimal TotalSize { get; init; }
+
+    public bool HasItems => Items.Count > 0;
+}
+
+public class MetalStockItemHistoryEntryViewModel
+{
+    public DateTime Timestamp { get; init; }
+
+    public string EventName { get; init; } = string.Empty;
+
+    public string Description { get; init; } = string.Empty;
+}
+
+public class MetalStockItemDetailsViewModel
+{
+    public Guid Id { get; init; }
+
+    public string GeneratedCode { get; init; } = string.Empty;
+
+    public string MaterialName { get; init; } = string.Empty;
+
+    public decimal SizeValue { get; init; }
+
+    public string SizeUnitText { get; init; } = string.Empty;
+
+    public decimal WeightKg { get; init; }
+
+    public string ReceiptNumber { get; init; } = string.Empty;
+
+    public DateTime ReceiptDate { get; init; }
+
+    public string Source { get; init; } = string.Empty;
+
+    public string? ReceiptComment { get; init; }
+
+    public string Status { get; init; } = "В наличии";
+
+    public IReadOnlyCollection<MetalStockItemHistoryEntryViewModel> History { get; init; } = Array.Empty<MetalStockItemHistoryEntryViewModel>();
+}
+
 public class MetalReceiptListItemViewModel
 {
     public Guid Id { get; init; }

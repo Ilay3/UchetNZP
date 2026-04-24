@@ -1,0 +1,48 @@
+@model MetalStockItemDetailsViewModel
+@{
+    ViewData["Title"] = $"Единица металла {Model.GeneratedCode}";
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">Карточка единицы металла</h1>
+    <p class="lead mb-0">Детальная информация по складской единице.</p>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Stock">К остаткам</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Receipts">К приходам</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Основная информация</div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6"><div><span class="text-muted">Код единицы:</span> <span class="fw-semibold">@Model.GeneratedCode</span></div></div>
+            <div class="col-md-6"><div><span class="text-muted">Материал:</span> @Model.MaterialName</div></div>
+            <div class="col-md-6"><div><span class="text-muted">Размер:</span> @Model.SizeValue.ToString("0.###")</div></div>
+            <div class="col-md-6"><div><span class="text-muted">Ед. изм.:</span> @Model.SizeUnitText</div></div>
+            <div class="col-md-6"><div><span class="text-muted">Вес:</span> @Model.WeightKg.ToString("0.###") кг</div></div>
+            <div class="col-md-6"><div><span class="text-muted">Номер прихода:</span> @Model.ReceiptNumber</div></div>
+            <div class="col-md-6"><div><span class="text-muted">Дата прихода:</span> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div></div>
+            <div class="col-md-6"><div><span class="text-muted">Источник:</span> @Model.Source</div></div>
+            <div class="col-md-12"><div><span class="text-muted">Комментарий прихода:</span> @(string.IsNullOrWhiteSpace(Model.ReceiptComment) ? "—" : Model.ReceiptComment)</div></div>
+            <div class="col-md-12"><div><span class="text-muted">Статус:</span> <span class="badge bg-success-subtle text-success-emphasis">@Model.Status</span></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold">История</div>
+    <div class="card-body">
+        <ul class="list-group list-group-flush">
+            @foreach (var entry in Model.History)
+            {
+                <li class="list-group-item px-0">
+                    <div class="fw-semibold">@entry.EventName</div>
+                    <div class="text-muted small">@entry.Timestamp.ToString("dd.MM.yyyy HH:mm")</div>
+                    <div>@entry.Description</div>
+                </li>
+            }
+        </ul>
+    </div>
+</div>
