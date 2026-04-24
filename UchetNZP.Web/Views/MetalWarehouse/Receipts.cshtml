@@ -31,7 +31,6 @@
                     <tr>
                         <th>Номер</th>
                         <th>Дата</th>
-                        <th>Источник</th>
                         <th>Позиций</th>
                         <th>Действия</th>
                     </tr>
@@ -40,7 +39,7 @@
                     @if (Model.Receipts.Count == 0)
                     {
                         <tr>
-                            <td colspan="5" class="py-4">
+                            <td colspan="4" class="py-4">
                                 <div class="fw-semibold">Поступлений пока нет</div>
                                 <div class="text-muted">Когда вы добавите первый приход металла, он появится в этой таблице.</div>
                             </td>
@@ -53,7 +52,6 @@
                             <tr>
                                 <td class="fw-semibold">@receipt.ReceiptNumber</td>
                                 <td>@receipt.ReceiptDate.ToString("dd.MM.yyyy")</td>
-                                <td>@(string.IsNullOrWhiteSpace(receipt.SupplierOrSource) ? "—" : receipt.SupplierOrSource)</td>
                                 <td>@receipt.PositionsCount</td>
                                 <td>
                                     <a class="btn btn-sm btn-outline-primary"
