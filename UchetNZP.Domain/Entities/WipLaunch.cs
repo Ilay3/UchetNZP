@@ -29,4 +29,6 @@ public class WipLaunch
     public virtual Section? Section { get; set; }
 
     public virtual ICollection<WipLaunchOperation> Operations { get; set; } = new List<WipLaunchOperation>();
+
+    public virtual ICollection<MetalRequirement> MetalRequirements { get; set; } = new List<MetalRequirement>();
 }

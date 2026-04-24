@@ -46,7 +46,9 @@ public class LaunchHistoryItemViewModel
         decimal quantity,
         decimal hours,
         string? comment,
-        IReadOnlyList<LaunchHistoryOperationViewModel> operations)
+        IReadOnlyList<LaunchHistoryOperationViewModel> operations,
+        IReadOnlyList<LaunchMetalNeedItemViewModel> metalNeeds,
+        LaunchMetalRequirementShortViewModel? metalRequirement)
     {
         Id = id;
         LaunchDate = launchDate;
@@ -58,6 +60,8 @@ public class LaunchHistoryItemViewModel
         Hours = hours;
         Comment = comment;
         Operations = operations ?? Array.Empty<LaunchHistoryOperationViewModel>();
+        MetalNeeds = metalNeeds ?? Array.Empty<LaunchMetalNeedItemViewModel>();
+        MetalRequirement = metalRequirement;
     }
 
     public Guid Id { get; }
@@ -79,6 +83,14 @@ public class LaunchHistoryItemViewModel
     public string? Comment { get; }
 
     public IReadOnlyList<LaunchHistoryOperationViewModel> Operations { get; }
+
+    public IReadOnlyList<LaunchMetalNeedItemViewModel> MetalNeeds { get; }
+
+    public LaunchMetalRequirementShortViewModel? MetalRequirement { get; }
+
+    public bool HasMetalNeeds => MetalNeeds.Count > 0;
+
+    public bool HasMetalRequirement => MetalRequirement is not null;
 
     public DateTime Date => LaunchDate.Date;
 
@@ -104,6 +116,78 @@ public class LaunchHistoryItemViewModel
     }
 
     public bool HasComment => !string.IsNullOrWhiteSpace(Comment);
+}
+
+public class LaunchMetalNeedItemViewModel
+{
+    public LaunchMetalNeedItemViewModel(
+        Guid metalMaterialId,
+        string materialName,
+        string? materialCode,
+        decimal normPerUnit,
+        decimal quantity,
+        decimal totalRequiredQty,
+        string unit,
+        decimal? totalRequiredWeightKg,
+        decimal stockQty,
+        decimal stockWeightKg)
+    {
+        MetalMaterialId = metalMaterialId;
+        MaterialName = materialName ?? string.Empty;
+        MaterialCode = materialCode;
+        NormPerUnit = normPerUnit;
+        Quantity = quantity;
+        TotalRequiredQty = totalRequiredQty;
+        Unit = unit ?? string.Empty;
+        TotalRequiredWeightKg = totalRequiredWeightKg;
+        StockQty = stockQty;
+        StockWeightKg = stockWeightKg;
+    }
+
+    public Guid MetalMaterialId { get; }
+
+    public string MaterialName { get; }
+
+    public string? MaterialCode { get; }
+
+    public decimal NormPerUnit { get; }
+
+    public decimal Quantity { get; }
+
+    public decimal TotalRequiredQty { get; }
+
+    public string Unit { get; }
+
+    public decimal? TotalRequiredWeightKg { get; }
+
+    public decimal StockQty { get; }
+
+    public decimal StockWeightKg { get; }
+
+    public decimal DifferenceQty => StockQty - TotalRequiredQty;
+
+    public bool IsEnough => DifferenceQty >= 0m;
+
+    public string MaterialDisplayName => string.IsNullOrWhiteSpace(MaterialCode) ? MaterialName : $"{MaterialName} ({MaterialCode})";
+}
+
+public class LaunchMetalRequirementShortViewModel
+{
+    public LaunchMetalRequirementShortViewModel(Guid id, string number, DateTime date, string status)
+    {
+        Id = id;
+        Number = number ?? string.Empty;
+        Date = date;
+        Status = status ?? string.Empty;
+    }
+
+    public Guid Id { get; }
+
+    public string Number { get; }
+
+    public DateTime Date { get; }
+
+    public string Status { get; }
 }
 
 public class LaunchHistoryDateGroupViewModel

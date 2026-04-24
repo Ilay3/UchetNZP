@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Launches;
+using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Infrastructure;
 using UchetNZP.Web.Models;
@@ -64,26 +65,90 @@ public class WipLaunchesController : Controller
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var launchIds = launches.Select(x => x.Id).ToList();
+        var partIds = launches.Select(x => x.PartId).Distinct().ToList();
+
+        var norms = await _dbContext.MetalConsumptionNorms
+            .AsNoTracking()
+            .Where(x => x.IsActive && partIds.Contains(x.PartId))
+            .Include(x => x.MetalMaterial)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var stockByMaterial = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .GroupBy(x => x.MetalMaterialId)
+            .Select(x => new
+            {
+                MetalMaterialId = x.Key,
+                Qty = x.Sum(i => i.SizeValue),
+                WeightKg = x.Sum(i => i.Quantity > 0 ? i.TotalWeightKg / i.Quantity : i.TotalWeightKg),
+            })
+            .ToDictionaryAsync(x => x.MetalMaterialId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var requirementsByLaunch = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => launchIds.Contains(x.WipLaunchId))
+            .GroupBy(x => x.WipLaunchId)
+            .Select(g => g.OrderByDescending(x => x.CreatedAt).First())
+            .ToDictionaryAsync(
+                x => x.WipLaunchId,
+                x => new LaunchMetalRequirementShortViewModel(x.Id, x.RequirementNumber, x.RequirementDate, x.Status),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var normsByPart = norms.GroupBy(x => x.PartId).ToDictionary(x => x.Key, x => x.ToList());
+
         var items = launches
-            .Select(x => new LaunchHistoryItemViewModel(
-                x.Id,
-                ToLocalDateTime(x.LaunchDate),
-                x.Part != null ? x.Part.Name : string.Empty,
-                x.Part?.Code,
-                x.Section != null ? x.Section.Name : string.Empty,
-                OperationNumber.Format(x.FromOpNumber),
-                x.Quantity,
-                x.SumHoursToFinish,
-                x.Comment,
-                x.Operations
-                    .OrderBy(o => o.OpNumber)
-                    .Select(o => new LaunchHistoryOperationViewModel(
-                        OperationNumber.Format(o.OpNumber),
-                        o.Operation != null ? o.Operation.Name : string.Empty,
-                        o.Section != null ? o.Section.Name : string.Empty,
-                        o.NormHours,
-                        o.Hours))
-                    .ToList()))
+            .Select(x =>
+            {
+                normsByPart.TryGetValue(x.PartId, out var launchNorms);
+                var needs = (launchNorms ?? [])
+                    .Select(norm =>
+                    {
+                        stockByMaterial.TryGetValue(norm.MetalMaterialId, out var stock);
+                        var requiredQty = norm.ConsumptionQty * x.Quantity;
+                        var requiredWeight = norm.WeightPerUnitKg.HasValue ? norm.WeightPerUnitKg.Value * x.Quantity : (decimal?)null;
+
+                        return new LaunchMetalNeedItemViewModel(
+                            norm.MetalMaterialId,
+                            norm.MetalMaterial?.Name ?? "Материал не указан",
+                            norm.MetalMaterial?.Code,
+                            norm.ConsumptionQty,
+                            x.Quantity,
+                            requiredQty,
+                            norm.ConsumptionUnit,
+                            requiredWeight,
+                            stock?.Qty ?? 0m,
+                            stock?.WeightKg ?? 0m);
+                    })
+                    .ToList();
+
+                requirementsByLaunch.TryGetValue(x.Id, out var requirement);
+
+                return new LaunchHistoryItemViewModel(
+                    x.Id,
+                    ToLocalDateTime(x.LaunchDate),
+                    x.Part != null ? x.Part.Name : string.Empty,
+                    x.Part?.Code,
+                    x.Section != null ? x.Section.Name : string.Empty,
+                    OperationNumber.Format(x.FromOpNumber),
+                    x.Quantity,
+                    x.SumHoursToFinish,
+                    x.Comment,
+                    x.Operations
+                        .OrderBy(o => o.OpNumber)
+                        .Select(o => new LaunchHistoryOperationViewModel(
+                            OperationNumber.Format(o.OpNumber),
+                            o.Operation != null ? o.Operation.Name : string.Empty,
+                            o.Section != null ? o.Section.Name : string.Empty,
+                            o.NormHours,
+                            o.Hours))
+                        .ToList(),
+                    needs,
+                    requirement);
+            })
             .ToList();
 
         var grouped = items
@@ -341,6 +406,80 @@ public class WipLaunchesController : Controller
         return File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
+    [HttpPost("{id:guid}/metal-requirements")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateMetalRequirement(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор запуска.");
+        }
+
+        var launch = await _dbContext.WipLaunches
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (launch is null)
+        {
+            return NotFound("Запуск не найден.");
+        }
+
+        var existing = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => x.WipLaunchId == id)
+            .OrderByDescending(x => x.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            TempData["LaunchMetalRequirementMessage"] = "Требование уже было создано для этого запуска.";
+            return RedirectToAction(nameof(History));
+        }
+
+        var norms = await _dbContext.MetalConsumptionNorms
+            .AsNoTracking()
+            .Where(x => x.IsActive && x.PartId == launch.PartId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (norms.Count == 0)
+        {
+            TempData["LaunchMetalRequirementError"] = "Норма расхода для детали и материала не найдена.";
+            return RedirectToAction(nameof(History));
+        }
+
+        var requirement = new MetalRequirement
+        {
+            Id = Guid.NewGuid(),
+            RequirementNumber = await GetNextRequirementNumberAsync(cancellationToken).ConfigureAwait(false),
+            RequirementDate = DateTime.UtcNow,
+            WipLaunchId = launch.Id,
+            PartId = launch.PartId,
+            Quantity = launch.Quantity,
+            Status = "Создано",
+            CreatedAt = DateTime.UtcNow,
+            Comment = "Черновик создан автоматически из запуска партии.",
+            Items = norms.Select(norm => new MetalRequirementItem
+            {
+                Id = Guid.NewGuid(),
+                MetalMaterialId = norm.MetalMaterialId,
+                NormPerUnit = norm.ConsumptionQty,
+                TotalRequiredQty = norm.ConsumptionQty * launch.Quantity,
+                Unit = norm.ConsumptionUnit,
+                TotalRequiredWeightKg = norm.WeightPerUnitKg.HasValue ? norm.WeightPerUnitKg.Value * launch.Quantity : null,
+            }).ToList(),
+        };
+
+        _dbContext.MetalRequirements.Add(requirement);
+        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        TempData["LaunchMetalRequirementMessage"] = $"Создано требование {requirement.RequirementNumber}.";
+
+        return RedirectToAction(nameof(History));
+    }
+
     public record LaunchSaveRequest(IReadOnlyList<LaunchSaveItem> Items);
 
     public record LaunchSaveItem(
@@ -349,6 +488,25 @@ public class WipLaunchesController : Controller
         DateTime LaunchDate,
         decimal Quantity,
         string? Comment);
+
+    private async Task<string> GetNextRequirementNumberAsync(CancellationToken cancellationToken)
+    {
+        var lastNumber = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => x.RequirementNumber.StartsWith("MREQ-"))
+            .OrderByDescending(x => x.RequirementNumber)
+            .Select(x => x.RequirementNumber)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var numericPart = 0;
+        if (!string.IsNullOrWhiteSpace(lastNumber) && lastNumber.Length > 5)
+        {
+            _ = int.TryParse(lastNumber[5..], out numericPart);
+        }
+
+        return $"MREQ-{(numericPart + 1):D6}";
+    }
 
     private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)
     {

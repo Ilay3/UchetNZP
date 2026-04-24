@@ -26,6 +26,16 @@
     </div>
 </div>
 
+@if (TempData["LaunchMetalRequirementMessage"] is string reqMessage)
+{
+    <div class="alert alert-success shadow-sm">@reqMessage</div>
+}
+
+@if (TempData["LaunchMetalRequirementError"] is string reqError)
+{
+    <div class="alert alert-warning shadow-sm">@reqError</div>
+}
+
 @if (Model.HasData)
 {
     <div class="accordion" id="launchHistoryAccordion">
@@ -115,6 +125,73 @@
                                                     <span class="visually-hidden">Удалить запуск по детали '@launch.PartDisplayName' от @launch.LaunchDate.ToString("dd.MM.yyyy")</span>
                                                     <i class="bi bi-trash" aria-hidden="true"></i>
                                                 </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="6" class="bg-light-subtle">
+                                                <div class="fw-semibold mb-2">Потребность в металле</div>
+                                                @if (launch.HasMetalNeeds)
+                                                {
+                                                    <div class="table-responsive mb-3">
+                                                        <table class="table table-sm table-bordered align-middle mb-0">
+                                                            <thead class="table-light">
+                                                                <tr>
+                                                                    <th>Материал</th>
+                                                                    <th>Норма на 1 деталь</th>
+                                                                    <th>Количество деталей</th>
+                                                                    <th>Итого требуется</th>
+                                                                    <th>Ед. изм.</th>
+                                                                    <th>Итого вес, кг</th>
+                                                                    <th>Сейчас на складе</th>
+                                                                    <th>Разница</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                @foreach (var need in launch.MetalNeeds)
+                                                                {
+                                                                    <tr>
+                                                                        <td>@need.MaterialDisplayName</td>
+                                                                        <td>@need.NormPerUnit.ToString("0.###")</td>
+                                                                        <td>@need.Quantity.ToString("0.###")</td>
+                                                                        <td>@need.TotalRequiredQty.ToString("0.###")</td>
+                                                                        <td>@need.Unit</td>
+                                                                        <td>@(need.TotalRequiredWeightKg.HasValue ? need.TotalRequiredWeightKg.Value.ToString("0.###") : "—")</td>
+                                                                        <td>@need.StockQty.ToString("0.###") @need.Unit</td>
+                                                                        <td>
+                                                                            @if (need.IsEnough)
+                                                                            {
+                                                                                <span class="text-success">Хватает (+@need.DifferenceQty.ToString("0.###"))</span>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <span class="text-danger">Не хватает (@need.DifferenceQty.ToString("0.###"))</span>
+                                                                            }
+                                                                        </td>
+                                                                    </tr>
+                                                                }
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    @if (launch.MetalRequirement is { } requirement)
+                                                    {
+                                                        <div class="alert alert-success py-2 mb-2">
+                                                            Требование создано: <a asp-controller="MetalWarehouse" asp-action="RequirementDetails" asp-route-id="@requirement.Id">@requirement.Number</a>,
+                                                            дата @requirement.Date.ToString("dd.MM.yyyy HH:mm"), статус: @requirement.Status.
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <form method="post" asp-action="CreateMetalRequirement" asp-route-id="@launch.Id" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <button type="submit" class="btn btn-outline-primary btn-sm">Создать требование на склад</button>
+                                                        </form>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <div class="text-muted">Норма расхода для детали и материала не найдена.</div>
+                                                }
                                             </td>
                                         </tr>
                                     }

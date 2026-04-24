@@ -1,3 +1,6 @@
+using System.Linq;
+using System.Collections.Generic;
+using System;
 using System.Threading;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
@@ -68,11 +71,13 @@ using (var scope = app.Services.CreateScope())
         await EnsureTransferAuditResidualColumnsAsync(db, CancellationToken.None);
         await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
+        await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
     else
     {
         await db.Database.EnsureCreatedAsync(CancellationToken.None);
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
+        await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
 }
 
@@ -153,6 +158,63 @@ static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, Cancellati
             IsActive = true,
         });
 
+    await in_db.SaveChangesAsync(in_cancellationToken);
+}
+
+
+static async Task EnsureMetalConsumptionNormsSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    if (await in_db.MetalConsumptionNorms.AnyAsync(x => x.IsActive, in_cancellationToken))
+    {
+        return;
+    }
+
+    var materials = await in_db.MetalMaterials
+        .AsNoTracking()
+        .Where(x => x.IsActive)
+        .OrderBy(x => x.Name)
+        .Take(2)
+        .ToListAsync(in_cancellationToken);
+
+    var parts = await in_db.Parts
+        .AsNoTracking()
+        .OrderBy(x => x.Name)
+        .Take(2)
+        .ToListAsync(in_cancellationToken);
+
+    if (materials.Count == 0 || parts.Count == 0)
+    {
+        return;
+    }
+
+    var norms = new List<UchetNZP.Domain.Entities.MetalConsumptionNorm>();
+    var unitByKind = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["SquareMeter"] = "м2",
+        ["Meter"] = "м",
+    };
+
+    foreach (var part in parts)
+    {
+        for (var i = 0; i < materials.Count; i++)
+        {
+            var material = materials[i];
+            var unit = unitByKind.TryGetValue(material.UnitKind, out var mapped) ? mapped : "ед";
+            norms.Add(new UchetNZP.Domain.Entities.MetalConsumptionNorm
+            {
+                Id = Guid.NewGuid(),
+                PartId = part.Id,
+                MetalMaterialId = material.Id,
+                ConsumptionQty = 0.25m + i * 0.1m,
+                ConsumptionUnit = unit,
+                WeightPerUnitKg = material.UnitKind == "SquareMeter" ? 1.5m + i : 0.8m + i,
+                Comment = "Тестовая норма для демонстрации UI.",
+                IsActive = true,
+            });
+        }
+    }
+
+    in_db.MetalConsumptionNorms.AddRange(norms);
     await in_db.SaveChangesAsync(in_cancellationToken);
 }
 

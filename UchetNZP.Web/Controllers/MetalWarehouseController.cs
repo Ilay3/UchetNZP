@@ -23,7 +23,7 @@ public class MetalWarehouseController : Controller
         {
             MaterialsInCatalog = await _dbContext.Parts.AsNoTracking().CountAsync(cancellationToken),
             MetalUnitsInStock = await _dbContext.WarehouseItems.AsNoTracking().SumAsync(x => (decimal?)x.Quantity, cancellationToken) ?? 0m,
-            OpenRequirements = 0,
+            OpenRequirements = await _dbContext.MetalRequirements.AsNoTracking().CountAsync(x => x.Status == "Создано", cancellationToken),
             MovementsToday = 0,
         };
 
@@ -365,18 +365,117 @@ public class MetalWarehouseController : Controller
     }
 
     [HttpGet("Requirements")]
-    public IActionResult Requirements()
+    public async Task<IActionResult> Requirements(CancellationToken cancellationToken)
     {
-        var model = new MetalWarehouseListPageViewModel
+        var items = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .OrderByDescending(x => x.RequirementDate)
+            .ThenByDescending(x => x.CreatedAt)
+            .SelectMany(
+                x => x.Items.DefaultIfEmpty(),
+                (requirement, item) => new MetalRequirementListItemViewModel
+                {
+                    Id = requirement.Id,
+                    RequirementNumber = requirement.RequirementNumber,
+                    RequirementDate = requirement.RequirementDate,
+                    PartDisplay = requirement.Part != null
+                        ? (string.IsNullOrWhiteSpace(requirement.Part.Code) ? requirement.Part.Name : $"{requirement.Part.Name} ({requirement.Part.Code})")
+                        : string.Empty,
+                    Quantity = requirement.Quantity,
+                    MaterialDisplay = item != null
+                        ? (item.MetalMaterial != null && !string.IsNullOrWhiteSpace(item.MetalMaterial.Code)
+                            ? $"{item.MetalMaterial.Name} ({item.MetalMaterial.Code})"
+                            : (item.MetalMaterial != null ? item.MetalMaterial.Name : "—"))
+                        : "—",
+                    RequiredQty = item != null ? item.TotalRequiredQty : 0m,
+                    Unit = item != null ? item.Unit : string.Empty,
+                    Status = requirement.Status,
+                })
+            .ToListAsync(cancellationToken);
+
+        return View(model: new MetalRequirementListViewModel
         {
-            Title = "Требования производства",
-            Description = "Запросы цеха на выдачу металла.",
-            Headers = new[] { "№ требования", "Дата", "Цех", "Материал", "Требуемо", "Статус" },
-            EmptyStateTitle = "Открытых требований нет",
-            EmptyStateDescription = "Новые требования появятся здесь после подключения процесса выдачи.",
+            Items = items,
+        });
+    }
+
+    [HttpGet("Requirements/Details/{id:guid}")]
+    public async Task<IActionResult> RequirementDetails(Guid id, CancellationToken cancellationToken)
+    {
+        var requirement = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.RequirementNumber,
+                x.RequirementDate,
+                x.Status,
+                x.PartId,
+                PartName = x.Part != null ? x.Part.Name : string.Empty,
+                PartCode = x.Part != null ? x.Part.Code : null,
+                x.Quantity,
+                x.WipLaunchId,
+                LaunchDate = x.WipLaunch != null ? x.WipLaunch.LaunchDate : (DateTime?)null,
+                x.Comment,
+                Items = x.Items.Select(i => new
+                {
+                    i.NormPerUnit,
+                    i.TotalRequiredQty,
+                    i.Unit,
+                    i.TotalRequiredWeightKg,
+                    MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : "—",
+                    MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : null,
+                    i.MetalMaterialId,
+                }).ToList(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (requirement is null)
+        {
+            return NotFound();
+        }
+
+        var stockLookup = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => requirement.Items.Select(i => i.MetalMaterialId).Contains(x.MetalMaterialId))
+            .GroupBy(x => x.MetalMaterialId)
+            .Select(x => new
+            {
+                MaterialId = x.Key,
+                Qty = x.Sum(i => i.SizeValue),
+                WeightKg = x.Sum(i => i.Quantity > 0 ? i.TotalWeightKg / i.Quantity : i.TotalWeightKg),
+            })
+            .ToDictionaryAsync(x => x.MaterialId, cancellationToken);
+
+        var model = new MetalRequirementDetailsViewModel
+        {
+            Id = requirement.Id,
+            RequirementNumber = requirement.RequirementNumber,
+            RequirementDate = requirement.RequirementDate,
+            Status = requirement.Status,
+            PartDisplay = string.IsNullOrWhiteSpace(requirement.PartCode) ? requirement.PartName : $"{requirement.PartName} ({requirement.PartCode})",
+            Quantity = requirement.Quantity,
+            WipLaunchId = requirement.WipLaunchId,
+            LaunchDate = requirement.LaunchDate,
+            Comment = requirement.Comment,
+            Items = requirement.Items.Select(i =>
+            {
+                stockLookup.TryGetValue(i.MetalMaterialId, out var stock);
+                return new MetalRequirementDetailsItemViewModel
+                {
+                    MaterialDisplay = string.IsNullOrWhiteSpace(i.MaterialCode) ? i.MaterialName : $"{i.MaterialName} ({i.MaterialCode})",
+                    NormPerUnit = i.NormPerUnit,
+                    TotalRequiredQty = i.TotalRequiredQty,
+                    Unit = i.Unit,
+                    TotalRequiredWeightKg = i.TotalRequiredWeightKg,
+                    StockQty = stock?.Qty ?? 0m,
+                    StockWeightKg = stock?.WeightKg ?? 0m,
+                };
+            }).ToList(),
         };
 
-        return View(model);
+        return View("~/Views/MetalWarehouse/RequirementDetails.cshtml", model);
     }
 
     [HttpGet("Movements")]

@@ -233,3 +233,73 @@ public class MetalReceiptDetailsViewModel
 
     public IReadOnlyCollection<MetalReceiptDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalReceiptDetailsItemViewModel>();
 }
+
+public class MetalRequirementListItemViewModel
+{
+    public Guid Id { get; init; }
+
+    public string RequirementNumber { get; init; } = string.Empty;
+
+    public DateTime RequirementDate { get; init; }
+
+    public string PartDisplay { get; init; } = string.Empty;
+
+    public decimal Quantity { get; init; }
+
+    public string MaterialDisplay { get; init; } = string.Empty;
+
+    public decimal RequiredQty { get; init; }
+
+    public string Unit { get; init; } = string.Empty;
+
+    public string Status { get; init; } = string.Empty;
+}
+
+public class MetalRequirementListViewModel
+{
+    public IReadOnlyCollection<MetalRequirementListItemViewModel> Items { get; init; } = Array.Empty<MetalRequirementListItemViewModel>();
+}
+
+public class MetalRequirementDetailsItemViewModel
+{
+    public string MaterialDisplay { get; init; } = string.Empty;
+
+    public decimal NormPerUnit { get; init; }
+
+    public decimal TotalRequiredQty { get; init; }
+
+    public string Unit { get; init; } = string.Empty;
+
+    public decimal? TotalRequiredWeightKg { get; init; }
+
+    public decimal StockQty { get; init; }
+
+    public decimal StockWeightKg { get; init; }
+
+    public decimal DifferenceQty => StockQty - TotalRequiredQty;
+
+    public bool IsEnough => DifferenceQty >= 0m;
+}
+
+public class MetalRequirementDetailsViewModel
+{
+    public Guid Id { get; init; }
+
+    public string RequirementNumber { get; init; } = string.Empty;
+
+    public DateTime RequirementDate { get; init; }
+
+    public string Status { get; init; } = string.Empty;
+
+    public string PartDisplay { get; init; } = string.Empty;
+
+    public decimal Quantity { get; init; }
+
+    public Guid WipLaunchId { get; init; }
+
+    public DateTime? LaunchDate { get; init; }
+
+    public string? Comment { get; init; }
+
+    public IReadOnlyCollection<MetalRequirementDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalRequirementDetailsItemViewModel>();
+}

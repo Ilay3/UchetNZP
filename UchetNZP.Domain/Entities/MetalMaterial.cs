@@ -15,4 +15,8 @@ public class MetalMaterial
     public bool IsActive { get; set; }
 
     public virtual ICollection<MetalReceiptItem> ReceiptItems { get; set; } = new List<MetalReceiptItem>();
+
+    public virtual ICollection<MetalConsumptionNorm> ConsumptionNorms { get; set; } = new List<MetalConsumptionNorm>();
+
+    public virtual ICollection<MetalRequirementItem> RequirementItems { get; set; } = new List<MetalRequirementItem>();
 }
