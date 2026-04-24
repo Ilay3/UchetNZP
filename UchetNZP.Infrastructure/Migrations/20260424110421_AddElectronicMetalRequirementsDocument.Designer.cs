@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using UchetNZP.Infrastructure.Data;
@@ -11,9 +12,11 @@ using UchetNZP.Infrastructure.Data;
 namespace UchetNZP.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424110421_AddElectronicMetalRequirementsDocument")]
+    partial class AddElectronicMetalRequirementsDocument
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -777,114 +780,6 @@ namespace UchetNZP.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("MetalRequirementItems", (string)null);
-                });
-
-            modelBuilder.Entity("UchetNZP.Domain.Entities.MetalRequirementPlan", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CalculationComment")
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<decimal>("DeficitQty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<Guid>("MetalRequirementId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("PlannedQty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<DateTime?>("RecalculatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RecalculatedBy")
-                        .HasMaxLength(128)
-                        .HasColumnType("character varying(128)");
-
-                    b.Property<decimal>("RequiredQty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MetalRequirementId")
-                        .IsUnique();
-
-                    b.ToTable("MetalRequirementPlans", (string)null);
-                });
-
-            modelBuilder.Entity("UchetNZP.Domain.Entities.MetalRequirementPlanItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("LineStatus")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("character varying(24)");
-
-                    b.Property<Guid?>("MetalReceiptItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("MetalRequirementPlanId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("PlannedUseQty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<decimal>("RemainingAfterQty")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("SourceCode")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
-                    b.Property<decimal>("SourceSize")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.Property<string>("SourceUnit")
-                        .IsRequired()
-                        .HasMaxLength(16)
-                        .HasColumnType("character varying(16)");
-
-                    b.Property<decimal?>("SourceWeightKg")
-                        .HasPrecision(12, 3)
-                        .HasColumnType("numeric(12,3)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MetalReceiptItemId");
-
-                    b.HasIndex("MetalRequirementPlanId", "SortOrder");
-
-                    b.ToTable("MetalRequirementPlanItems", (string)null);
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.Operation", b =>
@@ -2089,35 +1984,6 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Navigation("MetalRequirement");
                 });
 
-            modelBuilder.Entity("UchetNZP.Domain.Entities.MetalRequirementPlan", b =>
-                {
-                    b.HasOne("UchetNZP.Domain.Entities.MetalRequirement", "MetalRequirement")
-                        .WithMany("RequirementPlans")
-                        .HasForeignKey("MetalRequirementId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MetalRequirement");
-                });
-
-            modelBuilder.Entity("UchetNZP.Domain.Entities.MetalRequirementPlanItem", b =>
-                {
-                    b.HasOne("UchetNZP.Domain.Entities.MetalReceiptItem", "MetalReceiptItem")
-                        .WithMany("RequirementPlanItems")
-                        .HasForeignKey("MetalReceiptItemId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("UchetNZP.Domain.Entities.MetalRequirementPlan", "MetalRequirementPlan")
-                        .WithMany("Items")
-                        .HasForeignKey("MetalRequirementPlanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("MetalReceiptItem");
-
-                    b.Navigation("MetalRequirementPlan");
-                });
-
             modelBuilder.Entity("UchetNZP.Domain.Entities.PartRoute", b =>
                 {
                     b.HasOne("UchetNZP.Domain.Entities.Operation", "Operation")
@@ -2465,22 +2331,10 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Navigation("Items");
                 });
 
-            modelBuilder.Entity("UchetNZP.Domain.Entities.MetalReceiptItem", b =>
-                {
-                    b.Navigation("RequirementPlanItems");
-                });
-
             modelBuilder.Entity("UchetNZP.Domain.Entities.MetalRequirement", b =>
                 {
                     b.Navigation("CuttingPlans");
 
-                    b.Navigation("Items");
-
-                    b.Navigation("RequirementPlans");
-                });
-
-            modelBuilder.Entity("UchetNZP.Domain.Entities.MetalRequirementPlan", b =>
-                {
                     b.Navigation("Items");
                 });
 

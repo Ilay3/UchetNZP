@@ -12,6 +12,27 @@ public class MetalRequirementItemConfiguration : IEntityTypeConfiguration<MetalR
 
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.ConsumptionPerUnit)
+            .HasPrecision(12, 3)
+            .IsRequired();
+
+        builder.Property(x => x.ConsumptionUnit)
+            .IsRequired()
+            .HasMaxLength(16);
+
+        builder.Property(x => x.RequiredQty)
+            .HasPrecision(12, 3)
+            .IsRequired();
+
+        builder.Property(x => x.RequiredWeightKg)
+            .HasPrecision(12, 3);
+
+        builder.Property(x => x.SizeRaw)
+            .HasMaxLength(128);
+
+        builder.Property(x => x.Comment)
+            .HasMaxLength(512);
+
         builder.Property(x => x.NormPerUnit)
             .HasPrecision(12, 3)
             .IsRequired();

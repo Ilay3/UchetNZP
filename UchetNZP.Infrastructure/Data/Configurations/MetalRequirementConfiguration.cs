@@ -27,11 +27,26 @@ public class MetalRequirementConfiguration : IEntityTypeConfiguration<MetalRequi
             .IsRequired()
             .HasMaxLength(32);
 
+        builder.Property(x => x.PartCode)
+            .IsRequired()
+            .HasMaxLength(128);
+
+        builder.Property(x => x.PartName)
+            .IsRequired()
+            .HasMaxLength(256);
+
         builder.Property(x => x.CreatedAt)
             .IsRequired();
 
+        builder.Property(x => x.CreatedBy)
+            .IsRequired()
+            .HasMaxLength(128);
+
+        builder.Property(x => x.UpdatedAt)
+            .IsRequired();
+
         builder.Property(x => x.Comment)
-            .HasMaxLength(256);
+            .HasMaxLength(512);
 
         builder.HasOne(x => x.WipLaunch)
             .WithMany(x => x.MetalRequirements)
@@ -43,11 +58,17 @@ public class MetalRequirementConfiguration : IEntityTypeConfiguration<MetalRequi
             .HasForeignKey(x => x.PartId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(x => x.MetalMaterial)
+            .WithMany(x => x.Requirements)
+            .HasForeignKey(x => x.MetalMaterialId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(x => x.RequirementNumber)
             .IsUnique();
 
         builder.HasIndex(x => x.RequirementDate);
 
-        builder.HasIndex(x => x.WipLaunchId);
+        builder.HasIndex(x => x.WipLaunchId)
+            .IsUnique();
     }
 }
