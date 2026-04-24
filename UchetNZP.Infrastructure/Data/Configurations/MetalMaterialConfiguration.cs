@@ -19,6 +19,25 @@ public class MetalMaterialConfiguration : IEntityTypeConfiguration<MetalMaterial
             .IsRequired()
             .HasMaxLength(256);
 
+        builder.Property(x => x.MassPerMeterKg)
+            .HasPrecision(12, 6)
+            .HasDefaultValue(0m)
+            .IsRequired();
+
+        builder.Property(x => x.MassPerSquareMeterKg)
+            .HasPrecision(12, 6)
+            .HasDefaultValue(0m)
+            .IsRequired();
+
+        builder.Property(x => x.CoefConsumption)
+            .HasPrecision(12, 6)
+            .HasDefaultValue(1m)
+            .IsRequired();
+
+        builder.Property(x => x.StockUnit)
+            .IsRequired()
+            .HasMaxLength(16);
+
         builder.Property(x => x.WeightPerUnitKg)
             .HasPrecision(12, 6);
 

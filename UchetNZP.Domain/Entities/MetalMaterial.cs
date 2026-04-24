@@ -10,6 +10,14 @@ public class MetalMaterial
 
     public string Name { get; set; } = string.Empty;
 
+    public decimal MassPerMeterKg { get; set; }
+
+    public decimal MassPerSquareMeterKg { get; set; }
+
+    public decimal CoefConsumption { get; set; } = 1m;
+
+    public string StockUnit { get; set; } = "pcs";
+
     public decimal? WeightPerUnitKg { get; set; }
 
     public decimal Coefficient { get; set; } = 1m;

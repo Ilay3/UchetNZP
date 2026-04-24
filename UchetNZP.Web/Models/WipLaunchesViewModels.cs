@@ -131,11 +131,18 @@ public class LaunchMetalNeedItemViewModel
         decimal normPerUnit,
         string? sizeRaw,
         decimal quantity,
-        decimal totalRequiredQty,
+        decimal needM,
+        decimal needM2,
+        decimal needPcs,
         string unit,
-        decimal? weightPerUnitKg,
+        decimal massPerMeterKg,
+        decimal massPerSquareMeterKg,
         decimal coefficient,
+        string stockUnit,
         decimal totalRequiredWeightKg,
+        decimal metersFromKg,
+        decimal squareMetersFromKg,
+        string formula,
         decimal stockQty,
         decimal stockWeightKg)
     {
@@ -145,11 +152,18 @@ public class LaunchMetalNeedItemViewModel
         NormPerUnit = normPerUnit;
         SizeRaw = sizeRaw;
         Quantity = quantity;
-        TotalRequiredQty = totalRequiredQty;
+        NeedM = needM;
+        NeedM2 = needM2;
+        NeedPcs = needPcs;
         Unit = unit ?? string.Empty;
-        WeightPerUnitKg = weightPerUnitKg;
+        MassPerMeterKg = massPerMeterKg;
+        MassPerSquareMeterKg = massPerSquareMeterKg;
         Coefficient = coefficient;
+        StockUnit = stockUnit;
         TotalRequiredWeightKg = totalRequiredWeightKg;
+        MetersFromKg = metersFromKg;
+        SquareMetersFromKg = squareMetersFromKg;
+        Formula = formula ?? string.Empty;
         StockQty = stockQty;
         StockWeightKg = stockWeightKg;
     }
@@ -166,15 +180,31 @@ public class LaunchMetalNeedItemViewModel
 
     public decimal Quantity { get; }
 
-    public decimal TotalRequiredQty { get; }
+    public decimal NeedM { get; }
+
+    public decimal NeedM2 { get; }
+
+    public decimal NeedPcs { get; }
+
+    public decimal TotalRequiredQty => NeedM + NeedM2 + NeedPcs;
 
     public string Unit { get; }
 
-    public decimal? WeightPerUnitKg { get; }
+    public decimal MassPerMeterKg { get; }
+
+    public decimal MassPerSquareMeterKg { get; }
 
     public decimal Coefficient { get; }
 
+    public string StockUnit { get; }
+
     public decimal TotalRequiredWeightKg { get; }
+
+    public decimal MetersFromKg { get; }
+
+    public decimal SquareMetersFromKg { get; }
+
+    public string Formula { get; }
 
     public decimal StockQty { get; }
 

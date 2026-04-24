@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Contracts.Launches;
+using UchetNZP.Application.Services;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Infrastructure;
@@ -128,8 +129,7 @@ public class WipLaunchesController : Controller
                         }
 
                         stockByMaterial.TryGetValue(selectedMaterial.Id, out var stock);
-                        var requiredQty = norm.BaseConsumptionQty * x.Quantity;
-                        var totalWeightKg = CalculateTotalWeightKg(requiredQty, norm.ConsumptionUnit, selectedMaterial.WeightPerUnitKg, selectedMaterial.Coefficient);
+                        var calculation = MetalConsumptionCalculator.Calculate(norm, x.Quantity, selectedMaterial);
 
                         return new LaunchMetalNeedItemViewModel(
                             selectedMaterial.Id,
@@ -138,11 +138,18 @@ public class WipLaunchesController : Controller
                             norm.BaseConsumptionQty,
                             norm.SizeRaw,
                             x.Quantity,
-                            requiredQty,
+                            calculation.NeedM,
+                            calculation.NeedM2,
+                            calculation.NeedPcs,
                             norm.ConsumptionUnit,
-                            selectedMaterial.WeightPerUnitKg,
-                            selectedMaterial.Coefficient,
-                            totalWeightKg,
+                            selectedMaterial.MassPerMeterKg,
+                            selectedMaterial.MassPerSquareMeterKg,
+                            selectedMaterial.CoefConsumption,
+                            selectedMaterial.StockUnit,
+                            calculation.NeedKg,
+                            calculation.MetersFromKg,
+                            calculation.SquareMetersFromKg,
+                            calculation.Formula,
                             stock?.Qty ?? 0m,
                             stock?.WeightKg ?? 0m);
                     })
@@ -485,6 +492,25 @@ public class WipLaunchesController : Controller
             return RedirectToAction(nameof(History));
         }
 
+        var requirementItems = norms.Select(norm =>
+        {
+            var calculation = selectedMaterial is null
+                ? null
+                : MetalConsumptionCalculator.Calculate(norm, launch.Quantity, selectedMaterial);
+
+            return new MetalRequirementItem
+            {
+                Id = Guid.NewGuid(),
+                MetalMaterialId = selectedMaterialId.Value,
+                NormPerUnit = norm.BaseConsumptionQty,
+                TotalRequiredQty = norm.BaseConsumptionQty * launch.Quantity,
+                Unit = norm.ConsumptionUnit,
+                TotalRequiredWeightKg = calculation?.NeedKg ?? 0m,
+                CalculationFormula = calculation?.Formula,
+                CalculationInput = calculation?.FormulaInput,
+            };
+        }).ToList();
+
         var requirement = new MetalRequirement
         {
             Id = Guid.NewGuid(),
@@ -496,15 +522,7 @@ public class WipLaunchesController : Controller
             Status = "Создано",
             CreatedAt = DateTime.UtcNow,
             Comment = "Черновик создан автоматически из запуска партии.",
-            Items = norms.Select(norm => new MetalRequirementItem
-            {
-                Id = Guid.NewGuid(),
-                MetalMaterialId = selectedMaterialId.Value,
-                NormPerUnit = norm.BaseConsumptionQty,
-                TotalRequiredQty = norm.BaseConsumptionQty * launch.Quantity,
-                Unit = norm.ConsumptionUnit,
-                TotalRequiredWeightKg = CalculateTotalWeightKg(norm.BaseConsumptionQty * launch.Quantity, norm.ConsumptionUnit, selectedMaterial?.WeightPerUnitKg, selectedMaterial?.Coefficient ?? 1m),
-            }).ToList(),
+            Items = requirementItems,
         };
 
         _dbContext.MetalRequirements.Add(requirement);
@@ -541,19 +559,6 @@ public class WipLaunchesController : Controller
         }
 
         return $"MREQ-{(numericPart + 1):D6}";
-    }
-
-
-    private static decimal CalculateTotalWeightKg(decimal requiredQty, string unit, decimal? weightPerUnitKg, decimal coefficient)
-    {
-        var normalizedUnit = (unit ?? string.Empty).Trim().ToLowerInvariant();
-        return normalizedUnit switch
-        {
-            "м" or "m" or "м2" or "m2" or "м²" => requiredQty * (weightPerUnitKg ?? 0m) * coefficient,
-            "кг" or "kg" => requiredQty * coefficient,
-            "г" or "g" => (requiredQty / 1000m) * coefficient,
-            _ => requiredQty * coefficient,
-        };
     }
 
     private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)
