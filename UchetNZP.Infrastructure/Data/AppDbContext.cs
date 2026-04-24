@@ -78,6 +78,8 @@ public class AppDbContext : DbContext
 
     public DbSet<CuttingPlanItem> CuttingPlanItems => Set<CuttingPlanItem>();
 
+    public DbSet<CuttingReport> CuttingReports => Set<CuttingReport>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);

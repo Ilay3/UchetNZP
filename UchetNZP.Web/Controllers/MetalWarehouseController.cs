@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
@@ -265,6 +266,7 @@ public class MetalWarehouseController : Controller
     [HttpGet("Stock")]
     public async Task<IActionResult> Stock([FromQuery] MetalStockFilterViewModel filter, CancellationToken cancellationToken)
     {
+        var onlyActive = !Request.Query.ContainsKey(nameof(MetalStockFilterViewModel.ActiveOnly)) || filter.ActiveOnly;
         var stockQuery = _dbContext.MetalReceiptItems
             .AsNoTracking()
             .Select(x => new
@@ -280,6 +282,7 @@ public class MetalWarehouseController : Controller
                 ReceiptNumber = x.MetalReceipt != null ? x.MetalReceipt.ReceiptNumber : string.Empty,
                 ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
                 BatchNumber = x.MetalReceipt != null ? x.MetalReceipt.BatchNumber : string.Empty,
+                x.IsConsumed,
             });
 
         if (filter.MaterialId.HasValue)
@@ -297,6 +300,11 @@ public class MetalWarehouseController : Controller
         {
             var unitFilter = filter.UnitOfMeasure.Trim();
             stockQuery = stockQuery.Where(x => x.SizeUnitText == unitFilter);
+        }
+
+        if (onlyActive)
+        {
+            stockQuery = stockQuery.Where(x => !x.IsConsumed);
         }
 
         var stockRows = await stockQuery
@@ -336,7 +344,7 @@ public class MetalWarehouseController : Controller
                 MaterialId = filter.MaterialId,
                 UnitCodeOrNumber = filter.UnitCodeOrNumber,
                 UnitOfMeasure = filter.UnitOfMeasure,
-                ActiveOnly = filter.ActiveOnly,
+                ActiveOnly = onlyActive,
                 Materials = materialOptions,
                 UnitOfMeasures = unitOptions,
             },
@@ -352,7 +360,7 @@ public class MetalWarehouseController : Controller
                 ReceiptDate = x.ReceiptDate,
                 BatchNumber = x.BatchNumber,
                 StockCategory = x.StockCategory,
-                Status = ToStockCategoryCaption(x.StockCategory),
+                Status = x.IsConsumed ? "Списано в раскрой" : ToStockCategoryCaption(x.StockCategory),
             }).ToList(),
             TotalUnitsCount = stockRows.Count,
             TotalMaterialsCount = stockRows.Select(x => x.MetalMaterialId).Distinct().Count(),
@@ -361,6 +369,205 @@ public class MetalWarehouseController : Controller
         };
 
         return View(model);
+    }
+
+    [HttpGet("CuttingReports")]
+    public async Task<IActionResult> CuttingReports(CancellationToken cancellationToken)
+    {
+        var plans = await _dbContext.CuttingPlans
+            .AsNoTracking()
+            .Where(x => x.IsCurrent)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new SelectListItem
+            {
+                Value = x.Id.ToString(),
+                Text = $"{(x.MetalRequirement != null ? x.MetalRequirement.RequirementNumber : "—")} · v{x.Version}",
+            })
+            .ToListAsync(cancellationToken);
+
+        var sourceItems = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => !x.IsConsumed)
+            .OrderBy(x => x.GeneratedCode)
+            .Select(x => new SelectListItem
+            {
+                Value = x.Id.ToString(),
+                Text = $"{x.GeneratedCode} · {x.SizeValue:0.###} {x.SizeUnitText}",
+            })
+            .ToListAsync(cancellationToken);
+
+        var reports = await _dbContext.CuttingReports
+            .AsNoTracking()
+            .OrderByDescending(x => x.ReportDate)
+            .ThenByDescending(x => x.CreatedAt)
+            .Select(x => new CuttingReportListItemViewModel
+            {
+                Id = x.Id,
+                ReportNumber = x.ReportNumber,
+                ReportDate = x.ReportDate,
+                RequirementNumber = x.CuttingPlan != null && x.CuttingPlan.MetalRequirement != null ? x.CuttingPlan.MetalRequirement.RequirementNumber : "—",
+                MaterialName = x.SourceMetalReceiptItem != null && x.SourceMetalReceiptItem.MetalMaterial != null ? x.SourceMetalReceiptItem.MetalMaterial.Name : "—",
+                SourceCode = x.SourceMetalReceiptItem != null ? x.SourceMetalReceiptItem.GeneratedCode : "—",
+                Workshop = x.Workshop,
+                Shift = x.Shift,
+                PlannedSize = x.PlannedSize,
+                ActualProducedSize = x.ActualProducedSize,
+                PlannedMassKg = x.PlannedMassKg,
+                ActualProducedMassKg = x.ActualProducedMassKg,
+                PlannedWaste = x.PlannedWaste,
+                ActualWaste = x.ActualWaste,
+            })
+            .ToListAsync(cancellationToken);
+
+        var analytics = reports
+            .GroupBy(x => new { x.Workshop, x.Shift, x.MaterialName })
+            .Select(g => new CuttingAnalyticsItemViewModel
+            {
+                Workshop = g.Key.Workshop,
+                Shift = g.Key.Shift,
+                MaterialName = g.Key.MaterialName,
+                ReportsCount = g.Count(),
+                AvgWasteDeviation = g.Average(x => x.WasteDeviation),
+                TotalScrapMassKg = g.Sum(x => x.ActualWaste),
+            })
+            .OrderByDescending(x => x.TotalScrapMassKg)
+            .ToList();
+
+        var model = new CuttingReportPageViewModel
+        {
+            PlanOptions = plans,
+            SourceOptions = sourceItems,
+            Reports = reports,
+            Analytics = analytics,
+            CreateModel = new CuttingReportCreateViewModel(),
+        };
+
+        return View("~/Views/MetalWarehouse/CuttingReports.cshtml", model);
+    }
+
+    [HttpPost("CuttingReports")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateCuttingReport(CuttingReportCreateViewModel model, CancellationToken cancellationToken)
+    {
+        var plan = await _dbContext.CuttingPlans
+            .Include(x => x.MetalRequirement)
+            .FirstOrDefaultAsync(x => x.Id == model.CuttingPlanId, cancellationToken);
+        var source = await _dbContext.MetalReceiptItems
+            .Include(x => x.MetalMaterial)
+            .FirstOrDefaultAsync(x => x.Id == model.SourceMetalReceiptItemId, cancellationToken);
+
+        if (plan is null)
+        {
+            ModelState.AddModelError(nameof(model.CuttingPlanId), "План раскроя не найден.");
+        }
+
+        if (source is null || source.IsConsumed)
+        {
+            ModelState.AddModelError(nameof(model.SourceMetalReceiptItemId), "Исходная заготовка не найдена или уже списана.");
+        }
+
+        if (model.ActualProducedSize + model.BusinessResidualSize + model.ScrapSize <= 0m)
+        {
+            ModelState.AddModelError(string.Empty, "Укажите результат раскроя (полезный выход/остатки/лом).");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return await CuttingReports(cancellationToken);
+        }
+
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(source);
+
+        var now = DateTime.UtcNow;
+        var report = new CuttingReport
+        {
+            Id = Guid.NewGuid(),
+            ReportNumber = await GetNextCuttingReportNumberAsync(cancellationToken),
+            ReportDate = now.Date,
+            CuttingPlanId = plan.Id,
+            SourceMetalReceiptItemId = source.Id,
+            Workshop = model.Workshop.Trim(),
+            Shift = model.Shift.Trim(),
+            PlannedSize = source.SizeValue - plan.BusinessResidual - plan.ScrapResidual,
+            ActualProducedSize = model.ActualProducedSize,
+            PlannedMassKg = source.Quantity > 0 ? source.TotalWeightKg / source.Quantity : source.TotalWeightKg,
+            ActualProducedMassKg = model.ActualProducedMassKg,
+            PlannedWaste = plan.ScrapResidual,
+            ActualWaste = model.ScrapMassKg,
+            BusinessResidual = model.BusinessResidualSize,
+            ScrapSize = model.ScrapSize,
+            ScrapMassKg = model.ScrapMassKg,
+            CreatedAt = now,
+        };
+
+        source.IsConsumed = true;
+        source.ConsumedAt = now;
+        source.ConsumedByCuttingReportId = report.Id;
+
+        if (model.BusinessResidualSize > 0m)
+        {
+            _dbContext.MetalReceiptItems.Add(new MetalReceiptItem
+            {
+                Id = Guid.NewGuid(),
+                MetalReceiptId = source.MetalReceiptId,
+                MetalMaterialId = source.MetalMaterialId,
+                Quantity = 1m,
+                TotalWeightKg = model.BusinessResidualMassKg,
+                ItemIndex = source.ItemIndex,
+                SizeValue = model.BusinessResidualSize,
+                SizeUnitText = source.SizeUnitText,
+                ProfileType = source.ProfileType,
+                ThicknessMm = source.ThicknessMm,
+                WidthMm = source.WidthMm,
+                LengthMm = source.LengthMm,
+                DiameterMm = source.DiameterMm,
+                WallThicknessMm = source.WallThicknessMm,
+                PassportWeightKg = model.BusinessResidualMassKg,
+                ActualWeightKg = model.BusinessResidualMassKg,
+                CalculatedWeightKg = model.BusinessResidualMassKg,
+                WeightDeviationKg = 0m,
+                StockCategory = "business",
+                GeneratedCode = $"{source.GeneratedCode}-BUS",
+                SourceCuttingReportId = report.Id,
+                CreatedAt = now,
+            });
+        }
+
+        if (model.ScrapSize > 0m || model.ScrapMassKg > 0m)
+        {
+            _dbContext.MetalReceiptItems.Add(new MetalReceiptItem
+            {
+                Id = Guid.NewGuid(),
+                MetalReceiptId = source.MetalReceiptId,
+                MetalMaterialId = source.MetalMaterialId,
+                Quantity = 1m,
+                TotalWeightKg = model.ScrapMassKg,
+                ItemIndex = source.ItemIndex,
+                SizeValue = model.ScrapSize,
+                SizeUnitText = source.SizeUnitText,
+                ProfileType = source.ProfileType,
+                ThicknessMm = source.ThicknessMm,
+                WidthMm = source.WidthMm,
+                LengthMm = source.LengthMm,
+                DiameterMm = source.DiameterMm,
+                WallThicknessMm = source.WallThicknessMm,
+                PassportWeightKg = model.ScrapMassKg,
+                ActualWeightKg = model.ScrapMassKg,
+                CalculatedWeightKg = model.ScrapMassKg,
+                WeightDeviationKg = 0m,
+                StockCategory = "scrap",
+                GeneratedCode = $"{source.GeneratedCode}-SCRAP",
+                SourceCuttingReportId = report.Id,
+                CreatedAt = now,
+            });
+        }
+
+        plan.ExecutionStatus = "выполнено";
+        plan.ActualResidual = model.BusinessResidualSize + model.ScrapSize;
+        _dbContext.CuttingReports.Add(report);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return RedirectToAction(nameof(CuttingReports));
     }
 
     [HttpGet("Stock/Item/{id:guid}")]
@@ -581,6 +788,26 @@ public class MetalWarehouseController : Controller
                 .ThenInclude(x => x!.Part)
             .FirstOrDefaultAsync(cancellationToken);
         return plan is null ? null : MapCuttingPlan(plan);
+    }
+
+    private async Task<string> GetNextCuttingReportNumberAsync(CancellationToken cancellationToken)
+    {
+        var lastNumber = await _dbContext.CuttingReports
+            .AsNoTracking()
+            .Where(x => x.ReportNumber.StartsWith("CUTREP-"))
+            .OrderByDescending(x => x.ReportNumber)
+            .Select(x => x.ReportNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(lastNumber))
+        {
+            return "CUTREP-0001";
+        }
+
+        var chunk = lastNumber["CUTREP-".Length..];
+        return int.TryParse(chunk, out var number)
+            ? $"CUTREP-{number + 1:D4}"
+            : "CUTREP-0001";
     }
 
     private async Task<MetalRequirementDetailsViewModel?> BuildRequirementDetailsModelAsync(Guid id, CancellationToken cancellationToken)
