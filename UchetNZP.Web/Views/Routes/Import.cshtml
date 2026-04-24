@@ -136,6 +136,34 @@
     </div>
 </div>
 
+<div class="card shadow-sm mb-5">
+    <div class="card-header bg-light fw-semibold">Шаг 3. Импорт норм расхода материалов</div>
+    <div class="card-body">
+        <form id="metalImportForm" class="row g-3" enctype="multipart/form-data">
+            <div class="col-lg-7">
+                <label class="form-label" for="metalFileInput">Файл "Нормы расхода материалов.xlsx"</label>
+                <input id="metalFileInput" class="form-control form-control-lg" type="file" accept=".xlsx,.xls" />
+            </div>
+            <div class="col-lg-5">
+                <label class="form-label" for="metalImportMode">Режим</label>
+                <select id="metalImportMode" class="form-select form-select-lg">
+                    <option value="all">Импорт всего файла</option>
+                    <option value="materials">Импорт материалов</option>
+                    <option value="norms">Импорт норм деталей</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="metalPreviewButton">Dry-run preview</button>
+                <button type="button" class="btn btn-secondary" id="metalImportMaterialsButton">Импорт материалов</button>
+                <button type="button" class="btn btn-secondary" id="metalImportNormsButton">Импорт норм деталей</button>
+                <button type="button" class="btn btn-primary" id="metalImportAllButton">Импорт всего файла</button>
+            </div>
+        </form>
+
+        <div id="metalImportSummary" class="mt-4"></div>
+    </div>
+</div>
+
 @section Scripts
 {
     <script src="~/js/routes-import.js" asp-append-version="true"></script>

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
+using UchetNZP.Application.Contracts.Imports;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
 using UchetNZP.Web.Infrastructure;
@@ -462,6 +463,36 @@ public class RoutesController : Controller
         return Ok(summary);
     }
 
+    [HttpPost("import/metal-data/preview")]
+    [RequestSizeLimit(50 * 1024 * 1024)]
+    public async Task<IActionResult> PreviewMetalData(IFormFile? file, [FromForm] string mode = "all", CancellationToken cancellationToken = default)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest("Файл Excel не выбран.");
+        }
+
+        await using var stream = file.OpenReadStream();
+        var importMode = ParseMetalImportMode(mode);
+        var summary = await _importService.ImportMetalDataExcelAsync(stream, file.FileName, importMode, true, cancellationToken).ConfigureAwait(false);
+        return Ok(summary);
+    }
+
+    [HttpPost("import/metal-data/execute")]
+    [RequestSizeLimit(50 * 1024 * 1024)]
+    public async Task<IActionResult> ExecuteMetalData(IFormFile? file, [FromForm] string mode = "all", CancellationToken cancellationToken = default)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return BadRequest("Файл Excel не выбран.");
+        }
+
+        await using var stream = file.OpenReadStream();
+        var importMode = ParseMetalImportMode(mode);
+        var summary = await _importService.ImportMetalDataExcelAsync(stream, file.FileName, importMode, false, cancellationToken).ConfigureAwait(false);
+        return Ok(summary);
+    }
+
     private static string NormalizeName(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -471,6 +502,16 @@ public class RoutesController : Controller
 
         var normalized = new string(value.Where(character => !char.IsWhiteSpace(character)).ToArray());
         return normalized.ToLowerInvariant();
+    }
+
+    private static MetalImportMode ParseMetalImportMode(string? mode)
+    {
+        return mode?.Trim().ToLowerInvariant() switch
+        {
+            "materials" => MetalImportMode.Materials,
+            "norms" => MetalImportMode.Norms,
+            _ => MetalImportMode.All,
+        };
     }
 
     public class RouteListQuery

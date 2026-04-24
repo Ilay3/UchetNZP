@@ -19,6 +19,16 @@
                 <label class="form-label" for="historyToInput">по</label>
                 <input id="historyToInput" class="form-control form-control-lg" type="date" name="to" value='@Model.Filter.To.ToString("yyyy-MM-dd")' />
             </div>
+            <div class="col-md-6 col-lg-3">
+                <label class="form-label" for="historyMaterialInput">Материал</label>
+                <select id="historyMaterialInput" class="form-select form-select-lg" name="metalMaterialId">
+                    <option value="">— выберите материал —</option>
+                    @foreach (var material in Model.Filter.MaterialOptions)
+                    {
+                        <option value="@material.Id" selected="@(Model.Filter.MetalMaterialId == material.Id)">@material.Name</option>
+                    }
+                </select>
+            </div>
             <div class="col-md-6 col-lg-4 d-flex flex-wrap gap-3">
                 <button type="submit" class="btn btn-primary btn-lg flex-grow-1">Показать</button>
             </div>
@@ -137,13 +147,16 @@
                                                             <thead class="table-light">
                                                                 <tr>
                                                                     <th>Материал</th>
+                                                                    <th>Размеры мм</th>
                                                                     <th>Норма на 1 деталь</th>
+                                                                    <th>Ед. изм.</th>
                                                                     <th>Количество деталей</th>
                                                                     <th>Итого требуется</th>
-                                                                    <th>Ед. изм.</th>
-                                                                    <th>Итого вес, кг</th>
-                                                                    <th>Сейчас на складе</th>
-                                                                    <th>Разница</th>
+                                                                    <th>Вес 1 м/1 м², кг</th>
+                                                                    <th>Коэффициент</th>
+                                                                    <th>Итого кг</th>
+                                                                    <th>Остаток на складе</th>
+                                                                    <th>Хватает / не хватает</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -151,20 +164,23 @@
                                                                 {
                                                                     <tr>
                                                                         <td>@need.MaterialDisplayName</td>
+                                                                        <td>@(string.IsNullOrWhiteSpace(need.SizeRaw) ? "—" : need.SizeRaw)</td>
                                                                         <td>@need.NormPerUnit.ToString("0.###")</td>
+                                                                        <td>@need.Unit</td>
                                                                         <td>@need.Quantity.ToString("0.###")</td>
                                                                         <td>@need.TotalRequiredQty.ToString("0.###")</td>
-                                                                        <td>@need.Unit</td>
-                                                                        <td>@(need.TotalRequiredWeightKg.HasValue ? need.TotalRequiredWeightKg.Value.ToString("0.###") : "—")</td>
-                                                                        <td>@need.StockQty.ToString("0.###") @need.Unit</td>
+                                                                        <td>@(need.WeightPerUnitKg.HasValue ? need.WeightPerUnitKg.Value.ToString("0.###") : "—")</td>
+                                                                        <td>@need.Coefficient.ToString("0.###")</td>
+                                                                        <td>@need.TotalRequiredWeightKg.ToString("0.###")</td>
+                                                                        <td>@need.StockWeightKg.ToString("0.###") кг</td>
                                                                         <td>
                                                                             @if (need.IsEnough)
                                                                             {
-                                                                                <span class="text-success">Хватает (+@need.DifferenceQty.ToString("0.###"))</span>
+                                                                                <span class="text-success">Хватает (+@need.DifferenceWeightKg.ToString("0.###") кг)</span>
                                                                             }
                                                                             else
                                                                             {
-                                                                                <span class="text-danger">Не хватает (@need.DifferenceQty.ToString("0.###"))</span>
+                                                                                <span class="text-danger">Не хватает (@need.DifferenceWeightKg.ToString("0.###") кг)</span>
                                                                             }
                                                                         </td>
                                                                     </tr>

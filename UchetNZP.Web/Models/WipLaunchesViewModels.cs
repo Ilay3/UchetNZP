@@ -10,6 +10,10 @@ public class LaunchHistoryFilterViewModel
     public DateTime From { get; init; }
 
     public DateTime To { get; init; }
+
+    public Guid? MetalMaterialId { get; init; }
+
+    public IReadOnlyList<LookupItemViewModel> MaterialOptions { get; init; } = Array.Empty<LookupItemViewModel>();
 }
 
 public class LaunchHistoryOperationViewModel
@@ -125,10 +129,13 @@ public class LaunchMetalNeedItemViewModel
         string materialName,
         string? materialCode,
         decimal normPerUnit,
+        string? sizeRaw,
         decimal quantity,
         decimal totalRequiredQty,
         string unit,
-        decimal? totalRequiredWeightKg,
+        decimal? weightPerUnitKg,
+        decimal coefficient,
+        decimal totalRequiredWeightKg,
         decimal stockQty,
         decimal stockWeightKg)
     {
@@ -136,9 +143,12 @@ public class LaunchMetalNeedItemViewModel
         MaterialName = materialName ?? string.Empty;
         MaterialCode = materialCode;
         NormPerUnit = normPerUnit;
+        SizeRaw = sizeRaw;
         Quantity = quantity;
         TotalRequiredQty = totalRequiredQty;
         Unit = unit ?? string.Empty;
+        WeightPerUnitKg = weightPerUnitKg;
+        Coefficient = coefficient;
         TotalRequiredWeightKg = totalRequiredWeightKg;
         StockQty = stockQty;
         StockWeightKg = stockWeightKg;
@@ -152,13 +162,19 @@ public class LaunchMetalNeedItemViewModel
 
     public decimal NormPerUnit { get; }
 
+    public string? SizeRaw { get; }
+
     public decimal Quantity { get; }
 
     public decimal TotalRequiredQty { get; }
 
     public string Unit { get; }
 
-    public decimal? TotalRequiredWeightKg { get; }
+    public decimal? WeightPerUnitKg { get; }
+
+    public decimal Coefficient { get; }
+
+    public decimal TotalRequiredWeightKg { get; }
 
     public decimal StockQty { get; }
 
@@ -166,7 +182,9 @@ public class LaunchMetalNeedItemViewModel
 
     public decimal DifferenceQty => StockQty - TotalRequiredQty;
 
-    public bool IsEnough => DifferenceQty >= 0m;
+    public bool IsEnough => StockWeightKg >= TotalRequiredWeightKg;
+
+    public decimal DifferenceWeightKg => StockWeightKg - TotalRequiredWeightKg;
 
     public string MaterialDisplayName => string.IsNullOrWhiteSpace(MaterialCode) ? MaterialName : $"{MaterialName} ({MaterialCode})";
 }
@@ -262,6 +280,8 @@ public class LaunchHistoryQuery
     public DateTime? From { get; set; }
 
     public DateTime? To { get; set; }
+
+    public Guid? MetalMaterialId { get; set; }
 }
 
 public record LaunchDeleteResponseModel(

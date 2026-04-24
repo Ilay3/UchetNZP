@@ -131,6 +131,9 @@ static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, Cancellati
             Name = "Лист ст.35 t=6 ГОСТ19903-74/1577-93",
             Code = "LIST35T6",
             UnitKind = "SquareMeter",
+            WeightPerUnitKg = 1.5m,
+            Coefficient = 1m,
+            DisplayName = "Лист ст.35 t=6",
             IsActive = true,
         },
         new UchetNZP.Domain.Entities.MetalMaterial
@@ -139,6 +142,9 @@ static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, Cancellati
             Name = "Пруток 20Г",
             Code = "PRUT20G",
             UnitKind = "Meter",
+            WeightPerUnitKg = 0.8m,
+            Coefficient = 1m,
+            DisplayName = "Пруток 20Г",
             IsActive = true,
         },
         new UchetNZP.Domain.Entities.MetalMaterial
@@ -147,6 +153,9 @@ static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, Cancellati
             Name = "Круг 45",
             Code = "KRUG45",
             UnitKind = "Meter",
+            WeightPerUnitKg = 0.9m,
+            Coefficient = 1m,
+            DisplayName = "Круг 45",
             IsActive = true,
         },
         new UchetNZP.Domain.Entities.MetalMaterial
@@ -155,6 +164,9 @@ static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, Cancellati
             Name = "Лист 09Г2С t=4",
             Code = "LIST09G2S4",
             UnitKind = "SquareMeter",
+            WeightPerUnitKg = 1.2m,
+            Coefficient = 1m,
+            DisplayName = "Лист 09Г2С t=4",
             IsActive = true,
         });
 
@@ -169,49 +181,32 @@ static async Task EnsureMetalConsumptionNormsSeededAsync(AppDbContext in_db, Can
         return;
     }
 
-    var materials = await in_db.MetalMaterials
-        .AsNoTracking()
-        .Where(x => x.IsActive)
-        .OrderBy(x => x.Name)
-        .Take(2)
-        .ToListAsync(in_cancellationToken);
-
     var parts = await in_db.Parts
         .AsNoTracking()
         .OrderBy(x => x.Name)
         .Take(2)
         .ToListAsync(in_cancellationToken);
 
-    if (materials.Count == 0 || parts.Count == 0)
+    if (parts.Count == 0)
     {
         return;
     }
 
     var norms = new List<UchetNZP.Domain.Entities.MetalConsumptionNorm>();
-    var unitByKind = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-    {
-        ["SquareMeter"] = "м2",
-        ["Meter"] = "м",
-    };
 
     foreach (var part in parts)
     {
-        for (var i = 0; i < materials.Count; i++)
+        norms.Add(new UchetNZP.Domain.Entities.MetalConsumptionNorm
         {
-            var material = materials[i];
-            var unit = unitByKind.TryGetValue(material.UnitKind, out var mapped) ? mapped : "ед";
-            norms.Add(new UchetNZP.Domain.Entities.MetalConsumptionNorm
-            {
-                Id = Guid.NewGuid(),
-                PartId = part.Id,
-                MetalMaterialId = material.Id,
-                ConsumptionQty = 0.25m + i * 0.1m,
-                ConsumptionUnit = unit,
-                WeightPerUnitKg = material.UnitKind == "SquareMeter" ? 1.5m + i : 0.8m + i,
-                Comment = "Тестовая норма для демонстрации UI.",
-                IsActive = true,
-            });
-        }
+            Id = Guid.NewGuid(),
+            PartId = part.Id,
+            BaseConsumptionQty = 0.25m,
+            ConsumptionUnit = "м",
+            SizeRaw = "1000x500",
+            SourceFile = "seed",
+            Comment = "Тестовая норма для демонстрации UI.",
+            IsActive = true,
+        });
     }
 
     in_db.MetalConsumptionNorms.AddRange(norms);
