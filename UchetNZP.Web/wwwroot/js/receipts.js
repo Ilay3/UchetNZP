@@ -239,6 +239,11 @@
             return false;
         }
 
+        const selectedMaterialId = materialSelect?.value || "";
+        if (!selectedMaterialId) {
+            return false;
+        }
+
         const manualLabelNumber = getManualLabelNumber();
         if (!manualLabelNumber) {
             return false;
@@ -278,7 +283,8 @@
         }
 
         const quantity = Number(quantityInput.value);
-        return Boolean(quantity && quantity >= 1 && dateInput.value);
+        const selectedMaterialId = materialSelect?.value || "";
+        return Boolean(quantity && quantity >= 1 && dateInput.value && selectedMaterialId);
     }
 
     function updateFormState() {
@@ -1058,12 +1064,17 @@
             return null;
         }
 
+        const metalMaterialId = materialSelect?.value || null;
+        if (!metalMaterialId) {
+            alert("Выберите материал заготовки.");
+            return null;
+        }
+
         const key = getBalanceKey(part.id, selectedOperation.sectionId, selectedOperation.opNumber);
         const base = await ensureBalanceLoaded(part.id, selectedOperation.sectionId, selectedOperation.opNumber);
         const pending = pendingAdjustments.get(key) ?? 0;
         const partDisplay = formatNameWithCode(part.name, part.code);
         const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
-        const metalMaterialId = materialSelect?.value || null;
         const materialDisplay = materialSelect?.selectedOptions?.[0]?.textContent?.trim() || "—";
 
         return { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay };
