@@ -1,10 +1,11 @@
 (function () {
-    const quantityInput = document.getElementById("quantityInput");
+    const quantityInput = document.getElementById("Quantity") || document.getElementById("quantityInput");
     const unitsContainer = document.getElementById("unitsContainer");
     const materialInput = document.getElementById("materialInput");
     const materialIdInput = document.getElementById("materialId");
     const materialOptions = document.getElementById("materialOptions");
-    const profileTypeSelect = document.getElementById("profileTypeSelect");
+    const profileTypeSelect = document.getElementById("ProfileType") || document.getElementById("profileTypeSelect");
+    const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
     const materialProfileMapRaw = document.getElementById("materialProfileMap")?.textContent ?? "{}";
     let materialProfileMap = {};
     try {
@@ -35,6 +36,11 @@
 
         const match = materialsByDisplay.get(rawValue.toLowerCase());
         materialIdInput.value = match?.id || "";
+        console.debug("[MetalReceipt] syncMaterialSelection", {
+            enteredValue: rawValue,
+            matched: Boolean(match),
+            materialId: materialIdInput.value || null,
+        });
     }
 
     function getSelectedMaterialId() {
@@ -84,6 +90,9 @@
 
         if (safeCount === 0) {
             unitsContainer.innerHTML = '<div class="col-12 text-muted">Укажите количество, чтобы заполнить размеры по единицам.</div>';
+            console.debug("[MetalReceipt] Units not rendered: quantity is empty/invalid", {
+                quantity: quantityInput.value,
+            });
             return;
         }
 
@@ -109,6 +118,11 @@
                 </div>`;
             unitsContainer.appendChild(col);
         }
+
+        console.debug("[MetalReceipt] Units rendered", {
+            quantity: safeCount,
+            unitType: unitText,
+        });
 
         if (window.jQuery && window.jQuery.validator && window.jQuery.validator.unobtrusive) {
             const form = document.getElementById("metalReceiptForm");
@@ -140,6 +154,20 @@
     form?.addEventListener("submit", () => {
         syncMaterialSelection();
 
+        const payloadPreview = {
+            receiptDate: document.getElementById("ReceiptDate")?.value || null,
+            materialDisplay: getSelectedMaterialDisplay(),
+            materialId: materialIdInput.value || null,
+            quantity: quantityInput.value || null,
+            profileType: profileTypeSelect.value || null,
+            passportWeightKg: document.getElementById("PassportWeightKg")?.value || null,
+            thicknessMm: document.getElementById("ThicknessMm")?.value || null,
+            widthMm: document.getElementById("WidthMm")?.value || null,
+            lengthMm: document.getElementById("LengthMm")?.value || null,
+            diameterMm: document.getElementById("DiameterMm")?.value || null,
+            wallThicknessMm: document.getElementById("WallThicknessMm")?.value || null,
+        };
+
         if (materialIdInput.value) {
             materialInput.setCustomValidity("");
         } else if (getSelectedMaterialDisplay()) {
@@ -147,6 +175,20 @@
         } else {
             materialInput.setCustomValidity("");
         }
+
+        try {
+            sessionStorage.setItem(debugStorageKey, JSON.stringify({
+                submittedAt: new Date().toISOString(),
+                payloadPreview,
+            }));
+        } catch {
+            // ignore session storage errors in private mode
+        }
+
+        console.group("[MetalReceipt] Submit attempt");
+        console.log("Payload preview", payloadPreview);
+        console.log("Material selection valid", Boolean(materialIdInput.value));
+        console.groupEnd();
     });
 
     materialInput.addEventListener("input", () => {
@@ -165,4 +207,28 @@
     }
     syncProfileVisibility();
     renderUnitInputs();
+
+    try {
+        const previousSubmitRaw = sessionStorage.getItem(debugStorageKey);
+        if (previousSubmitRaw) {
+            const previousSubmit = JSON.parse(previousSubmitRaw);
+            const modelErrors = Array.from(document.querySelectorAll(".validation-summary-errors li, .field-validation-error"))
+                .map(el => (el.textContent || "").trim())
+                .filter(Boolean);
+
+            console.group("[MetalReceipt] Previous submit result");
+            console.log("Submitted at", previousSubmit?.submittedAt ?? null);
+            console.log("Payload preview", previousSubmit?.payloadPreview ?? null);
+            if (modelErrors.length > 0) {
+                console.warn("Server returned validation errors (save not completed):", modelErrors);
+            } else {
+                console.log("No validation errors on current page. If page redirected, save likely succeeded.");
+            }
+            console.groupEnd();
+
+            sessionStorage.removeItem(debugStorageKey);
+        }
+    } catch {
+        // ignore malformed debug payload
+    }
 })();
