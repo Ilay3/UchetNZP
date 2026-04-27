@@ -132,20 +132,18 @@ public class LaunchMetalNeedItemViewModel
         Guid metalMaterialId,
         string materialName,
         string? materialCode,
-        decimal normPerUnit,
+        decimal baseConsumptionQty,
         string? sizeRaw,
+        string sourceUnit,
         decimal quantity,
         decimal needM,
         decimal needM2,
         decimal needPcs,
         string unit,
-        decimal massPerMeterKg,
-        decimal massPerSquareMeterKg,
+        decimal weightPerUnitKg,
         decimal coefficient,
         string stockUnit,
-        decimal totalRequiredWeightKg,
-        decimal metersFromKg,
-        decimal squareMetersFromKg,
+        decimal needKg,
         string formula,
         decimal stockQty,
         decimal stockWeightKg)
@@ -153,20 +151,18 @@ public class LaunchMetalNeedItemViewModel
         MetalMaterialId = metalMaterialId;
         MaterialName = materialName ?? string.Empty;
         MaterialCode = materialCode;
-        NormPerUnit = normPerUnit;
+        BaseConsumptionQty = baseConsumptionQty;
         SizeRaw = sizeRaw;
+        SourceUnit = sourceUnit ?? string.Empty;
         Quantity = quantity;
         NeedM = needM;
         NeedM2 = needM2;
         NeedPcs = needPcs;
         Unit = unit ?? string.Empty;
-        MassPerMeterKg = massPerMeterKg;
-        MassPerSquareMeterKg = massPerSquareMeterKg;
+        WeightPerUnitKg = weightPerUnitKg;
         Coefficient = coefficient;
         StockUnit = stockUnit;
-        TotalRequiredWeightKg = totalRequiredWeightKg;
-        MetersFromKg = metersFromKg;
-        SquareMetersFromKg = squareMetersFromKg;
+        NeedKg = needKg;
         Formula = formula ?? string.Empty;
         StockQty = stockQty;
         StockWeightKg = stockWeightKg;
@@ -178,9 +174,11 @@ public class LaunchMetalNeedItemViewModel
 
     public string? MaterialCode { get; }
 
-    public decimal NormPerUnit { get; }
+    public decimal BaseConsumptionQty { get; }
 
     public string? SizeRaw { get; }
+
+    public string SourceUnit { get; }
 
     public decimal Quantity { get; }
 
@@ -194,19 +192,13 @@ public class LaunchMetalNeedItemViewModel
 
     public string Unit { get; }
 
-    public decimal MassPerMeterKg { get; }
-
-    public decimal MassPerSquareMeterKg { get; }
+    public decimal WeightPerUnitKg { get; }
 
     public decimal Coefficient { get; }
 
     public string StockUnit { get; }
 
-    public decimal TotalRequiredWeightKg { get; }
-
-    public decimal MetersFromKg { get; }
-
-    public decimal SquareMetersFromKg { get; }
+    public decimal NeedKg { get; }
 
     public string Formula { get; }
 
@@ -216,9 +208,9 @@ public class LaunchMetalNeedItemViewModel
 
     public decimal DifferenceQty => StockQty - TotalRequiredQty;
 
-    public bool IsEnough => StockWeightKg >= TotalRequiredWeightKg;
+    public bool IsEnough => StockWeightKg >= NeedKg;
 
-    public decimal DifferenceWeightKg => StockWeightKg - TotalRequiredWeightKg;
+    public decimal DifferenceWeightKg => StockWeightKg - NeedKg;
 
     public string MaterialDisplayName => string.IsNullOrWhiteSpace(MaterialCode) ? MaterialName : $"{MaterialName} ({MaterialCode})";
 }
