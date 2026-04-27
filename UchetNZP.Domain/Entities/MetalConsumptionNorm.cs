@@ -10,6 +10,12 @@ public class MetalConsumptionNorm
 
     public string? SizeRaw { get; set; }
 
+    public string NormalizedSizeRaw { get; set; } = string.Empty;
+
+    public string NormKeyHash { get; set; } = string.Empty;
+
+    public string? ConsumptionTextRaw { get; set; }
+
     public string ShapeType { get; set; } = "unknown";
 
     public decimal? DiameterMm { get; set; }
@@ -31,6 +37,8 @@ public class MetalConsumptionNorm
     public decimal BaseConsumptionQty { get; set; }
 
     public string ConsumptionUnit { get; set; } = string.Empty;
+
+    public string NormalizedConsumptionUnit { get; set; } = string.Empty;
 
     public string? SourceFile { get; set; }
 

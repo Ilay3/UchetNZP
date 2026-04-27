@@ -19,6 +19,9 @@ public class PartConfiguration : IEntityTypeConfiguration<Part>
         builder.Property(x => x.Code)
             .HasMaxLength(64);
 
+        builder.Property(x => x.CodeRaw)
+            .HasMaxLength(256);
+
         builder.HasIndex(x => x.Code)
             .IsUnique();
     }

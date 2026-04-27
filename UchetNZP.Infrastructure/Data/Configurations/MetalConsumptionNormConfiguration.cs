@@ -15,6 +15,17 @@ public class MetalConsumptionNormConfiguration : IEntityTypeConfiguration<MetalC
         builder.Property(x => x.SizeRaw)
             .HasMaxLength(128);
 
+        builder.Property(x => x.NormalizedSizeRaw)
+            .IsRequired()
+            .HasMaxLength(128);
+
+        builder.Property(x => x.NormKeyHash)
+            .IsRequired()
+            .HasMaxLength(128);
+
+        builder.Property(x => x.ConsumptionTextRaw)
+            .HasMaxLength(512);
+
         builder.Property(x => x.ShapeType)
             .IsRequired()
             .HasMaxLength(16);
@@ -53,6 +64,10 @@ public class MetalConsumptionNormConfiguration : IEntityTypeConfiguration<MetalC
             .IsRequired()
             .HasMaxLength(16);
 
+        builder.Property(x => x.NormalizedConsumptionUnit)
+            .IsRequired()
+            .HasMaxLength(16);
+
         builder.Property(x => x.SourceFile)
             .HasMaxLength(256);
 
@@ -73,5 +88,6 @@ public class MetalConsumptionNormConfiguration : IEntityTypeConfiguration<MetalC
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasIndex(x => new { x.PartId, x.IsActive });
+        builder.HasIndex(x => x.NormKeyHash);
     }
 }

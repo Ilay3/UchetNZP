@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
@@ -336,6 +338,9 @@ public class ImportService : IImportService
         var partsCreated = 0;
         var normsCreated = 0;
         var normsUpdated = 0;
+        var normsSkipped = 0;
+        var normDuplicates = 0;
+        var normConflicts = 0;
         var rowsSkipped = 0;
         var materialPreviewRows = new List<MetalMaterialImportPreviewRowDto>();
         var parsePreviewRows = new List<MetalDataParsePreviewRowDto>();
@@ -522,15 +527,19 @@ public class ImportService : IImportService
             var sheet = FindWorksheetOrThrow(
                 workbook,
                 ["Детали - Размеры - Нормы", "Детали-Размеры-Нормы", "Детали Размеры Нормы", "Детали"],
-                ["Обозначение", "На деталь", "Материал"]);
+                ["Обозначение", "Наименование", "Размеры", "Ед"]);
+            var fileNormKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var row in (sheet.RangeUsed()?.RowsUsed().Skip(1) ?? []).Where(x => !x.IsEmpty()))
             {
                 var rowNumber = row.RowNumber();
                 var code = row.Cell(1).GetString().Trim();
                 var name = row.Cell(2).GetString().Trim();
                 var sizeRaw = row.Cell(3).GetString().Trim();
+                var consumptionTextRaw = row.Cell(4).GetString().Trim();
                 var unit = row.Cell(6).GetString().Trim();
-                var parseResult = MetalSizeParser.Parse(sizeRaw, unit, null);
+                var normalizedSizeRaw = NormalizeSizeRaw(sizeRaw);
+                var normalizedUnit = NormalizeConsumptionUnit(unit);
+                var parseResult = MetalSizeParser.Parse(sizeRaw, normalizedUnit, null);
                 parsePreviewRows.Add(new MetalDataParsePreviewRowDto(
                     rowNumber,
                     code,
@@ -549,31 +558,41 @@ public class ImportService : IImportService
                 if (!TryParseDecimalCell(row.Cell(5), out var baseQty) || (string.IsNullOrWhiteSpace(code) && string.IsNullOrWhiteSpace(name)))
                 {
                     rowsSkipped++;
+                    normsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущены обязательные поля Обозначение/Наименование/BaseConsumptionQty."));
                     continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(unit))
+                if (string.IsNullOrWhiteSpace(normalizedUnit))
                 {
                     rowsSkipped++;
+                    normsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле Unit (единица измерения)."));
                     continue;
                 }
 
-                if ((!string.IsNullOrWhiteSpace(code) && code.Length > 64) || (!string.IsNullOrWhiteSpace(name) && name.Length > 256) || sizeRaw.Length > 128 || unit.Length > 16)
+                if ((!string.IsNullOrWhiteSpace(code) && code.Length > 256) || (!string.IsNullOrWhiteSpace(name) && name.Length > 256) || sizeRaw.Length > 128 || unit.Length > 16)
                 {
                     rowsSkipped++;
+                    normsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина полей (Code/Name/Size/Unit)."));
                     continue;
                 }
 
+                var normalizedCodeRaw = NormalizePartCodeRaw(code);
+                var canonicalCode = CanonicalizePartCode(code);
                 var partKey = !string.IsNullOrWhiteSpace(code)
-                    ? $"CODE:{code}"
+                    ? $"CODE:{normalizedCodeRaw}"
                     : $"NAME:{name.ToUpperInvariant()}";
                 if (!partCache.TryGetValue(partKey, out var part))
                 {
-                    part = !string.IsNullOrWhiteSpace(code)
-                        ? await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false)
+                    part = !string.IsNullOrWhiteSpace(normalizedCodeRaw)
+                        ? await _dbContext.Parts
+                            .FirstOrDefaultAsync(
+                                x => (x.CodeRaw != null && x.CodeRaw == normalizedCodeRaw)
+                                    || (x.Code == canonicalCode),
+                                cancellationToken)
+                            .ConfigureAwait(false)
                         : await _dbContext.Parts.FirstOrDefaultAsync(x => x.Code == null && x.Name == name, cancellationToken).ConfigureAwait(false);
                     if (part is null)
                     {
@@ -581,7 +600,8 @@ public class ImportService : IImportService
                         part = new Part
                         {
                             Id = Guid.NewGuid(),
-                            Code = string.IsNullOrWhiteSpace(code) ? null : code,
+                            Code = canonicalCode,
+                            CodeRaw = normalizedCodeRaw,
                             Name = string.IsNullOrWhiteSpace(name) ? code : name,
                         };
 
@@ -603,10 +623,25 @@ public class ImportService : IImportService
                     part.Name = name;
                 }
 
-                var norm = await _dbContext.MetalConsumptionNorms
-                    .FirstOrDefaultAsync(x => x.PartId == part.Id && x.IsActive, cancellationToken)
-                    .ConfigureAwait(false);
+                part.Code = canonicalCode;
+                part.CodeRaw = normalizedCodeRaw;
 
+                var normKeyHash = ComputeNormKeyHash(part.Id, normalizedSizeRaw, normalizedUnit, baseQty, null);
+                if (!fileNormKeys.Add(normKeyHash))
+                {
+                    normsSkipped++;
+                    normDuplicates++;
+                    warnings.Add(new MetalDataImportWarningDto(rowNumber, sheet.Name, "Точная дублирующая строка в файле: запись не создана повторно."));
+                    continue;
+                }
+
+                var existingNorms = await _dbContext.MetalConsumptionNorms
+                    .Where(x => x.PartId == part.Id && x.IsActive)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                var norm = existingNorms.FirstOrDefault(x =>
+                    x.NormKeyHash == normKeyHash
+                    || IsNaturalNormMatch(x, normalizedSizeRaw, normalizedUnit, baseQty, null));
                 if (norm is null)
                 {
                     normsCreated++;
@@ -625,17 +660,37 @@ public class ImportService : IImportService
                 else
                 {
                     normsUpdated++;
+                    var hasConflictInText = !string.IsNullOrWhiteSpace(consumptionTextRaw)
+                        && !string.Equals((norm.ConsumptionTextRaw ?? string.Empty).Trim(), consumptionTextRaw, StringComparison.OrdinalIgnoreCase);
+                    if (hasConflictInText)
+                    {
+                        normConflicts++;
+                        warnings.Add(new MetalDataImportWarningDto(rowNumber, sheet.Name, "Найдена строка с тем же natural key, но отличающимся текстом нормы: запись обновлена."));
+                    }
                 }
 
-                var comment = row.Cell(4).GetString().Trim();
+                if (existingNorms.Any(x =>
+                        x.NormKeyHash != normKeyHash
+                        && string.Equals(x.NormalizedSizeRaw, normalizedSizeRaw, StringComparison.Ordinal)
+                        && string.Equals(x.NormalizedConsumptionUnit, normalizedUnit, StringComparison.Ordinal)
+                        && x.MetalMaterialId == null))
+                {
+                    warnings.Add(new MetalDataImportWarningDto(rowNumber, sheet.Name, "Для детали уже есть другая активная норма с тем же размером/единицей и иным значением."));
+                }
+
+                var comment = consumptionTextRaw;
                 if (comment.Length > 256)
                 {
                     rowsSkipped++;
+                    normsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина поля Comment."));
                     continue;
                 }
 
                 norm.SizeRaw = sizeRaw;
+                norm.NormalizedSizeRaw = normalizedSizeRaw;
+                norm.NormKeyHash = normKeyHash;
+                norm.ConsumptionTextRaw = consumptionTextRaw.Length == 0 ? null : consumptionTextRaw;
                 norm.ShapeType = parseResult.ShapeType;
                 norm.DiameterMm = parseResult.DiameterMm;
                 norm.ThicknessMm = parseResult.ThicknessMm;
@@ -646,7 +701,8 @@ public class ImportService : IImportService
                 norm.ParseStatus = parseResult.ParseStatus;
                 norm.ParseError = parseResult.ParseError;
                 norm.BaseConsumptionQty = baseQty;
-                norm.ConsumptionUnit = unit;
+                norm.ConsumptionUnit = normalizedUnit;
+                norm.NormalizedConsumptionUnit = normalizedUnit;
                 norm.SourceFile = sourceFileName.Length > 256 ? sourceFileName[..256] : sourceFileName;
                 norm.MetalMaterialId = null;
                 norm.Comment = comment;
@@ -696,6 +752,9 @@ public class ImportService : IImportService
             partsCreated,
             normsCreated,
             normsUpdated,
+            normsSkipped,
+            normDuplicates,
+            normConflicts,
             rowsSkipped,
             materialPreviewRows.Count,
             materialPreviewRows,
@@ -1003,6 +1062,90 @@ public class ImportService : IImportService
         }
 
         return new string(buffer, 0, index);
+    }
+
+    private static string NormalizeSizeRaw(string value)
+    {
+        var raw = (value ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return string.Empty;
+        }
+
+        return raw
+            .Replace('Х', 'x')
+            .Replace('х', 'x')
+            .Replace('*', 'x')
+            .Replace('×', 'x')
+            .Replace("  ", " ", StringComparison.Ordinal)
+            .ToUpperInvariant();
+    }
+
+    private static string NormalizeConsumptionUnit(string value)
+    {
+        var raw = (value ?? string.Empty).Trim().ToLowerInvariant();
+        return raw switch
+        {
+            "м" or "m" => "m",
+            "м2" or "м²" or "m2" => "m2",
+            "кг" or "kg" => "kg",
+            "г" or "гр" or "g" => "g",
+            _ => string.Empty
+        };
+    }
+
+    private static string? NormalizePartCodeRaw(string code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return null;
+        }
+
+        return code.Trim().ToUpperInvariant();
+    }
+
+    private static string? CanonicalizePartCode(string code)
+    {
+        var raw = NormalizePartCodeRaw(code);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return null;
+        }
+
+        if (raw.Length <= 64)
+        {
+            return raw;
+        }
+
+        var prefix = raw[..52];
+        var suffix = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(raw)))[..11];
+        return $"{prefix}_{suffix}";
+    }
+
+    private static string ComputeNormKeyHash(Guid partId, string normalizedSizeRaw, string normalizedUnit, decimal baseQty, Guid? metalMaterialId)
+    {
+        var payload = string.Join("|",
+            partId.ToString("N"),
+            normalizedSizeRaw,
+            normalizedUnit,
+            baseQty.ToString("0.######", CultureInfo.InvariantCulture),
+            metalMaterialId?.ToString("N") ?? "NULL");
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
+    }
+
+    private static bool IsNaturalNormMatch(MetalConsumptionNorm norm, string normalizedSizeRaw, string normalizedUnit, decimal baseQty, Guid? metalMaterialId)
+    {
+        if (!string.IsNullOrWhiteSpace(norm.NormKeyHash))
+        {
+            return false;
+        }
+
+        var normSize = NormalizeSizeRaw(norm.NormalizedSizeRaw.Length > 0 ? norm.NormalizedSizeRaw : norm.SizeRaw ?? string.Empty);
+        var normUnit = NormalizeConsumptionUnit(norm.NormalizedConsumptionUnit.Length > 0 ? norm.NormalizedConsumptionUnit : norm.ConsumptionUnit);
+        return string.Equals(normSize, normalizedSizeRaw, StringComparison.Ordinal)
+            && string.Equals(normUnit, normalizedUnit, StringComparison.Ordinal)
+            && norm.BaseConsumptionQty == baseQty
+            && norm.MetalMaterialId == metalMaterialId;
     }
 
     private static XLWorkbook BuildMetalImportErrorWorkbook(IReadOnlyCollection<MetalDataImportErrorDto> errors)
