@@ -34,6 +34,24 @@
 </div>
 
 <div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Документы</div>
+    <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <div class="fw-semibold">Печатная форма доступна</div>
+                <div class="text-muted small">Скачать документ можно в формате DOCX.</div>
+            </div>
+            <a class="btn btn-outline-primary"
+               asp-controller="MetalWarehouse"
+               asp-action="PrintRequirement"
+               asp-route-id="@Model.Id">
+                Скачать требование на склад
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
     <div class="card-header bg-light fw-semibold">Исполнение требования</div>
     <div class="card-body">
         @if (Model.ExistingIssueId.HasValue)

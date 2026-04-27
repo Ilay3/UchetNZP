@@ -58,6 +58,7 @@ builder.Services.AddSingleton<ITransferPeriodReportPdfExporter, TransferPeriodRe
 builder.Services.AddSingleton<IWipBatchReportPdfExporter, WipBatchReportPdfExporter>();
 builder.Services.AddSingleton<IWipBatchInventoryDocumentExporter, WipBatchInventoryDocumentExporter>();
 builder.Services.AddScoped<IWipEscortLabelDocumentService, WipEscortLabelDocumentService>();
+builder.Services.AddScoped<IMetalRequirementWarehousePrintDocumentService, MetalRequirementWarehousePrintDocumentService>();
 builder.Services.AddSingleton<IWipHistoryExcelExporter, WipHistoryExcelExporter>();
 builder.Services.AddSingleton<ICuttingMapExcelExporter, CuttingMapExcelExporter>();
 builder.Services.AddSingleton<ICuttingMapPdfExporter, CuttingMapPdfExporter>();
