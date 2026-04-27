@@ -6,12 +6,19 @@
     const materialOptions = document.getElementById("materialOptions");
     const profileTypeSelect = document.getElementById("ProfileType") || document.getElementById("profileTypeSelect");
     const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
+    const debugContextRaw = document.getElementById("receiptDebugContext")?.textContent ?? "{}";
     const materialProfileMapRaw = document.getElementById("materialProfileMap")?.textContent ?? "{}";
     let materialProfileMap = {};
+    let debugContext = {};
     try {
         materialProfileMap = JSON.parse(materialProfileMapRaw);
     } catch {
         materialProfileMap = {};
+    }
+    try {
+        debugContext = JSON.parse(debugContextRaw);
+    } catch {
+        debugContext = {};
     }
 
     if (!quantityInput || !unitsContainer || !materialInput || !materialIdInput || !materialOptions || !profileTypeSelect) {
@@ -191,6 +198,20 @@
         console.groupEnd();
     });
 
+    form?.addEventListener("invalid", event => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+            return;
+        }
+
+        console.warn("[MetalReceipt] Browser blocked submit: invalid field", {
+            id: target.id || null,
+            name: target.name || null,
+            value: target.value,
+            validationMessage: target.validationMessage,
+        });
+    }, true);
+
     materialInput.addEventListener("input", () => {
         materialInput.setCustomValidity("");
     });
@@ -230,5 +251,18 @@
         }
     } catch {
         // ignore malformed debug payload
+    }
+
+    if (debugContext && debugContext.isPostBack === true) {
+        console.group("[MetalReceipt] Server POST result");
+        console.log("ModelState valid", debugContext.modelStateIsValid === true);
+        if (Array.isArray(debugContext.errors) && debugContext.errors.length > 0) {
+            console.warn("Server-side errors", debugContext.errors);
+        } else if (debugContext.modelStateIsValid === false) {
+            console.warn("Server returned POST view without explicit ModelState messages.");
+        } else {
+            console.log("Server returned POST view with valid ModelState.");
+        }
+        console.groupEnd();
     }
 })();
