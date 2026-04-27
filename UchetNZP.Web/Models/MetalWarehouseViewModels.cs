@@ -203,38 +203,9 @@ public class MetalReceiptCreateViewModel : IValidatableObject
             yield break;
         }
 
-        var profile = (ProfileType ?? string.Empty).Trim().ToLowerInvariant();
-        if (profile != "sheet" && profile != "rod" && profile != "pipe")
-        {
-            yield return new ValidationResult("Не указан корректный тип проката.", new[] { nameof(ProfileType) });
-            yield break;
-        }
-
         if (!PassportWeightKg.HasValue || PassportWeightKg.Value <= 0m)
         {
             yield return new ValidationResult("Паспортная масса обязательна.", new[] { nameof(PassportWeightKg) });
-        }
-
-        if (profile == "sheet")
-        {
-            if (!ThicknessMm.HasValue || ThicknessMm.Value <= 0m || !WidthMm.HasValue || WidthMm.Value <= 0m || !LengthMm.HasValue || LengthMm.Value <= 0m)
-            {
-                yield return new ValidationResult("Для листа обязательны толщина, ширина и длина.", new[] { nameof(ThicknessMm), nameof(WidthMm), nameof(LengthMm) });
-            }
-        }
-        else if (profile == "rod")
-        {
-            if (!DiameterMm.HasValue || DiameterMm.Value <= 0m || !LengthMm.HasValue || LengthMm.Value <= 0m)
-            {
-                yield return new ValidationResult("Для круга/прутка обязательны диаметр и длина хлыста.", new[] { nameof(DiameterMm), nameof(LengthMm) });
-            }
-        }
-        else if (profile == "pipe")
-        {
-            if (!DiameterMm.HasValue || DiameterMm.Value <= 0m || !WallThicknessMm.HasValue || WallThicknessMm.Value <= 0m || !LengthMm.HasValue || LengthMm.Value <= 0m)
-            {
-                yield return new ValidationResult("Для трубы обязательны диаметр, стенка и длина.", new[] { nameof(DiameterMm), nameof(WallThicknessMm), nameof(LengthMm) });
-            }
         }
 
         if (Units.Count != Quantity.Value)
