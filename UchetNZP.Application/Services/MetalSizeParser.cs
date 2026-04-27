@@ -7,7 +7,7 @@ public static class MetalSizeParser
 {
     private static readonly Regex DelimiterRegex = new("\\s*[xх*]\\s*", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
     private static readonly Regex UnitValueRegex = new(
-        "^(?<value>\\d+(?:[\\.,]\\d+)?)\\s*(?<unit>kg|кг|m2|м2|m|м|pcs|шт)\\.?$",
+        "^(?<value>\\d+(?:[\\.,]\\d+)?)\\s*(?<unit>kg|кг|g|гр|г|m2|м2|m|м|pcs|шт)\\.?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static MetalSizeParseResult Parse(string? rawValue, string? unitRaw, decimal? valueRaw)
@@ -220,6 +220,7 @@ public static class MetalSizeParser
         return unit switch
         {
             "кг" or "kg" => "kg",
+            "г" or "гр" or "g" => "g",
             "м" or "m" => "m",
             "м2" or "m2" or "м²" => "m2",
             "шт" or "pcs" => "pcs",

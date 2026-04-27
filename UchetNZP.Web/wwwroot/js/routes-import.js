@@ -583,6 +583,7 @@
                 <div>Материалы: создано <strong>${result.materialsCreated || 0}</strong>, обновлено <strong>${result.materialsUpdated || 0}</strong>, пропущено <strong>${result.materialsSkipped || 0}</strong></div>
                 <div>Деталей найдено: <strong>${result.partsFound}</strong>, создано: <strong>${result.partsCreated}</strong></div>
                 <div>Норм создано: <strong>${result.normsCreated}</strong>, обновлено: <strong>${result.normsUpdated}</strong></div>
+                <div>Норм пропущено: <strong>${result.normsSkipped || 0}</strong>, дубликатов: <strong>${result.normDuplicates || 0}</strong>, конфликтов: <strong>${result.normConflicts || 0}</strong></div>
                 <div>Строк пропущено: <strong>${result.rowsSkipped}</strong></div>
                 ${warnings.length === 0 ? "" : `<hr /><div><strong>Warnings:</strong><ul>${warnings.slice(0, 30).map(w => `<li>[${w.sheet} #${w.rowIndex}] ${w.message}</li>`).join("")}</ul>${warnings.length > 30 ? `<div class="small text-muted">Показаны первые 30 предупреждений из ${warnings.length}.</div>` : ""}</div>`}
                 ${errors.length === 0 ? "" : `<hr /><div><strong>Ошибки:</strong><ul>${errors.slice(0, 30).map(e => `<li>[${e.sheet} #${e.rowIndex}] ${e.message}</li>`).join("")}</ul>${errors.length > 30 ? `<div class="small text-muted">Показаны первые 30 ошибок из ${errors.length}. Полный список — в Excel-файле.</div>` : ""}</div>`}

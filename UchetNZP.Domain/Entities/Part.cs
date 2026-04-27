@@ -10,6 +10,8 @@ public class Part
 
     public string? Code { get; set; }
 
+    public string? CodeRaw { get; set; }
+
     public virtual ICollection<PartRoute> Routes { get; set; } = new List<PartRoute>();
 
     public virtual ICollection<WipBalance> WipBalances { get; set; } = new List<WipBalance>();

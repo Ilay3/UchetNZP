@@ -264,6 +264,121 @@ public class ImportServiceTests
         Assert.True(summary.MaterialPreviewRows.Single().UnresolvedUnitType);
     }
 
+    [Fact]
+    public async Task ImportMetalDataExcelAsync_NormsSupportDifferentSizesAndDeduplicateWithinFile()
+    {
+        await using var dbContext = CreateContext();
+        var service = new ImportService(dbContext, new TestCurrentUserService());
+
+        var summary = await ImportNormsWorkbookAsync(service, sheet =>
+        {
+            sheet.Cell(1, 1).Value = "Обозначение";
+            sheet.Cell(1, 2).Value = "Наименование";
+            sheet.Cell(1, 3).Value = "Размеры мм";
+            sheet.Cell(1, 4).Value = "Текст нормы на деталь";
+            sheet.Cell(1, 5).Value = "Числовое значение нормы на деталь";
+            sheet.Cell(1, 6).Value = "Ед. изм.";
+
+            sheet.Cell(2, 1).Value = "DET-001";
+            sheet.Cell(2, 2).Value = "Деталь";
+            sheet.Cell(2, 3).Value = "10x20";
+            sheet.Cell(2, 4).Value = "Норма 1";
+            sheet.Cell(2, 5).Value = 1.2m;
+            sheet.Cell(2, 6).Value = "м";
+
+            sheet.Cell(3, 1).Value = "DET-001";
+            sheet.Cell(3, 2).Value = "Деталь";
+            sheet.Cell(3, 3).Value = "15x25";
+            sheet.Cell(3, 4).Value = "Норма 2";
+            sheet.Cell(3, 5).Value = 1.5m;
+            sheet.Cell(3, 6).Value = "м";
+
+            sheet.Cell(4, 1).Value = "DET-001";
+            sheet.Cell(4, 2).Value = "Деталь";
+            sheet.Cell(4, 3).Value = "15x25";
+            sheet.Cell(4, 4).Value = "Норма 2";
+            sheet.Cell(4, 5).Value = 1.5m;
+            sheet.Cell(4, 6).Value = "м";
+        });
+
+        Assert.Equal(2, summary.NormsCreated);
+        Assert.Equal(1, summary.NormsSkipped);
+        Assert.Equal(1, summary.NormDuplicates);
+        Assert.Equal(0, summary.NormsUpdated);
+
+        var norms = await dbContext.MetalConsumptionNorms.OrderBy(x => x.SizeRaw).ToListAsync();
+        Assert.Equal(2, norms.Count);
+        Assert.Contains(norms, x => x.SizeRaw == "10x20" && x.BaseConsumptionQty == 1.2m);
+        Assert.Contains(norms, x => x.SizeRaw == "15x25" && x.BaseConsumptionQty == 1.5m);
+    }
+
+    [Fact]
+    public async Task ImportMetalDataExcelAsync_NormsSupportKgAndGUnits()
+    {
+        await using var dbContext = CreateContext();
+        var service = new ImportService(dbContext, new TestCurrentUserService());
+
+        var summary = await ImportNormsWorkbookAsync(service, sheet =>
+        {
+            sheet.Cell(1, 1).Value = "Обозначение";
+            sheet.Cell(1, 2).Value = "Наименование";
+            sheet.Cell(1, 3).Value = "Размеры мм";
+            sheet.Cell(1, 4).Value = "Текст нормы на деталь";
+            sheet.Cell(1, 5).Value = "Числовое значение нормы на деталь";
+            sheet.Cell(1, 6).Value = "Ед. изм.";
+
+            sheet.Cell(2, 1).Value = "DET-KG";
+            sheet.Cell(2, 2).Value = "Деталь кг";
+            sheet.Cell(2, 3).Value = "20x30";
+            sheet.Cell(2, 4).Value = "масса";
+            sheet.Cell(2, 5).Value = 5m;
+            sheet.Cell(2, 6).Value = "кг";
+
+            sheet.Cell(3, 1).Value = "DET-G";
+            sheet.Cell(3, 2).Value = "Деталь г";
+            sheet.Cell(3, 3).Value = "20x30";
+            sheet.Cell(3, 4).Value = "масса";
+            sheet.Cell(3, 5).Value = 550m;
+            sheet.Cell(3, 6).Value = "г";
+        });
+
+        Assert.Equal(2, summary.NormsCreated);
+        var norms = await dbContext.MetalConsumptionNorms.OrderBy(x => x.ConsumptionUnit).ToListAsync();
+        Assert.Equal(new[] { "g", "kg" }, norms.Select(x => x.ConsumptionUnit).ToArray());
+        Assert.Equal(new[] { "g", "kg" }, norms.Select(x => x.NormalizedConsumptionUnit).ToArray());
+    }
+
+    [Fact]
+    public async Task ImportMetalDataExcelAsync_LongPartCodeIsStoredWithoutLoss()
+    {
+        await using var dbContext = CreateContext();
+        var service = new ImportService(dbContext, new TestCurrentUserService());
+        var longCode = $"DET-{new string('X', 120)}";
+
+        var summary = await ImportNormsWorkbookAsync(service, sheet =>
+        {
+            sheet.Cell(1, 1).Value = "Обозначение";
+            sheet.Cell(1, 2).Value = "Наименование";
+            sheet.Cell(1, 3).Value = "Размеры мм";
+            sheet.Cell(1, 4).Value = "Текст нормы на деталь";
+            sheet.Cell(1, 5).Value = "Числовое значение нормы на деталь";
+            sheet.Cell(1, 6).Value = "Ед. изм.";
+
+            sheet.Cell(2, 1).Value = longCode;
+            sheet.Cell(2, 2).Value = "Длинный код";
+            sheet.Cell(2, 3).Value = "10x10";
+            sheet.Cell(2, 4).Value = "норма";
+            sheet.Cell(2, 5).Value = 1m;
+            sheet.Cell(2, 6).Value = "м2";
+        });
+
+        Assert.Equal(1, summary.NormsCreated);
+        var part = await dbContext.Parts.SingleAsync();
+        Assert.Equal(longCode.ToUpperInvariant(), part.CodeRaw);
+        Assert.NotNull(part.Code);
+        Assert.True(part.Code!.Length <= 64);
+    }
+
     private static async Task<ImportSummaryDto> ImportWorkbookAsync(ImportService service, Action<IXLWorksheet> configure)
     {
         using var workbook = new XLWorkbook();
@@ -288,6 +403,19 @@ public class ImportServiceTests
         stream.Position = 0;
 
         return await service.ImportMetalDataExcelAsync(stream, "materials.xlsx", MetalImportMode.Materials, false);
+    }
+
+    private static async Task<MetalDataImportSummaryDto> ImportNormsWorkbookAsync(ImportService service, Action<IXLWorksheet> configure)
+    {
+        using var workbook = new XLWorkbook();
+        var worksheet = workbook.AddWorksheet("Детали - Размеры - Нормы");
+        configure(worksheet);
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        stream.Position = 0;
+
+        return await service.ImportMetalDataExcelAsync(stream, "norms.xlsx", MetalImportMode.Norms, false);
     }
 
     private static AppDbContext CreateContext()
