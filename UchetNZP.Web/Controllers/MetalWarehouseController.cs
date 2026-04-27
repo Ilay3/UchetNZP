@@ -977,11 +977,13 @@ public class MetalWarehouseController : Controller
         var now = DateTime.UtcNow;
         var userName = User?.Identity?.Name ?? "system";
         var unit = requirement.Items.FirstOrDefault()?.Unit ?? "мм";
-        var requiredQty = requirement.Items.Sum(x => x.TotalRequiredQty);
+        var baseRequiredQty = requirement.Items.Sum(x => x.RequiredQty);
+        var adjustedRequiredQty = requirement.Items.Sum(x => x.TotalRequiredQty > 0m ? x.TotalRequiredQty : x.RequiredQty);
+        var requiredQty = adjustedRequiredQty;
 
         var receiptItems = await _dbContext.MetalReceiptItems
             .AsNoTracking()
-            .Where(x => requirement.Items.Select(i => i.MetalMaterialId).Contains(x.MetalMaterialId) && !x.IsConsumed)
+            .Where(x => requirement.Items.Select(i => i.MetalMaterialId).Contains(x.MetalMaterialId) && !x.IsConsumed && x.SizeValue > 0m)
             .Select(x => new
             {
                 x.Id,
@@ -1079,7 +1081,8 @@ public class MetalWarehouseController : Controller
         }
 
         existingPlan.Status = PlanCalculatedStatus;
-        existingPlan.RequiredQty = requiredQty;
+        existingPlan.BaseRequiredQty = baseRequiredQty;
+        existingPlan.AdjustedRequiredQty = adjustedRequiredQty;
         existingPlan.PlannedQty = plannedQty;
         existingPlan.DeficitQty = deficitQty;
         existingPlan.CalculationComment = deficitQty > 0m
@@ -1302,7 +1305,8 @@ public class MetalWarehouseController : Controller
 
         var requirementPlan = await _dbContext.MetalRequirementPlans
             .AsNoTracking()
-            .Where(x => x.MetalRequirementId == id)
+                        .Where(x => x.MetalRequirementId == id)
+            .OrderByDescending(x => x.RecalculatedAt ?? x.CreatedAt)
             .Include(x => x.Items)
                 .ThenInclude(x => x.MetalReceiptItem)
                     .ThenInclude(x => x!.MetalReceipt)
@@ -1364,7 +1368,8 @@ public class MetalWarehouseController : Controller
                 {
                     Id = requirementPlan.Id,
                     Status = requirementPlan.Status,
-                    RequiredQty = requirementPlan.RequiredQty,
+                    BaseRequiredQty = requirementPlan.BaseRequiredQty,
+                    AdjustedRequiredQty = requirementPlan.AdjustedRequiredQty,
                     PlannedQty = requirementPlan.PlannedQty,
                     DeficitQty = requirementPlan.DeficitQty,
                     Unit = requirement.Items.FirstOrDefault()?.Unit ?? "мм",
