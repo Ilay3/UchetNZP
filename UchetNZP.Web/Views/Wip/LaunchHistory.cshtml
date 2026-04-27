@@ -20,9 +20,9 @@
                 <input id="historyToInput" class="form-control form-control-lg" type="date" name="to" value='@Model.Filter.To.ToString("yyyy-MM-dd")' />
             </div>
             <div class="col-md-6 col-lg-3">
-                <label class="form-label" for="historyMaterialInput">Материал</label>
+                <label class="form-label" for="historyMaterialInput">Материал (режим анализа what-if)</label>
                 <select id="historyMaterialInput" class="form-select form-select-lg" name="metalMaterialId">
-                    <option value="">— выберите материал —</option>
+                    <option value="">— из требования запуска —</option>
                     @foreach (var material in Model.Filter.MaterialOptions)
                     {
                         <option value="@material.Id" selected="@(Model.Filter.MetalMaterialId == material.Id)">@material.Name</option>
@@ -147,15 +147,14 @@
                                                             <thead class="table-light">
                                                                 <tr>
                                                                     <th>Материал</th>
-                                                                    <th>Размеры мм</th>
-                                                                    <th>Норма на 1 деталь</th>
-                                                                    <th>Ед. изм.</th>
+                                                                    <th>SizeRaw</th>
+                                                                    <th>BaseConsumptionQty</th>
+                                                                    <th>Исходная ед. изм.</th>
                                                                     <th>Количество деталей</th>
                                                                     <th>Потребность (м / м² / шт)</th>
-                                                                    <th>Масса на ед. (кг/м; кг/м²)</th>
+                                                                    <th>WeightPerUnitKg</th>
                                                                     <th>Коэффициент</th>
-                                                                    <th>Итого кг</th>
-                                                                    <th>Обратный пересчет</th>
+                                                                    <th>NeedKg</th>
                                                                     <th>Формула</th>
                                                                     <th>Остаток на складе</th>
                                                                     <th>Хватает / не хватает</th>
@@ -167,16 +166,15 @@
                                                                     <tr>
                                                                         <td>@need.MaterialDisplayName</td>
                                                                         <td>@(string.IsNullOrWhiteSpace(need.SizeRaw) ? "—" : need.SizeRaw)</td>
-                                                                        <td>@need.NormPerUnit.ToString("0.###")</td>
-                                                                        <td>@need.Unit</td>
+                                                                        <td>@need.BaseConsumptionQty.ToString("0.###")</td>
+                                                                        <td>@need.SourceUnit</td>
                                                                         <td>@need.Quantity.ToString("0.###")</td>
                                                                         <td>@need.NeedM.ToString("0.###") / @need.NeedM2.ToString("0.###") / @need.NeedPcs.ToString("0.###")</td>
-                                                                        <td>@need.MassPerMeterKg.ToString("0.###") ; @need.MassPerSquareMeterKg.ToString("0.###")</td>
+                                                                        <td>@need.WeightPerUnitKg.ToString("0.###")</td>
                                                                         <td>@need.Coefficient.ToString("0.###")</td>
-                                                                        <td>@need.TotalRequiredWeightKg.ToString("0.###")</td>
-                                                                        <td>@need.MetersFromKg.ToString("0.###") м; @need.SquareMetersFromKg.ToString("0.###") м²</td>
+                                                                        <td>@need.NeedKg.ToString("0.###")</td>
                                                                         <td><code>@need.Formula</code></td>
-                                                                        <td>@need.StockWeightKg.ToString("0.###") кг</td>
+                                                                        <td>@need.StockWeightKg.ToString("0.###") кг (@need.StockQty.ToString("0.###") @need.StockUnit)</td>
                                                                         <td>
                                                                             @if (need.IsEnough)
                                                                             {
@@ -193,32 +191,36 @@
                                                         </table>
                                                     </div>
 
-                                                    <div class="card border-0 bg-light-subtle mb-2">
-                                                        <div class="card-body py-2">
-                                                            <div class="fw-semibold mb-2">Требование на склад</div>
-                                                            @if (launch.MetalRequirement is { } requirement)
-                                                            {
-                                                                <div class="small">Номер: @requirement.Number</div>
-                                                                <div class="small">Дата: @requirement.Date.ToString("dd.MM.yyyy HH:mm")</div>
-                                                                <div class="small">Статус: <span class="badge @(requirement.Status == "Completed" ? "bg-success" : requirement.Status == "ReadyToIssue" ? "bg-primary" : requirement.Status == "Planned" ? "bg-info text-dark" : requirement.Status == "Cancelled" ? "bg-danger" : "bg-secondary")">@requirement.Status</span></div>
-                                                                <div class="small">План подбора: <span class="badge @((requirement.PlanIndicatorStatus ?? string.Empty).Contains("дефицит", StringComparison.OrdinalIgnoreCase) ? "bg-danger" : "bg-info text-dark")">@(requirement.PlanIndicatorStatus ?? "План не рассчитан")</span></div>
-                                                                <div class="small">Материал: @string.Join(", ", launch.MetalNeeds.Select(x => x.MaterialDisplayName).Distinct())</div>
-                                                                <div class="small">Требуется всего: @launch.MetalNeeds.Sum(x => x.TotalRequiredQty).ToString("0.###")</div>
-                                                                <div class="small">Ед. изм.: @string.Join(", ", launch.MetalNeeds.Select(x => x.Unit).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())</div>
-                                                                <div class="small">Итого кг: @launch.MetalNeeds.Sum(x => x.TotalRequiredWeightKg).ToString("0.###")</div>
-                                                                <a class="btn btn-sm btn-outline-primary mt-2" asp-controller="MetalWarehouse" asp-action="RequirementDetails" asp-route-id="@requirement.Id">Открыть</a>
-                                                            }
-                                                            else
-                                                            {
-                                                                <div class="text-muted small mb-2">@(launch.MetalRequirementStatusMessage ?? "Требование пока не сформировано.")</div>
-                                                            }
-                                                        </div>
-                                                    </div>
                                                 }
                                                 else
                                                 {
                                                     <div class="text-muted">Норма расхода для детали и материала не найдена.</div>
                                                 }
+
+                                                <div class="card border-0 bg-light-subtle mb-2">
+                                                    <div class="card-body py-2">
+                                                        <div class="fw-semibold mb-2">Требование на склад</div>
+                                                        @if (launch.MetalRequirement is { } requirement)
+                                                        {
+                                                            <div class="small">Номер: @requirement.Number</div>
+                                                            <div class="small">Дата: @requirement.Date.ToString("dd.MM.yyyy HH:mm")</div>
+                                                            <div class="small">Статус: <span class="badge @(requirement.Status == "Completed" ? "bg-success" : requirement.Status == "ReadyToIssue" ? "bg-primary" : requirement.Status == "Planned" ? "bg-info text-dark" : requirement.Status == "Cancelled" ? "bg-danger" : "bg-secondary")">@requirement.Status</span></div>
+                                                            <div class="small">План подбора: <span class="badge @((requirement.PlanIndicatorStatus ?? string.Empty).Contains("дефицит", StringComparison.OrdinalIgnoreCase) ? "bg-danger" : "bg-info text-dark")">@(requirement.PlanIndicatorStatus ?? "План не рассчитан")</span></div>
+                                                            @if (launch.MetalNeeds.Any())
+                                                            {
+                                                                <div class="small">Материал: @string.Join(", ", launch.MetalNeeds.Select(x => x.MaterialDisplayName).Distinct())</div>
+                                                                <div class="small">Требуется всего: @launch.MetalNeeds.Sum(x => x.TotalRequiredQty).ToString("0.###")</div>
+                                                                <div class="small">Ед. изм.: @string.Join(", ", launch.MetalNeeds.Select(x => x.Unit).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())</div>
+                                                                <div class="small">Итого кг: @launch.MetalNeeds.Sum(x => x.NeedKg).ToString("0.###")</div>
+                                                            }
+                                                            <a class="btn btn-sm btn-outline-primary mt-2" asp-controller="MetalWarehouse" asp-action="RequirementDetails" asp-route-id="@requirement.Id">Открыть</a>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="text-muted small mb-2">@(launch.MetalRequirementStatusMessage ?? "Требование пока не сформировано.")</div>
+                                                        }
+                                                    </div>
+                                                </div>
                                             </td>
                                         </tr>
                                     }

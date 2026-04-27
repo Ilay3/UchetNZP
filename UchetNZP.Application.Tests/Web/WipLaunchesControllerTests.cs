@@ -18,6 +18,159 @@ namespace UchetNZP.Application.Tests.Web;
 public class WipLaunchesControllerTests
 {
     [Fact]
+    public async Task History_UsesRequirementMaterialByDefault_WhenNoAnalysisMaterialSelected()
+    {
+        await using var dbContext = CreateContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var launchId = Guid.NewGuid();
+        var materialFromRequirementId = Guid.NewGuid();
+        var anotherMaterialId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.Parts.Add(new Part
+        {
+            Id = partId,
+            Name = "Деталь 1",
+            Code = "P-1",
+        });
+
+        dbContext.Sections.Add(new Section
+        {
+            Id = sectionId,
+            Name = "Участок",
+            Code = "SEC",
+        });
+
+        dbContext.MetalMaterials.AddRange(
+            new MetalMaterial
+            {
+                Id = materialFromRequirementId,
+                Name = "Материал из требования",
+                Code = "MAT-REQ",
+                UnitKind = "Meter",
+                WeightPerUnitKg = 2m,
+                Coefficient = 1m,
+                IsActive = true,
+            },
+            new MetalMaterial
+            {
+                Id = anotherMaterialId,
+                Name = "Другой материал",
+                Code = "MAT-ALT",
+                UnitKind = "Meter",
+                WeightPerUnitKg = 1m,
+                Coefficient = 1m,
+                IsActive = true,
+            });
+
+        dbContext.WipLaunches.Add(new WipLaunch
+        {
+            Id = launchId,
+            UserId = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            FromOpNumber = 10,
+            LaunchDate = now,
+            CreatedAt = now,
+            Quantity = 3m,
+            SumHoursToFinish = 1m,
+        });
+
+        dbContext.MetalConsumptionNorms.Add(new MetalConsumptionNorm
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            IsActive = true,
+            BaseConsumptionQty = 2m,
+            ConsumptionUnit = "m",
+            NormalizedConsumptionUnit = "m",
+            ShapeType = "rod",
+            SizeRaw = "20x2000",
+        });
+
+        dbContext.MetalRequirements.Add(new MetalRequirement
+        {
+            Id = Guid.NewGuid(),
+            RequirementNumber = "MR-2026-0001",
+            RequirementDate = now,
+            Status = "Created",
+            WipLaunchId = launchId,
+            PartId = partId,
+            PartCode = "P-1",
+            PartName = "Деталь 1",
+            Quantity = 3m,
+            MetalMaterialId = materialFromRequirementId,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = "test",
+            UpdatedBy = "test",
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var controller = CreateController(dbContext);
+        var result = await controller.History(new LaunchHistoryQuery(), CancellationToken.None);
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<LaunchHistoryViewModel>(viewResult.Model);
+        var launch = Assert.Single(model.Dates.SelectMany(x => x.Launches));
+        var need = Assert.Single(launch.MetalNeeds);
+
+        Assert.Equal(materialFromRequirementId, need.MetalMaterialId);
+    }
+
+    [Fact]
+    public async Task History_ShowsDraftMessage_WhenRequirementExistsWithoutMaterial()
+    {
+        await using var dbContext = CreateContext();
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var launchId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        dbContext.Parts.Add(new Part { Id = partId, Name = "Деталь 2", Code = "P-2" });
+        dbContext.Sections.Add(new Section { Id = sectionId, Name = "Участок", Code = "SEC" });
+        dbContext.WipLaunches.Add(new WipLaunch
+        {
+            Id = launchId,
+            UserId = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            FromOpNumber = 10,
+            LaunchDate = now,
+            CreatedAt = now,
+            Quantity = 1m,
+            SumHoursToFinish = 1m,
+        });
+        dbContext.MetalRequirements.Add(new MetalRequirement
+        {
+            Id = Guid.NewGuid(),
+            RequirementNumber = "MR-2026-0002",
+            RequirementDate = now,
+            Status = "Draft",
+            WipLaunchId = launchId,
+            PartId = partId,
+            PartCode = "P-2",
+            PartName = "Деталь 2",
+            Quantity = 1m,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = "test",
+            UpdatedBy = "test",
+        });
+        await dbContext.SaveChangesAsync();
+
+        var controller = CreateController(dbContext);
+        var result = await controller.History(new LaunchHistoryQuery(), CancellationToken.None);
+        var viewResult = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<LaunchHistoryViewModel>(viewResult.Model);
+        var launch = Assert.Single(model.Dates.SelectMany(x => x.Launches));
+
+        Assert.True(launch.HasMetalRequirement);
+        Assert.Contains("Draft", launch.MetalRequirementStatusMessage ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Delete_ReturnsForbid_WhenUserNotAuthenticated()
     {
         await using var dbContext = CreateContext();

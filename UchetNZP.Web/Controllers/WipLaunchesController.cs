@@ -88,29 +88,38 @@ public class WipLaunchesController : Controller
             .ToDictionaryAsync(x => x.MetalMaterialId, cancellationToken)
             .ConfigureAwait(false);
 
-        var requirementsByLaunch = await _dbContext.MetalRequirements
+        var requirementCandidates = await _dbContext.MetalRequirements
             .AsNoTracking()
             .Where(x => launchIds.Contains(x.WipLaunchId))
-            .GroupBy(x => x.WipLaunchId)
-            .Select(g => g.OrderByDescending(x => x.CreatedAt).First())
             .Select(x => new
             {
                 x.WipLaunchId,
-                Requirement = new LaunchMetalRequirementShortViewModel(
-                    x.Id,
-                    x.RequirementNumber,
-                    x.RequirementDate,
-                    x.Status,
-                    x.RequirementPlans
-                        .OrderByDescending(p => p.RecalculatedAt ?? p.CreatedAt)
-                        .Select(p => p.DeficitQty > 0m ? "Есть дефицит" : "План рассчитан")
-                        .FirstOrDefault() ?? "План не рассчитан")
-            })
-            .ToDictionaryAsync(
-                x => x.WipLaunchId,
-                x => x.Requirement,
-                cancellationToken)
+                RequirementId = x.Id,
+                x.RequirementNumber,
+                x.RequirementDate,
+                x.Status,
+                PlanIndicatorStatus = x.RequirementPlans
+                    .OrderByDescending(p => p.RecalculatedAt ?? p.CreatedAt)
+                    .Select(p => p.DeficitQty > 0m ? "Есть дефицит" : "План рассчитан")
+                    .FirstOrDefault() ?? "План не рассчитан",
+                x.MetalMaterialId,
+                ItemMaterialId = x.Items
+                    .OrderBy(i => i.Id)
+                    .Select(i => i.MetalMaterialId)
+                    .FirstOrDefault(),
+                ItemFormula = x.Items
+                    .OrderBy(i => i.Id)
+                    .Select(i => i.CalculationFormula)
+                    .FirstOrDefault()
+            }).ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        var requirementsByLaunch = requirementCandidates
+            .GroupBy(x => x.WipLaunchId)
+            .Select(g => g.OrderByDescending(x => x.RequirementDate).ThenByDescending(x => x.RequirementId).First())
+            .ToDictionary(
+                x => x.WipLaunchId,
+                x => x);
 
         var normsByPart = norms.GroupBy(x => x.PartId).ToDictionary(x => x.Key, x => x.ToList());
         var activeMaterialLookup = await _dbContext.MetalMaterials
@@ -119,17 +128,9 @@ public class WipLaunchesController : Controller
             .ToDictionaryAsync(x => x.Id, cancellationToken)
             .ConfigureAwait(false);
 
-        var selectedMaterialId = query?.MetalMaterialId;
-        if (!selectedMaterialId.HasValue || selectedMaterialId == Guid.Empty)
-        {
-            selectedMaterialId = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => (Guid?)x.Id).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        MetalMaterial? selectedMaterial = null;
-        if (selectedMaterialId.HasValue)
-        {
-            selectedMaterial = await _dbContext.MetalMaterials.AsNoTracking().FirstOrDefaultAsync(x => x.Id == selectedMaterialId.Value, cancellationToken).ConfigureAwait(false);
-        }
+        var analysisMaterialId = query?.MetalMaterialId is { } queryMaterialId && queryMaterialId != Guid.Empty
+            ? queryMaterialId
+            : (Guid?)null;
 
         var materialOptions = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code)).ToListAsync(cancellationToken).ConfigureAwait(false);
 
@@ -138,6 +139,16 @@ public class WipLaunchesController : Controller
             .Select(x =>
             {
                 normsByPart.TryGetValue(x.PartId, out var launchNorms);
+                requirementsByLaunch.TryGetValue(x.Id, out var requirementProjection);
+
+                var requirementMaterialId = requirementProjection?.MetalMaterialId
+                    ?? requirementProjection?.ItemMaterialId;
+                var effectiveMaterialId = analysisMaterialId ?? requirementMaterialId;
+                var selectedMaterial = effectiveMaterialId.HasValue &&
+                    activeMaterialLookup.TryGetValue(effectiveMaterialId.Value, out var materialCandidate)
+                        ? materialCandidate
+                        : null;
+
                 var needs = (launchNorms ?? [])
                     .Select(norm =>
                     {
@@ -148,6 +159,8 @@ public class WipLaunchesController : Controller
 
                         stockByMaterial.TryGetValue(selectedMaterial.Id, out var stock);
                         var calculation = MetalConsumptionCalculator.Calculate(norm, x.Quantity, selectedMaterial);
+                        var weightPerUnitKg = ResolveWeightPerUnitKg(selectedMaterial, norm.ConsumptionUnit);
+                        var formula = BuildFormulaDisplay(norm.BaseConsumptionQty, x.Quantity, norm.ConsumptionUnit, weightPerUnitKg, selectedMaterial, calculation.NeedKg);
 
                         return new LaunchMetalNeedItemViewModel(
                             selectedMaterial.Id,
@@ -155,19 +168,17 @@ public class WipLaunchesController : Controller
                             selectedMaterial.Code,
                             norm.BaseConsumptionQty,
                             norm.SizeRaw,
+                            norm.ConsumptionUnit,
                             x.Quantity,
                             calculation.NeedM,
                             calculation.NeedM2,
                             calculation.NeedPcs,
                             norm.ConsumptionUnit,
-                            selectedMaterial.MassPerMeterKg,
-                            selectedMaterial.MassPerSquareMeterKg,
-                            selectedMaterial.CoefConsumption,
+                            weightPerUnitKg,
+                            ResolveCoefficient(selectedMaterial),
                             selectedMaterial.StockUnit,
                             calculation.NeedKg,
-                            calculation.MetersFromKg,
-                            calculation.SquareMetersFromKg,
-                            calculation.Formula,
+                            formula,
                             stock?.Qty ?? 0m,
                             stock?.WeightKg ?? 0m);
                     })
@@ -175,9 +186,19 @@ public class WipLaunchesController : Controller
                     .Cast<LaunchMetalNeedItemViewModel>()
                     .ToList();
 
-                requirementsByLaunch.TryGetValue(x.Id, out var requirement);
+                var requirement = requirementProjection is null
+                    ? null
+                    : new LaunchMetalRequirementShortViewModel(
+                        requirementProjection.RequirementId,
+                        requirementProjection.RequirementNumber,
+                        requirementProjection.RequirementDate,
+                        requirementProjection.Status,
+                        requirementProjection.PlanIndicatorStatus);
                 var requirementStatusMessage = ResolveRequirementStatusMessage(
                     requirement,
+                    requirementProjection?.Status,
+                    requirementMaterialId,
+                    analysisMaterialId,
                     launchNorms,
                     activeMaterialLookup);
 
@@ -236,7 +257,7 @@ public class WipLaunchesController : Controller
         {
             From = DateTime.SpecifyKind(fromDate, DateTimeKind.Unspecified),
             To = DateTime.SpecifyKind(toDate, DateTimeKind.Unspecified),
-            MetalMaterialId = selectedMaterialId,
+            MetalMaterialId = analysisMaterialId,
             MaterialOptions = materialOptions,
         };
 
@@ -474,12 +495,26 @@ public class WipLaunchesController : Controller
 
     private static string? ResolveRequirementStatusMessage(
         LaunchMetalRequirementShortViewModel? requirement,
+        string? requirementStatus,
+        Guid? requirementMaterialId,
+        Guid? analysisMaterialId,
         IReadOnlyCollection<MetalConsumptionNorm>? launchNorms,
         IReadOnlyDictionary<Guid, MetalMaterial> activeMaterialLookup)
     {
-        if (requirement is not null)
+        if (requirement is not null &&
+            !(string.Equals(requirementStatus, "Draft", StringComparison.OrdinalIgnoreCase) && !requirementMaterialId.HasValue))
         {
             return null;
+        }
+
+        if (string.Equals(requirementStatus, "Draft", StringComparison.OrdinalIgnoreCase) && !requirementMaterialId.HasValue)
+        {
+            return "Требование в статусе Draft: материал не выбран, расчёт по норме недоступен.";
+        }
+
+        if (analysisMaterialId.HasValue)
+        {
+            return "Материал выбран в режиме анализа (what-if).";
         }
 
         if (launchNorms is null || launchNorms.Count == 0)
@@ -493,6 +528,63 @@ public class WipLaunchesController : Controller
         return hasValidMaterial
             ? null
             : "Требование не сформировано: не выбран материал";
+    }
+
+    private static decimal ResolveCoefficient(MetalMaterial material)
+    {
+        if (material.Coefficient > 0m)
+        {
+            return material.Coefficient;
+        }
+
+        if (material.CoefConsumption > 0m)
+        {
+            return material.CoefConsumption;
+        }
+
+        return 1m;
+    }
+
+    private static decimal ResolveWeightPerUnitKg(MetalMaterial material, string? unit)
+    {
+        if (material.WeightPerUnitKg.HasValue && material.WeightPerUnitKg.Value > 0m)
+        {
+            return material.WeightPerUnitKg.Value;
+        }
+
+        var normalizedUnit = NormalizeUnit(unit);
+        return normalizedUnit switch
+        {
+            "m" when material.MassPerMeterKg > 0m => material.MassPerMeterKg,
+            "m2" when material.MassPerSquareMeterKg > 0m => material.MassPerSquareMeterKg,
+            _ => 0m,
+        };
+    }
+
+    private static string BuildFormulaDisplay(decimal baseConsumptionQty, decimal quantity, string? unit, decimal weightPerUnitKg, MetalMaterial material, decimal needKg)
+    {
+        var normalizedUnit = NormalizeUnit(unit);
+        var coefficient = ResolveCoefficient(material);
+
+        return normalizedUnit switch
+        {
+            "m" => $"NeedM = {quantity:0.###} × {baseConsumptionQty:0.###}; NeedKg = {quantity * baseConsumptionQty:0.###} × {weightPerUnitKg:0.###} × {coefficient:0.###} = {needKg:0.###}",
+            "m2" => $"NeedM2 = {quantity:0.###} × {baseConsumptionQty:0.###}; NeedKg = {quantity * baseConsumptionQty:0.###} × {weightPerUnitKg:0.###} × {coefficient:0.###} = {needKg:0.###}",
+            "g" => $"NeedKg = {quantity:0.###} × ({baseConsumptionQty:0.###} / 1000) × {coefficient:0.###} = {needKg:0.###}",
+            "kg" => $"NeedKg = {quantity:0.###} × {baseConsumptionQty:0.###} × {coefficient:0.###} = {needKg:0.###}",
+            _ => $"NeedQty = {quantity:0.###} × {baseConsumptionQty:0.###}; NeedKg = NeedQty × {coefficient:0.###} = {needKg:0.###}",
+        };
+    }
+
+    private static string NormalizeUnit(string? unit)
+    {
+        var normalized = (unit ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "м" => "m",
+            "м2" or "м²" => "m2",
+            _ => normalized,
+        };
     }
 
     private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)
