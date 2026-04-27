@@ -29,29 +29,28 @@ public class AdminMetalMaterialsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(AdminMetalMaterialCreateInputModel input, CancellationToken cancellationToken)
     {
-        var (normalizedProfile, normalizedCode) = await ValidateInputAsync(input, null, cancellationToken);
+        var normalizedCode = await ValidateInputAsync(input, null, cancellationToken);
 
-        if (!ModelState.IsValid || normalizedProfile is null)
+        if (!ModelState.IsValid)
         {
             var invalidModel = await BuildPageModelAsync(input, cancellationToken);
             return View("~/Views/AdminMetalMaterials/Index.cshtml", invalidModel);
         }
 
-        var unitKind = normalizedProfile == "sheet" ? "SquareMeter" : "Meter";
-        var stockUnit = normalizedProfile == "sheet" ? "m2" : "m";
-        var weight = input.MassPerUnitKg!.Value;
+        var weight = input.WeightPerUnitKg!.Value;
+        var coefficient = input.Coefficient!.Value;
         var material = new MetalMaterial
         {
             Id = Guid.NewGuid(),
             Name = input.Name.Trim(),
             Code = normalizedCode,
             DisplayName = input.Name.Trim(),
-            UnitKind = unitKind,
-            StockUnit = stockUnit,
-            MassPerMeterKg = normalizedProfile == "sheet" ? 0m : weight,
-            MassPerSquareMeterKg = normalizedProfile == "sheet" ? weight : 0m,
+            UnitKind = "Meter",
+            StockUnit = "m",
+            MassPerMeterKg = weight,
+            MassPerSquareMeterKg = weight,
             CoefConsumption = 1m,
-            Coefficient = 1m,
+            Coefficient = coefficient,
             WeightPerUnitKg = weight,
             IsActive = input.IsActive,
         };
@@ -74,24 +73,24 @@ public class AdminMetalMaterialsController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var (normalizedProfile, normalizedCode) = await ValidateInputAsync(input, input.Id, cancellationToken);
-        if (!ModelState.IsValid || normalizedProfile is null)
+        var normalizedCode = await ValidateInputAsync(input, input.Id, cancellationToken);
+        if (!ModelState.IsValid)
         {
             var invalidModel = await BuildPageModelAsync(input, cancellationToken);
             return View("~/Views/AdminMetalMaterials/Index.cshtml", invalidModel);
         }
 
-        var unitKind = normalizedProfile == "sheet" ? "SquareMeter" : "Meter";
-        var stockUnit = normalizedProfile == "sheet" ? "m2" : "m";
-        var weight = input.MassPerUnitKg!.Value;
+        var weight = input.WeightPerUnitKg!.Value;
+        var coefficient = input.Coefficient!.Value;
         material.Name = input.Name.Trim();
         material.Code = normalizedCode;
         material.DisplayName = input.Name.Trim();
-        material.UnitKind = unitKind;
-        material.StockUnit = stockUnit;
-        material.MassPerMeterKg = normalizedProfile == "sheet" ? 0m : weight;
-        material.MassPerSquareMeterKg = normalizedProfile == "sheet" ? weight : 0m;
+        material.UnitKind = "Meter";
+        material.StockUnit = "m";
+        material.MassPerMeterKg = weight;
+        material.MassPerSquareMeterKg = weight;
         material.WeightPerUnitKg = weight;
+        material.Coefficient = coefficient;
         material.IsActive = input.IsActive;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -138,9 +137,8 @@ public class AdminMetalMaterialsController : Controller
                 Id = x.Id,
                 Name = x.Name,
                 Code = x.Code,
-                UnitKind = x.UnitKind,
-                ProfileType = x.UnitKind == "SquareMeter" ? "Лист" : "Круг/пруток/труба",
-                MassPerUnitKg = x.UnitKind == "SquareMeter" ? x.MassPerSquareMeterKg : x.MassPerMeterKg,
+                WeightPerUnitKg = (x.WeightPerUnitKg ?? 0m) > 0m ? x.WeightPerUnitKg!.Value : (x.MassPerMeterKg > 0m ? x.MassPerMeterKg : x.MassPerSquareMeterKg),
+                Coefficient = x.Coefficient,
                 IsActive = x.IsActive,
             })
             .ToListAsync(cancellationToken);
@@ -153,17 +151,16 @@ public class AdminMetalMaterialsController : Controller
         };
     }
 
-    private async Task<(string? NormalizedProfile, string? NormalizedCode)> ValidateInputAsync(AdminMetalMaterialCreateInputModel input, Guid? currentId, CancellationToken cancellationToken)
+    private async Task<string?> ValidateInputAsync(AdminMetalMaterialCreateInputModel input, Guid? currentId, CancellationToken cancellationToken)
     {
-        var normalizedProfile = NormalizeProfile(input.ProfileType);
-        if (normalizedProfile is null)
+        if (!input.WeightPerUnitKg.HasValue || input.WeightPerUnitKg.Value <= 0m)
         {
-            ModelState.AddModelError(nameof(input.ProfileType), "Укажите корректный тип профиля.");
+            ModelState.AddModelError(nameof(input.WeightPerUnitKg), "Укажите вес 1м / 1м² больше 0.");
         }
 
-        if (!input.MassPerUnitKg.HasValue || input.MassPerUnitKg.Value <= 0m)
+        if (!input.Coefficient.HasValue || input.Coefficient.Value <= 0m)
         {
-            ModelState.AddModelError(nameof(input.MassPerUnitKg), "Укажите массу на единицу больше 0.");
+            ModelState.AddModelError(nameof(input.Coefficient), "Укажите коэффициент металла больше 0.");
         }
 
         var normalizedCode = string.IsNullOrWhiteSpace(input.Code) ? null : input.Code.Trim();
@@ -177,12 +174,6 @@ public class AdminMetalMaterialsController : Controller
             }
         }
 
-        return (normalizedProfile, normalizedCode);
-    }
-
-    private static string? NormalizeProfile(string? profileType)
-    {
-        var value = (profileType ?? string.Empty).Trim().ToLowerInvariant();
-        return value is "sheet" or "rod" or "pipe" ? value : null;
+        return normalizedCode;
     }
 }

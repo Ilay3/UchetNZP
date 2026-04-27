@@ -18,11 +18,9 @@ public class AdminMetalMaterialListItemViewModel
 
     public string? Code { get; init; }
 
-    public string ProfileType { get; init; } = string.Empty;
+    public decimal WeightPerUnitKg { get; init; }
 
-    public decimal MassPerUnitKg { get; init; }
-
-    public string UnitKind { get; init; } = string.Empty;
+    public decimal Coefficient { get; init; }
 
     public bool IsActive { get; init; }
 }
@@ -36,11 +34,11 @@ public class AdminMetalMaterialCreateInputModel
     [StringLength(64, ErrorMessage = "Код не должен превышать 64 символа.")]
     public string? Code { get; set; }
 
-    [Range(0.000001d, 999999999999d, ErrorMessage = "Масса должна быть больше 0.")]
-    public decimal? MassPerUnitKg { get; set; }
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Вес должен быть больше 0.")]
+    public decimal? WeightPerUnitKg { get; set; }
 
-    [Required(ErrorMessage = "Укажите тип профиля.")]
-    public string ProfileType { get; set; } = "sheet";
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Коэффициент должен быть больше 0.")]
+    public decimal? Coefficient { get; set; } = 1m;
 
     public bool IsActive { get; set; } = true;
 }

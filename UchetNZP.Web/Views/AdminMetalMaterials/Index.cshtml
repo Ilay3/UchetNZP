@@ -43,19 +43,15 @@
                     </div>
 
                     <div class="mb-3">
-                        <label asp-for="CreateModel.ProfileType" class="form-label">Тип проката</label>
-                        <select asp-for="CreateModel.ProfileType" class="form-select">
-                            <option value="sheet">Лист</option>
-                            <option value="rod">Круг/пруток</option>
-                            <option value="pipe">Труба</option>
-                        </select>
-                        <span asp-validation-for="CreateModel.ProfileType" class="text-danger"></span>
+                        <label asp-for="CreateModel.WeightPerUnitKg" class="form-label">Вес 1м / 1м², кг</label>
+                        <input asp-for="CreateModel.WeightPerUnitKg" class="form-control" type="number" min="0.001" step="0.001" />
+                        <span asp-validation-for="CreateModel.WeightPerUnitKg" class="text-danger"></span>
                     </div>
 
                     <div class="mb-3">
-                        <label asp-for="CreateModel.MassPerUnitKg" class="form-label">Масса на единицу, кг</label>
-                        <input asp-for="CreateModel.MassPerUnitKg" class="form-control" type="number" min="0.001" step="0.001" />
-                        <span asp-validation-for="CreateModel.MassPerUnitKg" class="text-danger"></span>
+                        <label asp-for="CreateModel.Coefficient" class="form-label">Коэффициент металла</label>
+                        <input asp-for="CreateModel.Coefficient" class="form-control" type="number" min="0.001" step="0.001" />
+                        <span asp-validation-for="CreateModel.Coefficient" class="text-danger"></span>
                     </div>
 
                     <div class="form-check mb-3">
@@ -79,9 +75,8 @@
                             <tr>
                                 <th>Название</th>
                                 <th>Код</th>
-                                <th>Тип</th>
-                                <th>Масса</th>
-                                <th>Ед. хранения</th>
+                                <th>Вес 1м / 1м², кг</th>
+                                <th>Коэффициент</th>
                                 <th>Статус</th>
                                 <th class="text-end">Действия</th>
                             </tr>
@@ -90,7 +85,7 @@
                             @if (Model.Materials.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="7" class="text-muted">Материалы пока не добавлены.</td>
+                                    <td colspan="6" class="text-muted">Материалы пока не добавлены.</td>
                                 </tr>
                             }
                             else
@@ -100,9 +95,8 @@
                                     <tr>
                                         <td class="fw-semibold">@material.Name</td>
                                         <td>@(string.IsNullOrWhiteSpace(material.Code) ? "—" : material.Code)</td>
-                                        <td>@material.ProfileType</td>
-                                        <td>@material.MassPerUnitKg.ToString("0.###")</td>
-                                        <td>@material.UnitKind</td>
+                                        <td>@material.WeightPerUnitKg.ToString("0.###")</td>
+                                        <td>@material.Coefficient.ToString("0.###")</td>
                                         <td>
                                             <span class="badge @(material.IsActive ? "bg-success-subtle text-success-emphasis" : "bg-secondary-subtle text-secondary-emphasis")">
                                                 @(material.IsActive ? "Активен" : "Отключен")
@@ -114,8 +108,8 @@
                                                     data-id="@material.Id"
                                                     data-name="@material.Name"
                                                     data-code="@material.Code"
-                                                    data-profile="@(material.UnitKind == "SquareMeter" ? "sheet" : "rod")"
-                                                    data-mass="@material.MassPerUnitKg.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
+                                                    data-weight="@material.WeightPerUnitKg.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
+                                                    data-coefficient="@material.Coefficient.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
                                                     data-active="@material.IsActive.ToString().ToLowerInvariant()">
                                                 Изменить
                                             </button>
@@ -156,16 +150,12 @@
                         <input asp-for="UpdateModel.Code" class="form-control" id="edit-code" />
                     </div>
                     <div class="mb-3">
-                        <label asp-for="UpdateModel.ProfileType" class="form-label">Тип проката</label>
-                        <select asp-for="UpdateModel.ProfileType" class="form-select" id="edit-profile">
-                            <option value="sheet">Лист</option>
-                            <option value="rod">Круг/пруток</option>
-                            <option value="pipe">Труба</option>
-                        </select>
+                        <label asp-for="UpdateModel.WeightPerUnitKg" class="form-label">Вес 1м / 1м², кг</label>
+                        <input asp-for="UpdateModel.WeightPerUnitKg" class="form-control" type="number" min="0.001" step="0.001" id="edit-weight" />
                     </div>
                     <div class="mb-3">
-                        <label asp-for="UpdateModel.MassPerUnitKg" class="form-label">Масса на единицу, кг</label>
-                        <input asp-for="UpdateModel.MassPerUnitKg" class="form-control" type="number" min="0.001" step="0.001" id="edit-mass" />
+                        <label asp-for="UpdateModel.Coefficient" class="form-label">Коэффициент металла</label>
+                        <input asp-for="UpdateModel.Coefficient" class="form-control" type="number" min="0.001" step="0.001" id="edit-coefficient" />
                     </div>
                     <div class="form-check mb-1">
                         <input asp-for="UpdateModel.IsActive" class="form-check-input" id="edit-active" />
@@ -194,8 +184,8 @@
                     document.getElementById("edit-id").value = button.dataset.id || "";
                     document.getElementById("edit-name").value = button.dataset.name || "";
                     document.getElementById("edit-code").value = button.dataset.code || "";
-                    document.getElementById("edit-profile").value = button.dataset.profile || "sheet";
-                    document.getElementById("edit-mass").value = button.dataset.mass || "";
+                    document.getElementById("edit-weight").value = button.dataset.weight || "";
+                    document.getElementById("edit-coefficient").value = button.dataset.coefficient || "1";
                     document.getElementById("edit-active").checked = (button.dataset.active || "") === "true";
                     modal.show();
                 });
