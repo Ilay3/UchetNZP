@@ -129,6 +129,7 @@
         if (profile) {
             profileTypeSelect.value = profile;
         }
+        syncSearchWithSelect();
         syncProfileVisibility();
         renderUnitInputs();
     });
