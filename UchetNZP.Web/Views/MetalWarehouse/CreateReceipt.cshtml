@@ -69,6 +69,32 @@
 
             <input asp-for="ProfileType" type="hidden" />
 
+            <div class="col-md-4 profile-sheet">
+                <label asp-for="WidthMm" class="form-label">Ширина листа, мм</label>
+                <input asp-for="WidthMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+            </div>
+            <div class="col-md-4 profile-sheet">
+                <label asp-for="LengthMm" class="form-label">Длина листа, мм</label>
+                <input asp-for="LengthMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+            </div>
+            <div class="col-md-4 profile-sheet">
+                <label asp-for="ThicknessMm" class="form-label">Толщина листа, мм</label>
+                <input asp-for="ThicknessMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+            </div>
+
+            <div class="col-md-4 profile-rod profile-pipe d-none">
+                <label asp-for="DiameterMm" class="form-label">Диаметр, мм</label>
+                <input asp-for="DiameterMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+            </div>
+            <div class="col-md-4 profile-pipe d-none">
+                <label asp-for="WallThicknessMm" class="form-label">Толщина стенки, мм</label>
+                <input asp-for="WallThicknessMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+            </div>
+            <div class="col-md-4 profile-rod profile-pipe d-none">
+                <label asp-for="LengthMm" class="form-label">Длина, мм</label>
+                <input asp-for="LengthMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+            </div>
+
             <div class="col-12">
                 <label asp-for="Comment" class="form-label">Комментарий</label>
                 <textarea asp-for="Comment" class="form-control" rows="2"></textarea>
@@ -79,6 +105,10 @@
                 <div class="card bg-light border-0">
                     <div class="card-body">
                         <h2 class="h5 mb-3">Поштучные размеры</h2>
+                        <div class="text-muted small mb-2">
+                            Для каждой единицы укажите размер в <span id="unitTextHint">м</span>.
+                            Ниже показывается фактический размер заготовки для этикетки.
+                        </div>
                         <div id="unitsContainer" class="row g-3">
                             @for (var i = 0; i < Model.Units.Count; i++)
                             {

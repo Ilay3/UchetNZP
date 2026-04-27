@@ -37,6 +37,7 @@
                         <th>№</th>
                         <th>Размер</th>
                         <th>Ед. изм.</th>
+                        <th>Факт. размер заготовки</th>
                         <th>Код</th>
                     </tr>
                 </thead>
@@ -47,6 +48,7 @@
                             <td>@item.ItemIndex</td>
                             <td>@item.SizeValue.ToString("0.###")</td>
                             <td>@item.SizeUnitText</td>
+                            <td>@item.ActualBlankSizeText</td>
                             <td class="fw-semibold">@item.GeneratedCode</td>
                         </tr>
                     }

@@ -237,6 +237,8 @@ public class MetalReceiptDetailsItemViewModel
     public decimal SizeValue { get; init; }
 
     public string SizeUnitText { get; init; } = string.Empty;
+    
+    public string ActualBlankSizeText { get; init; } = string.Empty;
 
     public string GeneratedCode { get; init; } = string.Empty;
 }
