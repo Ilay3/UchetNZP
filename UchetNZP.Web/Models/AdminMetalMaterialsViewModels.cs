@@ -5,6 +5,7 @@ namespace UchetNZP.Web.Models;
 public class AdminMetalMaterialsPageViewModel
 {
     public AdminMetalMaterialCreateInputModel CreateModel { get; init; } = new();
+    public AdminMetalMaterialUpdateInputModel UpdateModel { get; init; } = new();
 
     public IReadOnlyCollection<AdminMetalMaterialListItemViewModel> Materials { get; init; } = Array.Empty<AdminMetalMaterialListItemViewModel>();
 }
@@ -42,4 +43,10 @@ public class AdminMetalMaterialCreateInputModel
     public string ProfileType { get; set; } = "sheet";
 
     public bool IsActive { get; set; } = true;
+}
+
+public class AdminMetalMaterialUpdateInputModel : AdminMetalMaterialCreateInputModel
+{
+    [Required]
+    public Guid Id { get; set; }
 }

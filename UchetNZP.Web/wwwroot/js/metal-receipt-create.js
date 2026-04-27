@@ -60,6 +60,15 @@
         });
     }
 
+    function syncSearchWithSelect() {
+        const selectedOption = materialSelect.options[materialSelect.selectedIndex];
+        if (!selectedOption || !selectedOption.value) {
+            return;
+        }
+
+        materialSearchInput.value = selectedOption.textContent || "";
+    }
+
     function getUnitText() {
         const profileType = profileTypeSelect.value;
         return profileType === "sheet" ? "м2" : "м";
@@ -104,7 +113,7 @@
                            min="0.001"
                            step="0.001"
                            value="${values.get(i) ?? ""}"
-                           required />
+                           />
                     <span class="text-danger field-validation-valid"
                           data-valmsg-for="Units[${i - 1}].SizeValue"
                           data-valmsg-replace="true"></span>
@@ -142,6 +151,7 @@
         renderUnitInputs();
     });
     refillMaterialSelect("");
+    syncSearchWithSelect();
     syncProfileVisibility();
     renderUnitInputs();
 })();
