@@ -11,6 +11,9 @@ namespace UchetNZP.Application.Services;
 
 public class LaunchService : ILaunchService
 {
+    private const string RequirementStatusCreated = "Created";
+    private const string RequirementStatusUpdated = "Updated";
+
     private readonly AppDbContext _dbContext;
     private readonly IRouteService _routeService;
     private readonly ICurrentUserService _currentUserService;
@@ -126,6 +129,12 @@ public class LaunchService : ILaunchService
                     await _dbContext.WipLaunchOperations.AddAsync(launchOperation, cancellationToken).ConfigureAwait(false);
                 }
 
+                await UpsertElectronicMetalRequirementAsync(
+                        launch,
+                        userId,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
                 pendingSummaries.Add((
                     item.PartId,
                     item.FromOpNumber,
@@ -224,5 +233,184 @@ public class LaunchService : ILaunchService
             DateTimeKind.Local => value.ToUniversalTime(),
             _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
         };
+    }
+
+    private async Task UpsertElectronicMetalRequirementAsync(WipLaunch launch, Guid userId, CancellationToken cancellationToken)
+    {
+        var activeNorms = await _dbContext.MetalConsumptionNorms
+            .AsNoTracking()
+            .Where(x => x.IsActive && x.PartId == launch.PartId && x.MetalMaterialId.HasValue && x.MetalMaterialId.Value != Guid.Empty)
+            .OrderBy(x => x.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (activeNorms.Count == 0)
+        {
+            return;
+        }
+
+        var materialIds = activeNorms
+            .Select(x => x.MetalMaterialId!.Value)
+            .Distinct()
+            .ToList();
+
+        var activeMaterials = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive && materialIds.Contains(x.Id))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (activeMaterials.Count == 0)
+        {
+            return;
+        }
+
+        var selectedNorm = activeNorms.FirstOrDefault(x => activeMaterials.Any(m => m.Id == x.MetalMaterialId!.Value));
+        if (selectedNorm is null)
+        {
+            return;
+        }
+
+        var selectedMaterial = activeMaterials.First(x => x.Id == selectedNorm.MetalMaterialId!.Value);
+        var calculation = MetalConsumptionCalculator.Calculate(selectedNorm, launch.Quantity, selectedMaterial);
+        var requiredQty = selectedNorm.BaseConsumptionQty * launch.Quantity;
+        var now = DateTime.UtcNow;
+        var actor = userId == Guid.Empty ? "system" : userId.ToString();
+
+        var requirement = await _dbContext.MetalRequirements
+            .Include(x => x.Items)
+            .FirstOrDefaultAsync(x => x.WipLaunchId == launch.Id, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (requirement is null)
+        {
+            requirement = new MetalRequirement
+            {
+                Id = Guid.NewGuid(),
+                RequirementNumber = await GetNextRequirementNumberAsync(cancellationToken).ConfigureAwait(false),
+                RequirementDate = now,
+                WipLaunchId = launch.Id,
+                PartId = launch.PartId,
+                PartCode = launch.Part?.Code ?? string.Empty,
+                PartName = launch.Part?.Name ?? string.Empty,
+                Quantity = launch.Quantity,
+                MetalMaterialId = selectedMaterial.Id,
+                Status = RequirementStatusCreated,
+                Comment = "Документ создан в электронном виде автоматически при сохранении запуска партии",
+                CreatedAt = now,
+                CreatedBy = actor,
+                UpdatedAt = now,
+                UpdatedBy = actor,
+            };
+
+            requirement.Items.Add(new MetalRequirementItem
+            {
+                Id = Guid.NewGuid(),
+                MetalMaterialId = selectedMaterial.Id,
+                ConsumptionPerUnit = selectedNorm.BaseConsumptionQty,
+                ConsumptionUnit = selectedNorm.ConsumptionUnit,
+                RequiredQty = requiredQty,
+                RequiredWeightKg = calculation.NeedKg,
+                SizeRaw = selectedNorm.SizeRaw,
+                Comment = "Строка сформирована автоматически из нормы расхода.",
+                NormPerUnit = selectedNorm.BaseConsumptionQty,
+                TotalRequiredQty = requiredQty,
+                Unit = selectedNorm.ConsumptionUnit,
+                TotalRequiredWeightKg = calculation.NeedKg,
+                CalculationFormula = calculation.Formula,
+                CalculationInput = calculation.FormulaInput,
+                SelectionSource = "auto_from_launch",
+                SelectionReason = "Автоматическое создание из запуска партии.",
+                CandidateMaterials = null,
+            });
+
+            _dbContext.MetalRequirements.Add(requirement);
+            return;
+        }
+
+        requirement.RequirementDate = now;
+        requirement.PartId = launch.PartId;
+        requirement.PartCode = launch.Part?.Code ?? requirement.PartCode;
+        requirement.PartName = launch.Part?.Name ?? requirement.PartName;
+        requirement.Quantity = launch.Quantity;
+        requirement.MetalMaterialId = selectedMaterial.Id;
+        requirement.Comment = "Документ создан в электронном виде автоматически при сохранении запуска партии";
+        requirement.UpdatedAt = now;
+        requirement.UpdatedBy = actor;
+        if (string.Equals(requirement.Status, RequirementStatusCreated, StringComparison.OrdinalIgnoreCase))
+        {
+            requirement.Status = RequirementStatusUpdated;
+        }
+
+        var existingItem = requirement.Items.FirstOrDefault();
+        if (existingItem is null)
+        {
+            requirement.Items.Add(new MetalRequirementItem
+            {
+                Id = Guid.NewGuid(),
+                MetalMaterialId = selectedMaterial.Id,
+                ConsumptionPerUnit = selectedNorm.BaseConsumptionQty,
+                ConsumptionUnit = selectedNorm.ConsumptionUnit,
+                RequiredQty = requiredQty,
+                RequiredWeightKg = calculation.NeedKg,
+                SizeRaw = selectedNorm.SizeRaw,
+                Comment = "Строка сформирована автоматически из нормы расхода.",
+                NormPerUnit = selectedNorm.BaseConsumptionQty,
+                TotalRequiredQty = requiredQty,
+                Unit = selectedNorm.ConsumptionUnit,
+                TotalRequiredWeightKg = calculation.NeedKg,
+                CalculationFormula = calculation.Formula,
+                CalculationInput = calculation.FormulaInput,
+                SelectionSource = "auto_from_launch",
+                SelectionReason = "Автоматическое обновление из запуска партии.",
+                CandidateMaterials = null,
+            });
+            return;
+        }
+
+        existingItem.MetalMaterialId = selectedMaterial.Id;
+        existingItem.ConsumptionPerUnit = selectedNorm.BaseConsumptionQty;
+        existingItem.ConsumptionUnit = selectedNorm.ConsumptionUnit;
+        existingItem.RequiredQty = requiredQty;
+        existingItem.RequiredWeightKg = calculation.NeedKg;
+        existingItem.SizeRaw = selectedNorm.SizeRaw;
+        existingItem.Comment = "Строка обновлена автоматически из нормы расхода.";
+        existingItem.NormPerUnit = selectedNorm.BaseConsumptionQty;
+        existingItem.TotalRequiredQty = requiredQty;
+        existingItem.Unit = selectedNorm.ConsumptionUnit;
+        existingItem.TotalRequiredWeightKg = calculation.NeedKg;
+        existingItem.CalculationFormula = calculation.Formula;
+        existingItem.CalculationInput = calculation.FormulaInput;
+        existingItem.SelectionSource = "auto_from_launch";
+        existingItem.SelectionReason = "Автоматическое обновление из запуска партии.";
+
+        if (requirement.Items.Count > 1)
+        {
+            _dbContext.MetalRequirementItems.RemoveRange(requirement.Items.Skip(1));
+        }
+    }
+
+    private async Task<string> GetNextRequirementNumberAsync(CancellationToken cancellationToken)
+    {
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"MR-{year}-";
+
+        var lastNumber = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => x.RequirementNumber.StartsWith(prefix))
+            .OrderByDescending(x => x.RequirementNumber)
+            .Select(x => x.RequirementNumber)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(lastNumber))
+        {
+            return $"{prefix}000001";
+        }
+
+        var chunk = lastNumber[prefix.Length..];
+        return int.TryParse(chunk, out var number)
+            ? $"{prefix}{number + 1:D6}"
+            : $"{prefix}000001";
     }
 }

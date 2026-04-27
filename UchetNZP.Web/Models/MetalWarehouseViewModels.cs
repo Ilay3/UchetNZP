@@ -295,9 +295,9 @@ public class MetalRequirementListItemViewModel
 
     public string PartDisplay { get; init; } = string.Empty;
 
-    public decimal Quantity { get; init; }
-
     public string MaterialDisplay { get; init; } = string.Empty;
+
+    public decimal Quantity { get; init; }
 
     public decimal RequiredQty { get; init; }
 
@@ -413,6 +413,8 @@ public class MetalRequirementDetailsViewModel
     public string Status { get; init; } = string.Empty;
 
     public string PartDisplay { get; init; } = string.Empty;
+
+    public string MaterialDisplay { get; init; } = string.Empty;
 
     public decimal Quantity { get; init; }
 

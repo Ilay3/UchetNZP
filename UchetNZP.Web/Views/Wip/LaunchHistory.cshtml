@@ -198,22 +198,18 @@
                                                             <div class="fw-semibold mb-2">Требование на склад</div>
                                                             @if (launch.MetalRequirement is { } requirement)
                                                             {
-                                                                <div class="small">Статус: <span class="badge bg-secondary">@requirement.Status</span></div>
                                                                 <div class="small">Номер: @requirement.Number</div>
                                                                 <div class="small">Дата: @requirement.Date.ToString("dd.MM.yyyy HH:mm")</div>
+                                                                <div class="small">Статус: <span class="badge bg-secondary">@requirement.Status</span></div>
+                                                                <div class="small">Материал: @string.Join(", ", launch.MetalNeeds.Select(x => x.MaterialDisplayName).Distinct())</div>
+                                                                <div class="small">Требуется всего: @launch.MetalNeeds.Sum(x => x.TotalRequiredQty).ToString("0.###")</div>
+                                                                <div class="small">Ед. изм.: @string.Join(", ", launch.MetalNeeds.Select(x => x.Unit).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())</div>
+                                                                <div class="small">Итого кг: @launch.MetalNeeds.Sum(x => x.TotalRequiredWeightKg).ToString("0.###")</div>
                                                                 <a class="btn btn-sm btn-outline-primary mt-2" asp-controller="MetalWarehouse" asp-action="RequirementDetails" asp-route-id="@requirement.Id">Открыть</a>
                                                             }
                                                             else
                                                             {
-                                                                <div class="text-muted small mb-2">Требование еще не создано.</div>
-                                                                <form method="post" asp-action="CreateMetalRequirement" asp-route-id="@launch.Id" class="d-inline">
-                                                                    @Html.AntiForgeryToken()
-                                                                    @if (Model.Filter.MetalMaterialId.HasValue)
-                                                                    {
-                                                                        <input type="hidden" name="manualMaterialId" value="@Model.Filter.MetalMaterialId.Value" />
-                                                                    }
-                                                                    <button type="submit" class="btn btn-outline-primary btn-sm">Создать требование</button>
-                                                                </form>
+                                                                <div class="text-muted small mb-2">@(launch.MetalRequirementStatusMessage ?? "Требование пока не сформировано.")</div>
                                                             }
                                                         </div>
                                                     </div>

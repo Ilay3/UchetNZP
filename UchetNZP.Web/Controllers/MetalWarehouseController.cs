@@ -1351,6 +1351,7 @@ public class MetalWarehouseController : Controller
             RequirementDate = requirement.RequirementDate,
             Status = requirement.Status,
             PartDisplay = string.IsNullOrWhiteSpace(requirement.PartCode) ? requirement.PartName : $"{requirement.PartName} ({requirement.PartCode})",
+            MaterialDisplay = string.IsNullOrWhiteSpace(requirement.MaterialCode) ? requirement.MaterialName : $"{requirement.MaterialName} ({requirement.MaterialCode})",
             Quantity = requirement.Quantity,
             WipLaunchId = requirement.WipLaunchId,
             LaunchDate = requirement.LaunchDate,

@@ -52,7 +52,8 @@ public class LaunchHistoryItemViewModel
         string? comment,
         IReadOnlyList<LaunchHistoryOperationViewModel> operations,
         IReadOnlyList<LaunchMetalNeedItemViewModel> metalNeeds,
-        LaunchMetalRequirementShortViewModel? metalRequirement)
+        LaunchMetalRequirementShortViewModel? metalRequirement,
+        string? metalRequirementStatusMessage)
     {
         Id = id;
         LaunchDate = launchDate;
@@ -66,6 +67,7 @@ public class LaunchHistoryItemViewModel
         Operations = operations ?? Array.Empty<LaunchHistoryOperationViewModel>();
         MetalNeeds = metalNeeds ?? Array.Empty<LaunchMetalNeedItemViewModel>();
         MetalRequirement = metalRequirement;
+        MetalRequirementStatusMessage = metalRequirementStatusMessage;
     }
 
     public Guid Id { get; }
@@ -91,6 +93,8 @@ public class LaunchHistoryItemViewModel
     public IReadOnlyList<LaunchMetalNeedItemViewModel> MetalNeeds { get; }
 
     public LaunchMetalRequirementShortViewModel? MetalRequirement { get; }
+
+    public string? MetalRequirementStatusMessage { get; }
 
     public bool HasMetalNeeds => MetalNeeds.Count > 0;
 
