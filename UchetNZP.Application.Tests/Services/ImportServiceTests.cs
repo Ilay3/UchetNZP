@@ -313,7 +313,7 @@ public class ImportServiceTests
     }
 
     [Fact]
-    public async Task ImportMetalDataExcelAsync_NormsSupportKgAndGUnits()
+    public async Task ImportMetalDataExcelAsync_NormsRejectUnsupportedGramUnit()
     {
         await using var dbContext = CreateContext();
         var service = new ImportService(dbContext, new TestCurrentUserService());
@@ -342,10 +342,14 @@ public class ImportServiceTests
             sheet.Cell(3, 6).Value = "г";
         });
 
-        Assert.Equal(2, summary.NormsCreated);
+        Assert.Equal(1, summary.NormsCreated);
+        Assert.Equal(1, summary.NormsSkipped);
+        Assert.Contains(summary.Errors, x => x.Message.Contains("Unit", StringComparison.OrdinalIgnoreCase));
+
         var norms = await dbContext.MetalConsumptionNorms.OrderBy(x => x.ConsumptionUnit).ToListAsync();
-        Assert.Equal(new[] { "g", "kg" }, norms.Select(x => x.ConsumptionUnit).ToArray());
-        Assert.Equal(new[] { "g", "kg" }, norms.Select(x => x.NormalizedConsumptionUnit).ToArray());
+        Assert.Single(norms);
+        Assert.Equal("kg", norms[0].ConsumptionUnit);
+        Assert.Equal("kg", norms[0].NormalizedConsumptionUnit);
     }
 
     [Fact]

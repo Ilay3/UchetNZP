@@ -25,7 +25,6 @@
         <form asp-action="@formAction" asp-controller="Routes" asp-route-id="@Model.Id" method="post" class="row g-4" autocomplete="off" data-loading-submit>
             @Html.AntiForgeryToken()
             <input type="hidden" asp-for="Id" />
-            <input type="hidden" asp-for="OperationName" />
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
             <div class="col-12">
@@ -43,6 +42,12 @@
                 <input asp-for="OpNumber" class="form-control form-control-lg" type="text" inputmode="text" pattern="@OperationNumber.AllowedPattern" maxlength="16" placeholder="Например, 010/1" aria-describedby="OpNumberHelp" required />
                 <div class="form-text" id="OpNumberHelp">Допустимы 1–10 цифр и дробная часть через «/».</div>
                 <span asp-validation-for="OpNumber" class="text-danger"></span>
+            </div>
+            <div class="col-lg-3">
+                <label class="form-label" for="OperationName">@Html.DisplayNameFor(model => model.OperationName) <span class="text-danger">*</span></label>
+                <input asp-for="OperationName" class="form-control form-control-lg" placeholder="Например, Токарная" aria-describedby="OperationNameHelp" required />
+                <div class="form-text" id="OperationNameHelp">Наименование технологической операции.</div>
+                <span asp-validation-for="OperationName" class="text-danger"></span>
             </div>
             <div class="col-lg-6">
                 <label class="form-label" for="SectionName">@Html.DisplayNameFor(model => model.SectionName) <span class="text-danger">*</span></label>

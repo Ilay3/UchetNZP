@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -276,6 +278,87 @@ public class RoutesController : Controller
     public IActionResult Import()
     {
         return View("~/Views/Routes/Import.cshtml");
+    }
+
+    [HttpGet("import/metal-template")]
+    public IActionResult DownloadMetalImportTemplate()
+    {
+        using var workbook = BuildMetalImportTemplate(includeExamples: true);
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return File(
+            stream.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Шаблон_импорта_материалов_и_норм.xlsx");
+    }
+
+    [HttpGet("import/metal-template-empty")]
+    public IActionResult DownloadMetalImportEmptyTemplate()
+    {
+        using var workbook = BuildMetalImportTemplate(includeExamples: false);
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return File(
+            stream.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Пустой_шаблон_импорта_материалов_и_норм.xlsx");
+    }
+
+    private static XLWorkbook BuildMetalImportTemplate(bool includeExamples)
+    {
+        var workbook = new XLWorkbook();
+
+        var materialsSheet = workbook.Worksheets.Add("Материалы и коэф. металлов");
+        materialsSheet.Cell(1, 2).Value = "Артикул";
+        materialsSheet.Cell(1, 3).Value = "Наименование";
+        materialsSheet.Cell(1, 4).Value = "Вес";
+        materialsSheet.Cell(1, 5).Value = "Коэф";
+        materialsSheet.Cell(1, 6).Value = "Выбор";
+
+        var normsSheet = workbook.Worksheets.Add("Детали - Размеры - Нормы");
+        normsSheet.Cell(1, 1).Value = "Обозначение";
+        normsSheet.Cell(1, 2).Value = "Наименование";
+        normsSheet.Cell(1, 3).Value = "Размеры мм";
+        normsSheet.Cell(1, 4).Value = "Текст нормы на деталь";
+        normsSheet.Cell(1, 5).Value = "Числовое значение нормы на деталь";
+        normsSheet.Cell(1, 6).Value = "Ед. изм.";
+
+        if (includeExamples)
+        {
+            materialsSheet.Cell(2, 2).Value = "MAT-001";
+            materialsSheet.Cell(2, 3).Value = "Лист Ст3 4мм";
+            materialsSheet.Cell(2, 4).Value = 31.4m;
+            materialsSheet.Cell(2, 5).Value = 1.00m;
+            materialsSheet.Cell(2, 6).Value = "Да";
+            materialsSheet.Cell(3, 2).Value = "MAT-002";
+            materialsSheet.Cell(3, 3).Value = "Круг 45 ф20";
+            materialsSheet.Cell(3, 4).Value = 2.47m;
+            materialsSheet.Cell(3, 5).Value = 1.00m;
+            materialsSheet.Cell(3, 6).Value = "Да";
+
+            normsSheet.Cell(2, 1).Value = "DET-001";
+            normsSheet.Cell(2, 2).Value = "Кронштейн";
+            normsSheet.Cell(2, 3).Value = "120x80";
+            normsSheet.Cell(2, 4).Value = "Площадь листа";
+            normsSheet.Cell(2, 5).Value = 0.0096m;
+            normsSheet.Cell(2, 6).Value = "м2";
+            normsSheet.Cell(3, 1).Value = "DET-002";
+            normsSheet.Cell(3, 2).Value = "Ось";
+            normsSheet.Cell(3, 3).Value = "Ø20x350";
+            normsSheet.Cell(3, 4).Value = "Длина прутка";
+            normsSheet.Cell(3, 5).Value = 0.35m;
+            normsSheet.Cell(3, 6).Value = "м";
+            normsSheet.Cell(4, 1).Value = "DET-003";
+            normsSheet.Cell(4, 2).Value = "Груз";
+            normsSheet.Cell(4, 3).Value = "5кг";
+            normsSheet.Cell(4, 4).Value = "Масса";
+            normsSheet.Cell(4, 5).Value = 5m;
+            normsSheet.Cell(4, 6).Value = "кг";
+        }
+
+        materialsSheet.Columns().AdjustToContents();
+        normsSheet.Columns().AdjustToContents();
+        return workbook;
     }
 
     [HttpGet("import/parts")]

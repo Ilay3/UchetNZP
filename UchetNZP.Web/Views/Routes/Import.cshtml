@@ -139,6 +139,22 @@
 <div class="card shadow-sm mb-5">
     <div class="card-header bg-light fw-semibold">Шаг 3. Импорт норм расхода материалов</div>
     <div class="card-body">
+        <div class="alert alert-secondary" role="note">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <div class="fw-semibold">Требуемый формат файла (готовый встроенный пример)</div>
+                <div class="d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-primary btn-sm" asp-action="DownloadMetalImportTemplate">Скачать шаблон с примерами</a>
+                    <a class="btn btn-outline-secondary btn-sm" asp-action="DownloadMetalImportEmptyTemplate">Скачать пустой шаблон</a>
+                </div>
+            </div>
+            <ul class="mb-2">
+                <li>Лист <code>Материалы и коэф. металлов</code>: используются колонки <strong>B–F</strong> (Артикул, Наименование, Вес, Коэф, Выбор).</li>
+                <li>Лист <code>Детали - Размеры - Нормы</code>: используются колонки <strong>A–F</strong> (Обозначение, Наименование, Размеры мм, Текст нормы, Значение, Ед. изм.).</li>
+                <li>Поддерживаемые единицы норм: <strong>м</strong>, <strong>м2</strong>, <strong>кг</strong>.</li>
+            </ul>
+            <div class="small text-muted">Рекомендуется начать с кнопки «Скачать шаблон с примерами», заполнить свои данные по образцу и затем импортировать файл.</div>
+        </div>
+
         <form id="metalImportForm" class="row g-3" enctype="multipart/form-data">
             <div class="col-lg-7">
                 <label class="form-label" for="metalFileInput">Файл "Нормы расхода материалов.xlsx"</label>
