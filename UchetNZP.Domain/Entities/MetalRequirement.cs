@@ -24,7 +24,11 @@ public class MetalRequirement
 
     public decimal Quantity { get; set; }
 
-    public Guid MetalMaterialId { get; set; }
+    public Guid? MetalMaterialId { get; set; }
+
+    public string SelectionStatus { get; set; } = "Resolved";
+
+    public string? ResolutionMessage { get; set; }
 
     public string? Comment { get; set; }
 

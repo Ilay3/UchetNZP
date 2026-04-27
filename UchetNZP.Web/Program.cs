@@ -40,6 +40,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IRouteService, RouteService>();
 builder.Services.AddScoped<IWipService, WipService>();
 builder.Services.AddScoped<ILaunchService, LaunchService>();
+builder.Services.AddScoped<IMaterialSelectionService, MaterialSelectionService>();
 builder.Services.AddScoped<ITransferService, TransferService>();
 builder.Services.AddScoped<ILabelNumberingService, LabelNumberingService>();
 builder.Services.AddScoped<IImportService, ImportService>();

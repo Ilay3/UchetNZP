@@ -27,6 +27,13 @@ public class MetalRequirementConfiguration : IEntityTypeConfiguration<MetalRequi
             .IsRequired()
             .HasMaxLength(32);
 
+        builder.Property(x => x.SelectionStatus)
+            .IsRequired()
+            .HasMaxLength(32);
+
+        builder.Property(x => x.ResolutionMessage)
+            .HasMaxLength(512);
+
         builder.Property(x => x.PartCode)
             .IsRequired()
             .HasMaxLength(128);
@@ -65,7 +72,8 @@ public class MetalRequirementConfiguration : IEntityTypeConfiguration<MetalRequi
         builder.HasOne(x => x.MetalMaterial)
             .WithMany(x => x.Requirements)
             .HasForeignKey(x => x.MetalMaterialId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
         builder.HasIndex(x => x.RequirementNumber)
             .IsUnique();

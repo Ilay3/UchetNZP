@@ -6,7 +6,7 @@ public class MetalRequirementItem
 
     public Guid MetalRequirementId { get; set; }
 
-    public Guid MetalMaterialId { get; set; }
+    public Guid? MetalMaterialId { get; set; }
 
     public decimal ConsumptionPerUnit { get; set; }
 

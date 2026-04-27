@@ -1571,7 +1571,12 @@ public class MetalWarehouseController : Controller
             .OrderByDescending(x => x.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var materialIds = requirement.Items.Select(i => i.MetalMaterialId).Distinct().ToList();
+        var materialIds = requirement.Items
+            .Select(i => i.MetalMaterialId)
+            .Where(x => x.HasValue && x.Value != Guid.Empty)
+            .Select(x => x!.Value)
+            .Distinct()
+            .ToList();
         var stockLookup = await _dbContext.MetalReceiptItems
             .AsNoTracking()
             .Where(x => materialIds.Contains(x.MetalMaterialId))
@@ -2035,7 +2040,7 @@ public class MetalWarehouseController : Controller
 
 internal sealed class RequirementDetailsItemProjection
 {
-    public Guid MetalMaterialId { get; init; }
+    public Guid? MetalMaterialId { get; init; }
 
     public decimal ConsumptionPerUnit { get; init; }
 
