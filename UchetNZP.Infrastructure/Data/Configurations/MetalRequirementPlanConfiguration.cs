@@ -16,7 +16,11 @@ public class MetalRequirementPlanConfiguration : IEntityTypeConfiguration<MetalR
             .IsRequired()
             .HasMaxLength(24);
 
-        builder.Property(x => x.RequiredQty)
+        builder.Property(x => x.BaseRequiredQty)
+            .HasPrecision(12, 3)
+            .IsRequired();
+
+        builder.Property(x => x.AdjustedRequiredQty)
             .HasPrecision(12, 3)
             .IsRequired();
 

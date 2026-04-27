@@ -225,12 +225,13 @@ public class LaunchMetalNeedItemViewModel
 
 public class LaunchMetalRequirementShortViewModel
 {
-    public LaunchMetalRequirementShortViewModel(Guid id, string number, DateTime date, string status)
+    public LaunchMetalRequirementShortViewModel(Guid id, string number, DateTime date, string status, string? planIndicatorStatus)
     {
         Id = id;
         Number = number ?? string.Empty;
         Date = date;
         Status = status ?? string.Empty;
+        PlanIndicatorStatus = planIndicatorStatus;
     }
 
     public Guid Id { get; }
@@ -240,6 +241,8 @@ public class LaunchMetalRequirementShortViewModel
     public DateTime Date { get; }
 
     public string Status { get; }
+
+    public string? PlanIndicatorStatus { get; }
 }
 
 public class LaunchHistoryDateGroupViewModel

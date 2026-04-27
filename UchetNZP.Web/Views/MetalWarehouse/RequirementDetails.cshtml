@@ -48,11 +48,7 @@
         }
         else if (Model.CanCreateIssueFromPlan)
         {
-            <div class="text-muted mb-3">План рассчитан. Можно оформить электронную выдачу по рассчитанным строкам.</div>
-            <form method="post" asp-controller="MetalWarehouse" asp-action="CreateIssueFromPlan" asp-route-id="@Model.Id">
-                @Html.AntiForgeryToken()
-                <button type="submit" class="btn btn-primary">Оформить выдачу по плану</button>
-            </form>
+            <div class="alert alert-secondary mb-0">План рассчитан. На текущем этапе выполняется только электронный расчет подбора без фактической выдачи со склада.</div>
         }
         else
         {
@@ -96,7 +92,7 @@
 
 <div class="card shadow-sm mt-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">План подбора</span>
+        <span class="fw-semibold">План подбора металла</span>
         <div class="d-flex gap-2">
             @if (Model.RequirementPlan is null)
             {
@@ -129,14 +125,15 @@
         else
         {
             <div class="row g-3 mb-3">
-                <div class="col-md-2"><div class="text-muted small">Требуется всего</div><div class="fw-semibold">@Model.RequirementPlan.RequiredQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
+                <div class="col-md-2"><div class="text-muted small">Требуется по требованию</div><div class="fw-semibold">@Model.RequirementPlan.BaseRequiredQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
+                <div class="col-md-2"><div class="text-muted small">Требуется к подбору</div><div class="fw-semibold">@Model.RequirementPlan.AdjustedRequiredQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
                 <div class="col-md-2"><div class="text-muted small">Подобрано</div><div class="fw-semibold">@Model.RequirementPlan.PlannedQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
                 <div class="col-md-2"><div class="text-muted small">Дефицит</div><div class="fw-semibold @(Model.RequirementPlan.DeficitQty > 0 ? "text-danger" : "text-success")">@Model.RequirementPlan.DeficitQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
-                <div class="col-md-2"><div class="text-muted small">Статус</div><div><span class="badge bg-secondary">@Model.RequirementPlan.Status</span></div></div>
+                <div class="col-md-2"><div class="text-muted small">Статус плана</div><div><span class="badge bg-secondary">@Model.RequirementPlan.Status</span></div></div>
                 <div class="col-md-4">
                     <div class="text-muted small">Расчет</div>
                     <div class="small">
-                        @Model.RequirementPlan.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), @Model.RequirementPlan.CreatedBy
+                        @((Model.RequirementPlan.RecalculatedAt ?? Model.RequirementPlan.CreatedAt).ToLocalTime().ToString("dd.MM.yyyy HH:mm")), @(string.IsNullOrWhiteSpace(Model.RequirementPlan.RecalculatedBy) ? Model.RequirementPlan.CreatedBy : Model.RequirementPlan.RecalculatedBy)
                         @if (Model.RequirementPlan.RecalculatedAt.HasValue)
                         {
                             <span class="d-block">Пересчет: @Model.RequirementPlan.RecalculatedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm"), @(string.IsNullOrWhiteSpace(Model.RequirementPlan.RecalculatedBy) ? "—" : Model.RequirementPlan.RecalculatedBy)</span>
@@ -148,7 +145,7 @@
             @if (Model.RequirementPlan.DeficitQty > 0)
             {
                 <div class="alert alert-danger py-2">
-                    Не хватает: <strong>@Model.RequirementPlan.DeficitQty.ToString("0.###") @Model.RequirementPlan.Unit</strong>
+Материала недостаточно. Не хватает: <strong>@Model.RequirementPlan.DeficitQty.ToString("0.###") @Model.RequirementPlan.Unit</strong>
                 </div>
             }
 
@@ -159,8 +156,9 @@
                             <th>Код единицы</th>
                             <th>Размер исходный</th>
                             <th>Ед. изм.</th>
+                            <th>Доступно</th>
                             <th>Будет использовано</th>
-                            <th>Остаток после использования</th>
+                            <th>Остаток после</th>
                             <th>Статус</th>
                             <th>Дата прихода</th>
                         </tr>
@@ -180,6 +178,7 @@
                                 <td>@line.SourceCode</td>
                                 <td>@line.SourceSize.ToString("0.###")</td>
                                 <td>@line.SourceUnit</td>
+                                <td>@line.SourceSize.ToString("0.###")</td>
                                 <td>@line.PlannedUseQty.ToString("0.###")</td>
                                 <td>@line.RemainingAfterQty.ToString("0.###")</td>
                                 <td><span class="badge @badgeClass">@line.LineStatus</span></td>

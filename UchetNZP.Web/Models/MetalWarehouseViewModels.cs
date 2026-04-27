@@ -447,7 +447,8 @@ public class MetalRequirementPlanViewModel
 {
     public Guid Id { get; init; }
     public string Status { get; init; } = string.Empty;
-    public decimal RequiredQty { get; init; }
+    public decimal BaseRequiredQty { get; init; }
+    public decimal AdjustedRequiredQty { get; init; }
     public decimal PlannedQty { get; init; }
     public decimal DeficitQty { get; init; }
     public string Unit { get; init; } = string.Empty;

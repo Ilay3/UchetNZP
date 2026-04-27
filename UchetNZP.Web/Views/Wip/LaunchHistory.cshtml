@@ -201,6 +201,7 @@
                                                                 <div class="small">Номер: @requirement.Number</div>
                                                                 <div class="small">Дата: @requirement.Date.ToString("dd.MM.yyyy HH:mm")</div>
                                                                 <div class="small">Статус: <span class="badge bg-secondary">@requirement.Status</span></div>
+                                                                <div class="small">План подбора: <span class="badge bg-info text-dark">@(requirement.PlanIndicatorStatus ?? "План не рассчитан")</span></div>
                                                                 <div class="small">Материал: @string.Join(", ", launch.MetalNeeds.Select(x => x.MaterialDisplayName).Distinct())</div>
                                                                 <div class="small">Требуется всего: @launch.MetalNeeds.Sum(x => x.TotalRequiredQty).ToString("0.###")</div>
                                                                 <div class="small">Ед. изм.: @string.Join(", ", launch.MetalNeeds.Select(x => x.Unit).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())</div>

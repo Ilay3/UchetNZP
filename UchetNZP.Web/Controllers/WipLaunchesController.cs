@@ -93,9 +93,22 @@ public class WipLaunchesController : Controller
             .Where(x => launchIds.Contains(x.WipLaunchId))
             .GroupBy(x => x.WipLaunchId)
             .Select(g => g.OrderByDescending(x => x.CreatedAt).First())
+            .Select(x => new
+            {
+                x.WipLaunchId,
+                Requirement = new LaunchMetalRequirementShortViewModel(
+                    x.Id,
+                    x.RequirementNumber,
+                    x.RequirementDate,
+                    x.Status,
+                    x.RequirementPlans
+                        .OrderByDescending(p => p.RecalculatedAt ?? p.CreatedAt)
+                        .Select(p => p.DeficitQty > 0m ? "Есть дефицит" : "План рассчитан")
+                        .FirstOrDefault() ?? "План не рассчитан")
+            })
             .ToDictionaryAsync(
                 x => x.WipLaunchId,
-                x => new LaunchMetalRequirementShortViewModel(x.Id, x.RequirementNumber, x.RequirementDate, x.Status),
+                x => x.Requirement,
                 cancellationToken)
             .ConfigureAwait(false);
 

@@ -10,7 +10,9 @@ public class MetalRequirementPlan
 
     public string Status { get; set; } = string.Empty;
 
-    public decimal RequiredQty { get; set; }
+    public decimal BaseRequiredQty { get; set; }
+
+    public decimal AdjustedRequiredQty { get; set; }
 
     public decimal PlannedQty { get; set; }
 
