@@ -19,6 +19,8 @@ public class MetalReceiptItem
     public decimal SizeValue { get; set; }
 
     public string SizeUnitText { get; set; } = string.Empty;
+    
+    public string ActualBlankSizeText { get; set; } = string.Empty;
 
     public string ProfileType { get; set; } = string.Empty;
 

@@ -188,6 +188,7 @@ public class MetalWarehouseController : Controller
             var unit = model.Units[i];
             var suffix = (i + 1).ToString("D3");
             var (sizeValue, sizeUnitText) = ResolveSizeFromInputOrMass(profileType, unit.SizeValue, model, material, quantity, actualWeight);
+            var actualBlankSizeText = BuildActualBlankSizeText(profileType, model, sizeValue, sizeUnitText);
             var sizePart = sizeValue.ToString("0.###").Replace('.', '_');
             receipt.Items.Add(new MetalReceiptItem
             {
@@ -198,6 +199,7 @@ public class MetalWarehouseController : Controller
                 ItemIndex = i + 1,
                 SizeValue = sizeValue,
                 SizeUnitText = sizeUnitText,
+                ActualBlankSizeText = actualBlankSizeText,
                 ProfileType = profileType,
                 ThicknessMm = model.ThicknessMm,
                 WidthMm = model.WidthMm,
@@ -272,6 +274,7 @@ public class MetalWarehouseController : Controller
                         i.ItemIndex,
                         i.SizeValue,
                         i.SizeUnitText,
+                        i.ActualBlankSizeText,
                         i.GeneratedCode,
                         i.PassportWeightKg,
                         i.ActualWeightKg,
@@ -309,6 +312,7 @@ public class MetalWarehouseController : Controller
                     ItemIndex = i.ItemIndex,
                     SizeValue = i.SizeValue,
                     SizeUnitText = i.SizeUnitText,
+                    ActualBlankSizeText = i.ActualBlankSizeText,
                     GeneratedCode = i.GeneratedCode,
                 })
                 .ToList(),
@@ -1894,6 +1898,24 @@ public class MetalWarehouseController : Controller
             "pipe" => "Труба",
             _ => profileType,
         };
+
+    private static string BuildActualBlankSizeText(string profileType, MetalReceiptCreateViewModel model, decimal sizeValue, string unitText)
+    {
+        static string Mm(decimal value) => $"{Math.Round(value, 3):0.###} мм";
+        static string M(decimal value) => $"{Math.Round(value, 3):0.###} м";
+        static string M2(decimal value) => $"{Math.Round(value, 3):0.###} м2";
+
+        return profileType switch
+        {
+            "sheet" when model.WidthMm.HasValue && model.LengthMm.HasValue =>
+                $"{Mm(model.WidthMm.Value)} × {Mm(model.LengthMm.Value)}",
+            "rod" when model.DiameterMm.HasValue && model.LengthMm.HasValue =>
+                $"Ø {Mm(model.DiameterMm.Value)} × {Mm(model.LengthMm.Value)}",
+            "pipe" when model.DiameterMm.HasValue && model.WallThicknessMm.HasValue && model.LengthMm.HasValue =>
+                $"Ø {Mm(model.DiameterMm.Value)} × {Mm(model.LengthMm.Value)}, стенка {Mm(model.WallThicknessMm.Value)}",
+            _ => unitText == "м2" ? M2(sizeValue) : M(sizeValue),
+        };
+    }
 
     private static string ToStockCategoryCaption(string stockCategory) =>
         stockCategory switch

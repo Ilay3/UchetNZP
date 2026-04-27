@@ -30,6 +30,10 @@ public class MetalReceiptItemConfiguration : IEntityTypeConfiguration<MetalRecei
         builder.Property(x => x.SizeUnitText)
             .IsRequired()
             .HasMaxLength(16);
+        
+        builder.Property(x => x.ActualBlankSizeText)
+            .IsRequired()
+            .HasMaxLength(64);
 
         builder.Property(x => x.ProfileType)
             .IsRequired()

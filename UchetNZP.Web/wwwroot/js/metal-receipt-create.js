@@ -5,6 +5,7 @@
     const materialIdInput = document.getElementById("materialId");
     const materialOptions = document.getElementById("materialOptions");
     const profileTypeSelect = document.getElementById("ProfileType") || document.getElementById("profileTypeSelect");
+    const unitTextHint = document.getElementById("unitTextHint");
     const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
     const debugContextRaw = document.getElementById("receiptDebugContext")?.textContent ?? "{}";
     const materialProfileMapRaw = document.getElementById("materialProfileMap")?.textContent ?? "{}";
@@ -76,6 +77,39 @@
         return profileType === "sheet" ? "м2" : "м";
     }
 
+    function toNumber(id) {
+        const value = document.getElementById(id)?.value ?? "";
+        const parsed = Number.parseFloat(value);
+        return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+    }
+
+    function formatMm(value) {
+        return `${value.toFixed(3).replace(/\.?0+$/, "")} мм`;
+    }
+
+    function resolveActualBlankText(sizeValue) {
+        const profileType = profileTypeSelect.value;
+        const widthMm = toNumber("WidthMm");
+        const lengthMm = toNumber("LengthMm");
+        const diameterMm = toNumber("DiameterMm");
+        const wallThicknessMm = toNumber("WallThicknessMm");
+        const unitText = getUnitText();
+
+        if (profileType === "sheet" && widthMm && lengthMm) {
+            return `${formatMm(widthMm)} × ${formatMm(lengthMm)}`;
+        }
+
+        if (profileType === "rod" && diameterMm && lengthMm) {
+            return `Ø ${formatMm(diameterMm)} × ${formatMm(lengthMm)}`;
+        }
+
+        if (profileType === "pipe" && diameterMm && wallThicknessMm && lengthMm) {
+            return `Ø ${formatMm(diameterMm)} × ${formatMm(lengthMm)}, стенка ${formatMm(wallThicknessMm)}`;
+        }
+
+        return sizeValue ? `${sizeValue} ${unitText}` : "—";
+    }
+
     function currentUnitValues() {
         const result = new Map();
         unitsContainer.querySelectorAll("input[data-index]").forEach(input => {
@@ -92,6 +126,9 @@
         const safeCount = Number.isNaN(count) || count < 1 ? 0 : Math.min(count, 200);
         const unitText = getUnitText();
         const values = currentUnitValues();
+        if (unitTextHint) {
+            unitTextHint.textContent = unitText;
+        }
 
         unitsContainer.innerHTML = "";
 
@@ -108,7 +145,8 @@
             col.className = "col-md-6";
             col.innerHTML = `
                 <div class="border rounded p-3 bg-white">
-                    <div class="fw-semibold mb-2">Единица ${i} → Размер в ${unitText}</div>
+                    <div class="fw-semibold mb-2">Единица ${i}</div>
+                    <label class="form-label">Размер в ${unitText}</label>
                     <input type="hidden" name="Units[${i - 1}].ItemIndex" value="${i}" />
                     <input type="number"
                            id="Units_${i - 1}__SizeValue"
@@ -119,12 +157,23 @@
                            step="0.001"
                            value="${values.get(i) ?? ""}"
                            />
+                    <div class="form-text">Фактический размер заготовки: <span data-actual-size="${i}">${resolveActualBlankText(values.get(i) ?? "")}</span></div>
                     <span class="text-danger field-validation-valid"
                           data-valmsg-for="Units[${i - 1}].SizeValue"
                           data-valmsg-replace="true"></span>
                 </div>`;
             unitsContainer.appendChild(col);
         }
+
+        unitsContainer.querySelectorAll("input[data-index]").forEach(input => {
+            input.addEventListener("input", () => {
+                const index = input.dataset.index;
+                const marker = unitsContainer.querySelector(`[data-actual-size="${index}"]`);
+                if (marker) {
+                    marker.textContent = resolveActualBlankText(input.value);
+                }
+            });
+        });
 
         console.debug("[MetalReceipt] Units rendered", {
             quantity: safeCount,
@@ -219,6 +268,9 @@
     profileTypeSelect.addEventListener("change", () => {
         syncProfileVisibility();
         renderUnitInputs();
+    });
+    document.querySelectorAll(".js-dimension-input").forEach(input => {
+        input.addEventListener("input", renderUnitInputs);
     });
 
     syncMaterialSelection();
