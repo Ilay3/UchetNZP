@@ -245,12 +245,14 @@ public class MetalReceiptCreateViewModel : IValidatableObject
             yield break;
         }
 
-        foreach (var unit in Units)
+        // Размер по единицам может быть не заполнен вручную:
+        // значение будет рассчитано автоматически из массы/геометрии в контроллере.
+        foreach (var unit in Units.Where(x => x.SizeValue.HasValue))
         {
-            if (!unit.SizeValue.HasValue || unit.SizeValue.Value <= 0m)
+            if (unit.SizeValue!.Value <= 0m)
             {
                 yield return new ValidationResult(
-                    $"Размер для единицы №{unit.ItemIndex} обязателен и должен быть больше 0.",
+                    $"Размер для единицы №{unit.ItemIndex} должен быть больше 0.",
                     new[] { nameof(Units) });
             }
         }

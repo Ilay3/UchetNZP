@@ -8,7 +8,10 @@
 <div class="admin-compact admin-page-layout">
     <div class="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
         <h1 class="mb-0">@ViewData["Title"]</h1>
-        <span class="text-muted small" id="adminActiveEntityLabel"></span>
+        <div class="d-flex align-items-center gap-2">
+            <a class="btn btn-sm btn-outline-primary" asp-controller="AdminMetalMaterials" asp-action="Index">Материалы металла</a>
+            <span class="text-muted small" id="adminActiveEntityLabel"></span>
+        </div>
     </div>
 
     <div class="card shadow-sm mb-4">
