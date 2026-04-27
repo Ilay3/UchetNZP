@@ -1,50 +1,61 @@
 (function () {
-    const quantityInput = document.getElementById("quantityInput");
+    const quantityInput = document.getElementById("Quantity") || document.getElementById("quantityInput");
     const unitsContainer = document.getElementById("unitsContainer");
-    const materialSelect = document.getElementById("materialSelect");
-    const materialSearchInput = document.getElementById("materialSearchInput");
-    const profileTypeSelect = document.getElementById("profileTypeSelect");
+    const materialInput = document.getElementById("materialInput");
+    const materialIdInput = document.getElementById("materialId");
+    const materialOptions = document.getElementById("materialOptions");
+    const profileTypeSelect = document.getElementById("ProfileType") || document.getElementById("profileTypeSelect");
+    const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
+    const debugContextRaw = document.getElementById("receiptDebugContext")?.textContent ?? "{}";
     const materialProfileMapRaw = document.getElementById("materialProfileMap")?.textContent ?? "{}";
     let materialProfileMap = {};
+    let debugContext = {};
     try {
         materialProfileMap = JSON.parse(materialProfileMapRaw);
     } catch {
         materialProfileMap = {};
     }
+    try {
+        debugContext = JSON.parse(debugContextRaw);
+    } catch {
+        debugContext = {};
+    }
 
-    if (!quantityInput || !unitsContainer || !materialSelect || !profileTypeSelect) {
+    if (!quantityInput || !unitsContainer || !materialInput || !materialIdInput || !materialOptions || !profileTypeSelect) {
         return;
     }
 
-    const materialOptionsSource = Array.from(materialSelect.options)
-        .filter(option => option.value)
-        .map(option => ({ value: option.value, text: (option.textContent || "").trim() }));
-
-    function refillMaterialSelect(searchText) {
-        const normalized = (searchText || "").trim().toLowerCase();
-        const selectedValue = materialSelect.value;
-        const filtered = !normalized
-            ? materialOptionsSource
-            : materialOptionsSource.filter(option => option.text.toLowerCase().includes(normalized));
-
-        materialSelect.innerHTML = "";
-        const placeholder = document.createElement("option");
-        placeholder.value = "";
-        placeholder.textContent = filtered.length > 0 ? "Выберите материал" : "Ничего не найдено";
-        materialSelect.appendChild(placeholder);
-
-        filtered.forEach(option => {
-            const item = document.createElement("option");
-            item.value = option.value;
-            item.textContent = option.text;
-            materialSelect.appendChild(item);
-        });
-
-        if (filtered.some(option => option.value === selectedValue)) {
-            materialSelect.value = selectedValue;
-        } else {
-            materialSelect.value = "";
+    const materialsByDisplay = new Map();
+    Array.from(materialOptions.querySelectorAll("option")).forEach(option => {
+        const text = (option.getAttribute("value") || "").trim();
+        const id = (option.getAttribute("data-id") || "").trim();
+        if (text && id) {
+            materialsByDisplay.set(text.toLowerCase(), { id, text });
         }
+    });
+
+    function syncMaterialSelection() {
+        const rawValue = (materialInput.value || "").trim();
+        if (!rawValue) {
+            materialIdInput.value = "";
+            return;
+        }
+
+        const match = materialsByDisplay.get(rawValue.toLowerCase());
+        materialIdInput.value = match?.id || "";
+        console.debug("[MetalReceipt] syncMaterialSelection", {
+            enteredValue: rawValue,
+            matched: Boolean(match),
+            materialId: materialIdInput.value || null,
+        });
+    }
+
+    function getSelectedMaterialId() {
+        return (materialIdInput.value || "").trim();
+    }
+
+    function getSelectedMaterialDisplay() {
+        return (materialInput.value || "").trim();
     }
 
     function syncProfileVisibility() {
@@ -58,15 +69,6 @@
         document.querySelectorAll(".profile-pipe").forEach(el => {
             el.classList.toggle("d-none", type !== "pipe");
         });
-    }
-
-    function syncSearchWithSelect() {
-        const selectedOption = materialSelect.options[materialSelect.selectedIndex];
-        if (!selectedOption || !selectedOption.value) {
-            return;
-        }
-
-        materialSearchInput.value = selectedOption.textContent || "";
     }
 
     function getUnitText() {
@@ -95,6 +97,9 @@
 
         if (safeCount === 0) {
             unitsContainer.innerHTML = '<div class="col-12 text-muted">Укажите количество, чтобы заполнить размеры по единицам.</div>';
+            console.debug("[MetalReceipt] Units not rendered: quantity is empty/invalid", {
+                quantity: quantityInput.value,
+            });
             return;
         }
 
@@ -121,6 +126,11 @@
             unitsContainer.appendChild(col);
         }
 
+        console.debug("[MetalReceipt] Units rendered", {
+            quantity: safeCount,
+            unitType: unitText,
+        });
+
         if (window.jQuery && window.jQuery.validator && window.jQuery.validator.unobtrusive) {
             const form = document.getElementById("metalReceiptForm");
             if (form) {
@@ -132,26 +142,127 @@
     }
 
     quantityInput.addEventListener("input", renderUnitInputs);
-    materialSelect.addEventListener("change", () => {
-        const materialId = materialSelect.value;
+    materialInput.addEventListener("input", () => {
+        syncMaterialSelection();
+    });
+
+    materialInput.addEventListener("change", () => {
+        syncMaterialSelection();
+        const materialId = getSelectedMaterialId();
         const profile = materialProfileMap[materialId];
         if (profile) {
             profileTypeSelect.value = profile;
         }
-        syncSearchWithSelect();
         syncProfileVisibility();
         renderUnitInputs();
     });
 
-    materialSearchInput?.addEventListener("input", () => {
-        refillMaterialSelect(materialSearchInput.value);
+    const form = document.getElementById("metalReceiptForm");
+    form?.addEventListener("submit", () => {
+        syncMaterialSelection();
+
+        const payloadPreview = {
+            receiptDate: document.getElementById("ReceiptDate")?.value || null,
+            materialDisplay: getSelectedMaterialDisplay(),
+            materialId: materialIdInput.value || null,
+            quantity: quantityInput.value || null,
+            profileType: profileTypeSelect.value || null,
+            passportWeightKg: document.getElementById("PassportWeightKg")?.value || null,
+            thicknessMm: document.getElementById("ThicknessMm")?.value || null,
+            widthMm: document.getElementById("WidthMm")?.value || null,
+            lengthMm: document.getElementById("LengthMm")?.value || null,
+            diameterMm: document.getElementById("DiameterMm")?.value || null,
+            wallThicknessMm: document.getElementById("WallThicknessMm")?.value || null,
+        };
+
+        if (materialIdInput.value) {
+            materialInput.setCustomValidity("");
+        } else if (getSelectedMaterialDisplay()) {
+            materialInput.setCustomValidity("Выберите материал из списка подсказок.");
+        } else {
+            materialInput.setCustomValidity("");
+        }
+
+        try {
+            sessionStorage.setItem(debugStorageKey, JSON.stringify({
+                submittedAt: new Date().toISOString(),
+                payloadPreview,
+            }));
+        } catch {
+            // ignore session storage errors in private mode
+        }
+
+        console.group("[MetalReceipt] Submit attempt");
+        console.log("Payload preview", payloadPreview);
+        console.log("Material selection valid", Boolean(materialIdInput.value));
+        console.groupEnd();
     });
+
+    form?.addEventListener("invalid", event => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
+            return;
+        }
+
+        console.warn("[MetalReceipt] Browser blocked submit: invalid field", {
+            id: target.id || null,
+            name: target.name || null,
+            value: target.value,
+            validationMessage: target.validationMessage,
+        });
+    }, true);
+
+    materialInput.addEventListener("input", () => {
+        materialInput.setCustomValidity("");
+    });
+
     profileTypeSelect.addEventListener("change", () => {
         syncProfileVisibility();
         renderUnitInputs();
     });
-    refillMaterialSelect("");
-    syncSearchWithSelect();
+
+    syncMaterialSelection();
+    const initialProfile = materialProfileMap[getSelectedMaterialId()];
+    if (initialProfile) {
+        profileTypeSelect.value = initialProfile;
+    }
     syncProfileVisibility();
     renderUnitInputs();
+
+    try {
+        const previousSubmitRaw = sessionStorage.getItem(debugStorageKey);
+        if (previousSubmitRaw) {
+            const previousSubmit = JSON.parse(previousSubmitRaw);
+            const modelErrors = Array.from(document.querySelectorAll(".validation-summary-errors li, .field-validation-error"))
+                .map(el => (el.textContent || "").trim())
+                .filter(Boolean);
+
+            console.group("[MetalReceipt] Previous submit result");
+            console.log("Submitted at", previousSubmit?.submittedAt ?? null);
+            console.log("Payload preview", previousSubmit?.payloadPreview ?? null);
+            if (modelErrors.length > 0) {
+                console.warn("Server returned validation errors (save not completed):", modelErrors);
+            } else {
+                console.log("No validation errors on current page. If page redirected, save likely succeeded.");
+            }
+            console.groupEnd();
+
+            sessionStorage.removeItem(debugStorageKey);
+        }
+    } catch {
+        // ignore malformed debug payload
+    }
+
+    if (debugContext && debugContext.isPostBack === true) {
+        console.group("[MetalReceipt] Server POST result");
+        console.log("ModelState valid", debugContext.modelStateIsValid === true);
+        if (Array.isArray(debugContext.errors) && debugContext.errors.length > 0) {
+            console.warn("Server-side errors", debugContext.errors);
+        } else if (debugContext.modelStateIsValid === false) {
+            console.warn("Server returned POST view without explicit ModelState messages.");
+        } else {
+            console.log("Server returned POST view with valid ModelState.");
+        }
+        console.groupEnd();
+    }
 })();
