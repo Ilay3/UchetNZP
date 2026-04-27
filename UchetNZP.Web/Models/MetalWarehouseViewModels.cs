@@ -42,7 +42,7 @@ public class MetalStockFilterViewModel
 
     public string? UnitOfMeasure { get; init; }
 
-    public bool ActiveOnly { get; init; }
+    public bool ShowConsumed { get; init; }
 
     public IReadOnlyCollection<SelectListItem> Materials { get; init; } = Array.Empty<SelectListItem>();
 
@@ -96,6 +96,14 @@ public class MetalStockItemHistoryEntryViewModel
     public string EventName { get; init; } = string.Empty;
 
     public string Description { get; init; } = string.Empty;
+
+    public string? DocumentNumber { get; init; }
+
+    public string? SourceDocumentType { get; init; }
+
+    public Guid? SourceDocumentId { get; init; }
+
+    public string? UserName { get; init; }
 }
 
 public class MetalStockItemDetailsViewModel
@@ -449,6 +457,8 @@ public class MetalRequirementDetailsViewModel
     public IReadOnlyCollection<MetalRequirementCutDetailViewModel> CutDetails { get; init; } = Array.Empty<MetalRequirementCutDetailViewModel>();
 
     public IReadOnlyCollection<MetalRequirementDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalRequirementDetailsItemViewModel>();
+
+    public IReadOnlyCollection<MetalAuditLogEntryViewModel> History { get; init; } = Array.Empty<MetalAuditLogEntryViewModel>();
 }
 
 public class MetalRequirementPlanViewModel
@@ -514,6 +524,49 @@ public class MetalIssueDetailsViewModel
     public string? CompletedBy { get; init; }
     public bool CanComplete { get; init; }
     public IReadOnlyCollection<MetalIssueDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalIssueDetailsItemViewModel>();
+    public IReadOnlyCollection<MetalAuditLogEntryViewModel> History { get; init; } = Array.Empty<MetalAuditLogEntryViewModel>();
+}
+
+public class MetalAuditLogEntryViewModel
+{
+    public DateTime EventDate { get; init; }
+    public string EventType { get; init; } = string.Empty;
+    public string UserName { get; init; } = "system";
+    public string Message { get; init; } = string.Empty;
+}
+
+public class MetalMovementsFilterViewModel
+{
+    [DataType(DataType.Date)]
+    public DateTime? DateFrom { get; init; }
+    [DataType(DataType.Date)]
+    public DateTime? DateTo { get; init; }
+    public Guid? MaterialId { get; init; }
+    public string? MovementType { get; init; }
+    public string? DocumentNumber { get; init; }
+    public string? MetalUnitCode { get; init; }
+    public IReadOnlyCollection<SelectListItem> Materials { get; init; } = Array.Empty<SelectListItem>();
+    public IReadOnlyCollection<SelectListItem> MovementTypes { get; init; } = Array.Empty<SelectListItem>();
+}
+
+public class MetalMovementRowViewModel
+{
+    public DateTime Date { get; init; }
+    public string MovementType { get; init; } = string.Empty;
+    public string Material { get; init; } = string.Empty;
+    public string MetalUnitCode { get; init; } = string.Empty;
+    public string Document { get; init; } = string.Empty;
+    public decimal? Before { get; init; }
+    public decimal Change { get; init; }
+    public decimal? After { get; init; }
+    public string Unit { get; init; } = string.Empty;
+    public string User { get; init; } = string.Empty;
+}
+
+public class MetalMovementsPageViewModel
+{
+    public MetalMovementsFilterViewModel Filter { get; init; } = new();
+    public IReadOnlyCollection<MetalMovementRowViewModel> Rows { get; init; } = Array.Empty<MetalMovementRowViewModel>();
 }
 
 public class MetalIssueDetailsItemViewModel

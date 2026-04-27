@@ -20,7 +20,7 @@
     <div class="card-body row g-3">
         <div class="col-md-3"><div class="text-muted small">Номер выдачи</div><div class="fw-semibold">@Model.IssueNumber</div></div>
         <div class="col-md-3"><div class="text-muted small">Дата</div><div class="fw-semibold">@Model.IssueDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
-        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge bg-secondary">@Model.Status</span></div></div>
+        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge @(Model.Status == "Completed" ? "bg-success" : Model.Status == "Cancelled" ? "bg-danger" : "bg-secondary")">@Model.Status</span></div></div>
         <div class="col-md-3"><div class="text-muted small">Требование</div><div class="fw-semibold">@Model.RequirementNumber</div></div>
         <div class="col-md-6"><div class="text-muted small">Деталь</div><div class="fw-semibold">@Model.PartDisplay</div></div>
         <div class="col-md-3"><div class="text-muted small">Материал</div><div class="fw-semibold">@Model.MaterialDisplay</div></div>
@@ -28,6 +28,29 @@
         @if (!string.IsNullOrWhiteSpace(Model.Comment))
         {
             <div class="col-12"><div class="text-muted small">Комментарий</div><div>@Model.Comment</div></div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-light fw-semibold">История выдачи</div>
+    <div class="card-body">
+        @if (!Model.History.Any())
+        {
+            <div class="text-muted">История пока пуста.</div>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var entry in Model.History)
+                {
+                    <li class="list-group-item px-0">
+                        <div class="d-flex justify-content-between"><span class="fw-semibold">@entry.EventType</span><span class="text-muted small">@entry.EventDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span></div>
+                        <div class="small text-muted">@entry.UserName</div>
+                        <div>@entry.Message</div>
+                    </li>
+                }
+            </ul>
         }
     </div>
 </div>

@@ -6,6 +6,7 @@ using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
 using UchetNZP.Web.Services;
 using System.Text.Json;
+using System.Security.Claims;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -14,6 +15,7 @@ public class MetalWarehouseController : Controller
 {
     private const string PlanDraftStatus = "Draft";
     private const string PlanCalculatedStatus = "Calculated";
+    private const string PlanHasDeficitStatus = "HasDeficit";
     private const string LineStatusFullUse = "FullUse";
     private const string LineStatusPartialCut = "PartialCut";
     private const string LineStatusReserveCandidate = "ReserveCandidate";
@@ -22,9 +24,20 @@ public class MetalWarehouseController : Controller
     private const string IssueCompletedStatus = "Completed";
     private const string IssueCancelledStatus = "Cancelled";
     private const string RequirementCancelledStatus = "Cancelled";
+    private const string RequirementStatusUpdated = "Updated";
+    private const string RequirementPlannedStatus = "Planned";
+    private const string RequirementReadyToIssueStatus = "ReadyToIssue";
     private const string MovementTypeIssue = "Issue";
     private const string MovementTypeFullConsumption = "FullConsumption";
     private const string MovementTypeResidualUpdate = "ResidualUpdate";
+    private const string AuditEventReceiptCreated = "ReceiptCreated";
+    private const string AuditEventRequirementCreated = "RequirementCreated";
+    private const string AuditEventRequirementUpdated = "RequirementUpdated";
+    private const string AuditEventRequirementPlanCalculated = "RequirementPlanCalculated";
+    private const string AuditEventIssueCreated = "IssueCreated";
+    private const string AuditEventIssueCompleted = "IssueCompleted";
+    private const string AuditEventStockChanged = "StockChanged";
+    private const string AuditEventErrorPrevented = "ErrorPrevented";
 
     private readonly AppDbContext _dbContext;
     private readonly ICuttingMapExcelExporter _cuttingMapExcelExporter;
@@ -196,6 +209,35 @@ public class MetalWarehouseController : Controller
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         _dbContext.MetalReceipts.Add(receipt);
+        var nowUser = GetCurrentUserContext();
+        foreach (var item in receipt.Items)
+        {
+            _dbContext.MetalStockMovements.Add(new MetalStockMovement
+            {
+                Id = Guid.NewGuid(),
+                MovementDate = now,
+                MovementType = "Receipt",
+                MetalMaterialId = item.MetalMaterialId,
+                MetalReceiptItemId = item.Id,
+                SourceDocumentType = nameof(MetalReceipt),
+                SourceDocumentId = receipt.Id,
+                QtyBefore = 0m,
+                QtyChange = item.SizeValue,
+                QtyAfter = item.SizeValue,
+                Unit = item.SizeUnitText,
+                Comment = $"Приход по документу {receipt.ReceiptNumber}.",
+                CreatedAt = now,
+                CreatedBy = nowUser.UserName,
+            });
+        }
+
+        AddAuditLog(
+            AuditEventReceiptCreated,
+            nameof(MetalReceipt),
+            receipt.Id,
+            receipt.ReceiptNumber,
+            "Создан приход металла.",
+            new { receipt.ReceiptDate, receipt.Comment, Units = receipt.Items.Count });
         await _dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -271,7 +313,7 @@ public class MetalWarehouseController : Controller
     [HttpGet("Stock")]
     public async Task<IActionResult> Stock([FromQuery] MetalStockFilterViewModel filter, CancellationToken cancellationToken)
     {
-        var onlyActive = !Request.Query.ContainsKey(nameof(MetalStockFilterViewModel.ActiveOnly)) || filter.ActiveOnly;
+        var showConsumed = filter.ShowConsumed;
         var stockQuery = _dbContext.MetalReceiptItems
             .AsNoTracking()
             .Select(x => new
@@ -287,6 +329,7 @@ public class MetalWarehouseController : Controller
                 ReceiptNumber = x.MetalReceipt != null ? x.MetalReceipt.ReceiptNumber : string.Empty,
                 ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
                 x.IsConsumed,
+                HasUsage = x.StockMovements.Any(m => m.QtyChange < 0m),
             });
 
         if (filter.MaterialId.HasValue)
@@ -306,7 +349,7 @@ public class MetalWarehouseController : Controller
             stockQuery = stockQuery.Where(x => x.SizeUnitText == unitFilter);
         }
 
-        if (onlyActive)
+        if (!showConsumed)
         {
             stockQuery = stockQuery.Where(x => !x.IsConsumed);
         }
@@ -348,7 +391,7 @@ public class MetalWarehouseController : Controller
                 MaterialId = filter.MaterialId,
                 UnitCodeOrNumber = filter.UnitCodeOrNumber,
                 UnitOfMeasure = filter.UnitOfMeasure,
-                ActiveOnly = onlyActive,
+                ShowConsumed = showConsumed,
                 Materials = materialOptions,
                 UnitOfMeasures = unitOptions,
             },
@@ -363,7 +406,7 @@ public class MetalWarehouseController : Controller
                 ReceiptNumber = x.ReceiptNumber,
                 ReceiptDate = x.ReceiptDate,
                 StockCategory = x.StockCategory,
-                Status = x.IsConsumed ? "Израсходовано" : ToStockCategoryCaption(x.StockCategory),
+                Status = ResolveStockStatus(x.IsConsumed, x.HasUsage, x.SizeValue),
             }).ToList(),
             TotalUnitsCount = stockRows.Count,
             TotalMaterialsCount = stockRows.Select(x => x.MetalMaterialId).Distinct().Count(),
@@ -613,6 +656,9 @@ public class MetalWarehouseController : Controller
                 x.QtyAfter,
                 x.Unit,
                 x.Comment,
+                x.SourceDocumentType,
+                x.SourceDocumentId,
+                x.CreatedBy,
             })
             .ToListAsync(cancellationToken);
 
@@ -623,6 +669,8 @@ public class MetalWarehouseController : Controller
                 Timestamp = item.CreatedAt,
                 EventName = "Приход",
                 Description = $"Единица добавлена по документу {item.ReceiptNumber}.",
+                DocumentNumber = item.ReceiptNumber,
+                UserName = "system",
             },
         };
 
@@ -631,12 +679,17 @@ public class MetalWarehouseController : Controller
             Timestamp = x.MovementDate,
             EventName = x.MovementType switch
             {
+                "Receipt" => "Приход",
                 MovementTypeIssue => "Выдача по требованию",
                 MovementTypeResidualUpdate => "Изменение остатка",
                 MovementTypeFullConsumption => "Полный расход",
                 _ => "Движение",
             },
             Description = $"{(x.QtyBefore ?? 0m):0.###} -> {(x.QtyAfter ?? 0m):0.###} {x.Unit} (изменение {x.QtyChange:0.###}). {(string.IsNullOrWhiteSpace(x.Comment) ? string.Empty : x.Comment)}".Trim(),
+            SourceDocumentType = x.SourceDocumentType,
+            SourceDocumentId = x.SourceDocumentId,
+            DocumentNumber = x.Comment,
+            UserName = x.CreatedBy,
         }));
 
         var model = new MetalStockItemDetailsViewModel
@@ -716,12 +769,14 @@ public class MetalWarehouseController : Controller
 
         if (requirement.Status == IssueCompletedStatus)
         {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка повторно оформить выдачу по исполненному требованию заблокирована.");
             TempData["MetalRequirementError"] = "Требование уже исполнено. Повторное оформление выдачи запрещено.";
             return RedirectToAction(nameof(RequirementDetails), new { id });
         }
 
         if (requirement.Status == RequirementCancelledStatus)
         {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка оформить выдачу по отмененному требованию заблокирована.");
             TempData["MetalRequirementError"] = "Требование отменено. Оформление выдачи запрещено.";
             return RedirectToAction(nameof(RequirementDetails), new { id });
         }
@@ -731,6 +786,7 @@ public class MetalWarehouseController : Controller
             .FirstOrDefaultAsync(x => x.MetalRequirementId == id && x.Status != IssueCancelledStatus, cancellationToken);
         if (existingIssue is not null)
         {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка создать вторую выдачу по требованию заблокирована.");
             return RedirectToAction(nameof(IssueDetails), new { id = existingIssue.Id });
         }
 
@@ -740,6 +796,7 @@ public class MetalWarehouseController : Controller
             .FirstOrDefaultAsync(x => x.MetalRequirementId == id, cancellationToken);
         if (plan is null || plan.Items.Count == 0)
         {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка создать выдачу без рассчитанного плана заблокирована.");
             TempData["MetalRequirementError"] = "Невозможно оформить выдачу: план подбора не рассчитан.";
             return RedirectToAction(nameof(RequirementDetails), new { id });
         }
@@ -747,6 +804,7 @@ public class MetalWarehouseController : Controller
         if (plan.DeficitQty > 0m)
         {
             var deficitUnit = requirement.Items.FirstOrDefault()?.Unit ?? "мм";
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, $"Попытка создать выдачу при дефиците {plan.DeficitQty:0.###} {deficitUnit} заблокирована.");
             TempData["MetalRequirementError"] = $"Невозможно оформить выдачу: по плану есть дефицит {plan.DeficitQty:0.###} {deficitUnit}.";
             return RedirectToAction(nameof(RequirementDetails), new { id });
         }
@@ -786,6 +844,10 @@ public class MetalWarehouseController : Controller
         }
 
         _dbContext.MetalIssues.Add(issue);
+        requirement.Status = RequirementReadyToIssueStatus;
+        requirement.UpdatedAt = DateTime.UtcNow;
+        requirement.UpdatedBy = User?.Identity?.Name ?? "system";
+        AddAuditLog(AuditEventIssueCreated, nameof(MetalIssue), issue.Id, issue.IssueNumber, $"Создана электронная выдача по требованию {requirement.RequirementNumber}.", new { requirementId = requirement.Id });
         await _dbContext.SaveChangesAsync(cancellationToken);
         return RedirectToAction(nameof(IssueDetails), new { id = issue.Id });
     }
@@ -837,6 +899,19 @@ public class MetalWarehouseController : Controller
             return NotFound();
         }
 
+        var history = await _dbContext.MetalAuditLogs
+            .AsNoTracking()
+            .Where(x => (x.EntityType == nameof(MetalIssue) && x.EntityId == issue.Id) || (x.EntityType == nameof(MetalRequirement) && x.EntityId == issue.MetalRequirementId))
+            .OrderByDescending(x => x.EventDate)
+            .Select(x => new MetalAuditLogEntryViewModel
+            {
+                EventDate = x.EventDate,
+                EventType = x.EventType,
+                UserName = string.IsNullOrWhiteSpace(x.UserName) ? "system" : x.UserName!,
+                Message = x.Message,
+            })
+            .ToListAsync(cancellationToken);
+
         return View("~/Views/MetalWarehouse/IssueDetails.cshtml", new MetalIssueDetailsViewModel
         {
             Id = issue.Id,
@@ -874,6 +949,7 @@ public class MetalWarehouseController : Controller
                     LineStatus = x.LineStatus,
                 })
                 .ToList(),
+            History = history,
         });
     }
 
@@ -891,6 +967,7 @@ public class MetalWarehouseController : Controller
 
         if (issue.Status == IssueCompletedStatus)
         {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalIssue), issue.Id, issue.IssueNumber, "Попытка повторно провести Completed выдачу заблокирована.");
             TempData["MetalIssueError"] = "Эта выдача уже проведена.";
             return RedirectToAction(nameof(IssueDetails), new { id });
         }
@@ -904,12 +981,14 @@ public class MetalWarehouseController : Controller
 
         if (requirement.Status == IssueCompletedStatus)
         {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка провести выдачу по уже исполненному требованию заблокирована.");
             TempData["MetalIssueError"] = "Требование уже исполнено другой выдачей. Повторное проведение запрещено.";
             return RedirectToAction(nameof(IssueDetails), new { id });
         }
 
         if (requirement.Status == RequirementCancelledStatus)
         {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка провести выдачу по отмененному требованию заблокирована.");
             TempData["MetalIssueError"] = "Требование отменено. Проведение выдачи запрещено.";
             return RedirectToAction(nameof(IssueDetails), new { id });
         }
@@ -923,6 +1002,7 @@ public class MetalWarehouseController : Controller
                 .FirstOrDefaultAsync(x => x.Id == line.MetalReceiptItemId, cancellationToken);
             if (source is null)
             {
+                AddAuditLog(AuditEventErrorPrevented, nameof(MetalIssue), issue.Id, issue.IssueNumber, $"Проведение выдачи заблокировано: не найдена исходная единица {line.SourceCode}.");
                 await tx.RollbackAsync(cancellationToken);
                 TempData["MetalIssueError"] = $"Не найдена исходная единица {line.SourceCode}.";
                 return RedirectToAction(nameof(IssueDetails), new { id });
@@ -930,6 +1010,7 @@ public class MetalWarehouseController : Controller
 
             if (source.IsConsumed)
             {
+                AddAuditLog(AuditEventErrorPrevented, nameof(MetalIssue), issue.Id, issue.IssueNumber, $"Проведение выдачи заблокировано: единица {source.GeneratedCode} уже недоступна.");
                 await tx.RollbackAsync(cancellationToken);
                 TempData["MetalIssueError"] = $"Единица {source.GeneratedCode} уже недоступна для выдачи.";
                 return RedirectToAction(nameof(IssueDetails), new { id });
@@ -937,6 +1018,7 @@ public class MetalWarehouseController : Controller
 
             if (source.SizeValue < line.IssuedQty)
             {
+                AddAuditLog(AuditEventErrorPrevented, nameof(MetalIssue), issue.Id, issue.IssueNumber, $"Проведение выдачи заблокировано: недостаточный остаток по {source.GeneratedCode}.");
                 await tx.RollbackAsync(cancellationToken);
                 TempData["MetalIssueError"] = $"Недостаточный остаток по {source.GeneratedCode}: доступно {source.SizeValue:0.###} {source.SizeUnitText}, требуется {line.IssuedQty:0.###} {line.Unit}.";
                 return RedirectToAction(nameof(IssueDetails), new { id });
@@ -974,6 +1056,7 @@ public class MetalWarehouseController : Controller
                 CreatedAt = now,
                 CreatedBy = userName,
             });
+            AddAuditLog(AuditEventStockChanged, nameof(MetalReceiptItem), source.Id, source.GeneratedCode, $"Изменение остатка по выдаче {issue.IssueNumber}: {(qtyBefore):0.###} -> {line.RemainingQtyAfter:0.###} {source.SizeUnitText}.", new { issueId = issue.Id, requirementId = requirement.Id, line.IssuedQty });
         }
 
         issue.Status = IssueCompletedStatus;
@@ -984,6 +1067,8 @@ public class MetalWarehouseController : Controller
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         await tx.CommitAsync(cancellationToken);
+        AddAuditLog(AuditEventIssueCompleted, nameof(MetalIssue), issue.Id, issue.IssueNumber, $"Выдача {issue.IssueNumber} подтверждена.");
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         return RedirectToAction(nameof(IssueDetails), new { id });
     }
@@ -998,6 +1083,14 @@ public class MetalWarehouseController : Controller
         if (requirement is null)
         {
             return NotFound();
+        }
+
+        if (requirement.Status == IssueCompletedStatus || requirement.Status == RequirementCancelledStatus)
+        {
+            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка пересчитать план по закрытому требованию заблокирована.");
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            TempData["MetalRequirementError"] = "Пересчет плана запрещен для завершенного или отмененного требования.";
+            return RedirectToAction(nameof(RequirementDetails), new { id });
         }
 
         var existingPlan = await _dbContext.MetalRequirementPlans
@@ -1110,7 +1203,7 @@ public class MetalWarehouseController : Controller
             existingPlan.RecalculatedBy = userName;
         }
 
-        existingPlan.Status = PlanCalculatedStatus;
+        existingPlan.Status = deficitQty > 0m ? PlanHasDeficitStatus : PlanCalculatedStatus;
         existingPlan.BaseRequiredQty = baseRequiredQty;
         existingPlan.AdjustedRequiredQty = adjustedRequiredQty;
         existingPlan.PlannedQty = plannedQty;
@@ -1119,6 +1212,19 @@ public class MetalWarehouseController : Controller
             ? $"Не хватает {deficitQty:0.###} {unit}."
             : "План рассчитан без дефицита.";
         existingPlan.Items = planItems;
+
+        requirement.Status = deficitQty > 0m ? RequirementStatusUpdated : RequirementPlannedStatus;
+        requirement.UpdatedAt = now;
+        requirement.UpdatedBy = userName;
+        AddAuditLog(
+            AuditEventRequirementPlanCalculated,
+            nameof(MetalRequirementPlan),
+            existingPlan.Id,
+            requirement.RequirementNumber,
+            deficitQty > 0m
+                ? $"План подбора рассчитан с дефицитом {deficitQty:0.###} {unit}."
+                : "План подбора рассчитан без дефицита.",
+            new { requirementId = requirement.Id, plannedQty, deficitQty });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return RedirectToAction(nameof(RequirementDetails), new { id });
@@ -1245,15 +1351,98 @@ public class MetalWarehouseController : Controller
     }
 
     [HttpGet("Movements")]
-    public IActionResult Movements()
+    public async Task<IActionResult> Movements([FromQuery] MetalMovementsFilterViewModel filter, CancellationToken cancellationToken)
     {
-        var model = new MetalWarehouseListPageViewModel
+        var query = _dbContext.MetalStockMovements
+            .AsNoTracking()
+            .Select(x => new
+            {
+                x.MovementDate,
+                x.MovementType,
+                Material = x.MetalMaterial != null ? x.MetalMaterial.Name : "—",
+                MetalUnitCode = x.MetalReceiptItem != null ? x.MetalReceiptItem.GeneratedCode : "—",
+                x.SourceDocumentType,
+                x.QtyBefore,
+                x.QtyChange,
+                x.QtyAfter,
+                x.Unit,
+                x.CreatedBy,
+                x.Comment,
+                x.MetalMaterialId,
+            });
+
+        if (filter.DateFrom.HasValue)
         {
-            Title = "История движений",
-            Description = "Хронология всех операций по складу металла.",
-            Headers = new[] { "Дата и время", "Операция", "Материал", "Количество", "Источник", "Ответственный" },
-            EmptyStateTitle = "Движений пока нет",
-            EmptyStateDescription = "История начнёт наполняться после проведения операций в модуле.",
+            query = query.Where(x => x.MovementDate >= filter.DateFrom.Value.Date);
+        }
+
+        if (filter.DateTo.HasValue)
+        {
+            var toExclusive = filter.DateTo.Value.Date.AddDays(1);
+            query = query.Where(x => x.MovementDate < toExclusive);
+        }
+
+        if (filter.MaterialId.HasValue)
+        {
+            query = query.Where(x => x.MetalMaterialId == filter.MaterialId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.MovementType))
+        {
+            query = query.Where(x => x.MovementType == filter.MovementType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.DocumentNumber))
+        {
+            query = query.Where(x => (x.Comment ?? string.Empty).Contains(filter.DocumentNumber.Trim()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.MetalUnitCode))
+        {
+            query = query.Where(x => x.MetalUnitCode.Contains(filter.MetalUnitCode.Trim()));
+        }
+
+        var rows = await query
+            .OrderByDescending(x => x.MovementDate)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        var model = new MetalMovementsPageViewModel
+        {
+            Filter = new MetalMovementsFilterViewModel
+            {
+                DateFrom = filter.DateFrom,
+                DateTo = filter.DateTo,
+                MaterialId = filter.MaterialId,
+                MovementType = filter.MovementType,
+                DocumentNumber = filter.DocumentNumber,
+                MetalUnitCode = filter.MetalUnitCode,
+                Materials = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => new SelectListItem
+                {
+                    Value = x.Id.ToString(),
+                    Text = string.IsNullOrWhiteSpace(x.Code) ? x.Name : $"{x.Name} ({x.Code})",
+                    Selected = filter.MaterialId == x.Id,
+                }).ToListAsync(cancellationToken),
+                MovementTypes = await _dbContext.MetalStockMovements.AsNoTracking().Select(x => x.MovementType).Distinct().OrderBy(x => x).Select(x => new SelectListItem
+                {
+                    Value = x,
+                    Text = x,
+                    Selected = filter.MovementType == x,
+                }).ToListAsync(cancellationToken),
+            },
+            Rows = rows.Select(x => new MetalMovementRowViewModel
+            {
+                Date = x.MovementDate,
+                MovementType = x.MovementType,
+                Material = x.Material,
+                MetalUnitCode = x.MetalUnitCode,
+                Document = x.Comment ?? x.SourceDocumentType,
+                Before = x.QtyBefore,
+                Change = x.QtyChange,
+                After = x.QtyAfter,
+                Unit = x.Unit,
+                User = x.CreatedBy,
+            }).ToList(),
         };
 
         return View(model);
@@ -1388,6 +1577,21 @@ public class MetalWarehouseController : Controller
             })
             .ToDictionaryAsync(x => x.MaterialId, cancellationToken);
 
+        var history = await _dbContext.MetalAuditLogs
+            .AsNoTracking()
+            .Where(x => (x.EntityType == nameof(MetalRequirement) && x.EntityId == requirement.Id)
+                        || (x.EntityType == nameof(MetalRequirementPlan) && requirementPlan != null && x.EntityId == requirementPlan.Id)
+                        || (existingIssue != null && x.EntityType == nameof(MetalIssue) && x.EntityId == existingIssue.Id))
+            .OrderByDescending(x => x.EventDate)
+            .Select(x => new MetalAuditLogEntryViewModel
+            {
+                EventDate = x.EventDate,
+                EventType = x.EventType,
+                UserName = string.IsNullOrWhiteSpace(x.UserName) ? "system" : x.UserName!,
+                Message = x.Message,
+            })
+            .ToListAsync(cancellationToken);
+
         var sourceBlank = currentPlan is null
             ? "—"
             : (ReadDecimalFromJson(currentPlan.ParametersJson, "Linear", "StockLength") is decimal stockLength
@@ -1466,6 +1670,7 @@ public class MetalWarehouseController : Controller
             },
             Items = items,
             CutDetails = [],
+            History = history,
         };
 
         if (existingIssue is not null)
@@ -1686,6 +1891,49 @@ public class MetalWarehouseController : Controller
             "scrap" => "Лом",
             _ => "В наличии",
         };
+
+    private static string ResolveStockStatus(bool isConsumed, bool hasUsage, decimal currentSize)
+    {
+        if (isConsumed || currentSize <= 0m)
+        {
+            return "Израсходовано";
+        }
+
+        if (hasUsage)
+        {
+            return "Частично использовано";
+        }
+
+        return "В наличии";
+    }
+
+    private (Guid? UserId, string UserName) GetCurrentUserContext()
+    {
+        var userName = User?.Identity?.Name ?? "system";
+        var userIdRaw = User?.FindFirstValue(ClaimTypes.NameIdentifier);
+        return Guid.TryParse(userIdRaw, out var userId)
+            ? (userId, userName)
+            : (null, userName);
+    }
+
+    private void AddAuditLog(string eventType, string entityType, Guid entityId, string? documentNumber, string message, object? payload = null)
+    {
+        var user = GetCurrentUserContext();
+        _dbContext.MetalAuditLogs.Add(new MetalAuditLog
+        {
+            Id = Guid.NewGuid(),
+            EventDate = DateTime.UtcNow,
+            EventType = eventType,
+            EntityType = entityType,
+            EntityId = entityId,
+            DocumentNumber = string.IsNullOrWhiteSpace(documentNumber) ? null : documentNumber,
+            Message = message,
+            UserId = user.UserId,
+            UserName = user.UserName,
+            PayloadJson = payload is null ? null : JsonSerializer.Serialize(payload),
+            CreatedAt = DateTime.UtcNow,
+        });
+    }
 
 
     private static DateTime ToUtcDate(DateTime value)

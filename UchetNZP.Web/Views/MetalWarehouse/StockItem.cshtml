@@ -33,15 +33,22 @@
 <div class="card shadow-sm">
     <div class="card-header bg-light fw-semibold">История движений</div>
     <div class="card-body">
-        <ul class="list-group list-group-flush">
-            @foreach (var entry in Model.History)
-            {
-                <li class="list-group-item px-0">
-                    <div class="fw-semibold">@entry.EventName</div>
-                    <div class="text-muted small">@entry.Timestamp.ToString("dd.MM.yyyy HH:mm")</div>
-                    <div>@entry.Description</div>
-                </li>
-            }
-        </ul>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead class="table-light"><tr><th>Событие</th><th>Документ</th><th>Дата</th><th>Пользователь</th><th>Комментарий</th></tr></thead>
+                <tbody>
+                @foreach (var entry in Model.History)
+                {
+                    <tr>
+                        <td>@entry.EventName</td>
+                        <td>@(string.IsNullOrWhiteSpace(entry.DocumentNumber) ? "—" : entry.DocumentNumber)</td>
+                        <td>@entry.Timestamp.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>@(string.IsNullOrWhiteSpace(entry.UserName) ? "system" : entry.UserName)</td>
+                        <td>@entry.Description</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>

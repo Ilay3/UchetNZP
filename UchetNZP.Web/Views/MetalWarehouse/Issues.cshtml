@@ -44,7 +44,7 @@
                                 <td>@item.RequirementNumber</td>
                                 <td>@item.PartDisplay</td>
                                 <td>@item.MaterialDisplay</td>
-                                <td><span class="badge bg-secondary">@item.Status</span></td>
+                                <td><span class="badge @(item.Status == "Completed" ? "bg-success" : item.Status == "Cancelled" ? "bg-danger" : "bg-secondary")">@item.Status</span></td>
                                 <td class="text-end">
                                     <a class="btn btn-sm btn-outline-primary" asp-controller="MetalWarehouse" asp-action="IssueDetails" asp-route-id="@item.Id">Открыть</a>
                                 </td>

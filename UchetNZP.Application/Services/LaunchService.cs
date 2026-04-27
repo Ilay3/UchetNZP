@@ -13,6 +13,8 @@ public class LaunchService : ILaunchService
 {
     private const string RequirementStatusCreated = "Created";
     private const string RequirementStatusUpdated = "Updated";
+    private const string AuditEventRequirementCreated = "RequirementCreated";
+    private const string AuditEventRequirementUpdated = "RequirementUpdated";
 
     private readonly AppDbContext _dbContext;
     private readonly IRouteService _routeService;
@@ -325,6 +327,20 @@ public class LaunchService : ILaunchService
             });
 
             _dbContext.MetalRequirements.Add(requirement);
+            _dbContext.MetalAuditLogs.Add(new MetalAuditLog
+            {
+                Id = Guid.NewGuid(),
+                EventDate = now,
+                EventType = AuditEventRequirementCreated,
+                EntityType = nameof(MetalRequirement),
+                EntityId = requirement.Id,
+                DocumentNumber = requirement.RequirementNumber,
+                Message = "Требование создано автоматически при сохранении запуска партии.",
+                UserId = userId == Guid.Empty ? null : userId,
+                UserName = actor,
+                PayloadJson = $"{{\"wipLaunchId\":\"{launch.Id}\",\"partId\":\"{launch.PartId}\",\"quantity\":{launch.Quantity}}}",
+                CreatedAt = now,
+            });
             return;
         }
 
@@ -388,6 +404,21 @@ public class LaunchService : ILaunchService
         {
             _dbContext.MetalRequirementItems.RemoveRange(requirement.Items.Skip(1));
         }
+
+        _dbContext.MetalAuditLogs.Add(new MetalAuditLog
+        {
+            Id = Guid.NewGuid(),
+            EventDate = now,
+            EventType = AuditEventRequirementUpdated,
+            EntityType = nameof(MetalRequirement),
+            EntityId = requirement.Id,
+            DocumentNumber = requirement.RequirementNumber,
+            Message = "Требование автоматически обновлено после изменения запуска партии.",
+            UserId = userId == Guid.Empty ? null : userId,
+            UserName = actor,
+            PayloadJson = $"{{\"wipLaunchId\":\"{launch.Id}\",\"partId\":\"{launch.PartId}\",\"quantity\":{launch.Quantity}}}",
+            CreatedAt = now,
+        });
     }
 
     private async Task<string> GetNextRequirementNumberAsync(CancellationToken cancellationToken)
