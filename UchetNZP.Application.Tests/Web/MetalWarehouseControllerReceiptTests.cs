@@ -38,9 +38,6 @@ public class MetalWarehouseControllerReceiptTests
             MetalMaterialId = material.Id,
             Quantity = 2,
             PassportWeightKg = 100m,
-            ProfileType = "sheet",
-            WidthMm = 1500m,
-            LengthMm = 3000m,
             Units = new List<MetalReceiptUnitInputViewModel>
             {
                 new() { ItemIndex = 1, SizeValue = 2.500m },
@@ -60,7 +57,8 @@ public class MetalWarehouseControllerReceiptTests
         Assert.Equal(2.500m, items[0].SizeValue);
         Assert.Equal(2.650m, items[1].SizeValue);
         Assert.All(items, x => Assert.Equal("м2", x.SizeUnitText));
-        Assert.All(items, x => Assert.Equal("1500 мм × 3000 мм", x.ActualBlankSizeText));
+        Assert.Equal("2.5 м2", items[0].ActualBlankSizeText);
+        Assert.Equal("2.65 м2", items[1].ActualBlankSizeText);
     }
 
     [Fact]
@@ -87,7 +85,6 @@ public class MetalWarehouseControllerReceiptTests
             MetalMaterialId = material.Id,
             Quantity = 2,
             PassportWeightKg = 8m,
-            ProfileType = "rod",
             Units = new List<MetalReceiptUnitInputViewModel>
             {
                 new() { ItemIndex = 1, SizeValue = null },

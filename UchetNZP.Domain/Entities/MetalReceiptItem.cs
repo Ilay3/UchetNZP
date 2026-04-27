@@ -22,18 +22,6 @@ public class MetalReceiptItem
     
     public string ActualBlankSizeText { get; set; } = string.Empty;
 
-    public string ProfileType { get; set; } = string.Empty;
-
-    public decimal? ThicknessMm { get; set; }
-
-    public decimal? WidthMm { get; set; }
-
-    public decimal? LengthMm { get; set; }
-
-    public decimal? DiameterMm { get; set; }
-
-    public decimal? WallThicknessMm { get; set; }
-
     public decimal PassportWeightKg { get; set; }
 
     public decimal ActualWeightKg { get; set; }

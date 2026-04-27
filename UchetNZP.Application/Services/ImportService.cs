@@ -1089,7 +1089,6 @@ public class ImportService : IImportService
             "м" or "m" => "m",
             "м2" or "м²" or "m2" => "m2",
             "кг" or "kg" => "kg",
-            "г" or "гр" or "g" => "g",
             _ => string.Empty
         };
     }

@@ -180,19 +180,7 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
     public List<MetalReceiptUnitInputViewModel> Units { get; set; } = new();
 
-    public string ProfileType { get; set; } = "sheet";
-
-    public decimal? ThicknessMm { get; set; }
-
-    public decimal? WidthMm { get; set; }
-
-    public decimal? LengthMm { get; set; }
-
-    public decimal? DiameterMm { get; set; }
-
-    public decimal? WallThicknessMm { get; set; }
-
-    public IReadOnlyDictionary<Guid, string> MaterialProfileTypes { get; set; } = new Dictionary<Guid, string>();
+    public IReadOnlyDictionary<Guid, string> MaterialUnitKinds { get; set; } = new Dictionary<Guid, string>();
 
     public IReadOnlyCollection<SelectListItem> Materials { get; set; } = Array.Empty<SelectListItem>();
 
@@ -262,8 +250,6 @@ public class MetalReceiptDetailsViewModel
     public decimal CalculatedWeightKg { get; init; }
 
     public decimal WeightDeviationKg { get; init; }
-
-    public string ProfileTypeDisplay { get; init; } = string.Empty;
 
     public int Quantity { get; init; }
 

@@ -70,24 +70,6 @@
                 <span asp-validation-for="Quantity" class="text-danger"></span>
             </div>
 
-            <input asp-for="ProfileType" type="hidden" />
-
-            <div class="col-md-4 profile-rod profile-pipe d-none">
-                <label asp-for="DiameterMm" class="form-label">Диаметр, мм</label>
-                <input asp-for="DiameterMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
-                <div class="form-text">Заполняйте только для трубы/прутка.</div>
-            </div>
-            <div class="col-md-4 profile-pipe d-none">
-                <label asp-for="WallThicknessMm" class="form-label">Толщина стенки, мм</label>
-                <input asp-for="WallThicknessMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
-                <div class="form-text">Для трубы укажите толщину стенки.</div>
-            </div>
-            <div class="col-md-4 profile-rod profile-pipe d-none">
-                <label asp-for="LengthMm" class="form-label">Длина, мм</label>
-                <input asp-for="LengthMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
-                <div class="form-text">Для трубы/прутка укажите длину одной единицы в мм.</div>
-            </div>
-
             <div class="col-12">
                 <label asp-for="Comment" class="form-label">Комментарий</label>
                 <textarea asp-for="Comment" class="form-control" rows="2"></textarea>
@@ -101,7 +83,6 @@
                         <h2 class="h5 mb-3">Поштучные размеры</h2>
                         <div class="text-muted small mb-2">
                             Для каждой единицы укажите размер в <span id="unitTextHint">м</span>.
-                            Для листа это площадь (м²), для трубы/прутка — длина (м).
                             Ниже сразу показывается, как размер попадёт в этикетку.
                         </div>
                         <div id="unitsContainer" class="row g-3">
@@ -137,7 +118,7 @@
     <script src="~/js/metal-receipt-create.js" asp-append-version="true"></script>
 }
 
-<script id="materialProfileMap" type="application/json">@System.Text.Json.JsonSerializer.Serialize(Model.MaterialProfileTypes)</script>
+<script id="materialUnitKindMap" type="application/json">@System.Text.Json.JsonSerializer.Serialize(Model.MaterialUnitKinds)</script>
 <script id="receiptDebugContext" type="application/json">@System.Text.Json.JsonSerializer.Serialize(new
 {
     IsPostBack = string.Equals(Context.Request.Method, "POST", StringComparison.OrdinalIgnoreCase),
