@@ -13,18 +13,27 @@ public class LaunchService : ILaunchService
 {
     private const string RequirementStatusCreated = "Created";
     private const string RequirementStatusUpdated = "Updated";
+    private const string RequirementStatusDraft = "Draft";
+    private const string SelectionStatusResolved = "Resolved";
+    private const string SelectionStatusNeedMaterialSelection = "NeedMaterialSelection";
     private const string AuditEventRequirementCreated = "RequirementCreated";
     private const string AuditEventRequirementUpdated = "RequirementUpdated";
 
     private readonly AppDbContext _dbContext;
     private readonly IRouteService _routeService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IMaterialSelectionService _materialSelectionService;
 
-    public LaunchService(AppDbContext dbContext, IRouteService routeService, ICurrentUserService currentUserService)
+    public LaunchService(
+        AppDbContext dbContext,
+        IRouteService routeService,
+        ICurrentUserService currentUserService,
+        IMaterialSelectionService materialSelectionService)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _routeService = routeService ?? throw new ArgumentNullException(nameof(routeService));
         _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+        _materialSelectionService = materialSelectionService ?? throw new ArgumentNullException(nameof(materialSelectionService));
     }
 
     public async Task<LaunchBatchSummaryDto> AddLaunchesBatchAsync(IEnumerable<LaunchItemDto> items, CancellationToken cancellationToken = default)
@@ -241,41 +250,55 @@ public class LaunchService : ILaunchService
     {
         var activeNorms = await _dbContext.MetalConsumptionNorms
             .AsNoTracking()
-            .Where(x => x.IsActive && x.PartId == launch.PartId && x.MetalMaterialId.HasValue && x.MetalMaterialId.Value != Guid.Empty)
+            .Where(x => x.IsActive && x.PartId == launch.PartId)
             .OrderBy(x => x.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        if (activeNorms.Count == 0)
-        {
-            return;
-        }
-
-        var materialIds = activeNorms
-            .Select(x => x.MetalMaterialId!.Value)
-            .Distinct()
-            .ToList();
-
         var activeMaterials = await _dbContext.MetalMaterials
             .AsNoTracking()
-            .Where(x => x.IsActive && materialIds.Contains(x.Id))
+            .Where(x => x.IsActive)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        if (activeMaterials.Count == 0)
+        var rules = await _dbContext.PartToMaterialRules
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderByDescending(x => x.Priority)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var selectedNorm = activeNorms.FirstOrDefault();
+        var part = launch.Part ?? await _dbContext.Parts.AsNoTracking().FirstOrDefaultAsync(x => x.Id == launch.PartId, cancellationToken).ConfigureAwait(false);
+
+        var selection = _materialSelectionService.ResolveForNorm(
+            part?.Name,
+            selectedNorm,
+            rules,
+            activeMaterials);
+
+        MetalMaterial? selectedMaterial = null;
+        MetalConsumptionCalculationResult? calculation = null;
+        decimal requiredQty = 0m;
+        if (selection.IsResolved && selection.MetalMaterialId.HasValue)
         {
-            return;
+            selectedMaterial = activeMaterials.FirstOrDefault(x => x.Id == selection.MetalMaterialId.Value);
+            if (selectedMaterial is not null && selectedNorm is not null)
+            {
+                calculation = MetalConsumptionCalculator.Calculate(selectedNorm, launch.Quantity, selectedMaterial);
+                requiredQty = selectedNorm.BaseConsumptionQty * launch.Quantity;
+            }
+            else
+            {
+                selection = MaterialSelectionDecision.NeedSelection("Материал из резолвинга не найден среди активных материалов.");
+            }
         }
 
-        var selectedNorm = activeNorms.FirstOrDefault(x => activeMaterials.Any(m => m.Id == x.MetalMaterialId!.Value));
-        if (selectedNorm is null)
+        if (selectedNorm is not null && requiredQty == 0m)
         {
-            return;
+            requiredQty = selectedNorm.BaseConsumptionQty * launch.Quantity;
         }
 
-        var selectedMaterial = activeMaterials.First(x => x.Id == selectedNorm.MetalMaterialId!.Value);
-        var calculation = MetalConsumptionCalculator.Calculate(selectedNorm, launch.Quantity, selectedMaterial);
-        var requiredQty = selectedNorm.BaseConsumptionQty * launch.Quantity;
         var now = DateTime.UtcNow;
         var actor = userId == Guid.Empty ? "system" : userId.ToString();
 
@@ -283,6 +306,12 @@ public class LaunchService : ILaunchService
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.WipLaunchId == launch.Id, cancellationToken)
             .ConfigureAwait(false);
+
+        var requirementStatus = selection.IsResolved ? RequirementStatusCreated : RequirementStatusDraft;
+        var selectionStatus = selection.IsResolved ? SelectionStatusResolved : SelectionStatusNeedMaterialSelection;
+        var requirementComment = selection.IsResolved
+            ? "Документ создан в электронном виде автоматически при сохранении запуска партии"
+            : "Документ создан автоматически, материал требует ручного выбора.";
 
         if (requirement is null)
         {
@@ -293,12 +322,14 @@ public class LaunchService : ILaunchService
                 RequirementDate = now,
                 WipLaunchId = launch.Id,
                 PartId = launch.PartId,
-                PartCode = launch.Part?.Code ?? string.Empty,
-                PartName = launch.Part?.Name ?? string.Empty,
+                PartCode = part?.Code ?? string.Empty,
+                PartName = part?.Name ?? string.Empty,
                 Quantity = launch.Quantity,
-                MetalMaterialId = selectedMaterial.Id,
-                Status = RequirementStatusCreated,
-                Comment = "Документ создан в электронном виде автоматически при сохранении запуска партии",
+                MetalMaterialId = selectedMaterial?.Id,
+                Status = requirementStatus,
+                SelectionStatus = selectionStatus,
+                ResolutionMessage = selection.Reason,
+                Comment = requirementComment,
                 CreatedAt = now,
                 CreatedBy = actor,
                 UpdatedAt = now,
@@ -308,22 +339,24 @@ public class LaunchService : ILaunchService
             requirement.Items.Add(new MetalRequirementItem
             {
                 Id = Guid.NewGuid(),
-                MetalMaterialId = selectedMaterial.Id,
-                ConsumptionPerUnit = selectedNorm.BaseConsumptionQty,
-                ConsumptionUnit = selectedNorm.ConsumptionUnit,
+                MetalMaterialId = selectedMaterial?.Id,
+                ConsumptionPerUnit = selectedNorm?.BaseConsumptionQty ?? 0m,
+                ConsumptionUnit = selectedNorm?.ConsumptionUnit ?? "pcs",
                 RequiredQty = requiredQty,
-                RequiredWeightKg = calculation.NeedKg,
-                SizeRaw = selectedNorm.SizeRaw,
-                Comment = "Строка сформирована автоматически из нормы расхода.",
-                NormPerUnit = selectedNorm.BaseConsumptionQty,
+                RequiredWeightKg = calculation?.NeedKg,
+                SizeRaw = selectedNorm?.SizeRaw,
+                Comment = selection.IsResolved
+                    ? "Строка сформирована автоматически из нормы расхода."
+                    : "Строка сформирована автоматически, требуется выбор материала.",
+                NormPerUnit = selectedNorm?.BaseConsumptionQty ?? 0m,
                 TotalRequiredQty = requiredQty,
-                Unit = selectedNorm.ConsumptionUnit,
-                TotalRequiredWeightKg = calculation.NeedKg,
-                CalculationFormula = calculation.Formula,
-                CalculationInput = calculation.FormulaInput,
-                SelectionSource = "auto_from_launch",
-                SelectionReason = "Автоматическое создание из запуска партии.",
-                CandidateMaterials = null,
+                Unit = selectedNorm?.ConsumptionUnit ?? "pcs",
+                TotalRequiredWeightKg = calculation?.NeedKg,
+                CalculationFormula = calculation?.Formula,
+                CalculationInput = calculation?.FormulaInput,
+                SelectionSource = selection.Source,
+                SelectionReason = selection.Reason,
+                CandidateMaterials = selection.CandidatesDisplay,
             });
 
             _dbContext.MetalRequirements.Add(requirement);
@@ -338,7 +371,7 @@ public class LaunchService : ILaunchService
                 Message = "Требование создано автоматически при сохранении запуска партии.",
                 UserId = userId == Guid.Empty ? null : userId,
                 UserName = actor,
-                PayloadJson = $"{{\"wipLaunchId\":\"{launch.Id}\",\"partId\":\"{launch.PartId}\",\"quantity\":{launch.Quantity}}}",
+                PayloadJson = $"{{\"wipLaunchId\":\"{launch.Id}\",\"partId\":\"{launch.PartId}\",\"quantity\":{launch.Quantity},\"selectionStatus\":\"{selection.SelectionStatus}\"}}",
                 CreatedAt = now,
             });
             return;
@@ -346,17 +379,19 @@ public class LaunchService : ILaunchService
 
         requirement.RequirementDate = now;
         requirement.PartId = launch.PartId;
-        requirement.PartCode = launch.Part?.Code ?? requirement.PartCode;
-        requirement.PartName = launch.Part?.Name ?? requirement.PartName;
+        requirement.PartCode = part?.Code ?? requirement.PartCode;
+        requirement.PartName = part?.Name ?? requirement.PartName;
         requirement.Quantity = launch.Quantity;
-        requirement.MetalMaterialId = selectedMaterial.Id;
-        requirement.Comment = "Документ создан в электронном виде автоматически при сохранении запуска партии";
+        requirement.MetalMaterialId = selectedMaterial?.Id;
+        requirement.Comment = requirementComment;
+        requirement.SelectionStatus = selectionStatus;
+        requirement.ResolutionMessage = selection.Reason;
         requirement.UpdatedAt = now;
         requirement.UpdatedBy = actor;
-        if (string.Equals(requirement.Status, RequirementStatusCreated, StringComparison.OrdinalIgnoreCase))
-        {
-            requirement.Status = RequirementStatusUpdated;
-        }
+
+        requirement.Status = selection.IsResolved && string.Equals(requirement.Status, RequirementStatusCreated, StringComparison.OrdinalIgnoreCase)
+            ? RequirementStatusUpdated
+            : (selection.IsResolved ? requirement.Status : RequirementStatusDraft);
 
         var existingItem = requirement.Items.FirstOrDefault();
         if (existingItem is null)
@@ -364,41 +399,46 @@ public class LaunchService : ILaunchService
             requirement.Items.Add(new MetalRequirementItem
             {
                 Id = Guid.NewGuid(),
-                MetalMaterialId = selectedMaterial.Id,
-                ConsumptionPerUnit = selectedNorm.BaseConsumptionQty,
-                ConsumptionUnit = selectedNorm.ConsumptionUnit,
+                MetalMaterialId = selectedMaterial?.Id,
+                ConsumptionPerUnit = selectedNorm?.BaseConsumptionQty ?? 0m,
+                ConsumptionUnit = selectedNorm?.ConsumptionUnit ?? "pcs",
                 RequiredQty = requiredQty,
-                RequiredWeightKg = calculation.NeedKg,
-                SizeRaw = selectedNorm.SizeRaw,
-                Comment = "Строка сформирована автоматически из нормы расхода.",
-                NormPerUnit = selectedNorm.BaseConsumptionQty,
+                RequiredWeightKg = calculation?.NeedKg,
+                SizeRaw = selectedNorm?.SizeRaw,
+                Comment = selection.IsResolved
+                    ? "Строка сформирована автоматически из нормы расхода."
+                    : "Строка сформирована автоматически, требуется выбор материала.",
+                NormPerUnit = selectedNorm?.BaseConsumptionQty ?? 0m,
                 TotalRequiredQty = requiredQty,
-                Unit = selectedNorm.ConsumptionUnit,
-                TotalRequiredWeightKg = calculation.NeedKg,
-                CalculationFormula = calculation.Formula,
-                CalculationInput = calculation.FormulaInput,
-                SelectionSource = "auto_from_launch",
-                SelectionReason = "Автоматическое обновление из запуска партии.",
-                CandidateMaterials = null,
+                Unit = selectedNorm?.ConsumptionUnit ?? "pcs",
+                TotalRequiredWeightKg = calculation?.NeedKg,
+                CalculationFormula = calculation?.Formula,
+                CalculationInput = calculation?.FormulaInput,
+                SelectionSource = selection.Source,
+                SelectionReason = selection.Reason,
+                CandidateMaterials = selection.CandidatesDisplay,
             });
             return;
         }
 
-        existingItem.MetalMaterialId = selectedMaterial.Id;
-        existingItem.ConsumptionPerUnit = selectedNorm.BaseConsumptionQty;
-        existingItem.ConsumptionUnit = selectedNorm.ConsumptionUnit;
+        existingItem.MetalMaterialId = selectedMaterial?.Id;
+        existingItem.ConsumptionPerUnit = selectedNorm?.BaseConsumptionQty ?? 0m;
+        existingItem.ConsumptionUnit = selectedNorm?.ConsumptionUnit ?? "pcs";
         existingItem.RequiredQty = requiredQty;
-        existingItem.RequiredWeightKg = calculation.NeedKg;
-        existingItem.SizeRaw = selectedNorm.SizeRaw;
-        existingItem.Comment = "Строка обновлена автоматически из нормы расхода.";
-        existingItem.NormPerUnit = selectedNorm.BaseConsumptionQty;
+        existingItem.RequiredWeightKg = calculation?.NeedKg;
+        existingItem.SizeRaw = selectedNorm?.SizeRaw;
+        existingItem.Comment = selection.IsResolved
+            ? "Строка обновлена автоматически из нормы расхода."
+            : "Строка обновлена автоматически, требуется выбор материала.";
+        existingItem.NormPerUnit = selectedNorm?.BaseConsumptionQty ?? 0m;
         existingItem.TotalRequiredQty = requiredQty;
-        existingItem.Unit = selectedNorm.ConsumptionUnit;
-        existingItem.TotalRequiredWeightKg = calculation.NeedKg;
-        existingItem.CalculationFormula = calculation.Formula;
-        existingItem.CalculationInput = calculation.FormulaInput;
-        existingItem.SelectionSource = "auto_from_launch";
-        existingItem.SelectionReason = "Автоматическое обновление из запуска партии.";
+        existingItem.Unit = selectedNorm?.ConsumptionUnit ?? "pcs";
+        existingItem.TotalRequiredWeightKg = calculation?.NeedKg;
+        existingItem.CalculationFormula = calculation?.Formula;
+        existingItem.CalculationInput = calculation?.FormulaInput;
+        existingItem.SelectionSource = selection.Source;
+        existingItem.SelectionReason = selection.Reason;
+        existingItem.CandidateMaterials = selection.CandidatesDisplay;
 
         if (requirement.Items.Count > 1)
         {
@@ -416,7 +456,7 @@ public class LaunchService : ILaunchService
             Message = "Требование автоматически обновлено после изменения запуска партии.",
             UserId = userId == Guid.Empty ? null : userId,
             UserName = actor,
-            PayloadJson = $"{{\"wipLaunchId\":\"{launch.Id}\",\"partId\":\"{launch.PartId}\",\"quantity\":{launch.Quantity}}}",
+            PayloadJson = $"{{\"wipLaunchId\":\"{launch.Id}\",\"partId\":\"{launch.PartId}\",\"quantity\":{launch.Quantity},\"selectionStatus\":\"{selection.SelectionStatus}\"}}",
             CreatedAt = now,
         });
     }

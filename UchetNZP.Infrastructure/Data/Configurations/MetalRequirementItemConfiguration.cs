@@ -72,7 +72,8 @@ public class MetalRequirementItemConfiguration : IEntityTypeConfiguration<MetalR
         builder.HasOne(x => x.MetalMaterial)
             .WithMany(x => x.RequirementItems)
             .HasForeignKey(x => x.MetalMaterialId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
 
         builder.HasIndex(x => new { x.MetalRequirementId, x.MetalMaterialId })
             .IsUnique();

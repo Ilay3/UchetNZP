@@ -243,7 +243,7 @@ public class WipLaunchesControllerTests
     {
         var routeService = new RouteService(dbContext);
         var currentUser = new TestCurrentUserService();
-        var launchService = new LaunchService(dbContext, routeService, currentUser);
+        var launchService = new LaunchService(dbContext, routeService, currentUser, new MaterialSelectionService());
         var actualReportService = reportService ?? new FakeReportService();
         var controller = new WipLaunchesController(dbContext, launchService, routeService, actualReportService)
         {
