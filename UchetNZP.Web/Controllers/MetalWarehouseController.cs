@@ -142,6 +142,13 @@ public class MetalWarehouseController : Controller
             ModelState.AddModelError(nameof(model.MetalMaterialId), "Выбранный материал не найден.");
         }
 
+        if (material is not null)
+        {
+            // Привязываем тип проката к выбранному материалу до валидации модели,
+            // иначе IValidatableObject может проверить не те обязательные поля.
+            model.ProfileType = ResolveProfileType(material.Name, model.ProfileType);
+        }
+
         if (!ModelState.IsValid)
         {
             await PopulateMaterialsAsync(model, cancellationToken);
