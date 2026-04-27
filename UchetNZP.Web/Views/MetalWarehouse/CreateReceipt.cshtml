@@ -5,7 +5,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-6 fw-semibold">Добавить приход металла</h1>
-    <p class="lead mb-0">Заполните документ и укажите размеры для каждой единицы.</p>
+    <p class="lead mb-0">Заполните документ по шагам — все поля ниже снабжены подсказками.</p>
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -30,8 +30,9 @@
             }
 
             <div class="col-md-4">
-                <label asp-for="ReceiptDate" class="form-label"></label>
+                <label asp-for="ReceiptDate" class="form-label">Дата прихода</label>
                 <input asp-for="ReceiptDate" class="form-control" type="date" />
+                <div class="form-text">Укажите фактическую дату поступления металла на склад.</div>
                 <span asp-validation-for="ReceiptDate" class="text-danger"></span>
             </div>
 
@@ -41,7 +42,7 @@
                        class="form-control"
                        type="text"
                        list="materialOptions"
-                       placeholder="Начните вводить материал"
+                       placeholder="Например: Лист Ст3 3мм"
                        autocomplete="off"
                        value="@(Model.Materials.FirstOrDefault(x => x.Value == Model.MetalMaterialId?.ToString())?.Text ?? string.Empty)" />
                 <datalist id="materialOptions">
@@ -51,53 +52,46 @@
                     }
                 </datalist>
                 <input asp-for="MetalMaterialId" type="hidden" id="materialId" />
-                <div class="form-text">Ищите по наименованию или коду материала.</div>
+                <div class="form-text">Начните вводить название или код, затем выберите вариант из списка.</div>
                 <span asp-validation-for="MetalMaterialId" class="text-danger"></span>
             </div>
 
             <div class="col-md-3">
                 <label asp-for="PassportWeightKg" class="form-label">Паспортная масса, кг</label>
                 <input asp-for="PassportWeightKg" class="form-control" type="number" min="0.001" step="0.001" />
+                <div class="form-text">Введите общий вес по документам поставщика (например, 1250.5).</div>
                 <span asp-validation-for="PassportWeightKg" class="text-danger"></span>
             </div>
 
             <div class="col-md-3">
                 <label asp-for="Quantity" class="form-label">Количество</label>
                 <input asp-for="Quantity" class="form-control" type="number" min="1" step="1" />
+                <div class="form-text">Сколько отдельных единиц поступило: листов, труб или прутков.</div>
                 <span asp-validation-for="Quantity" class="text-danger"></span>
             </div>
 
             <input asp-for="ProfileType" type="hidden" />
 
-            <div class="col-md-4 profile-sheet">
-                <label asp-for="WidthMm" class="form-label">Ширина листа, мм</label>
-                <input asp-for="WidthMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
-            </div>
-            <div class="col-md-4 profile-sheet">
-                <label asp-for="LengthMm" class="form-label">Длина листа, мм</label>
-                <input asp-for="LengthMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
-            </div>
-            <div class="col-md-4 profile-sheet">
-                <label asp-for="ThicknessMm" class="form-label">Толщина листа, мм</label>
-                <input asp-for="ThicknessMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
-            </div>
-
             <div class="col-md-4 profile-rod profile-pipe d-none">
                 <label asp-for="DiameterMm" class="form-label">Диаметр, мм</label>
                 <input asp-for="DiameterMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+                <div class="form-text">Заполняйте только для трубы/прутка.</div>
             </div>
             <div class="col-md-4 profile-pipe d-none">
                 <label asp-for="WallThicknessMm" class="form-label">Толщина стенки, мм</label>
                 <input asp-for="WallThicknessMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+                <div class="form-text">Для трубы укажите толщину стенки.</div>
             </div>
             <div class="col-md-4 profile-rod profile-pipe d-none">
                 <label asp-for="LengthMm" class="form-label">Длина, мм</label>
                 <input asp-for="LengthMm" class="form-control js-dimension-input" type="number" min="0.001" step="0.001" />
+                <div class="form-text">Для трубы/прутка укажите длину одной единицы в мм.</div>
             </div>
 
             <div class="col-12">
                 <label asp-for="Comment" class="form-label">Комментарий</label>
                 <textarea asp-for="Comment" class="form-control" rows="2"></textarea>
+                <div class="form-text">Необязательно. Можно указать номер накладной, поставщика или примечание.</div>
                 <span asp-validation-for="Comment" class="text-danger"></span>
             </div>
 
@@ -107,7 +101,8 @@
                         <h2 class="h5 mb-3">Поштучные размеры</h2>
                         <div class="text-muted small mb-2">
                             Для каждой единицы укажите размер в <span id="unitTextHint">м</span>.
-                            Ниже показывается фактический размер заготовки для этикетки.
+                            Для листа это площадь (м²), для трубы/прутка — длина (м).
+                            Ниже сразу показывается, как размер попадёт в этикетку.
                         </div>
                         <div id="unitsContainer" class="row g-3">
                             @for (var i = 0; i < Model.Units.Count; i++)
