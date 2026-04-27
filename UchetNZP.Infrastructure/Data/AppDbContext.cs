@@ -81,6 +81,7 @@ public class AppDbContext : DbContext
     public DbSet<MetalIssueItem> MetalIssueItems => Set<MetalIssueItem>();
 
     public DbSet<MetalStockMovement> MetalStockMovements => Set<MetalStockMovement>();
+    public DbSet<MetalAuditLog> MetalAuditLogs => Set<MetalAuditLog>();
 
     public DbSet<PartToMaterialRule> PartToMaterialRules => Set<PartToMaterialRule>();
 

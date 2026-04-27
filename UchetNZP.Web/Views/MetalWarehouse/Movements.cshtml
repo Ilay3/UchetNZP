@@ -1,6 +1,77 @@
-@model MetalWarehouseListPageViewModel
+@model MetalMovementsPageViewModel
 @{
     ViewData["Title"] = "История движений";
 }
 
-<partial name="_ListPage" model="Model" />
+<div class="page-header mb-4">
+    <h1 class="display-6 fw-semibold">История движений металла</h1>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold">Фильтры</div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">Период с</label>
+                <input type="date" name="DateFrom" class="form-control" value="@Model.Filter.DateFrom?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">по</label>
+                <input type="date" name="DateTo" class="form-control" value="@Model.Filter.DateTo?.ToString("yyyy-MM-dd")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Материал</label>
+                <select class="form-select" name="MaterialId"><option value="">Все</option>@foreach (var m in Model.Filter.Materials){<option value="@m.Value" selected="@m.Selected">@m.Text</option>}</select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Тип движения</label>
+                <select class="form-select" name="MovementType"><option value="">Все</option>@foreach (var t in Model.Filter.MovementTypes){<option value="@t.Value" selected="@t.Selected">@t.Text</option>}</select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Документ</label>
+                <input type="text" name="DocumentNumber" class="form-control" value="@Model.Filter.DocumentNumber" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Код единицы</label>
+                <input type="text" name="MetalUnitCode" class="form-control" value="@Model.Filter.MetalUnitCode" />
+            </div>
+            <div class="col-12"><button type="submit" class="btn btn-primary">Показать</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-light">
+                    <tr><th>Дата</th><th>Тип</th><th>Материал</th><th>Код единицы</th><th>Документ-основание</th><th>Было</th><th>Изменение</th><th>Стало</th><th>Ед.</th><th>Пользователь</th></tr>
+                </thead>
+                <tbody>
+                @if (!Model.Rows.Any())
+                {
+                    <tr><td colspan="10" class="text-muted">Движений не найдено.</td></tr>
+                }
+                else
+                {
+                    @foreach (var row in Model.Rows)
+                    {
+                        <tr>
+                            <td>@row.Date.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@row.MovementType</td>
+                            <td>@row.Material</td>
+                            <td>@row.MetalUnitCode</td>
+                            <td>@row.Document</td>
+                            <td>@(row.Before?.ToString("0.###") ?? "—")</td>
+                            <td>@row.Change.ToString("0.###")</td>
+                            <td>@(row.After?.ToString("0.###") ?? "—")</td>
+                            <td>@row.Unit</td>
+                            <td>@row.User</td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -18,7 +18,7 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body row g-3">
         <div class="col-md-3"><div class="text-muted small">Дата</div><div class="fw-semibold">@Model.RequirementDate.ToString("dd.MM.yyyy HH:mm")</div></div>
-        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge bg-secondary">@Model.Status</span></div></div>
+        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge @(Model.Status == "Completed" ? "bg-success" : Model.Status == "Cancelled" ? "bg-danger" : Model.Status == "ReadyToIssue" ? "bg-primary" : Model.Status == "Planned" ? "bg-info text-dark" : "bg-secondary")">@Model.Status</span></div></div>
         <div class="col-md-6"><div class="text-muted small">Запуск партии</div><div class="fw-semibold">@Model.WipLaunchId</div></div>
         <div class="col-md-6"><div class="text-muted small">Деталь</div><div class="fw-semibold">@Model.PartDisplay</div></div>
         <div class="col-md-3"><div class="text-muted small">Количество деталей</div><div class="fw-semibold">@Model.Quantity.ToString("0.###")</div></div>
@@ -160,7 +160,7 @@
                 <div class="col-md-2"><div class="text-muted small">Требуется к подбору</div><div class="fw-semibold">@Model.RequirementPlan.AdjustedRequiredQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
                 <div class="col-md-2"><div class="text-muted small">Подобрано</div><div class="fw-semibold">@Model.RequirementPlan.PlannedQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
                 <div class="col-md-2"><div class="text-muted small">Дефицит</div><div class="fw-semibold @(Model.RequirementPlan.DeficitQty > 0 ? "text-danger" : "text-success")">@Model.RequirementPlan.DeficitQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
-                <div class="col-md-2"><div class="text-muted small">Статус плана</div><div><span class="badge bg-secondary">@Model.RequirementPlan.Status</span></div></div>
+                <div class="col-md-2"><div class="text-muted small">Статус плана</div><div><span class="badge @(Model.RequirementPlan.Status == "HasDeficit" ? "bg-danger" : Model.RequirementPlan.Status == "Calculated" ? "bg-success" : "bg-secondary")">@Model.RequirementPlan.Status</span></div></div>
                 <div class="col-md-4">
                     <div class="text-muted small">Расчет</div>
                     <div class="small">
@@ -219,6 +219,29 @@
                     </tbody>
                 </table>
             </div>
+        }
+    </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-light fw-semibold">История документа</div>
+    <div class="card-body">
+        @if (!Model.History.Any())
+        {
+            <div class="text-muted">История пока пуста.</div>
+        }
+        else
+        {
+            <ul class="list-group list-group-flush">
+                @foreach (var entry in Model.History)
+                {
+                    <li class="list-group-item px-0">
+                        <div class="d-flex justify-content-between"><span class="fw-semibold">@entry.EventType</span><span class="text-muted small">@entry.EventDate.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span></div>
+                        <div class="small text-muted">@entry.UserName</div>
+                        <div>@entry.Message</div>
+                    </li>
+                }
+            </ul>
         }
     </div>
 </div>

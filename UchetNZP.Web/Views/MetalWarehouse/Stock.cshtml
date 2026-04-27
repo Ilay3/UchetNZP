@@ -82,8 +82,8 @@
             </div>
             <div class="col-12 col-lg-2">
                 <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" name="ActiveOnly" value="true" id="activeOnly" checked="@Model.Filters.ActiveOnly" />
-                    <label class="form-check-label" for="activeOnly">Только активные остатки</label>
+                    <input class="form-check-input" type="checkbox" name="ShowConsumed" value="true" id="showConsumed" checked="@Model.Filters.ShowConsumed" />
+                    <label class="form-check-label" for="showConsumed">Показывать израсходованные</label>
                 </div>
             </div>
             <div class="col-12 col-lg-1 d-flex gap-2">
@@ -132,7 +132,7 @@
                             <td>@item.WeightKg.ToString("0.###")</td>
                             <td>@item.ReceiptNumber</td>
                             <td>@item.ReceiptDate.ToString("dd.MM.yyyy")</td>
-                            <td><span class="badge bg-success-subtle text-success-emphasis">@item.Status</span></td>
+                            <td><span class="badge @(item.Status == "Израсходовано" ? "bg-secondary" : item.Status == "Частично использовано" ? "bg-warning text-dark" : item.Status == "Недоступно" ? "bg-danger" : "bg-success-subtle text-success-emphasis")">@item.Status</span></td>
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-primary"
                                    asp-controller="MetalWarehouse"
