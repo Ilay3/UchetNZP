@@ -3,7 +3,6 @@
     const unitsContainer = document.getElementById("unitsContainer");
     const materialSelect = document.getElementById("materialSelect");
     const materialSearchInput = document.getElementById("materialSearchInput");
-    const materialSearchOptions = document.getElementById("materialSearchOptions");
     const profileTypeSelect = document.getElementById("profileTypeSelect");
     const materialProfileMapRaw = document.getElementById("materialProfileMap")?.textContent ?? "{}";
     let materialProfileMap = {};
@@ -17,32 +16,35 @@
         return;
     }
 
-    function getMaterialLabel(option) {
-        return typeof option?.textContent === "string" ? option.textContent.trim() : "";
-    }
+    const materialOptionsSource = Array.from(materialSelect.options)
+        .filter(option => option.value)
+        .map(option => ({ value: option.value, text: (option.textContent || "").trim() }));
 
-    function syncSearchWithSelect() {
-        if (!materialSearchInput) {
-            return;
+    function refillMaterialSelect(searchText) {
+        const normalized = (searchText || "").trim().toLowerCase();
+        const selectedValue = materialSelect.value;
+        const filtered = !normalized
+            ? materialOptionsSource
+            : materialOptionsSource.filter(option => option.text.toLowerCase().includes(normalized));
+
+        materialSelect.innerHTML = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = filtered.length > 0 ? "Выберите материал" : "Ничего не найдено";
+        materialSelect.appendChild(placeholder);
+
+        filtered.forEach(option => {
+            const item = document.createElement("option");
+            item.value = option.value;
+            item.textContent = option.text;
+            materialSelect.appendChild(item);
+        });
+
+        if (filtered.some(option => option.value === selectedValue)) {
+            materialSelect.value = selectedValue;
+        } else {
+            materialSelect.value = "";
         }
-
-        const selectedOption = materialSelect.selectedOptions?.[0];
-        materialSearchInput.value = selectedOption ? getMaterialLabel(selectedOption) : "";
-    }
-
-    function fillSearchOptions() {
-        if (!materialSearchOptions) {
-            return;
-        }
-
-        materialSearchOptions.innerHTML = "";
-        Array.from(materialSelect.options)
-            .filter(option => option.value)
-            .forEach(option => {
-                const entry = document.createElement("option");
-                entry.value = getMaterialLabel(option);
-                materialSearchOptions.appendChild(entry);
-            });
     }
 
     function syncProfileVisibility() {
@@ -132,34 +134,14 @@
         renderUnitInputs();
     });
 
-    materialSearchInput?.addEventListener("change", () => {
-        const search = materialSearchInput.value.trim().toLowerCase();
-        if (!search) {
-            return;
-        }
-
-        const matchedOption = Array.from(materialSelect.options).find(option => {
-            if (!option.value) {
-                return false;
-            }
-
-            const text = getMaterialLabel(option).toLowerCase();
-            return text === search || text.includes(search);
-        });
-
-        if (!matchedOption) {
-            return;
-        }
-
-        materialSelect.value = matchedOption.value;
-        materialSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    materialSearchInput?.addEventListener("input", () => {
+        refillMaterialSelect(materialSearchInput.value);
     });
     profileTypeSelect.addEventListener("change", () => {
         syncProfileVisibility();
         renderUnitInputs();
     });
-    fillSearchOptions();
-    syncSearchWithSelect();
+    refillMaterialSelect("");
     syncProfileVisibility();
     renderUnitInputs();
 })();

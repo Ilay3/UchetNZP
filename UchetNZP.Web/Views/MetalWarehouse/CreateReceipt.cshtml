@@ -14,7 +14,7 @@
 
 <div class="card shadow-sm">
     <div class="card-body">
-        <form method="post" class="row g-3" id="metalReceiptForm">
+        <form method="post" asp-controller="MetalWarehouse" asp-action="CreateReceipt" class="row g-3" id="metalReceiptForm">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
@@ -37,16 +37,14 @@
 
             <div class="col-md-6">
                 <label asp-for="MetalMaterialId" class="form-label">Материал</label>
-                <input type="text"
+                <input type="search"
                        class="form-control mb-2"
                        id="materialSearchInput"
-                       list="materialSearchOptions"
-                       placeholder="Поиск материала по наименованию или коду" />
-                <datalist id="materialSearchOptions"></datalist>
+                       placeholder="Поиск по материалам (наименование/код)" />
                 <select asp-for="MetalMaterialId" asp-items="Model.Materials" class="form-select" id="materialSelect">
                     <option value="">Выберите материал</option>
                 </select>
-                <div class="form-text">Можно выбрать из списка или начать ввод в поле поиска выше.</div>
+                <div class="form-text">Введите текст в поиск, затем выберите материал из списка.</div>
                 <span asp-validation-for="MetalMaterialId" class="text-danger"></span>
             </div>
 
