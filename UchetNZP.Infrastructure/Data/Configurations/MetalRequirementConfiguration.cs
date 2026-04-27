@@ -45,6 +45,10 @@ public class MetalRequirementConfiguration : IEntityTypeConfiguration<MetalRequi
         builder.Property(x => x.UpdatedAt)
             .IsRequired();
 
+        builder.Property(x => x.UpdatedBy)
+            .IsRequired()
+            .HasMaxLength(128);
+
         builder.Property(x => x.Comment)
             .HasMaxLength(512);
 

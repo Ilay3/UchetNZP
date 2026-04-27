@@ -100,6 +100,11 @@ public class WipLaunchesController : Controller
             .ConfigureAwait(false);
 
         var normsByPart = norms.GroupBy(x => x.PartId).ToDictionary(x => x.Key, x => x.ToList());
+        var activeMaterialLookup = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .ToDictionaryAsync(x => x.Id, cancellationToken)
+            .ConfigureAwait(false);
 
         var selectedMaterialId = query?.MetalMaterialId;
         if (!selectedMaterialId.HasValue || selectedMaterialId == Guid.Empty)
@@ -158,6 +163,10 @@ public class WipLaunchesController : Controller
                     .ToList();
 
                 requirementsByLaunch.TryGetValue(x.Id, out var requirement);
+                var requirementStatusMessage = ResolveRequirementStatusMessage(
+                    requirement,
+                    launchNorms,
+                    activeMaterialLookup);
 
                 return new LaunchHistoryItemViewModel(
                     x.Id,
@@ -179,7 +188,8 @@ public class WipLaunchesController : Controller
                             o.Hours))
                         .ToList(),
                     needs,
-                    requirement);
+                    requirement,
+                    requirementStatusMessage);
             })
             .ToList();
 
@@ -440,130 +450,6 @@ public class WipLaunchesController : Controller
         return File(file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
     }
 
-    [HttpPost("{id:guid}/metal-requirements")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateMetalRequirement(Guid id, Guid? manualMaterialId, CancellationToken cancellationToken)
-    {
-        if (id == Guid.Empty)
-        {
-            return BadRequest("Некорректный идентификатор запуска.");
-        }
-
-        var launch = await _dbContext.WipLaunches
-            .AsNoTracking()
-            .Include(x => x.Part)
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (launch is null)
-        {
-            return NotFound("Запуск не найден.");
-        }
-
-        var existing = await _dbContext.MetalRequirements
-            .AsNoTracking()
-            .Where(x => x.WipLaunchId == id)
-            .OrderByDescending(x => x.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        if (existing is not null)
-        {
-            TempData["LaunchMetalRequirementMessage"] = "Требование уже создано.";
-            return RedirectToAction("RequirementDetails", "MetalWarehouse", new { id = existing.Id });
-        }
-
-        var activeMaterials = await _dbContext.MetalMaterials
-            .AsNoTracking()
-            .Where(x => x.IsActive)
-            .OrderBy(x => x.Name)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        if (activeMaterials.Count == 0)
-        {
-            TempData["LaunchMetalRequirementError"] = "Не найден активный материал.";
-            return RedirectToAction(nameof(History));
-        }
-
-        var norms = await _dbContext.MetalConsumptionNorms
-            .AsNoTracking()
-            .Where(x => x.IsActive && x.PartId == launch.PartId)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        if (norms.Count == 0)
-        {
-            TempData["LaunchMetalRequirementError"] = "Норма расхода для детали и материала не найдена.";
-            return RedirectToAction(nameof(History));
-        }
-
-        var selectedMaterialId = manualMaterialId;
-        if (!selectedMaterialId.HasValue || selectedMaterialId == Guid.Empty)
-        {
-            selectedMaterialId = norms.Select(x => x.MetalMaterialId).FirstOrDefault(x => x != Guid.Empty);
-        }
-
-        var norm = norms.FirstOrDefault(x => x.MetalMaterialId == selectedMaterialId) ?? norms[0];
-        var material = activeMaterials.FirstOrDefault(x => x.Id == norm.MetalMaterialId);
-        if (material is null)
-        {
-            TempData["LaunchMetalRequirementError"] = "Выбранный материал не найден или неактивен.";
-            return RedirectToAction(nameof(History));
-        }
-
-        var calculation = MetalConsumptionCalculator.Calculate(norm, launch.Quantity, material);
-        var requiredQty = norm.BaseConsumptionQty * launch.Quantity;
-
-        var requirement = new MetalRequirement
-        {
-            Id = Guid.NewGuid(),
-            RequirementNumber = await GetNextRequirementNumberAsync(cancellationToken).ConfigureAwait(false),
-            RequirementDate = DateTime.UtcNow,
-            WipLaunchId = launch.Id,
-            PartId = launch.PartId,
-            PartCode = launch.Part?.Code ?? string.Empty,
-            PartName = launch.Part?.Name ?? string.Empty,
-            Quantity = launch.Quantity,
-            MetalMaterialId = material.Id,
-            Status = "Created",
-            CreatedAt = DateTime.UtcNow,
-            CreatedBy = User?.Identity?.Name ?? "system",
-            UpdatedAt = DateTime.UtcNow,
-            Comment = "Документ создан в электронном виде из запуска партии.",
-            Items = new List<MetalRequirementItem>
-            {
-                new()
-                {
-                    Id = Guid.NewGuid(),
-                    MetalMaterialId = material.Id,
-                    ConsumptionPerUnit = norm.BaseConsumptionQty,
-                    ConsumptionUnit = norm.ConsumptionUnit,
-                    RequiredQty = requiredQty,
-                    RequiredWeightKg = calculation.NeedKg,
-                    SizeRaw = norm.SizeRaw,
-                    Comment = "Строка создана автоматически из расчета потребности.",
-                    NormPerUnit = norm.BaseConsumptionQty,
-                    TotalRequiredQty = requiredQty,
-                    Unit = norm.ConsumptionUnit,
-                    TotalRequiredWeightKg = calculation.NeedKg,
-                    CalculationFormula = calculation.Formula,
-                    CalculationInput = calculation.FormulaInput,
-                    SelectionSource = "manual_or_norm",
-                    SelectionReason = "Выбор по материалу в запуске/норме расхода.",
-                    CandidateMaterials = null,
-                },
-            },
-        };
-
-        _dbContext.MetalRequirements.Add(requirement);
-        await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-        TempData["LaunchMetalRequirementMessage"] = $"Создано требование {requirement.RequirementNumber}.";
-
-        return RedirectToAction("RequirementDetails", "MetalWarehouse", new { id = requirement.Id });
-    }
-
     public record LaunchSaveRequest(IReadOnlyList<LaunchSaveItem> Items);
 
     public record LaunchSaveItem(
@@ -573,30 +459,27 @@ public class WipLaunchesController : Controller
         decimal Quantity,
         string? Comment);
 
-    private async Task<string> GetNextRequirementNumberAsync(CancellationToken cancellationToken)
+    private static string? ResolveRequirementStatusMessage(
+        LaunchMetalRequirementShortViewModel? requirement,
+        IReadOnlyCollection<MetalConsumptionNorm>? launchNorms,
+        IReadOnlyDictionary<Guid, MetalMaterial> activeMaterialLookup)
     {
-        var year = DateTime.UtcNow.Year;
-        var prefix = $"MR-{year}-";
-
-        var lastNumber = await _dbContext.MetalRequirements
-            .AsNoTracking()
-            .Where(x => x.RequirementNumber.StartsWith(prefix))
-            .OrderByDescending(x => x.RequirementNumber)
-            .Select(x => x.RequirementNumber)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var nextSequence = 1;
-        if (!string.IsNullOrWhiteSpace(lastNumber))
+        if (requirement is not null)
         {
-            var chunk = lastNumber[prefix.Length..];
-            if (int.TryParse(chunk, out var parsed))
-            {
-                nextSequence = parsed + 1;
-            }
+            return null;
         }
 
-        return $"{prefix}{nextSequence:D6}";
+        if (launchNorms is null || launchNorms.Count == 0)
+        {
+            return "Требование не сформировано: не найдена норма расхода";
+        }
+
+        var hasValidMaterial = launchNorms
+            .Any(x => x.MetalMaterialId.HasValue && x.MetalMaterialId.Value != Guid.Empty && activeMaterialLookup.ContainsKey(x.MetalMaterialId.Value));
+
+        return hasValidMaterial
+            ? null
+            : "Требование не сформировано: не выбран материал";
     }
 
     private static (DateTime From, DateTime To) NormalizePeriod(DateTime from, DateTime to)

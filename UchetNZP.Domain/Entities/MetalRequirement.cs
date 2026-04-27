@@ -34,6 +34,8 @@ public class MetalRequirement
 
     public DateTime UpdatedAt { get; set; }
 
+    public string UpdatedBy { get; set; } = string.Empty;
+
     public virtual WipLaunch? WipLaunch { get; set; }
 
     public virtual Part? Part { get; set; }
