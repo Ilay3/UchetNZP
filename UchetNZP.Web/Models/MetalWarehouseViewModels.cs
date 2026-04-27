@@ -251,6 +251,10 @@ public class MetalReceiptDetailsViewModel
 
     public decimal WeightDeviationKg { get; init; }
 
+    public string CalculatedWeightFormula { get; init; } = string.Empty;
+
+    public string WeightDeviationFormula { get; init; } = string.Empty;
+
     public int Quantity { get; init; }
 
     public IReadOnlyCollection<MetalReceiptDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalReceiptDetailsItemViewModel>();

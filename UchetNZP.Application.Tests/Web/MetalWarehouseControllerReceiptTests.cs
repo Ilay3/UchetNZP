@@ -105,6 +105,71 @@ public class MetalWarehouseControllerReceiptTests
         Assert.All(items, x => Assert.Equal("2 м", x.ActualBlankSizeText));
     }
 
+    [Fact]
+    public async Task ReceiptDetails_ReturnsFormulaTooltipsForCalculatedWeightAndDeviation()
+    {
+        await using var dbContext = CreateContext();
+        var material = new MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = "Круг 45",
+            Code = "KRUG45",
+            UnitKind = "Meter",
+            MassPerMeterKg = 2m,
+            Coefficient = 1.05m,
+            StockUnit = "m",
+            IsActive = true,
+        };
+
+        var receipt = new MetalReceipt
+        {
+            Id = Guid.NewGuid(),
+            ReceiptNumber = "MET-000123",
+            ReceiptDate = new DateTime(2026, 4, 27),
+            Comment = "Тест",
+            BatchNumber = string.Empty,
+        };
+
+        var item = new MetalReceiptItem
+        {
+            Id = Guid.NewGuid(),
+            MetalReceiptId = receipt.Id,
+            MetalReceipt = receipt,
+            MetalMaterialId = material.Id,
+            MetalMaterial = material,
+            ItemIndex = 1,
+            Quantity = 1,
+            SizeValue = 3m,
+            SizeUnitText = "м",
+            ActualBlankSizeText = "3 м",
+            PassportWeightKg = 10m,
+            ActualWeightKg = 10m,
+            CalculatedWeightKg = 10.5m,
+            WeightDeviationKg = 0m,
+            TotalWeightKg = 10m,
+            StockCategory = "whole",
+            GeneratedCode = "KRUG45-3-M-001",
+            CreatedAt = new DateTime(2026, 4, 27),
+        };
+
+        dbContext.MetalMaterials.Add(material);
+        dbContext.MetalReceipts.Add(receipt);
+        dbContext.MetalReceiptItems.Add(item);
+        await dbContext.SaveChangesAsync();
+
+        var controller = CreateController(dbContext);
+        var result = await controller.ReceiptDetails(receipt.Id, CancellationToken.None);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<MetalReceiptDetailsViewModel>(view.Model);
+        Assert.Equal(
+            "Расчётная масса = Паспортная масса × Коэффициент материала = 10 × 1.05 = 10.5 кг",
+            model.CalculatedWeightFormula);
+        Assert.Equal(
+            "Отклонение = Фактическая масса - Паспортная масса = 10 - 10 = 0 кг",
+            model.WeightDeviationFormula);
+    }
+
     private static MetalWarehouseController CreateController(AppDbContext dbContext)
     {
         var controller = new MetalWarehouseController(

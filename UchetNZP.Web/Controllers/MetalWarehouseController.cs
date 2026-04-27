@@ -6,6 +6,7 @@ using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
 using UchetNZP.Web.Services;
 using System.Text.Json;
+using System.Globalization;
 using System.Security.Claims;
 
 namespace UchetNZP.Web.Controllers;
@@ -270,6 +271,7 @@ public class MetalWarehouseController : Controller
                         i.ActualWeightKg,
                         i.CalculatedWeightKg,
                         i.WeightDeviationKg,
+                        MaterialCoefficient = i.MetalMaterial != null ? i.MetalMaterial.Coefficient : 0m,
                         i.Quantity,
                         MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty,
                     })
@@ -293,6 +295,8 @@ public class MetalWarehouseController : Controller
             PassportWeightKg = first.PassportWeightKg,
             CalculatedWeightKg = first.CalculatedWeightKg,
             WeightDeviationKg = first.WeightDeviationKg,
+            CalculatedWeightFormula = BuildCalculatedWeightFormula(first.PassportWeightKg, first.MaterialCoefficient, first.CalculatedWeightKg),
+            WeightDeviationFormula = BuildWeightDeviationFormula(first.ActualWeightKg, first.PassportWeightKg, first.WeightDeviationKg),
             Quantity = (int)first.Quantity,
             Items = receipt.Item
                 .Select(i => new MetalReceiptDetailsItemViewModel
@@ -1856,6 +1860,18 @@ public class MetalWarehouseController : Controller
 
     private static string BuildActualBlankSizeText(decimal sizeValue, string unitText)
         => $"{Math.Round(sizeValue, 3):0.###} {unitText}";
+
+    private static string BuildCalculatedWeightFormula(decimal passportWeightKg, decimal coefficient, decimal calculatedWeightKg)
+    {
+        var safeCoefficient = coefficient <= 0m ? 1m : coefficient;
+        return $"Расчётная масса = Паспортная масса × Коэффициент материала = {FormatDecimal(passportWeightKg)} × {FormatDecimal(safeCoefficient)} = {FormatDecimal(calculatedWeightKg)} кг";
+    }
+
+    private static string BuildWeightDeviationFormula(decimal actualWeightKg, decimal passportWeightKg, decimal deviationKg)
+        => $"Отклонение = Фактическая масса - Паспортная масса = {FormatDecimal(actualWeightKg)} - {FormatDecimal(passportWeightKg)} = {FormatDecimal(deviationKg)} кг";
+
+    private static string FormatDecimal(decimal value)
+        => value.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static string ToStockCategoryCaption(string stockCategory) =>
         stockCategory switch
