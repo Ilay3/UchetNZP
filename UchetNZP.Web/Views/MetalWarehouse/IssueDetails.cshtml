@@ -23,7 +23,8 @@
         <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge bg-secondary">@Model.Status</span></div></div>
         <div class="col-md-3"><div class="text-muted small">Требование</div><div class="fw-semibold">@Model.RequirementNumber</div></div>
         <div class="col-md-6"><div class="text-muted small">Деталь</div><div class="fw-semibold">@Model.PartDisplay</div></div>
-        <div class="col-md-6"><div class="text-muted small">Материал</div><div class="fw-semibold">@Model.MaterialDisplay</div></div>
+        <div class="col-md-3"><div class="text-muted small">Материал</div><div class="fw-semibold">@Model.MaterialDisplay</div></div>
+        <div class="col-md-3"><div class="text-muted small">Количество деталей</div><div class="fw-semibold">@Model.Quantity.ToString("0.###")</div></div>
         @if (!string.IsNullOrWhiteSpace(Model.Comment))
         {
             <div class="col-12"><div class="text-muted small">Комментарий</div><div>@Model.Comment</div></div>

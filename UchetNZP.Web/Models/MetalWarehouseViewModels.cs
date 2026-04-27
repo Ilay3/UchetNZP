@@ -434,7 +434,15 @@ public class MetalRequirementDetailsViewModel
 
     public string? ExistingIssueStatus { get; init; }
 
-    public bool CanCreateIssueFromPlan { get; init; }
+    public bool HasSelectionPlan { get; init; }
+
+    public decimal PlanDeficitQty { get; init; }
+
+    public string PlanUnit { get; init; } = string.Empty;
+
+    public bool CanCreateIssueFromPlan { get; set; }
+
+    public string IssueCreationBlockedReason { get; set; } = string.Empty;
 
     public MetalRequirementAggregateViewModel Aggregates { get; init; } = new();
 
@@ -483,6 +491,7 @@ public class MetalIssueListItemViewModel
     public string IssueNumber { get; init; } = string.Empty;
     public DateTime IssueDate { get; init; }
     public string RequirementNumber { get; init; } = string.Empty;
+    public string PartDisplay { get; init; } = string.Empty;
     public string MaterialDisplay { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
 }
@@ -497,6 +506,7 @@ public class MetalIssueDetailsViewModel
     public Guid RequirementId { get; init; }
     public string PartDisplay { get; init; } = string.Empty;
     public string MaterialDisplay { get; init; } = string.Empty;
+    public decimal Quantity { get; init; }
     public string? Comment { get; init; }
     public DateTime CreatedAt { get; init; }
     public string CreatedBy { get; init; } = string.Empty;

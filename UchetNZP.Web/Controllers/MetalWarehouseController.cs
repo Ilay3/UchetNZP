@@ -21,8 +21,9 @@ public class MetalWarehouseController : Controller
     private const string IssueDraftStatus = "Draft";
     private const string IssueCompletedStatus = "Completed";
     private const string IssueCancelledStatus = "Cancelled";
+    private const string RequirementCancelledStatus = "Cancelled";
     private const string MovementTypeIssue = "Issue";
-    private const string MovementTypeResidualCreate = "ResidualCreate";
+    private const string MovementTypeFullConsumption = "FullConsumption";
     private const string MovementTypeResidualUpdate = "ResidualUpdate";
 
     private readonly AppDbContext _dbContext;
@@ -629,7 +630,7 @@ public class MetalWarehouseController : Controller
             {
                 MovementTypeIssue => "Выдача по требованию",
                 MovementTypeResidualUpdate => "Изменение остатка",
-                MovementTypeResidualCreate => "Создание остатка",
+                MovementTypeFullConsumption => "Полный расход",
                 _ => "Движение",
             },
             Description = $"{(x.QtyBefore ?? 0m):0.###} -> {(x.QtyAfter ?? 0m):0.###} {x.Unit} (изменение {x.QtyChange:0.###}). {(string.IsNullOrWhiteSpace(x.Comment) ? string.Empty : x.Comment)}".Trim(),
@@ -703,6 +704,7 @@ public class MetalWarehouseController : Controller
     public async Task<IActionResult> CreateIssueFromPlan(Guid id, CancellationToken cancellationToken)
     {
         var requirement = await _dbContext.MetalRequirements
+            .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (requirement is null)
         {
@@ -712,6 +714,12 @@ public class MetalWarehouseController : Controller
         if (requirement.Status == IssueCompletedStatus)
         {
             TempData["MetalRequirementError"] = "Требование уже исполнено. Повторное оформление выдачи запрещено.";
+            return RedirectToAction(nameof(RequirementDetails), new { id });
+        }
+
+        if (requirement.Status == RequirementCancelledStatus)
+        {
+            TempData["MetalRequirementError"] = "Требование отменено. Оформление выдачи запрещено.";
             return RedirectToAction(nameof(RequirementDetails), new { id });
         }
 
@@ -730,6 +738,13 @@ public class MetalWarehouseController : Controller
         if (plan is null || plan.Items.Count == 0)
         {
             TempData["MetalRequirementError"] = "Невозможно оформить выдачу: план подбора не рассчитан.";
+            return RedirectToAction(nameof(RequirementDetails), new { id });
+        }
+
+        if (plan.DeficitQty > 0m)
+        {
+            var deficitUnit = requirement.Items.FirstOrDefault()?.Unit ?? "мм";
+            TempData["MetalRequirementError"] = $"Невозможно оформить выдачу: по плану есть дефицит {plan.DeficitQty:0.###} {deficitUnit}.";
             return RedirectToAction(nameof(RequirementDetails), new { id });
         }
 
@@ -785,6 +800,11 @@ public class MetalWarehouseController : Controller
                 IssueNumber = x.IssueNumber,
                 IssueDate = x.IssueDate,
                 RequirementNumber = x.MetalRequirement != null ? x.MetalRequirement.RequirementNumber : "—",
+                PartDisplay = x.MetalRequirement == null
+                    ? "—"
+                    : (string.IsNullOrWhiteSpace(x.MetalRequirement.PartCode)
+                        ? x.MetalRequirement.PartName
+                        : $"{x.MetalRequirement.PartName} ({x.MetalRequirement.PartCode})"),
                 MaterialDisplay = x.MetalRequirement != null && x.MetalRequirement.MetalMaterial != null
                     ? (string.IsNullOrWhiteSpace(x.MetalRequirement.MetalMaterial.Code)
                         ? x.MetalRequirement.MetalMaterial.Name
@@ -832,6 +852,7 @@ public class MetalWarehouseController : Controller
                 : (string.IsNullOrWhiteSpace(issue.MetalRequirement.MetalMaterial.Code)
                     ? issue.MetalRequirement.MetalMaterial.Name
                     : $"{issue.MetalRequirement.MetalMaterial.Name} ({issue.MetalRequirement.MetalMaterial.Code})"),
+            Quantity = issue.MetalRequirement?.Quantity ?? 0m,
             Comment = issue.Comment,
             CreatedAt = issue.CreatedAt,
             CreatedBy = issue.CreatedBy,
@@ -884,6 +905,12 @@ public class MetalWarehouseController : Controller
             return RedirectToAction(nameof(IssueDetails), new { id });
         }
 
+        if (requirement.Status == RequirementCancelledStatus)
+        {
+            TempData["MetalIssueError"] = "Требование отменено. Проведение выдачи запрещено.";
+            return RedirectToAction(nameof(IssueDetails), new { id });
+        }
+
         await using var tx = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         var now = DateTime.UtcNow;
         var userName = User?.Identity?.Name ?? "system";
@@ -931,7 +958,7 @@ public class MetalWarehouseController : Controller
             {
                 Id = Guid.NewGuid(),
                 MovementDate = now,
-                MovementType = line.LineStatus == LineStatusPartialCut ? MovementTypeResidualUpdate : MovementTypeIssue,
+                MovementType = line.LineStatus == LineStatusPartialCut ? MovementTypeResidualUpdate : MovementTypeFullConsumption,
                 MetalMaterialId = source.MetalMaterialId,
                 MetalReceiptItemId = source.Id,
                 SourceDocumentType = "MetalIssue",
@@ -1348,7 +1375,7 @@ public class MetalWarehouseController : Controller
             SelectionReason = i.Comment,
         }).ToList();
 
-        return new MetalRequirementDetailsViewModel
+        var model = new MetalRequirementDetailsViewModel
         {
             Id = requirement.Id,
             RequirementNumber = requirement.RequirementNumber,
@@ -1395,9 +1422,9 @@ public class MetalWarehouseController : Controller
                 },
             ExistingIssueId = existingIssue?.Id,
             ExistingIssueStatus = existingIssue?.Status,
-            CanCreateIssueFromPlan = requirement.Status != IssueCompletedStatus
-                && requirementPlan is not null
-                && existingIssue is null,
+            HasSelectionPlan = requirementPlan is not null,
+            PlanDeficitQty = requirementPlan?.DeficitQty ?? 0m,
+            PlanUnit = requirement.Items.FirstOrDefault()?.Unit ?? "мм",
             Aggregates = new MetalRequirementAggregateViewModel
             {
                 TotalKg = items.Sum(x => x.TotalRequiredWeightKg ?? 0m),
@@ -1410,6 +1437,38 @@ public class MetalWarehouseController : Controller
             Items = items,
             CutDetails = [],
         };
+
+        if (existingIssue is not null)
+        {
+            return model;
+        }
+
+        if (requirementPlan is null)
+        {
+            model.IssueCreationBlockedReason = "Сначала рассчитайте план подбора.";
+            return model;
+        }
+
+        if (requirementPlan.DeficitQty > 0m)
+        {
+            model.IssueCreationBlockedReason = $"Выдача невозможна: по плану дефицит {requirementPlan.DeficitQty:0.###} {model.PlanUnit}.";
+            return model;
+        }
+
+        if (requirement.Status == IssueCompletedStatus)
+        {
+            model.IssueCreationBlockedReason = "Требование уже исполнено.";
+            return model;
+        }
+
+        if (requirement.Status == RequirementCancelledStatus)
+        {
+            model.IssueCreationBlockedReason = "Требование отменено.";
+            return model;
+        }
+
+        model.CanCreateIssueFromPlan = true;
+        return model;
     }
 
     private static CuttingMapCardViewModel MapCuttingPlan(CuttingPlan plan)
