@@ -37,14 +37,21 @@
 
             <div class="col-md-6">
                 <label asp-for="MetalMaterialId" class="form-label">Материал</label>
-                <input type="search"
-                       class="form-control mb-2"
-                       id="materialSearchInput"
-                       placeholder="Поиск по материалам (наименование/код)" />
-                <select asp-for="MetalMaterialId" asp-items="Model.Materials" class="form-select" id="materialSelect">
-                    <option value="">Выберите материал</option>
-                </select>
-                <div class="form-text">Введите текст в поиск, затем выберите материал из списка.</div>
+                <input id="materialInput"
+                       class="form-control"
+                       type="text"
+                       list="materialOptions"
+                       placeholder="Начните вводить материал"
+                       autocomplete="off"
+                       value="@(Model.Materials.FirstOrDefault(x => x.Value == Model.MetalMaterialId?.ToString())?.Text ?? string.Empty)" />
+                <datalist id="materialOptions">
+                    @foreach (var material in Model.Materials)
+                    {
+                        <option value="@material.Text" data-id="@material.Value"></option>
+                    }
+                </datalist>
+                <input asp-for="MetalMaterialId" type="hidden" id="materialId" />
+                <div class="form-text">Ищите по наименованию или коду материала.</div>
                 <span asp-validation-for="MetalMaterialId" class="text-danger"></span>
             </div>
 
