@@ -39,6 +39,7 @@
                         <th>Ед. изм.</th>
                         <th>Факт. размер заготовки</th>
                         <th>Код</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -50,6 +51,14 @@
                             <td>@item.SizeUnitText</td>
                             <td>@item.ActualBlankSizeText</td>
                             <td class="fw-semibold">@item.GeneratedCode</td>
+                            <td class="text-nowrap">
+                                <a class="btn btn-sm btn-outline-dark"
+                                   asp-controller="MetalWarehouse"
+                                   asp-action="ReceiptItemLabel"
+                                   asp-route-id="@item.Id">
+                                    Этикетка 50×30
+                                </a>
+                            </td>
                         </tr>
                     }
                 </tbody>

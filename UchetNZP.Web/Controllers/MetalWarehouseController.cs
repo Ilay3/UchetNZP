@@ -43,17 +43,20 @@ public class MetalWarehouseController : Controller
     private readonly ICuttingMapExcelExporter _cuttingMapExcelExporter;
     private readonly ICuttingMapPdfExporter _cuttingMapPdfExporter;
     private readonly IMetalRequirementWarehousePrintDocumentService _requirementWarehousePrintDocumentService;
+    private readonly IMetalReceiptItemLabelDocumentService _metalReceiptItemLabelDocumentService;
 
     public MetalWarehouseController(
         AppDbContext dbContext,
         ICuttingMapExcelExporter cuttingMapExcelExporter,
         ICuttingMapPdfExporter cuttingMapPdfExporter,
-        IMetalRequirementWarehousePrintDocumentService requirementWarehousePrintDocumentService)
+        IMetalRequirementWarehousePrintDocumentService requirementWarehousePrintDocumentService,
+        IMetalReceiptItemLabelDocumentService metalReceiptItemLabelDocumentService)
     {
         _dbContext = dbContext;
         _cuttingMapExcelExporter = cuttingMapExcelExporter;
         _cuttingMapPdfExporter = cuttingMapPdfExporter;
         _requirementWarehousePrintDocumentService = requirementWarehousePrintDocumentService;
+        _metalReceiptItemLabelDocumentService = metalReceiptItemLabelDocumentService;
     }
 
     [HttpGet("")]
@@ -271,6 +274,7 @@ public class MetalWarehouseController : Controller
                     .OrderBy(i => i.ItemIndex)
                     .Select(i => new
                     {
+                        i.Id,
                         i.ItemIndex,
                         i.SizeValue,
                         i.SizeUnitText,
@@ -309,6 +313,7 @@ public class MetalWarehouseController : Controller
             Items = receipt.Item
                 .Select(i => new MetalReceiptDetailsItemViewModel
                 {
+                    Id = i.Id,
                     ItemIndex = i.ItemIndex,
                     SizeValue = i.SizeValue,
                     SizeUnitText = i.SizeUnitText,
@@ -719,6 +724,30 @@ public class MetalWarehouseController : Controller
         };
 
         return View("~/Views/MetalWarehouse/StockItem.cshtml", model);
+    }
+
+    [HttpGet("ReceiptItems/{id:guid}/Label")]
+    public async Task<IActionResult> ReceiptItemLabel(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор единицы прихода.");
+        }
+
+        var detailsPath = $"/MetalWarehouse/Stock/Item/{id:D}";
+        var detailsUrl = Request.Host.HasValue
+            ? $"{Request.Scheme}://{Request.Host}{detailsPath}"
+            : detailsPath;
+
+        try
+        {
+            var document = await _metalReceiptItemLabelDocumentService.BuildAsync(id, detailsUrl, cancellationToken);
+            return File(document.Content, document.ContentType, document.FileName);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 
     [HttpGet("Requirements")]

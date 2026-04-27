@@ -232,6 +232,8 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
 public class MetalReceiptDetailsItemViewModel
 {
+    public Guid Id { get; init; }
+
     public int ItemIndex { get; init; }
 
     public decimal SizeValue { get; init; }
