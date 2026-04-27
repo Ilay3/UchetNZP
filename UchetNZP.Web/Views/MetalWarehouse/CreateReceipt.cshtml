@@ -37,9 +37,16 @@
 
             <div class="col-md-6">
                 <label asp-for="MetalMaterialId" class="form-label">Материал</label>
+                <input type="text"
+                       class="form-control mb-2"
+                       id="materialSearchInput"
+                       list="materialSearchOptions"
+                       placeholder="Поиск материала по наименованию или коду" />
+                <datalist id="materialSearchOptions"></datalist>
                 <select asp-for="MetalMaterialId" asp-items="Model.Materials" class="form-select" id="materialSelect">
                     <option value="">Выберите материал</option>
                 </select>
+                <div class="form-text">Можно выбрать из списка или начать ввод в поле поиска выше.</div>
                 <span asp-validation-for="MetalMaterialId" class="text-danger"></span>
             </div>
 
