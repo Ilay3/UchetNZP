@@ -500,8 +500,42 @@
 
     function renderSummary(result) {
         const errors = Array.isArray(result.errors) ? result.errors : [];
+        const warnings = Array.isArray(result.warnings) ? result.warnings : [];
         const hasErrorFile = !!result.errorFileContent;
+        const materialRows = Array.isArray(result.materialPreviewRows) ? result.materialPreviewRows : [];
         const parseRows = Array.isArray(result.parsePreviewRows) ? result.parsePreviewRows : [];
+        const materialRowsHtml = materialRows.length === 0
+            ? ""
+            : `<hr />
+                <div class="mb-2"><strong>Материалы (первые ${materialRows.length} из ${result.materialPreviewTotal || materialRows.length}):</strong></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Артикул</th>
+                                <th>Наименование</th>
+                                <th>DisplayName</th>
+                                <th>Статус</th>
+                                <th>UnitKind</th>
+                                <th>StockUnit</th>
+                                <th>Предупреждения</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${materialRows.map(row => `<tr>
+                                <td>${row.rowIndex}</td>
+                                <td>${escapeHtml(row.code || "")}</td>
+                                <td>${escapeHtml(row.name || "")}</td>
+                                <td>${escapeHtml(row.displayName || "")}</td>
+                                <td>${escapeHtml(row.status || "")}</td>
+                                <td>${escapeHtml(row.unitKind || "")}</td>
+                                <td>${escapeHtml(row.stockUnit || "")}</td>
+                                <td>${escapeHtml((Array.isArray(row.warnings) ? row.warnings.join("; ") : "") || (row.unresolvedUnitType ? "Не определён тип единицы." : ""))}</td>
+                            </tr>`).join("")}
+                        </tbody>
+                    </table>
+                </div>`;
         const parseRowsHtml = parseRows.length === 0
             ? ""
             : `<hr />
@@ -546,10 +580,13 @@
             <div class="alert ${result.dryRun ? "alert-info" : "alert-success"}">
                 <div><strong>${result.dryRun ? "Dry-run" : "Импорт"}:</strong> ${result.sourceFileName}</div>
                 <div>Материалов импортировано: <strong>${result.materialsImported}</strong></div>
+                <div>Материалы: создано <strong>${result.materialsCreated || 0}</strong>, обновлено <strong>${result.materialsUpdated || 0}</strong>, пропущено <strong>${result.materialsSkipped || 0}</strong></div>
                 <div>Деталей найдено: <strong>${result.partsFound}</strong>, создано: <strong>${result.partsCreated}</strong></div>
                 <div>Норм создано: <strong>${result.normsCreated}</strong>, обновлено: <strong>${result.normsUpdated}</strong></div>
                 <div>Строк пропущено: <strong>${result.rowsSkipped}</strong></div>
+                ${warnings.length === 0 ? "" : `<hr /><div><strong>Warnings:</strong><ul>${warnings.slice(0, 30).map(w => `<li>[${w.sheet} #${w.rowIndex}] ${w.message}</li>`).join("")}</ul>${warnings.length > 30 ? `<div class="small text-muted">Показаны первые 30 предупреждений из ${warnings.length}.</div>` : ""}</div>`}
                 ${errors.length === 0 ? "" : `<hr /><div><strong>Ошибки:</strong><ul>${errors.slice(0, 30).map(e => `<li>[${e.sheet} #${e.rowIndex}] ${e.message}</li>`).join("")}</ul>${errors.length > 30 ? `<div class="small text-muted">Показаны первые 30 ошибок из ${errors.length}. Полный список — в Excel-файле.</div>` : ""}</div>`}
+                ${materialRowsHtml}
                 ${parseRowsHtml}
                 ${hasErrorFile ? `<div class="mt-3"><button type="button" class="btn btn-outline-danger" id="metalDownloadErrorsButton">Скачать ошибки в Excel</button></div>` : ""}
             </div>`;

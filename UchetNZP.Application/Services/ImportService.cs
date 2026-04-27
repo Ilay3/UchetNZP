@@ -327,12 +327,17 @@ public class ImportService : IImportService
         using var workbook = new XLWorkbook(stream);
         var sourceFileName = Path.GetFileName(fileName.Trim());
         var errors = new List<MetalDataImportErrorDto>();
+        var warnings = new List<MetalDataImportWarningDto>();
         var materialsImported = 0;
+        var materialsCreated = 0;
+        var materialsUpdated = 0;
+        var materialsSkipped = 0;
         var partsFound = 0;
         var partsCreated = 0;
         var normsCreated = 0;
         var normsUpdated = 0;
         var rowsSkipped = 0;
+        var materialPreviewRows = new List<MetalMaterialImportPreviewRowDto>();
         var parsePreviewRows = new List<MetalDataParsePreviewRowDto>();
         var materialCache = new Dictionary<string, MetalMaterial>(StringComparer.OrdinalIgnoreCase);
         var partCache = new Dictionary<string, Part>(StringComparer.OrdinalIgnoreCase);
@@ -342,88 +347,173 @@ public class ImportService : IImportService
             var sheet = FindWorksheetOrThrow(
                 workbook,
                 ["Материалы и коэф. металлов", "Материалы и коэф металлов", "Материалы"]);
+            var dbMaterials = await _dbContext.MetalMaterials.ToListAsync(cancellationToken).ConfigureAwait(false);
+            var materialsByCode = dbMaterials
+                .Where(x => !string.IsNullOrWhiteSpace(x.Code))
+                .GroupBy(x => NormalizeToken(x.Code!))
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
+            var materialsByName = dbMaterials
+                .GroupBy(x => NormalizeToken(x.Name))
+                .ToDictionary(x => x.Key, x => x.First(), StringComparer.Ordinal);
+
             foreach (var row in (sheet.RangeUsed()?.RowsUsed().Skip(1) ?? []).Where(x => !x.IsEmpty()))
             {
                 var rowNumber = row.RowNumber();
-                var code = row.Cell(2).GetString().Trim();
-                var name = row.Cell(3).GetString().Trim();
-                var hasMassPerMeter = TryParseDecimalCell(row.Cell(4), out var massPerMeter);
-                var hasMassPerM2 = TryParseDecimalCell(row.Cell(5), out var massPerM2);
-                var hasCoef = TryParseDecimalCell(row.Cell(6), out var coefConsumption);
-                var stockUnit = row.Cell(7).GetString().Trim();
-                var displayName = row.Cell(8).GetString().Trim();
+                var code = sheet.Cell(rowNumber, 2).GetString().Trim();
+                var name = sheet.Cell(rowNumber, 3).GetString().Trim();
+                var hasWeightPerUnit = TryParseDecimalCell(sheet.Cell(rowNumber, 4), out var weightPerUnitKg);
+                var hasCoef = TryParseDecimalCell(sheet.Cell(rowNumber, 5), out var coefConsumption);
+                var displayNameRaw = sheet.Cell(rowNumber, 6).GetString().Trim();
+                var rowWarnings = new List<string>();
 
                 if (string.IsNullOrWhiteSpace(name))
                 {
+                    materialsSkipped++;
                     rowsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле Name."));
                     continue;
                 }
 
-                if ((!string.IsNullOrWhiteSpace(code) && code.Length > 64) || name.Length > 256 || (!string.IsNullOrWhiteSpace(displayName) && displayName.Length > 256))
+                var normalizedCode = NormalizeToken(code);
+                var normalizedName = NormalizeToken(name);
+                var displayName = ResolveDisplayName(code, name, displayNameRaw);
+                var unitInfo = ResolveUnitFromMaterialName(name);
+                if (!unitInfo.Resolved)
                 {
+                    const string unresolvedMessage = "Не удалось автоматически определить тип единицы (m/m2) по названию материала.";
+                    rowWarnings.Add(unresolvedMessage);
+                    warnings.Add(new MetalDataImportWarningDto(rowNumber, sheet.Name, unresolvedMessage));
+                }
+
+                if ((!string.IsNullOrWhiteSpace(code) && code.Length > 64) || name.Length > 256 || displayName.Length > 256)
+                {
+                    materialsSkipped++;
                     rowsSkipped++;
                     errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Превышена максимальная длина полей (Code/Name/DisplayName)."));
+                    materialPreviewRows.Add(new MetalMaterialImportPreviewRowDto(
+                        rowNumber,
+                        string.IsNullOrWhiteSpace(code) ? null : code,
+                        name,
+                        displayName,
+                        "skipped",
+                        unitInfo.UnitKind,
+                        unitInfo.StockUnit,
+                        !unitInfo.Resolved,
+                        rowWarnings));
                     continue;
                 }
 
-                if (!hasMassPerMeter && !hasMassPerM2)
+                if (!hasWeightPerUnit)
                 {
+                    materialsSkipped++;
                     rowsSkipped++;
-                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Должно быть заполнено обязательное поле mass_per_meter или mass_per_m2."));
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле WeightPerUnitKg."));
+                    materialPreviewRows.Add(new MetalMaterialImportPreviewRowDto(
+                        rowNumber,
+                        string.IsNullOrWhiteSpace(code) ? null : code,
+                        name,
+                        displayName,
+                        "skipped",
+                        unitInfo.UnitKind,
+                        unitInfo.StockUnit,
+                        !unitInfo.Resolved,
+                        rowWarnings));
                     continue;
                 }
 
+                var coefValue = hasCoef ? coefConsumption : 1m;
                 if (!hasCoef)
                 {
-                    rowsSkipped++;
-                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле coef_consumption."));
-                    continue;
+                    const string coefDefaultMessage = "Коэффициент не заполнен, применено значение 1.";
+                    rowWarnings.Add(coefDefaultMessage);
+                    warnings.Add(new MetalDataImportWarningDto(rowNumber, sheet.Name, coefDefaultMessage));
                 }
 
-                if (string.IsNullOrWhiteSpace(stockUnit))
+                if (!unitInfo.Resolved)
                 {
+                    materialsSkipped++;
                     rowsSkipped++;
-                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Пропущено обязательное поле stock_unit (кг/м/м2/шт)."));
+                    errors.Add(new MetalDataImportErrorDto(rowNumber, sheet.Name, "Строка пропущена: не удалось определить UnitKind/StockUnit по названию материала."));
+                    materialPreviewRows.Add(new MetalMaterialImportPreviewRowDto(
+                        rowNumber,
+                        string.IsNullOrWhiteSpace(code) ? null : code,
+                        name,
+                        displayName,
+                        "skipped",
+                        unitInfo.UnitKind,
+                        unitInfo.StockUnit,
+                        true,
+                        rowWarnings));
                     continue;
                 }
 
-                var materialKey = !string.IsNullOrWhiteSpace(code)
-                    ? $"CODE:{code}"
-                    : $"NAME:{name.ToUpperInvariant()}";
+                var materialKey = !string.IsNullOrWhiteSpace(normalizedCode)
+                    ? $"CODE:{normalizedCode}"
+                    : $"NAME:{normalizedName}";
+
+                var isCreated = false;
                 if (!materialCache.TryGetValue(materialKey, out var entity))
                 {
-                    entity = !string.IsNullOrWhiteSpace(code)
-                        ? await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == code, cancellationToken).ConfigureAwait(false)
-                        : await _dbContext.MetalMaterials.FirstOrDefaultAsync(x => x.Code == null && x.Name == name, cancellationToken).ConfigureAwait(false);
+                    entity = !string.IsNullOrWhiteSpace(normalizedCode)
+                        ? materialsByCode.GetValueOrDefault(normalizedCode)
+                        : materialsByName.GetValueOrDefault(normalizedName);
+
                     if (entity is null)
                     {
+                        isCreated = true;
                         entity = new MetalMaterial
                         {
                             Id = Guid.NewGuid(),
                             Code = string.IsNullOrWhiteSpace(code) ? null : code,
-                            UnitKind = "Unknown",
+                            UnitKind = unitInfo.UnitKind,
                         };
 
                         if (!dryRun)
                         {
                             await _dbContext.MetalMaterials.AddAsync(entity, cancellationToken).ConfigureAwait(false);
                         }
+
+                        if (!string.IsNullOrWhiteSpace(normalizedCode))
+                        {
+                            materialsByCode[normalizedCode] = entity;
+                        }
+
+                        materialsByName[normalizedName] = entity;
                     }
 
                     materialCache[materialKey] = entity;
                 }
 
                 entity.Name = name;
-                entity.MassPerMeterKg = hasMassPerMeter ? massPerMeter : 0m;
-                entity.MassPerSquareMeterKg = hasMassPerM2 ? massPerM2 : 0m;
-                entity.CoefConsumption = coefConsumption == 0m ? 1m : coefConsumption;
-                entity.StockUnit = stockUnit.ToLowerInvariant();
-                entity.WeightPerUnitKg = hasMassPerMeter ? massPerMeter : (hasMassPerM2 ? massPerM2 : null);
+                entity.MassPerMeterKg = unitInfo.UnitKind == "Meter" ? weightPerUnitKg : 0m;
+                entity.MassPerSquareMeterKg = unitInfo.UnitKind == "SquareMeter" ? weightPerUnitKg : 0m;
+                entity.CoefConsumption = coefValue == 0m ? 1m : coefValue;
+                entity.StockUnit = unitInfo.StockUnit;
+                entity.WeightPerUnitKg = weightPerUnitKg;
                 entity.Coefficient = entity.CoefConsumption;
-                entity.DisplayName = string.IsNullOrWhiteSpace(displayName) ? name : displayName;
+                entity.UnitKind = unitInfo.UnitKind;
+                entity.DisplayName = displayName;
                 entity.IsActive = true;
                 materialsImported++;
+                if (isCreated)
+                {
+                    materialsCreated++;
+                }
+                else
+                {
+                    materialsUpdated++;
+                }
+
+                materialPreviewRows.Add(new MetalMaterialImportPreviewRowDto(
+                    rowNumber,
+                    string.IsNullOrWhiteSpace(code) ? null : code,
+                    name,
+                    displayName,
+                    isCreated ? "created" : "updated",
+                    unitInfo.UnitKind,
+                    unitInfo.StockUnit,
+                    false,
+                    rowWarnings));
             }
         }
 
@@ -599,13 +689,19 @@ public class ImportService : IImportService
             sourceFileName,
             dryRun,
             materialsImported,
+            materialsCreated,
+            materialsUpdated,
+            materialsSkipped,
             partsFound,
             partsCreated,
             normsCreated,
             normsUpdated,
             rowsSkipped,
+            materialPreviewRows.Count,
+            materialPreviewRows,
             parsePreviewRows.Count,
             parsePreviewRows,
+            warnings,
             errors,
             errorFileName,
             errorFileContent);
@@ -788,6 +884,46 @@ public class ImportService : IImportService
         }
 
         return TryParseDecimal(cell.GetString().Trim(), out result);
+    }
+
+    private static (bool Resolved, string UnitKind, string StockUnit) ResolveUnitFromMaterialName(string name)
+    {
+        var haystack = (name ?? string.Empty).Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(haystack))
+        {
+            return (false, "Unknown", "unknown");
+        }
+
+        if (haystack.Contains("лист", StringComparison.Ordinal)
+            || haystack.Contains("лента", StringComparison.Ordinal)
+            || haystack.Contains("пластин", StringComparison.Ordinal))
+        {
+            return (true, "SquareMeter", "m2");
+        }
+
+        if (haystack.Contains("круг", StringComparison.Ordinal)
+            || haystack.Contains("прут", StringComparison.Ordinal)
+            || haystack.Contains("труб", StringComparison.Ordinal)
+            || haystack.Contains("профил", StringComparison.Ordinal)
+            || haystack.Contains("полос", StringComparison.Ordinal)
+            || haystack.Contains("шин", StringComparison.Ordinal))
+        {
+            return (true, "Meter", "m");
+        }
+
+        return (false, "Unknown", "unknown");
+    }
+
+    private static string ResolveDisplayName(string code, string name, string displayName)
+    {
+        if (!string.IsNullOrWhiteSpace(displayName))
+        {
+            return displayName.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(code)
+            ? name
+            : $"{code.Trim()} | {name}";
     }
 
     private static IXLWorksheet FindWorksheetOrThrow(

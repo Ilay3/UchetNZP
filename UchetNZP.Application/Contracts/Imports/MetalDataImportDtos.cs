@@ -15,6 +15,19 @@ public record MetalDataImportRequestDto(
 
 public record MetalDataImportErrorDto(int RowIndex, string Sheet, string Message);
 
+public record MetalDataImportWarningDto(int RowIndex, string Sheet, string Message);
+
+public record MetalMaterialImportPreviewRowDto(
+    int RowIndex,
+    string? Code,
+    string Name,
+    string DisplayName,
+    string Status,
+    string UnitKind,
+    string StockUnit,
+    bool UnresolvedUnitType,
+    IReadOnlyList<string> Warnings);
+
 public record MetalDataParsePreviewRowDto(
     int RowIndex,
     string Code,
@@ -34,13 +47,19 @@ public record MetalDataImportSummaryDto(
     string SourceFileName,
     bool DryRun,
     int MaterialsImported,
+    int MaterialsCreated,
+    int MaterialsUpdated,
+    int MaterialsSkipped,
     int PartsFound,
     int PartsCreated,
     int NormsCreated,
     int NormsUpdated,
     int RowsSkipped,
+    int MaterialPreviewTotal,
+    IReadOnlyList<MetalMaterialImportPreviewRowDto> MaterialPreviewRows,
     int ParsePreviewTotal,
     IReadOnlyList<MetalDataParsePreviewRowDto> ParsePreviewRows,
+    IReadOnlyList<MetalDataImportWarningDto> Warnings,
     IReadOnlyList<MetalDataImportErrorDto> Errors,
     string? ErrorFileName,
     byte[]? ErrorFileContent
