@@ -6,46 +6,112 @@ namespace UchetNZP.Application.Tests.Services;
 
 public class MetalConsumptionCalculatorTests
 {
-    public static IEnumerable<object?[]> ExampleCases()
+    [Fact]
+    public void Calculate_ForMeters_UsesBaseConsumptionAsSourceOfTruth()
     {
-        yield return ["Ø8x23", "rod", 8m, null, null, 23m, 10m, 0.23m];
-        yield return ["15x25", "sheet", null, null, 15m, 25m, 10m, 0.00375m];
-        yield return ["1,5x38x90", "plate", null, 1.5m, 38m, 90m, 10m, 0.0342m];
+        var norm = CreateNorm(2.5m, "m");
+        var material = CreateMaterial(weightPerUnitKg: 0.00325m, coefficient: 1.2m);
+
+        var result = MetalConsumptionCalculator.Calculate(norm, quantity: 4m, material);
+
+        Assert.Equal(10m, result.NeedM);
+        Assert.Equal(0m, result.NeedM2);
+        Assert.Equal(0m, result.NeedPcs);
+        Assert.Equal(0.039m, result.NeedKg);
+        Assert.DoesNotContain("warning", result.Formula, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Theory]
-    [MemberData(nameof(ExampleCases))]
-    public void Calculate_UsesExpectedGeometryForExamples(string _, string shape, decimal? diameterMm, decimal? thicknessMm, decimal? widthMm, decimal? lengthMm, decimal qty, decimal expectedNeedBase)
+    [Fact]
+    public void Calculate_ForSquareMeters_UsesBaseConsumptionAsSourceOfTruth()
     {
-        var norm = new MetalConsumptionNorm
+        var norm = CreateNorm(0.25m, "m2", shapeType: "sheet", widthMm: 150m, lengthMm: 300m);
+        var material = CreateMaterial(weightPerUnitKg: 7m, coefficient: 1.05m);
+
+        var result = MetalConsumptionCalculator.Calculate(norm, quantity: 8m, material);
+
+        Assert.Equal(0m, result.NeedM);
+        Assert.Equal(2m, result.NeedM2);
+        Assert.Equal(0m, result.NeedPcs);
+        Assert.Equal(14.7m, result.NeedKg);
+    }
+
+    [Fact]
+    public void Calculate_ForKilograms_UsesBaseConsumptionDirectly()
+    {
+        var norm = CreateNorm(0.00325m, "kg");
+        var material = CreateMaterial(weightPerUnitKg: 99m, coefficient: 1.1m);
+
+        var result = MetalConsumptionCalculator.Calculate(norm, quantity: 10m, material);
+
+        Assert.Equal(0m, result.NeedM);
+        Assert.Equal(0m, result.NeedM2);
+        Assert.Equal(0.0325m, result.NeedPcs);
+        Assert.Equal(0.03575m, result.NeedKg);
+    }
+
+    [Fact]
+    public void Calculate_ForGrams_ConvertsToKilogramsCorrectly()
+    {
+        var norm = CreateNorm(7m, "g");
+        var material = CreateMaterial(weightPerUnitKg: 10m, coefficient: 1m);
+
+        var result = MetalConsumptionCalculator.Calculate(norm, quantity: 12m, material);
+
+        Assert.Equal(84m, result.NeedPcs);
+        Assert.Equal(0.084m, result.NeedKg);
+    }
+
+    [Fact]
+    public void Calculate_KeepsPrecisionForSmallValues()
+    {
+        var norm = CreateNorm(0.000084m, "kg");
+        var material = CreateMaterial(weightPerUnitKg: 1m, coefficient: 1m);
+
+        var result = MetalConsumptionCalculator.Calculate(norm, quantity: 1m, material);
+
+        Assert.Equal(0.000084m, result.NeedKg);
+    }
+
+    [Fact]
+    public void Calculate_WhenGeometryDiffersSignificantly_AddsWarningButKeepsBaseCalculation()
+    {
+        var norm = CreateNorm(1m, "m", shapeType: "rod", lengthMm: 200m);
+        var material = CreateMaterial(weightPerUnitKg: 0.8m, coefficient: 1m);
+
+        var result = MetalConsumptionCalculator.Calculate(norm, quantity: 5m, material);
+
+        Assert.Equal(5m, result.NeedM);
+        Assert.Equal(4m, result.NeedKg);
+        Assert.Contains("warning", result.Formula, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static MetalConsumptionNorm CreateNorm(
+        decimal baseConsumptionQty,
+        string unit,
+        string shapeType = "unknown",
+        decimal? widthMm = null,
+        decimal? lengthMm = null)
+    {
+        return new MetalConsumptionNorm
         {
-            ShapeType = shape,
-            DiameterMm = diameterMm,
-            ThicknessMm = thicknessMm,
+            BaseConsumptionQty = baseConsumptionQty,
+            ConsumptionUnit = unit,
+            ShapeType = shapeType,
             WidthMm = widthMm,
             LengthMm = lengthMm,
-            BaseConsumptionQty = 1m,
-            ConsumptionUnit = "m",
         };
+    }
 
-        var material = new MetalMaterial
+    private static MetalMaterial CreateMaterial(decimal weightPerUnitKg, decimal coefficient)
+    {
+        return new MetalMaterial
         {
-            MassPerMeterKg = 2m,
-            MassPerSquareMeterKg = 5m,
-            CoefConsumption = 1.1m,
+            WeightPerUnitKg = weightPerUnitKg,
+            Coefficient = coefficient,
+            CoefConsumption = 1m,
+            MassPerMeterKg = 0.8m,
+            MassPerSquareMeterKg = 7m,
             StockUnit = "kg",
         };
-
-        var result = MetalConsumptionCalculator.Calculate(norm, qty, material);
-
-        if (shape == "rod")
-        {
-            Assert.Equal(expectedNeedBase, result.NeedM);
-            Assert.True(result.NeedKg > 0m);
-            return;
-        }
-
-        Assert.Equal(expectedNeedBase, result.NeedM2);
-        Assert.True(result.NeedKg > 0m);
     }
 }
