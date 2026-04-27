@@ -12,6 +12,9 @@ namespace UchetNZP.Application.Services;
 
 public class WipService : IWipService
 {
+    private const string RequirementStatusCreated = "Created";
+    private const string AuditEventRequirementCreated = "RequirementCreated";
+
     private readonly AppDbContext _dbContext;
     private readonly ICurrentUserService _currentUserService;
 
@@ -142,6 +145,11 @@ public class WipService : IWipService
 
                 await _dbContext.WipReceipts.AddAsync(receipt, cancellationToken).ConfigureAwait(false);
 
+                if (item.MetalMaterialId.HasValue && item.MetalMaterialId.Value != Guid.Empty)
+                {
+                    await CreateMetalRequirementForReceiptAsync(item, receipt, userId, now, cancellationToken).ConfigureAwait(false);
+                }
+
                 await _dbContext.ReceiptAudits.AddAsync(
                     new ReceiptAudit
                     {
@@ -216,6 +224,135 @@ public class WipService : IWipService
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private async Task CreateMetalRequirementForReceiptAsync(
+        ReceiptItemDto item,
+        WipReceipt receipt,
+        Guid userId,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var material = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == item.MetalMaterialId!.Value && x.IsActive, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (material is null)
+        {
+            return;
+        }
+
+        var part = await _dbContext.Parts
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == item.PartId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (part is null)
+        {
+            return;
+        }
+
+        var launch = new WipLaunch
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PartId = item.PartId,
+            SectionId = item.SectionId,
+            FromOpNumber = item.OpNumber,
+            LaunchDate = NormalizeToUtc(item.ReceiptDate),
+            CreatedAt = now,
+            Quantity = item.Quantity,
+            Comment = "Автоматически создано из /wip/receipts для формирования требования материала.",
+            SumHoursToFinish = 0m,
+        };
+
+        await _dbContext.WipLaunches.AddAsync(launch, cancellationToken).ConfigureAwait(false);
+
+        var consumptionUnit = material.UnitKind == "SquareMeter" ? "м2" : "м";
+        var actor = userId == Guid.Empty ? "system" : userId.ToString();
+        var requirement = new MetalRequirement
+        {
+            Id = Guid.NewGuid(),
+            RequirementNumber = await GetNextRequirementNumberAsync(cancellationToken).ConfigureAwait(false),
+            RequirementDate = now,
+            Status = RequirementStatusCreated,
+            WipReceiptId = receipt.Id,
+            WipLaunchId = launch.Id,
+            PartId = part.Id,
+            PartCode = part.Code ?? string.Empty,
+            PartName = part.Name,
+            Quantity = item.Quantity,
+            MetalMaterialId = material.Id,
+            Comment = $"Создано автоматически при сохранении прихода НЗП {receipt.Id}.",
+            CreatedAt = now,
+            CreatedBy = actor,
+            UpdatedAt = now,
+            UpdatedBy = actor,
+        };
+
+        requirement.Items.Add(new MetalRequirementItem
+        {
+            Id = Guid.NewGuid(),
+            MetalRequirementId = requirement.Id,
+            MetalMaterialId = material.Id,
+            NormPerUnit = 1m,
+            TotalRequiredQty = item.Quantity,
+            Unit = consumptionUnit,
+            TotalRequiredWeightKg = null,
+            ConsumptionPerUnit = 1m,
+            ConsumptionUnit = consumptionUnit,
+            RequiredQty = item.Quantity,
+            RequiredWeightKg = null,
+            SizeRaw = null,
+            Comment = "Строка создана автоматически из прихода НЗП.",
+            CalculationFormula = "qty * 1",
+            CalculationInput = $"{{\"qty\":{item.Quantity.ToString(CultureInfo.InvariantCulture)}}}",
+            SelectionSource = "auto_from_wip_receipt",
+            SelectionReason = "Материал указан в /wip/receipts.",
+            CandidateMaterials = null,
+        });
+
+        await _dbContext.MetalRequirements.AddAsync(requirement, cancellationToken).ConfigureAwait(false);
+
+        await _dbContext.MetalAuditLogs.AddAsync(new MetalAuditLog
+        {
+            Id = Guid.NewGuid(),
+            EventDate = now,
+            EventType = AuditEventRequirementCreated,
+            EntityType = nameof(MetalRequirement),
+            EntityId = requirement.Id,
+            DocumentNumber = requirement.RequirementNumber,
+            Message = "Требование создано автоматически при сохранении прихода НЗП.",
+            UserId = userId == Guid.Empty ? null : userId,
+            UserName = actor,
+            PayloadJson = $"{{\"wipReceiptId\":\"{receipt.Id}\",\"partId\":\"{part.Id}\",\"materialId\":\"{material.Id}\",\"qty\":{item.Quantity.ToString(CultureInfo.InvariantCulture)}}}",
+            CreatedAt = now,
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<string> GetNextRequirementNumberAsync(CancellationToken cancellationToken)
+    {
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"MR-{year}-";
+
+        var lastNumber = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => x.RequirementNumber.StartsWith(prefix))
+            .OrderByDescending(x => x.RequirementNumber)
+            .Select(x => x.RequirementNumber)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (string.IsNullOrWhiteSpace(lastNumber))
+        {
+            return $"{prefix}000001";
+        }
+
+        var chunk = lastNumber[prefix.Length..];
+        return int.TryParse(chunk, out var number)
+            ? $"{prefix}{number + 1:D6}"
+            : $"{prefix}000001";
     }
 
     private async Task<WipLabel> ResolveLabelAsync(ReceiptItemDto in_item, ISet<Guid> in_reservedLabelIds, CancellationToken cancellationToken)

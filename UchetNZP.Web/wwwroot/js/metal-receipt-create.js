@@ -2,6 +2,7 @@
     const quantityInput = document.getElementById("quantityInput");
     const unitsContainer = document.getElementById("unitsContainer");
     const materialSelect = document.getElementById("materialSelect");
+    const materialSearchInput = document.getElementById("materialSearchInput");
     const profileTypeSelect = document.getElementById("profileTypeSelect");
     const materialProfileMapRaw = document.getElementById("materialProfileMap")?.textContent ?? "{}";
     let materialProfileMap = {};
@@ -13,6 +14,37 @@
 
     if (!quantityInput || !unitsContainer || !materialSelect || !profileTypeSelect) {
         return;
+    }
+
+    const materialOptionsSource = Array.from(materialSelect.options)
+        .filter(option => option.value)
+        .map(option => ({ value: option.value, text: (option.textContent || "").trim() }));
+
+    function refillMaterialSelect(searchText) {
+        const normalized = (searchText || "").trim().toLowerCase();
+        const selectedValue = materialSelect.value;
+        const filtered = !normalized
+            ? materialOptionsSource
+            : materialOptionsSource.filter(option => option.text.toLowerCase().includes(normalized));
+
+        materialSelect.innerHTML = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = filtered.length > 0 ? "Выберите материал" : "Ничего не найдено";
+        materialSelect.appendChild(placeholder);
+
+        filtered.forEach(option => {
+            const item = document.createElement("option");
+            item.value = option.value;
+            item.textContent = option.text;
+            materialSelect.appendChild(item);
+        });
+
+        if (filtered.some(option => option.value === selectedValue)) {
+            materialSelect.value = selectedValue;
+        } else {
+            materialSelect.value = "";
+        }
     }
 
     function syncProfileVisibility() {
@@ -100,10 +132,15 @@
         syncProfileVisibility();
         renderUnitInputs();
     });
+
+    materialSearchInput?.addEventListener("input", () => {
+        refillMaterialSelect(materialSearchInput.value);
+    });
     profileTypeSelect.addEventListener("change", () => {
         syncProfileVisibility();
         renderUnitInputs();
     });
+    refillMaterialSelect("");
     syncProfileVisibility();
     renderUnitInputs();
 })();
