@@ -29,15 +29,18 @@ public class MetalWarehouseController : Controller
     private readonly AppDbContext _dbContext;
     private readonly ICuttingMapExcelExporter _cuttingMapExcelExporter;
     private readonly ICuttingMapPdfExporter _cuttingMapPdfExporter;
+    private readonly IMetalRequirementWarehousePrintDocumentService _requirementWarehousePrintDocumentService;
 
     public MetalWarehouseController(
         AppDbContext dbContext,
         ICuttingMapExcelExporter cuttingMapExcelExporter,
-        ICuttingMapPdfExporter cuttingMapPdfExporter)
+        ICuttingMapPdfExporter cuttingMapPdfExporter,
+        IMetalRequirementWarehousePrintDocumentService requirementWarehousePrintDocumentService)
     {
         _dbContext = dbContext;
         _cuttingMapExcelExporter = cuttingMapExcelExporter;
         _cuttingMapPdfExporter = cuttingMapPdfExporter;
+        _requirementWarehousePrintDocumentService = requirementWarehousePrintDocumentService;
     }
 
     [HttpGet("")]
@@ -1143,6 +1146,33 @@ public class MetalWarehouseController : Controller
         }
 
         return View("~/Views/MetalWarehouse/RequirementPrintMaster.cshtml", model);
+    }
+
+    [HttpGet("Requirements/Print/{id:guid}")]
+    public async Task<IActionResult> PrintRequirement(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор требования.");
+        }
+
+        try
+        {
+            var document = await _requirementWarehousePrintDocumentService.BuildAsync(id, cancellationToken);
+            return File(
+                document.Content,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                document.FileName);
+        }
+        catch (FileNotFoundException)
+        {
+            TempData["MetalRequirementError"] = "Шаблон печатной формы не найден. Проверьте наличие файла Templates/Documents/Требование на склад.docx.";
+            return RedirectToAction(nameof(RequirementDetails), new { id });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 
     [HttpGet("CuttingMaps")]
