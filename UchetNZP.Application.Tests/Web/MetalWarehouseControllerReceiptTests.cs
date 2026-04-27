@@ -114,7 +114,8 @@ public class MetalWarehouseControllerReceiptTests
             dbContext,
             new NoOpCuttingMapExcelExporter(),
             new NoOpCuttingMapPdfExporter(),
-            new NoOpWarehousePrintService())
+            new NoOpWarehousePrintService(),
+            new NoOpMetalReceiptItemLabelDocumentService())
         {
             ControllerContext = new ControllerContext
             {
@@ -159,5 +160,11 @@ public class MetalWarehouseControllerReceiptTests
         public void SaveTempData(HttpContext context, IDictionary<string, object?> values)
         {
         }
+    }
+
+    private sealed class NoOpMetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocumentService
+    {
+        public Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, string qrTarget, CancellationToken cancellationToken = default)
+            => Task.FromResult(new MetalReceiptItemLabelDocumentResult("label.pdf", "application/pdf", Array.Empty<byte>(), qrTarget));
     }
 }
