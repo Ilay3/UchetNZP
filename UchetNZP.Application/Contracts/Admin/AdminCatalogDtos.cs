@@ -2,7 +2,13 @@ using System;
 
 namespace UchetNZP.Application.Contracts.Admin;
 
-public record AdminPartDto(Guid Id, string Name, string? Code);
+public record AdminPartDto(
+    Guid Id,
+    string Name,
+    string? Code,
+    string? SizeRaw,
+    decimal? BaseConsumptionQty,
+    string? ConsumptionUnit);
 
 public record AdminPartEditDto(string Name, string? Code);
 

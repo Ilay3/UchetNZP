@@ -22,12 +22,29 @@ public class AdminCatalogService : IAdminCatalogService
 
     public async Task<IReadOnlyCollection<AdminPartDto>> GetPartsAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Parts
+        var parts = await _dbContext.Parts
             .AsNoTracking()
+            .Include(x => x.MetalConsumptionNorms)
             .OrderBy(x => x.Name)
-            .Select(x => new AdminPartDto(x.Id, x.Name, x.Code))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        return parts
+            .Select(x =>
+            {
+                var activeNorm = x.MetalConsumptionNorms
+                    .Where(n => n.IsActive)
+                    .OrderByDescending(n => n.Id)
+                    .FirstOrDefault();
+                return new AdminPartDto(
+                    x.Id,
+                    x.Name,
+                    x.Code,
+                    activeNorm?.SizeRaw,
+                    activeNorm?.BaseConsumptionQty,
+                    activeNorm?.ConsumptionUnit);
+            })
+            .ToList();
     }
 
     public async Task<AdminPartDto> CreatePartAsync(AdminPartEditDto input, CancellationToken cancellationToken = default)
@@ -49,7 +66,7 @@ public class AdminCatalogService : IAdminCatalogService
         await _dbContext.Parts.AddAsync(entity, cancellationToken).ConfigureAwait(false);
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return new AdminPartDto(entity.Id, entity.Name, entity.Code);
+        return new AdminPartDto(entity.Id, entity.Name, entity.Code, null, null, null);
     }
 
     public async Task<AdminPartDto> UpdatePartAsync(Guid id, AdminPartEditDto input, CancellationToken cancellationToken = default)
@@ -69,7 +86,7 @@ public class AdminCatalogService : IAdminCatalogService
 
         await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return new AdminPartDto(entity.Id, entity.Name, entity.Code);
+        return new AdminPartDto(entity.Id, entity.Name, entity.Code, null, null, null);
     }
 
     public async Task DeletePartAsync(Guid id, CancellationToken cancellationToken = default)

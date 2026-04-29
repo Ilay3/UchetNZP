@@ -53,6 +53,12 @@ public class AdminEntityRowViewModel
     public string Name { get; init; } = string.Empty;
 
     public string? Code { get; init; }
+
+    public string? SizeRaw { get; init; }
+
+    public decimal? BaseConsumptionQty { get; init; }
+
+    public string? ConsumptionUnit { get; init; }
 }
 
 public class AdminCatalogWipBalanceRowViewModel
