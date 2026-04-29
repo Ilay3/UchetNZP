@@ -36,14 +36,14 @@
                 <span asp-validation-for="ReceiptDate" class="text-danger"></span>
             </div>
 
-            <div class="col-md-6">
+            <div class="col-md-6 position-relative">
                 <label class="form-label" for="materialInput">Материал</label>
                 <input id="materialInput"
                        class="form-control"
                        type="text"
-                       list="materialOptions"
                        placeholder="Например: Лист Ст3 3мм"
                        autocomplete="off"
+                       aria-describedby="materialSearchHelp"
                        value="@(Model.Materials.FirstOrDefault(x => x.Value == Model.MetalMaterialId?.ToString())?.Text ?? string.Empty)" />
                 <datalist id="materialOptions">
                     @foreach (var material in Model.Materials)
@@ -51,8 +51,9 @@
                         <option value="@material.Text" data-id="@material.Value"></option>
                     }
                 </datalist>
+                <div id="materialSuggestions" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 1050; max-height: 260px; overflow-y: auto;"></div>
                 <input asp-for="MetalMaterialId" type="hidden" id="materialId" />
-                <div class="form-text">Начните вводить название или код, затем выберите вариант из списка.</div>
+                <div class="form-text" id="materialSearchHelp">Начните вводить название или код, затем выберите вариант из списка.</div>
                 <span asp-validation-for="MetalMaterialId" class="text-danger"></span>
             </div>
 
@@ -82,7 +83,7 @@
                     <div class="card-body">
                         <h2 class="h5 mb-3">Поштучные размеры</h2>
                         <div class="text-muted small mb-2">
-                            Для каждой единицы укажите размер в <span id="unitTextHint">м</span>.
+                            Для каждой единицы укажите размер в <span id="unitTextHint">ед. изм.</span>.
                             Ниже сразу показывается, как размер попадёт в этикетку.
                         </div>
                         <div id="unitsContainer" class="row g-3">
