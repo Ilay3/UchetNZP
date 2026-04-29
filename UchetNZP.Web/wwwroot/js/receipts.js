@@ -58,6 +58,9 @@
     const materialTotalWeightLabel = document.getElementById("receiptMaterialTotalWeightLabel");
     const materialEmptyState = document.getElementById("receiptMaterialEmptyState");
     const materialUnitsTableBody = document.querySelector("#receiptMaterialUnitsTable tbody");
+    const materialNormPerPartLabel = document.getElementById("receiptMaterialNormPerPartLabel");
+    const materialRequiredLabel = document.getElementById("receiptMaterialRequiredLabel");
+    const materialRecommendationLabel = document.getElementById("receiptMaterialRecommendationLabel");
 
     dateInput.value = new Date().toISOString().slice(0, 10);
 
@@ -81,6 +84,9 @@
     let labelExistsInSystem = false;
     let labelCheckRequestId = 0;
     let currentMaterialStockSummary = "";
+    let currentMaterialTotalSize = 0;
+    const materialNormById = new Map();
+    let fallbackPartNorm = 0;
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
@@ -301,6 +307,7 @@
 
     function resetMaterialStockView() {
         currentMaterialStockSummary = "";
+        currentMaterialTotalSize = 0;
         if (materialUnitInput) {
             materialUnitInput.value = "—";
         }
@@ -334,6 +341,7 @@
 
             const materials = await response.json();
             materialSelect.innerHTML = "<option value=\"\">Выберите материал</option>";
+            materialNormById.clear();
             (Array.isArray(materials) ? materials : []).forEach(item => {
                 const option = document.createElement("option");
                 option.value = item.id;
@@ -354,6 +362,8 @@
 
         materialSelect.innerHTML = "<option value=\"\">Выберите материал</option>";
         resetMaterialStockView();
+        materialNormById.clear();
+        fallbackPartNorm = 0;
 
         if (!partId) {
             return;
@@ -370,8 +380,13 @@
             for (const item of list) {
                 const option = document.createElement("option");
                 option.value = item.id;
-                option.textContent = `${formatNameWithCode(item.name ?? "", item.code ?? "")} (норма: ${Number(item.baseConsumptionQty ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 6 })})`;
+                option.textContent = formatNameWithCode(item.name ?? "", item.code ?? "");
                 materialSelect.appendChild(option);
+                const normValue = Number(item.baseConsumptionQty ?? 0);
+                materialNormById.set(item.id, normValue);
+                if (normValue > 0 && (fallbackPartNorm <= 0 || normValue < fallbackPartNorm)) {
+                    fallbackPartNorm = normValue;
+                }
             }
 
             if (list.length === 1) {
@@ -440,6 +455,7 @@
             if (materialTotalSizeLabel) {
                 materialTotalSizeLabel.textContent = Number(summary.totalSize ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 3 });
             }
+            currentMaterialTotalSize = Number(summary.totalSize ?? 0);
             if (materialTotalWeightLabel) {
                 materialTotalWeightLabel.textContent = Number(summary.totalWeightKg ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 3 });
             }
@@ -839,6 +855,33 @@
         hideLabelMessage();
     }
 
+
+
+    function updateMaterialNeedInfo() {
+        const materialId = materialSelect?.value || "";
+        const qty = Number(quantityInput?.value ?? 0);
+        const norm = materialNormById.get(materialId) ?? fallbackPartNorm;
+        const unit = materialUnitInput?.value && materialUnitInput.value !== "—" ? materialUnitInput.value : "ед.";
+        const required = norm > 0 && qty > 0 ? norm * qty : 0;
+        const remainder = currentMaterialTotalSize - required;
+
+        if (materialNormPerPartLabel) {
+            materialNormPerPartLabel.textContent = norm > 0 ? `${norm.toLocaleString("ru-RU", { maximumFractionDigits: 6 })} ${unit}` : "—";
+        }
+        if (materialRequiredLabel) {
+            materialRequiredLabel.textContent = required > 0 ? `${required.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}` : "—";
+        }
+        if (materialRecommendationLabel) {
+            if (!materialId || qty <= 0 || norm <= 0) {
+                materialRecommendationLabel.textContent = "Выберите деталь, материал и количество.";
+            } else if (remainder < 0) {
+                materialRecommendationLabel.textContent = `Недостаточно материала: не хватает ${Math.abs(remainder).toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+            } else {
+                materialRecommendationLabel.textContent = `Подходит. Ожидаемый остаток: ${remainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+            }
+        }
+    }
+
     function renderCart() {
         if (!cart.length) {
             cartTableBody.innerHTML = "<tr><td colspan=\"11\" class=\"text-center text-muted\">Добавьте операции в корзину для сохранения.</td></tr>";
@@ -894,7 +937,7 @@
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>
                 <td>
-                    <a class="btn btn-outline-secondary btn-sm" href="/wip/receipts/${encodeURIComponent(item.receiptId)}/escort-label">Скачать сопроводительный ярлык</a>
+                    <a class="btn btn-link text-decoration-none" title="Скачать сопроводительный ярлык" href="/wip/receipts/${encodeURIComponent(item.receiptId)}/escort-label">🏷️</a>
                 </td>
                 <td class="text-center">
                     <button type="button" class="btn btn-link text-danger text-decoration-none" data-action="cancel" data-receipt-id="${item.receiptId}">Отменить</button>
@@ -1006,6 +1049,7 @@
 
     quantityInput.addEventListener("input", () => {
         updateFormState();
+        updateMaterialNeedInfo();
         saveDraft();
     });
     commentInput.addEventListener("input", () => saveDraft());
@@ -1400,6 +1444,9 @@
 
         history = [...newEntries, ...history].slice(0, 10);
         renderHistory();
+        newEntries.forEach(entry => {
+            window.open(`/wip/receipts/${encodeURIComponent(entry.receiptId)}/escort-label`, "_blank");
+        });
     }
 
     async function cancelSavedReceipt(receiptId, button, skipPrompt = false) {
