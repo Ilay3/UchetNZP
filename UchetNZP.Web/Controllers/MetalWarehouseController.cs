@@ -8,6 +8,7 @@ using UchetNZP.Web.Services;
 using System.Text.Json;
 using System.Globalization;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -158,7 +159,7 @@ public class MetalWarehouseController : Controller
         ArgumentNullException.ThrowIfNull(material);
 
         var now = DateTime.UtcNow;
-        var nextNumber = await GetNextReceiptNumberAsync(cancellationToken);
+        var nextNumber = await GetNextReceiptNumberAsync(model, material, cancellationToken);
         var receipt = new MetalReceipt
         {
             Id = Guid.NewGuid(),
@@ -2006,22 +2007,56 @@ public class MetalWarehouseController : Controller
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<string> GetNextReceiptNumberAsync(CancellationToken cancellationToken)
+    private async Task<string> GetNextReceiptNumberAsync(
+        MetalReceiptCreateViewModel model,
+        MetalMaterial material,
+        CancellationToken cancellationToken)
     {
+        const string prefix = "ПРИХОД-МЕТАЛЛА";
+        var datePart = model.ReceiptDate?.ToString("yyyyMMdd") ?? DateTime.UtcNow.ToString("yyyyMMdd");
+        var materialPart = BuildMaterialCode(material);
+        var quantity = model.Quantity ?? 0;
+        var weight = model.PassportWeightKg ?? 0m;
+        var unitKind = material.UnitKind == "SquareMeter" ? "м2" : "м";
+        var sizeSummary = BuildSizeSummary(model);
+
         var lastNumber = await _dbContext.MetalReceipts
             .AsNoTracking()
-            .Where(x => x.ReceiptNumber.StartsWith("MR-"))
+            .Where(x => x.ReceiptNumber.StartsWith(prefix))
             .OrderByDescending(x => x.ReceiptNumber)
             .Select(x => x.ReceiptNumber)
             .FirstOrDefaultAsync(cancellationToken);
 
         var numericPart = 0;
-        if (!string.IsNullOrWhiteSpace(lastNumber) && lastNumber.Length > 3)
+        if (!string.IsNullOrWhiteSpace(lastNumber))
         {
-            _ = int.TryParse(lastNumber[3..], out numericPart);
+            var match = Regex.Match(lastNumber, @"-№(?<sequence>\d+)$");
+            if (match.Success)
+            {
+                _ = int.TryParse(match.Groups["sequence"].Value, out numericPart);
+            }
         }
 
-        return $"MR-{(numericPart + 1):D6}";
+        return $"{prefix}-{datePart}-МАТЕРИАЛ_{materialPart}-КОЛ_{quantity}-ВЕС_{weight:0.###}кг-РАЗМЕР_{sizeSummary}{unitKind}-№{(numericPart + 1):D4}";
+    }
+
+    private static string BuildSizeSummary(MetalReceiptCreateViewModel model)
+    {
+        var sizes = model.Units
+            .Where(x => x.SizeValue.HasValue && x.SizeValue.Value > 0m)
+            .Select(x => x.SizeValue!.Value)
+            .ToList();
+
+        if (sizes.Count == 0)
+        {
+            return "НЕ_УКАЗАН";
+        }
+
+        var min = sizes.Min();
+        var max = sizes.Max();
+        return min == max
+            ? min.ToString("0.###")
+            : $"{min:0.###}-{max:0.###}";
     }
 
     private static string BuildMaterialCode(MetalMaterial material)
