@@ -8,6 +8,74 @@
     <p class="lead mb-0">Добавляйте материалы через интерфейс, без ручных правок в базе данных.</p>
 </div>
 
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-light fw-semibold">Связи "Деталь → Материалы (1..8)" и норма расхода на 1 деталь</div>
+    <div class="card-body">
+        <form method="post" asp-action="CreatePartNorm" asp-controller="AdminMetalMaterials" class="row g-3 mb-3">
+            @Html.AntiForgeryToken()
+            <div class="col-md-4">
+                <label class="form-label">Деталь</label>
+                <select class="form-select" name="PartId" required>
+                    <option value="">Выберите деталь</option>
+                    @foreach (var part in Model.Parts)
+                    {
+                        <option value="@part.Id">@part.Name (@part.Code)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Материал</label>
+                <select class="form-select" name="MetalMaterialId" required>
+                    <option value="">Выберите материал</option>
+                    @foreach (var material in Model.ActiveMaterials)
+                    {
+                        <option value="@material.Id">@material.Name (@material.Code)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Норма</label>
+                <input class="form-control" type="number" min="0.000001" step="0.000001" name="BaseConsumptionQty" required />
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-primary w-100" type="submit">Добавить</button>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr><th>Деталь</th><th>Материал</th><th>Норма на 1 деталь</th><th></th></tr>
+                </thead>
+                <tbody>
+                @if (!Model.PartMaterialNorms.Any())
+                {
+                    <tr><td colspan="4" class="text-muted">Связи пока не добавлены.</td></tr>
+                }
+                else
+                {
+                    @foreach (var norm in Model.PartMaterialNorms)
+                    {
+                        <tr>
+                            <td>@norm.PartName (@norm.PartCode)</td>
+                            <td>@norm.MaterialName (@norm.MaterialCode)</td>
+                            <td>@norm.BaseConsumptionQty.ToString("0.######")</td>
+                            <td class="text-end">
+                                <form method="post" asp-action="DeletePartNorm" asp-controller="AdminMetalMaterials">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@norm.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Отключить</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-outline-primary" asp-controller="Admin" asp-action="Index">В общий /admin</a>
 </div>

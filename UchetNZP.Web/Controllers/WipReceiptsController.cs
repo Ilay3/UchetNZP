@@ -85,6 +85,30 @@ public class WipReceiptsController : Controller
         return Ok(items);
     }
 
+    [HttpGet("part-materials")]
+    public async Task<IActionResult> GetPartMaterials([FromQuery] Guid partId, CancellationToken cancellationToken)
+    {
+        if (partId == Guid.Empty)
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        var items = await _dbContext.MetalConsumptionNorms
+            .AsNoTracking()
+            .Where(x => x.PartId == partId && x.IsActive && x.MetalMaterialId.HasValue && x.MetalMaterial != null && x.MetalMaterial.IsActive)
+            .Select(x => new
+            {
+                id = x.MetalMaterialId!.Value,
+                name = x.MetalMaterial!.Name,
+                code = x.MetalMaterial.Code,
+                baseConsumptionQty = x.BaseConsumptionQty
+            })
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return Ok(items);
+    }
+
     [HttpGet("operations")]
     public async Task<IActionResult> GetOperations([FromQuery] Guid partId, CancellationToken cancellationToken)
     {
