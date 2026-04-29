@@ -87,6 +87,7 @@
     let currentMaterialTotalSize = 0;
     const materialNormById = new Map();
     let fallbackPartNorm = 0;
+    let fallbackPartNormUnit = "";
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
@@ -365,12 +366,23 @@
         resetMaterialStockView();
         materialNormById.clear();
         fallbackPartNorm = 0;
+        fallbackPartNormUnit = "";
 
         if (!partId) {
             return;
         }
 
         try {
+            const normResponse = await fetch(`/wip/receipts/part-norms?partId=${encodeURIComponent(partId)}`);
+            if (normResponse.ok) {
+                const normPayload = await normResponse.json();
+                const qty = Number(normPayload?.baseConsumptionQty ?? 0);
+                if (qty > 0) {
+                    fallbackPartNorm = qty;
+                    fallbackPartNormUnit = typeof normPayload?.consumptionUnit === "string" ? normPayload.consumptionUnit.trim() : "";
+                }
+            }
+
             const response = await fetch(`/wip/receipts/part-materials?partId=${encodeURIComponent(partId)}`);
             if (!response.ok) {
                 throw new Error("Не удалось загрузить материалы детали.");
@@ -862,7 +874,7 @@
         const materialId = materialSelect?.value || "";
         const qty = Number(quantityInput?.value ?? 0);
         const norm = materialNormById.get(materialId) ?? fallbackPartNorm;
-        const unit = materialUnitInput?.value && materialUnitInput.value !== "—" ? materialUnitInput.value : "ед.";
+        const unit = materialUnitInput?.value && materialUnitInput.value !== "—" ? materialUnitInput.value : (fallbackPartNormUnit || "ед.");
         const required = norm > 0 && qty > 0 ? norm * qty : 0;
         const remainder = currentMaterialTotalSize - required;
 
@@ -873,8 +885,10 @@
             materialRequiredLabel.textContent = required > 0 ? `${required.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}` : "—";
         }
         if (materialRecommendationLabel) {
-            if (!materialId || qty <= 0 || norm <= 0) {
+            if (qty <= 0 || norm <= 0) {
                 materialRecommendationLabel.textContent = "Выберите деталь, материал и количество.";
+            } else if (!materialId) {
+                materialRecommendationLabel.textContent = `Нужно ${required.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}. Выберите материал с минимальным остатком, который покрывает эту потребность.`;
             } else if (remainder < 0) {
                 materialRecommendationLabel.textContent = `Недостаточно материала: не хватает ${Math.abs(remainder).toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
             } else {
