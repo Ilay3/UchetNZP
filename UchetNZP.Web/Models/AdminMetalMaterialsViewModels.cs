@@ -59,8 +59,6 @@ public class AdminPartMaterialNormCreateInputModel
     public Guid PartId { get; set; }
     [Required]
     public Guid MetalMaterialId { get; set; }
-    [Range(0.000001d, 999999999999d, ErrorMessage = "Норма должна быть больше 0.")]
-    public decimal BaseConsumptionQty { get; set; }
 }
 
 public class AdminPartMaterialNormListItemViewModel
