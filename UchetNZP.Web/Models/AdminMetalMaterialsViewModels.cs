@@ -8,6 +8,10 @@ public class AdminMetalMaterialsPageViewModel
     public AdminMetalMaterialUpdateInputModel UpdateModel { get; init; } = new();
 
     public IReadOnlyCollection<AdminMetalMaterialListItemViewModel> Materials { get; init; } = Array.Empty<AdminMetalMaterialListItemViewModel>();
+    public IReadOnlyCollection<AdminPartMaterialNormListItemViewModel> PartMaterialNorms { get; init; } = Array.Empty<AdminPartMaterialNormListItemViewModel>();
+    public IReadOnlyCollection<LookupItemViewModel> Parts { get; init; } = Array.Empty<LookupItemViewModel>();
+    public IReadOnlyCollection<LookupItemViewModel> ActiveMaterials { get; init; } = Array.Empty<LookupItemViewModel>();
+    public AdminPartMaterialNormCreateInputModel NormCreateModel { get; init; } = new();
 }
 
 public class AdminMetalMaterialListItemViewModel
@@ -47,4 +51,26 @@ public class AdminMetalMaterialUpdateInputModel : AdminMetalMaterialCreateInputM
 {
     [Required]
     public Guid Id { get; set; }
+}
+
+public class AdminPartMaterialNormCreateInputModel
+{
+    [Required]
+    public Guid PartId { get; set; }
+    [Required]
+    public Guid MetalMaterialId { get; set; }
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Норма должна быть больше 0.")]
+    public decimal BaseConsumptionQty { get; set; }
+}
+
+public class AdminPartMaterialNormListItemViewModel
+{
+    public Guid Id { get; init; }
+    public Guid PartId { get; init; }
+    public string PartName { get; init; } = string.Empty;
+    public string? PartCode { get; init; }
+    public Guid MaterialId { get; init; }
+    public string MaterialName { get; init; } = string.Empty;
+    public string? MaterialCode { get; init; }
+    public decimal BaseConsumptionQty { get; init; }
 }

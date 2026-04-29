@@ -171,12 +171,13 @@
         return rawValue;
     }
 
-    partLookup.inputElement?.addEventListener("lookup:selected", event => {
+    partLookup.inputElement?.addEventListener("lookup:selected", async event => {
         const part = event.detail;
         if (!part || !part.id) {
             return;
         }
 
+        await loadPartMaterials(part.id);
         loadOperations(part.id);
         updateFormState();
         saveDraft();
@@ -343,6 +344,59 @@
         catch (error) {
             console.error(error);
             materialSelect.innerHTML = "<option value=\"\">Материалы недоступны</option>";
+        }
+    }
+
+    async function loadPartMaterials(partId) {
+        if (!materialSelect) {
+            return;
+        }
+
+        materialSelect.innerHTML = "<option value=\"\">Выберите материал</option>";
+        resetMaterialStockView();
+
+        if (!partId) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/wip/receipts/part-materials?partId=${encodeURIComponent(partId)}`);
+            if (!response.ok) {
+                throw new Error("Не удалось загрузить материалы детали.");
+            }
+
+            const materials = await response.json();
+            const list = Array.isArray(materials) ? materials : [];
+            for (const item of list) {
+                const option = document.createElement("option");
+                option.value = item.id;
+                option.textContent = `${formatNameWithCode(item.name ?? "", item.code ?? "")} (норма: ${Number(item.baseConsumptionQty ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 6 })})`;
+                materialSelect.appendChild(option);
+            }
+
+            if (list.length === 1) {
+                materialSelect.value = list[0].id;
+                await loadMaterialStock(materialSelect.value);
+            } else if (list.length > 1) {
+                const available = [];
+                for (const m of list) {
+                    const stockResponse = await fetch(`/wip/receipts/material-stock?materialId=${encodeURIComponent(m.id)}`);
+                    if (!stockResponse.ok) {
+                        continue;
+                    }
+                    const stock = await stockResponse.json();
+                    if (Number(stock?.summary?.unitsCount ?? 0) > 0) {
+                        available.push(m);
+                    }
+                }
+                if (available.length === 1) {
+                    materialSelect.value = available[0].id;
+                    await loadMaterialStock(materialSelect.value);
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            materialSelect.innerHTML = "<option value=\"\">Материалы детали недоступны</option>";
         }
     }
 

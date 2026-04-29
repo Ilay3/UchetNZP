@@ -127,6 +127,61 @@ public class AdminMetalMaterialsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [HttpPost("part-norms/create")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreatePartNorm(AdminPartMaterialNormCreateInputModel input, CancellationToken cancellationToken)
+    {
+        var existingCount = await _dbContext.MetalConsumptionNorms.CountAsync(x => x.PartId == input.PartId && x.IsActive, cancellationToken);
+        if (existingCount >= 8)
+        {
+            TempData["AdminMetalMaterialsError"] = "Для одной детали можно указать не более 8 материалов.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var duplicate = await _dbContext.MetalConsumptionNorms.AnyAsync(x => x.PartId == input.PartId && x.MetalMaterialId == input.MetalMaterialId && x.IsActive, cancellationToken);
+        if (duplicate)
+        {
+            TempData["AdminMetalMaterialsError"] = "Для этой детали выбранный материал уже назначен.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        _dbContext.MetalConsumptionNorms.Add(new MetalConsumptionNorm
+        {
+            Id = Guid.NewGuid(),
+            PartId = input.PartId,
+            MetalMaterialId = input.MetalMaterialId,
+            BaseConsumptionQty = input.BaseConsumptionQty,
+            ConsumptionUnit = "м",
+            NormalizedConsumptionUnit = "m",
+            UnitNorm = "pcs",
+            NormalizedSizeRaw = string.Empty,
+            NormKeyHash = $"{input.PartId:N}:{input.MetalMaterialId:N}",
+            ShapeType = "unknown",
+            ParseStatus = "manual",
+            IsActive = true,
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        TempData["AdminMetalMaterialsStatus"] = "Связь деталь-материал добавлена.";
+        return RedirectToAction(nameof(Index));
+    }
+
+    [HttpPost("part-norms/delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeletePartNorm(Guid id, CancellationToken cancellationToken)
+    {
+        var norm = await _dbContext.MetalConsumptionNorms.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (norm is null)
+        {
+            TempData["AdminMetalMaterialsError"] = "Связь не найдена.";
+            return RedirectToAction(nameof(Index));
+        }
+        norm.IsActive = false;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        TempData["AdminMetalMaterialsStatus"] = "Связь деталь-материал деактивирована.";
+        return RedirectToAction(nameof(Index));
+    }
+
     private async Task<AdminMetalMaterialsPageViewModel> BuildPageModelAsync(AdminMetalMaterialCreateInputModel input, CancellationToken cancellationToken)
     {
         var materials = await _dbContext.MetalMaterials
@@ -148,6 +203,26 @@ public class AdminMetalMaterialsController : Controller
             CreateModel = input,
             UpdateModel = new AdminMetalMaterialUpdateInputModel(),
             Materials = materials,
+            Parts = await _dbContext.Parts.AsNoTracking().OrderBy(x => x.Name).Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code)).Take(500).ToListAsync(cancellationToken),
+            ActiveMaterials = await _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive).OrderBy(x => x.Name).Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code)).ToListAsync(cancellationToken),
+            PartMaterialNorms = await _dbContext.MetalConsumptionNorms
+                .AsNoTracking()
+                .Where(x => x.IsActive && x.MetalMaterialId.HasValue)
+                .Include(x => x.Part)
+                .Include(x => x.MetalMaterial)
+                .OrderBy(x => x.Part!.Name)
+                .ThenBy(x => x.MetalMaterial!.Name)
+                .Select(x => new AdminPartMaterialNormListItemViewModel
+                {
+                    Id = x.Id,
+                    PartId = x.PartId,
+                    PartName = x.Part != null ? x.Part.Name : string.Empty,
+                    PartCode = x.Part != null ? x.Part.Code : null,
+                    MaterialId = x.MetalMaterialId!.Value,
+                    MaterialName = x.MetalMaterial != null ? x.MetalMaterial.Name : string.Empty,
+                    MaterialCode = x.MetalMaterial != null ? x.MetalMaterial.Code : null,
+                    BaseConsumptionQty = x.BaseConsumptionQty,
+                }).ToListAsync(cancellationToken),
         };
     }
 
