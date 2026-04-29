@@ -724,14 +724,9 @@ public class MetalWarehouseController : Controller
             return BadRequest("Некорректный идентификатор единицы прихода.");
         }
 
-        var detailsPath = $"/MetalWarehouse/Stock/Item/{id:D}";
-        var detailsUrl = Request.Host.HasValue
-            ? $"{Request.Scheme}://{Request.Host}{detailsPath}"
-            : detailsPath;
-
         try
         {
-            var document = await _metalReceiptItemLabelDocumentService.BuildAsync(id, detailsUrl, cancellationToken);
+            var document = await _metalReceiptItemLabelDocumentService.BuildAsync(id, cancellationToken);
             return File(document.Content, document.ContentType, document.FileName);
         }
         catch (KeyNotFoundException)
