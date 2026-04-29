@@ -19,6 +19,7 @@ public class ReceiptReportFilterViewModel
 }
 
 public record ReceiptReportItemViewModel(
+    Guid ReceiptId,
     DateTime Date,
     string SectionName,
     string PartName,

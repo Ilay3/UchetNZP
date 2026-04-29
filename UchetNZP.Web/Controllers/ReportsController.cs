@@ -95,6 +95,7 @@ public class ReportsController : Controller
 
         var items = receipts
             .Select(x => new ReceiptReportItemViewModel(
+                x.Id,
                 ConvertToLocal(x.ReceiptDate),
                 x.Section != null ? x.Section.Name : "Вид работ не задан",
                 x.Part != null ? x.Part.Name : string.Empty,
