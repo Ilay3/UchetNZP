@@ -95,7 +95,7 @@
             return "";
         }
 
-        return String(value).trim();
+        return String(value).trim().toLowerCase();
     }
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
