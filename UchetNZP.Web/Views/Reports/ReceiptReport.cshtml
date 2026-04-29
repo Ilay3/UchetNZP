@@ -66,6 +66,7 @@
                             <th scope="col">Операция</th>
                             <th scope="col">Количество</th>
                             <th scope="col">Комментарий</th>
+                            <th scope="col" class="text-center">Документы</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -85,6 +86,9 @@
                                 <td>@item.OpNumber</td>
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@(string.IsNullOrWhiteSpace(item.Comment) ? "—" : item.Comment)</td>
+                                <td class="text-center">
+                                    <a class="btn btn-link text-decoration-none" title="Скачать сопроводительный ярлык" href="/wip/receipts/@item.ReceiptId/escort-label">🏷️</a>
+                                </td>
                             </tr>
                         }
                     </tbody>
