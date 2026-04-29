@@ -163,10 +163,16 @@ public class AdminMetalMaterialsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreatePartNorm(AdminPartMaterialNormCreateInputModel input, CancellationToken cancellationToken)
     {
-        var rawNormValue = Request.Form["BaseConsumptionQty"].ToString();
-        if (!TryParseNorm(rawNormValue, out var parsedNorm) || parsedNorm <= 0)
+        var referenceNorm = await _dbContext.MetalConsumptionNorms
+            .AsNoTracking()
+            .Where(x => x.PartId == input.PartId && x.IsActive && x.BaseConsumptionQty > 0m)
+            .OrderBy(x => x.MetalMaterialId.HasValue)
+            .ThenByDescending(x => x.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (referenceNorm is null)
         {
-            TempData["AdminMetalMaterialsError"] = "Норма должна быть больше 0. Используйте формат 0.02 или 0,02.";
+            TempData["AdminMetalMaterialsError"] = "У детали нет активной нормы расхода. Сначала задайте норму в карточке детали.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -180,11 +186,8 @@ public class AdminMetalMaterialsController : Controller
         var duplicate = await _dbContext.MetalConsumptionNorms.FirstOrDefaultAsync(x => x.PartId == input.PartId && x.MetalMaterialId == input.MetalMaterialId && x.IsActive, cancellationToken);
         if (duplicate is not null)
         {
-            duplicate.BaseConsumptionQty = parsedNorm;
-            duplicate.ConsumptionUnit = "м";
-            duplicate.NormalizedConsumptionUnit = "m";
             await _dbContext.SaveChangesAsync(cancellationToken);
-            TempData["AdminMetalMaterialsStatus"] = "Норма для связи деталь-материал обновлена.";
+            TempData["AdminMetalMaterialsStatus"] = "Связь деталь-материал уже существует.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -193,13 +196,14 @@ public class AdminMetalMaterialsController : Controller
             Id = Guid.NewGuid(),
             PartId = input.PartId,
             MetalMaterialId = input.MetalMaterialId,
-            BaseConsumptionQty = parsedNorm,
-            ConsumptionUnit = "м",
-            NormalizedConsumptionUnit = "m",
-            UnitNorm = "pcs",
-            NormalizedSizeRaw = string.Empty,
+            BaseConsumptionQty = referenceNorm.BaseConsumptionQty,
+            ConsumptionUnit = referenceNorm.ConsumptionUnit,
+            NormalizedConsumptionUnit = referenceNorm.NormalizedConsumptionUnit,
+            UnitNorm = referenceNorm.UnitNorm,
+            SizeRaw = referenceNorm.SizeRaw,
+            NormalizedSizeRaw = referenceNorm.NormalizedSizeRaw,
             NormKeyHash = $"{input.PartId:N}:{input.MetalMaterialId:N}",
-            ShapeType = "unknown",
+            ShapeType = referenceNorm.ShapeType,
             ParseStatus = "manual",
             IsActive = true,
         });

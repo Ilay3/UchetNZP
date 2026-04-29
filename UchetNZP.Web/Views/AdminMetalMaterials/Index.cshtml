@@ -9,7 +9,7 @@
 </div>
 
 <div class="card shadow-sm mt-4">
-    <div class="card-header bg-light fw-semibold">Связи "Деталь → Материалы (1..8)" и норма расхода на 1 деталь</div>
+    <div class="card-header bg-light fw-semibold">Связи "Деталь → Материалы (1..8)"</div>
     <div class="card-body">
         <form method="post" asp-action="CreatePartNorm" asp-controller="AdminMetalMaterials" class="row g-3 mb-3">
             @Html.AntiForgeryToken()
@@ -25,11 +25,7 @@
                 <datalist id="materialLookupOptions"></datalist>
                 <input type="hidden" id="materialLookupId" name="MetalMaterialId" required />
             </div>
-            <div class="col-md-2">
-                <label class="form-label">Норма</label>
-                <input class="form-control" type="text" inputmode="decimal" placeholder="0,02" name="BaseConsumptionQty" required />
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
+            <div class="col-md-4 d-flex align-items-end">
                 <button class="btn btn-primary w-100" type="submit">Добавить</button>
             </div>
         </form>
@@ -37,7 +33,7 @@
         <div class="table-responsive">
             <table class="table table-sm table-striped">
                 <thead>
-                    <tr><th>Деталь</th><th>Материал</th><th>Норма на 1 деталь</th><th></th></tr>
+                    <tr><th>Деталь</th><th>Материал</th><th>Норма детали (только просмотр)</th><th></th></tr>
                 </thead>
                 <tbody>
                 @if (!Model.PartMaterialNorms.Any())
