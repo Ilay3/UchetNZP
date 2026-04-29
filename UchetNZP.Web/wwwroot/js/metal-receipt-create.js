@@ -4,6 +4,7 @@
     const materialInput = document.getElementById("materialInput");
     const materialIdInput = document.getElementById("materialId");
     const materialOptions = document.getElementById("materialOptions");
+    const materialSuggestions = document.getElementById("materialSuggestions");
     const unitTextHint = document.getElementById("unitTextHint");
     const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
     const debugContextRaw = document.getElementById("receiptDebugContext")?.textContent ?? "{}";
@@ -23,18 +24,22 @@
         debugContext = {};
     }
 
-    if (!quantityInput || !unitsContainer || !materialInput || !materialIdInput || !materialOptions) {
+    if (!quantityInput || !unitsContainer || !materialInput || !materialIdInput || !materialOptions || !materialSuggestions) {
         return;
     }
 
     const materialsByDisplay = new Map();
-    Array.from(materialOptions.querySelectorAll("option")).forEach(option => {
+    const materials = Array.from(materialOptions.querySelectorAll("option")).map(option => {
         const text = (option.getAttribute("value") || "").trim();
         const id = (option.getAttribute("data-id") || "").trim();
         if (text && id) {
             materialsByDisplay.set(text.toLowerCase(), { id, text });
         }
-    });
+        return text && id ? { id, text, search: text.toLowerCase() } : null;
+    }).filter(Boolean);
+
+    const suggestionLimit = 30;
+    let suggestionRenderTimer = null;
 
     function syncMaterialSelection() {
         const rawValue = (materialInput.value || "").trim();
@@ -45,6 +50,43 @@
 
         const match = materialsByDisplay.get(rawValue.toLowerCase());
         materialIdInput.value = match?.id || "";
+    }
+
+    function closeSuggestions() {
+        materialSuggestions.classList.add("d-none");
+        materialSuggestions.innerHTML = "";
+    }
+
+    function escapeHtml(value) {
+        return value
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll("\"", "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    function renderMaterialSuggestions() {
+        const query = (materialInput.value || "").trim().toLowerCase();
+        if (!query || query.length < 2) {
+            closeSuggestions();
+            return;
+        }
+
+        const filtered = materials
+            .filter(item => item.search.includes(query))
+            .slice(0, suggestionLimit);
+
+        if (filtered.length === 0) {
+            closeSuggestions();
+            return;
+        }
+
+        materialSuggestions.innerHTML = filtered.map(item => `
+            <button type="button" class="list-group-item list-group-item-action" data-id="${escapeHtml(item.id)}" data-text="${escapeHtml(item.text)}">
+                ${escapeHtml(item.text)}
+            </button>`).join("");
+        materialSuggestions.classList.remove("d-none");
     }
 
     function getSelectedMaterialId() {
@@ -58,7 +100,7 @@
     function getUnitText() {
         const materialId = getSelectedMaterialId();
         const unitKind = materialUnitKindMap[materialId];
-        return unitKind === "SquareMeter" ? "м2" : "м";
+        return unitKind === "SquareMeter" ? "м²" : "м";
     }
 
     function resolveActualBlankText(sizeValue) {
@@ -140,9 +182,30 @@
     }
 
     quantityInput.addEventListener("input", renderUnitInputs);
-    materialInput.addEventListener("input", syncMaterialSelection);
+    materialInput.addEventListener("input", () => {
+        syncMaterialSelection();
+        if (suggestionRenderTimer) {
+            clearTimeout(suggestionRenderTimer);
+        }
+        suggestionRenderTimer = setTimeout(renderMaterialSuggestions, 120);
+    });
     materialInput.addEventListener("change", () => {
         syncMaterialSelection();
+        renderUnitInputs();
+    });
+    materialInput.addEventListener("focus", renderMaterialSuggestions);
+    materialInput.addEventListener("blur", () => {
+        setTimeout(closeSuggestions, 120);
+    });
+    materialSuggestions.addEventListener("mousedown", event => {
+        const button = event.target.closest("button[data-id]");
+        if (!button) {
+            return;
+        }
+        event.preventDefault();
+        materialInput.value = button.dataset.text || "";
+        materialIdInput.value = button.dataset.id || "";
+        closeSuggestions();
         renderUnitInputs();
     });
 
