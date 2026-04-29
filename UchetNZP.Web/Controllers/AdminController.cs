@@ -73,7 +73,7 @@ public class AdminController : Controller
         var filters = NormalizeFilters(new AdminCatalogFilters(PartSearch: partSearch));
         var partDtos = await _catalogService.GetPartsAsync(cancellationToken).ConfigureAwait(false);
         var partRows = partDtos
-            .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code })
+            .Select(x => new AdminEntityRowViewModel { Id = x.Id, Name = x.Name, Code = x.Code, SizeRaw = x.SizeRaw, BaseConsumptionQty = x.BaseConsumptionQty, ConsumptionUnit = x.ConsumptionUnit })
             .ToList();
 
         var filtered = FilterEntities(partRows, filters.PartSearch);
@@ -909,6 +909,9 @@ public class AdminController : Controller
                 Id = x.Id,
                 Name = x.Name,
                 Code = x.Code,
+                SizeRaw = x.SizeRaw,
+                BaseConsumptionQty = x.BaseConsumptionQty,
+                ConsumptionUnit = x.ConsumptionUnit,
             })
             .ToList();
 
@@ -1094,6 +1097,15 @@ public class AdminController : Controller
             "code" => descending
                 ? source.OrderByDescending(x => x.Code)
                 : source.OrderBy(x => x.Code),
+            "sizeRaw" => descending
+                ? source.OrderByDescending(x => x.SizeRaw)
+                : source.OrderBy(x => x.SizeRaw),
+            "baseConsumptionQty" => descending
+                ? source.OrderByDescending(x => x.BaseConsumptionQty)
+                : source.OrderBy(x => x.BaseConsumptionQty),
+            "consumptionUnit" => descending
+                ? source.OrderByDescending(x => x.ConsumptionUnit)
+                : source.OrderBy(x => x.ConsumptionUnit),
             _ => descending
                 ? source.OrderByDescending(x => x.Name)
                 : source.OrderBy(x => x.Name),

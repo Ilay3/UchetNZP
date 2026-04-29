@@ -109,6 +109,28 @@ public class WipReceiptsController : Controller
         return Ok(items);
     }
 
+    [HttpGet("part-norms")]
+    public async Task<IActionResult> GetPartNorms([FromQuery] Guid partId, CancellationToken cancellationToken)
+    {
+        if (partId == Guid.Empty)
+        {
+            return Ok(new { baseConsumptionQty = 0m, consumptionUnit = string.Empty });
+        }
+
+        var norm = await _dbContext.MetalConsumptionNorms
+            .AsNoTracking()
+            .Where(x => x.PartId == partId && x.IsActive)
+            .OrderBy(x => x.BaseConsumptionQty)
+            .Select(x => new
+            {
+                baseConsumptionQty = x.BaseConsumptionQty,
+                consumptionUnit = x.ConsumptionUnit
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return Ok(norm ?? new { baseConsumptionQty = 0m, consumptionUnit = string.Empty });
+    }
+
     [HttpGet("operations")]
     public async Task<IActionResult> GetOperations([FromQuery] Guid partId, CancellationToken cancellationToken)
     {
