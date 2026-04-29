@@ -146,34 +146,14 @@
 <div class="card shadow-sm mt-4">
     <div class="card-header bg-light d-flex justify-content-between align-items-center">
         <span class="fw-semibold">План подбора металла</span>
-        <div class="d-flex gap-2">
-            @if (Model.RequirementPlan is null)
-            {
-                <form method="post" asp-controller="MetalWarehouse" asp-action="CalculateRequirementPlan" asp-route-id="@Model.Id">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-primary btn-sm">Рассчитать план</button>
-                </form>
-            }
-            else
-            {
-                <form method="post" asp-controller="MetalWarehouse" asp-action="CalculateRequirementPlan" asp-route-id="@Model.Id">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-outline-primary btn-sm">Пересчитать</button>
-                </form>
-            }
-        </div>
     </div>
     <div class="card-body">
         @if (Model.RequirementPlan is null)
         {
-            <div class="text-center py-4 border rounded bg-light-subtle">
-                <div class="fw-semibold mb-2">План подбора еще не рассчитан</div>
-                <div class="text-muted mb-3">Нажмите «Рассчитать план», чтобы сформировать электронный подбор металла без расхода склада.</div>
-                <form method="post" asp-controller="MetalWarehouse" asp-action="CalculateRequirementPlan" asp-route-id="@Model.Id">
-                    @Html.AntiForgeryToken()
-                    <button type="submit" class="btn btn-primary">Рассчитать план</button>
-                </form>
-            </div>
+                <div class="text-center py-4 border rounded bg-light-subtle">
+                <div class="fw-semibold mb-2">План подбора формируется автоматически</div>
+                <div class="text-muted mb-3">Обновите страницу через несколько секунд.</div>
+                </div>
         }
         else
         {
@@ -206,7 +186,7 @@
                 <table class="table table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th>Код единицы</th>
+                            <th>Наименование металла</th>
                             <th>Размер исходный</th>
                             <th>Ед. изм.</th>
                             <th>Доступно</th>
@@ -228,7 +208,7 @@
                                 _ => "bg-secondary",
                             };
                             <tr>
-                                <td>@line.SourceCode</td>
+                                <td>@Model.MaterialDisplay</td>
                                 <td>@line.SourceSize.ToString("0.###")</td>
                                 <td>@line.SourceUnit</td>
                                 <td>@line.SourceSize.ToString("0.###")</td>
