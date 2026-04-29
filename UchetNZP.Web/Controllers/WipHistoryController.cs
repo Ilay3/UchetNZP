@@ -20,6 +20,7 @@ namespace UchetNZP.Web.Controllers;
 [Route("wip/history")]
 public class WipHistoryController : Controller
 {
+    private const int HistoryPageSize = 50;
     private readonly AppDbContext _dbContext;
     private readonly IWipService? _wipService;
     private readonly IWipHistoryExcelExporter _wipHistoryExcelExporter;
@@ -665,7 +666,16 @@ public class WipHistoryController : Controller
             }
         }
 
-        var grouped = deduplicatedEntries
+        var totalEntries = deduplicatedEntries.Count;
+        var totalPages = totalEntries == 0 ? 1 : (int)Math.Ceiling((double)totalEntries / HistoryPageSize);
+        var currentPage = Math.Clamp(query?.Page ?? 1, 1, totalPages);
+
+        var pagedEntries = deduplicatedEntries
+            .Skip((currentPage - 1) * HistoryPageSize)
+            .Take(HistoryPageSize)
+            .ToList();
+
+        var grouped = pagedEntries
             .GroupBy(x => x.Date)
             .OrderByDescending(g => g.Key)
             .Select(g =>
@@ -702,7 +712,14 @@ public class WipHistoryController : Controller
             SectionSearch = sectionSearch,
         };
 
-        var model = new WipHistoryViewModel(filter, grouped);
+        var pagination = new WipHistoryPaginationViewModel
+        {
+            CurrentPage = currentPage,
+            PageSize = HistoryPageSize,
+            TotalEntries = totalEntries,
+        };
+
+        var model = new WipHistoryViewModel(filter, grouped, pagination);
         return model;
     }
 

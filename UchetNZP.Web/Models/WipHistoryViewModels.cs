@@ -344,21 +344,40 @@ public class WipHistoryDateGroupViewModel
     public decimal TotalQuantity => Entries.Sum(x => x.Quantity);
 }
 
+
+public class WipHistoryPaginationViewModel
+{
+    public int CurrentPage { get; init; }
+
+    public int PageSize { get; init; }
+
+    public int TotalEntries { get; init; }
+
+    public int TotalPages => PageSize <= 0 ? 0 : (int)Math.Ceiling((double)TotalEntries / PageSize);
+
+    public bool HasPreviousPage => CurrentPage > 1;
+
+    public bool HasNextPage => CurrentPage < TotalPages;
+}
+
 public class WipHistoryViewModel
 {
-    public WipHistoryViewModel(WipHistoryFilterViewModel filter, IReadOnlyList<WipHistoryDateGroupViewModel> groups)
+    public WipHistoryViewModel(WipHistoryFilterViewModel filter, IReadOnlyList<WipHistoryDateGroupViewModel> groups, WipHistoryPaginationViewModel pagination)
     {
         Filter = filter ?? throw new ArgumentNullException(nameof(filter));
         Groups = groups ?? throw new ArgumentNullException(nameof(groups));
+        Pagination = pagination ?? throw new ArgumentNullException(nameof(pagination));
     }
 
     public WipHistoryFilterViewModel Filter { get; }
 
     public IReadOnlyList<WipHistoryDateGroupViewModel> Groups { get; }
 
+    public WipHistoryPaginationViewModel Pagination { get; }
+
     public bool HasData => Groups.Count > 0;
 
-    public int TotalEntries => Groups.Sum(x => x.EntryCount);
+    public int TotalEntries => Pagination.TotalEntries;
 
     public decimal TotalQuantity => Groups.Sum(x => x.TotalQuantity);
 }
@@ -389,4 +408,6 @@ public class WipHistoryQuery
     public string? Part { get; set; }
 
     public string? Section { get; set; }
+
+    public int? Page { get; set; }
 }

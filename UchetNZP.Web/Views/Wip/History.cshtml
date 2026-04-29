@@ -81,6 +81,8 @@
                 <datalist id="historySectionOptions"></datalist>
                 <input type="hidden" id="historyFilterSectionId" />
             </div>
+
+            <input type="hidden" name="page" value="1" />
             <div class="col-sm-6 col-md-3 col-lg-2">
                 <button type="submit" class="btn btn-primary btn-lg w-100">Показать</button>
             </div>
@@ -430,6 +432,18 @@
             </div>
         </div>
     }
+    <nav aria-label="Пагинация истории" class="mt-4">
+        <ul class="pagination justify-content-center">
+            <li class="page-item @(Model.Pagination.HasPreviousPage ? string.Empty : "disabled")">
+                <a class="page-link" href="@Url.Action("Index", "WipHistory", new { from = Model.Filter.From.ToString("yyyy-MM-dd"), to = Model.Filter.To.ToString("yyyy-MM-dd"), part = Model.Filter.PartSearch, section = Model.Filter.SectionSearch, types = Model.Filter.Types.Select(GetTypeValue).ToArray(), page = Model.Pagination.CurrentPage - 1 })">Назад</a>
+            </li>
+            <li class="page-item disabled"><span class="page-link">Стр. @Model.Pagination.CurrentPage из @Model.Pagination.TotalPages</span></li>
+            <li class="page-item @(Model.Pagination.HasNextPage ? string.Empty : "disabled")">
+                <a class="page-link" href="@Url.Action("Index", "WipHistory", new { from = Model.Filter.From.ToString("yyyy-MM-dd"), to = Model.Filter.To.ToString("yyyy-MM-dd"), part = Model.Filter.PartSearch, section = Model.Filter.SectionSearch, types = Model.Filter.Types.Select(GetTypeValue).ToArray(), page = Model.Pagination.CurrentPage + 1 })">Вперёд</a>
+            </li>
+        </ul>
+    </nav>
+
 }
 else
 {
