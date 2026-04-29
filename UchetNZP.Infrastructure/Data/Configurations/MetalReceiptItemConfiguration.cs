@@ -57,7 +57,7 @@ public class MetalReceiptItemConfiguration : IEntityTypeConfiguration<MetalRecei
 
         builder.Property(x => x.GeneratedCode)
             .IsRequired()
-            .HasMaxLength(64);
+            .HasMaxLength(128);
 
         builder.Property(x => x.CreatedAt)
             .IsRequired();

@@ -3,6 +3,28 @@
     ViewData["Title"] = $"Требование {Model.RequirementNumber}";
 }
 
+@functions {
+    private static string ToStatusRu(string? status)
+    {
+        return status switch
+        {
+            "Planned" => "Запланировано",
+            "ReadyToIssue" => "Готово к выдаче",
+            "Completed" => "Выполнено",
+            "Cancelled" => "Отменено",
+            "Updated" => "Обновлено",
+            "Draft" => "Черновик",
+            "HasDeficit" => "Есть дефицит",
+            "Calculated" => "Рассчитан",
+            "FullUse" => "Полное использование",
+            "PartialCut" => "Частичное использование",
+            "ReserveCandidate" => "Резерв",
+            "Deficit" => "Дефицит",
+            _ => string.IsNullOrWhiteSpace(status) ? "—" : status,
+        };
+    }
+}
+
 <div class="page-header mb-4">
     <h1 class="display-6 fw-semibold">Требование @Model.RequirementNumber</h1>
     <div class="d-flex gap-2 flex-wrap">
@@ -18,7 +40,7 @@
 <div class="card shadow-sm mb-4">
     <div class="card-body row g-3">
         <div class="col-md-3"><div class="text-muted small">Дата</div><div class="fw-semibold">@Model.RequirementDate.ToString("dd.MM.yyyy HH:mm")</div></div>
-        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge @(Model.Status == "Completed" ? "bg-success" : Model.Status == "Cancelled" ? "bg-danger" : Model.Status == "ReadyToIssue" ? "bg-primary" : Model.Status == "Planned" ? "bg-info text-dark" : "bg-secondary")">@Model.Status</span></div></div>
+        <div class="col-md-3"><div class="text-muted small">Статус</div><div><span class="badge @(Model.Status == "Completed" ? "bg-success" : Model.Status == "Cancelled" ? "bg-danger" : Model.Status == "ReadyToIssue" ? "bg-primary" : Model.Status == "Planned" ? "bg-info text-dark" : "bg-secondary")">@ToStatusRu(Model.Status)</span></div></div>
         <div class="col-md-6"><div class="text-muted small">Запуск партии</div><div class="fw-semibold">@Model.WipLaunchId</div></div>
         <div class="col-md-6"><div class="text-muted small">Деталь</div><div class="fw-semibold">@Model.PartDisplay</div></div>
         <div class="col-md-3"><div class="text-muted small">Количество деталей</div><div class="fw-semibold">@Model.Quantity.ToString("0.###")</div></div>
@@ -59,7 +81,7 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <div>
                     <div class="text-muted small">По требованию уже оформлена выдача</div>
-                    <div class="fw-semibold">Статус: @Model.ExistingIssueStatus</div>
+                    <div class="fw-semibold">Статус: @ToStatusRu(Model.ExistingIssueStatus)</div>
                 </div>
                 <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="IssueDetails" asp-route-id="@Model.ExistingIssueId.Value">Открыть выдачу</a>
             </div>
@@ -160,7 +182,7 @@
                 <div class="col-md-2"><div class="text-muted small">Требуется к подбору</div><div class="fw-semibold">@Model.RequirementPlan.AdjustedRequiredQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
                 <div class="col-md-2"><div class="text-muted small">Подобрано</div><div class="fw-semibold">@Model.RequirementPlan.PlannedQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
                 <div class="col-md-2"><div class="text-muted small">Дефицит</div><div class="fw-semibold @(Model.RequirementPlan.DeficitQty > 0 ? "text-danger" : "text-success")">@Model.RequirementPlan.DeficitQty.ToString("0.###") @Model.RequirementPlan.Unit</div></div>
-                <div class="col-md-2"><div class="text-muted small">Статус плана</div><div><span class="badge @(Model.RequirementPlan.Status == "HasDeficit" ? "bg-danger" : Model.RequirementPlan.Status == "Calculated" ? "bg-success" : "bg-secondary")">@Model.RequirementPlan.Status</span></div></div>
+                <div class="col-md-2"><div class="text-muted small">Статус плана</div><div><span class="badge @(Model.RequirementPlan.Status == "HasDeficit" ? "bg-danger" : Model.RequirementPlan.Status == "Calculated" ? "bg-success" : "bg-secondary")">@ToStatusRu(Model.RequirementPlan.Status)</span></div></div>
                 <div class="col-md-4">
                     <div class="text-muted small">Расчет</div>
                     <div class="small">
@@ -212,7 +234,7 @@
                                 <td>@line.SourceSize.ToString("0.###")</td>
                                 <td>@line.PlannedUseQty.ToString("0.###")</td>
                                 <td>@line.RemainingAfterQty.ToString("0.###")</td>
-                                <td><span class="badge @badgeClass">@line.LineStatus</span></td>
+                                <td><span class="badge @badgeClass">@ToStatusRu(line.LineStatus)</span></td>
                                 <td>@(line.ReceiptDate.HasValue ? line.ReceiptDate.Value.ToLocalTime().ToString("dd.MM.yyyy") : "—")</td>
                             </tr>
                         }

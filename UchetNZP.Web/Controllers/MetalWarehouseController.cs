@@ -89,8 +89,11 @@ public class MetalWarehouseController : Controller
             {
                 Id = x.Id,
                 ReceiptNumber = x.ReceiptNumber,
-                ReceiptDate = x.ReceiptDate,
-                PositionsCount = x.Items.Count,
+                MaterialName = x.Items.OrderBy(i => i.ItemIndex).Select(i => i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty).FirstOrDefault() ?? string.Empty,
+                Quantity = x.Items.OrderBy(i => i.ItemIndex).Select(i => (int)i.Quantity).FirstOrDefault(),
+                PassportWeightKg = x.Items.OrderBy(i => i.ItemIndex).Select(i => i.PassportWeightKg).FirstOrDefault(),
+                TotalSize = x.Items.Sum(i => i.SizeValue),
+                SizeUnitText = x.Items.OrderBy(i => i.ItemIndex).Select(i => i.SizeUnitText).FirstOrDefault() ?? string.Empty,
             })
             .ToListAsync(cancellationToken);
 

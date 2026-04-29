@@ -30,16 +30,17 @@
                 <thead class="table-light">
                     <tr>
                         <th>Номер</th>
-                        <th>Дата</th>
-                        <th>Позиций</th>
-                        <th>Действия</th>
+                        <th>Металл</th>
+                        <th>Количество, шт</th>
+                        <th>Паспортный вес, кг</th>
+                        <th>Сумма, м/м²</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (Model.Receipts.Count == 0)
                     {
                         <tr>
-                            <td colspan="4" class="py-4">
+                            <td colspan="5" class="py-4">
                                 <div class="fw-semibold">Поступлений пока нет</div>
                                 <div class="text-muted">Когда вы добавите первый приход металла, он появится в этой таблице.</div>
                             </td>
@@ -49,16 +50,12 @@
                     {
                         foreach (var receipt in Model.Receipts)
                         {
-                            <tr>
+                            <tr role="button" ondblclick="window.location='@Url.Action("ReceiptDetails", "MetalWarehouse", new { id = receipt.Id })'">
                                 <td class="fw-semibold">@receipt.ReceiptNumber</td>
-                                <td>@receipt.ReceiptDate.ToString("dd.MM.yyyy")</td>
-                                <td>@receipt.PositionsCount</td>
-                                <td>
-                                    <a class="btn btn-sm btn-outline-primary"
-                                       asp-controller="MetalWarehouse"
-                                       asp-action="ReceiptDetails"
-                                       asp-route-id="@receipt.Id">Открыть</a>
-                                </td>
+                                <td>@receipt.MaterialName</td>
+                                <td>@receipt.Quantity</td>
+                                <td>@receipt.PassportWeightKg.ToString("0.###")</td>
+                                <td>@receipt.TotalSize.ToString("0.###") @receipt.SizeUnitText</td>
                             </tr>
                         }
                     }

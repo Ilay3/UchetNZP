@@ -137,9 +137,15 @@ public class MetalReceiptListItemViewModel
 
     public string ReceiptNumber { get; init; } = string.Empty;
 
-    public DateTime ReceiptDate { get; init; }
+    public string MaterialName { get; init; } = string.Empty;
 
-    public int PositionsCount { get; init; }
+    public int Quantity { get; init; }
+
+    public decimal PassportWeightKg { get; init; }
+
+    public decimal TotalSize { get; init; }
+
+    public string SizeUnitText { get; init; } = string.Empty;
 }
 
 public class MetalReceiptListViewModel
