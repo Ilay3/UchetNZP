@@ -20,18 +20,6 @@
         <div class="col-md-3"><strong>Дата:</strong> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div>
         <div class="col-md-6"><strong>Материал:</strong> @Model.MaterialName</div>
         <div class="col-md-3"><strong>Паспортная масса, кг:</strong> @Model.PassportWeightKg.ToString("0.###")</div>
-        <div class="col-md-3">
-            <strong>Расчётная масса, кг:</strong>
-            <span title="@Model.CalculatedWeightFormula" class="text-decoration-underline" style="text-decoration-style: dotted; cursor: help;">
-                @Model.CalculatedWeightKg.ToString("0.###")
-            </span>
-        </div>
-        <div class="col-md-3">
-            <strong>Отклонение, кг:</strong>
-            <span title="@Model.WeightDeviationFormula" class="text-decoration-underline" style="text-decoration-style: dotted; cursor: help;">
-                @Model.WeightDeviationKg.ToString("0.###")
-            </span>
-        </div>
         <div class="col-md-3"><strong>Количество:</strong> @Model.Quantity</div>
         <div class="col-12"><strong>Комментарий:</strong> @(string.IsNullOrWhiteSpace(Model.Comment) ? "—" : Model.Comment)</div>
     </div>
@@ -66,7 +54,7 @@
                                    asp-controller="MetalWarehouse"
                                    asp-action="ReceiptItemLabel"
                                    asp-route-id="@item.Id">
-                                    Этикетка 50×30
+                                    Этикетка 50×50
                                 </a>
                             </td>
                         </tr>

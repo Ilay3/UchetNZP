@@ -10,7 +10,7 @@ namespace UchetNZP.Web.Services;
 
 public interface IMetalReceiptItemLabelDocumentService
 {
-    Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, string qrTarget, CancellationToken cancellationToken = default);
+    Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, CancellationToken cancellationToken = default);
 }
 
 public sealed record MetalReceiptItemLabelDocumentResult(string FileName, string ContentType, byte[] Content, string QrPayload);
@@ -18,7 +18,7 @@ public sealed record MetalReceiptItemLabelDocumentResult(string FileName, string
 public class MetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocumentService
 {
     private const float LabelWidthMm = 50f;
-    private const float LabelHeightMm = 30f;
+    private const float LabelHeightMm = 50f;
 
     private readonly AppDbContext _dbContext;
 
@@ -28,26 +28,28 @@ public class MetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocume
         QuestPDF.Settings.License = LicenseType.Community;
     }
 
-    public async Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, string qrTarget, CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(qrTarget))
-        {
-            throw new ArgumentException("Целевой URL/payload для QR обязателен.", nameof(qrTarget));
-        }
+    private sealed record ReceiptItemQrContext(
+        Guid Id,
+        string? GeneratedCode,
+        decimal SizeValue,
+        string? SizeUnitText,
+        string? ActualBlankSizeText,
+        string MaterialName,
+        string MaterialCode);
 
+    public async Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, CancellationToken cancellationToken = default)
+    {
         var item = await _dbContext.MetalReceiptItems
             .AsNoTracking()
             .Where(x => x.Id == receiptItemId)
-            .Select(x => new
-            {
+            .Select(x => new ReceiptItemQrContext(
                 x.Id,
                 x.GeneratedCode,
                 x.SizeValue,
                 x.SizeUnitText,
                 x.ActualBlankSizeText,
-                MaterialName = x.MetalMaterial != null ? x.MetalMaterial.Name : string.Empty,
-                MaterialCode = x.MetalMaterial != null ? x.MetalMaterial.Code : string.Empty,
-            })
+                x.MetalMaterial != null ? x.MetalMaterial.Name : string.Empty,
+                x.MetalMaterial != null ? (x.MetalMaterial.Code ?? string.Empty) : string.Empty))
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -57,7 +59,8 @@ public class MetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocume
         }
 
         var displaySize = ResolveDisplaySize(item.SizeValue, item.SizeUnitText, item.ActualBlankSizeText);
-        var qrPng = BuildQrCodePng(qrTarget);
+        var qrPayload = await BuildQrPayloadAsync(item, cancellationToken).ConfigureAwait(false);
+        var qrPng = BuildQrCodePng(qrPayload);
 
         var pdf = Document.Create(container =>
         {
@@ -83,15 +86,55 @@ public class MetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocume
                         }
                     });
 
-                    row.ConstantItem(22, Unit.Millimetre)
-                        .Height(22, Unit.Millimetre)
+                    row.ConstantItem(30, Unit.Millimetre)
+                        .Height(30, Unit.Millimetre)
                         .Image(qrPng);
                 });
             });
         }).GeneratePdf();
 
         var fileName = $"Этикетка_{SanitizeFileNamePart(item.GeneratedCode)}.pdf";
-        return new MetalReceiptItemLabelDocumentResult(fileName, "application/pdf", pdf, qrTarget);
+        return new MetalReceiptItemLabelDocumentResult(fileName, "application/pdf", pdf, qrPayload);
+    }
+
+
+
+    private async Task<string> BuildQrPayloadAsync(ReceiptItemQrContext item, CancellationToken cancellationToken)
+    {
+        var stockItems = await _dbContext.MetalReceiptItems
+            .AsNoTracking()
+            .Where(x => x.MetalMaterial != null && x.MetalMaterial.Name == item.MaterialName && !x.IsConsumed)
+            .OrderBy(x => x.GeneratedCode)
+            .Select(x => new
+            {
+                x.GeneratedCode,
+                x.SizeValue,
+                x.SizeUnitText,
+                x.TotalWeightKg,
+            })
+            .Take(20)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var lines = new List<string>
+        {
+            $"Материал: {item.MaterialName}",
+            string.IsNullOrWhiteSpace(item.MaterialCode) ? string.Empty : $"Код материала: {item.MaterialCode}",
+            $"Единица: {item.GeneratedCode}",
+            $"Размер: {ResolveDisplaySize(item.SizeValue, item.SizeUnitText, item.ActualBlankSizeText)}",
+            "В наличии на складе по этому материалу:",
+        };
+
+        foreach (var stockItem in stockItems)
+        {
+            lines.Add($"- №{stockItem.GeneratedCode}; {stockItem.SizeValue:0.###} {stockItem.SizeUnitText}; {stockItem.TotalWeightKg:0.###} кг");
+        }
+
+        var totalWeight = stockItems.Sum(x => x.TotalWeightKg);
+        lines.Add($"Итого позиций: {stockItems.Count}, вес: {totalWeight:0.###} кг");
+        lines.Add("(Показаны первые 20 позиций)");
+
+        return string.Join("\n", lines.Where(x => !string.IsNullOrWhiteSpace(x)));
     }
 
     private static byte[] BuildQrCodePng(string payload)
