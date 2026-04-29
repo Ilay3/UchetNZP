@@ -347,6 +347,7 @@
                 option.value = item.id;
                 option.textContent = formatNameWithCode(item.name ?? "", item.code ?? "");
                 materialSelect.appendChild(option);
+                materialNormById.set(item.id, Number(item.baseConsumptionQty ?? 0));
             });
         }
         catch (error) {
