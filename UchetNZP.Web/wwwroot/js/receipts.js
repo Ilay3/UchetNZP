@@ -86,6 +86,7 @@
     let currentMaterialStockSummary = "";
     let currentMaterialTotalSize = 0;
     const materialNormById = new Map();
+    let fallbackPartNorm = 0;
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
@@ -340,6 +341,7 @@
 
             const materials = await response.json();
             materialSelect.innerHTML = "<option value=\"\">Выберите материал</option>";
+            materialNormById.clear();
             (Array.isArray(materials) ? materials : []).forEach(item => {
                 const option = document.createElement("option");
                 option.value = item.id;
@@ -361,6 +363,8 @@
 
         materialSelect.innerHTML = "<option value=\"\">Выберите материал</option>";
         resetMaterialStockView();
+        materialNormById.clear();
+        fallbackPartNorm = 0;
 
         if (!partId) {
             return;
@@ -377,9 +381,13 @@
             for (const item of list) {
                 const option = document.createElement("option");
                 option.value = item.id;
-                option.textContent = `${formatNameWithCode(item.name ?? "", item.code ?? "")} (норма: ${Number(item.baseConsumptionQty ?? 0).toLocaleString("ru-RU", { maximumFractionDigits: 6 })})`;
+                option.textContent = formatNameWithCode(item.name ?? "", item.code ?? "");
                 materialSelect.appendChild(option);
-                materialNormById.set(item.id, Number(item.baseConsumptionQty ?? 0));
+                const normValue = Number(item.baseConsumptionQty ?? 0);
+                materialNormById.set(item.id, normValue);
+                if (normValue > 0 && (fallbackPartNorm <= 0 || normValue < fallbackPartNorm)) {
+                    fallbackPartNorm = normValue;
+                }
             }
 
             if (list.length === 1) {
@@ -853,7 +861,7 @@
     function updateMaterialNeedInfo() {
         const materialId = materialSelect?.value || "";
         const qty = Number(quantityInput?.value ?? 0);
-        const norm = materialNormById.get(materialId) ?? 0;
+        const norm = materialNormById.get(materialId) ?? fallbackPartNorm;
         const unit = materialUnitInput?.value && materialUnitInput.value !== "—" ? materialUnitInput.value : "ед.";
         const required = norm > 0 && qty > 0 ? norm * qty : 0;
         const remainder = currentMaterialTotalSize - required;
