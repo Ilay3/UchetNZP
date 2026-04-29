@@ -14,6 +14,21 @@
 
 <div class="card shadow-sm">
     <div class="card-body">
+        @if (TempData["MetalReceiptSuccess"] is string success)
+        {
+            var createdId = TempData["MetalReceiptId"]?.ToString();
+            var createdNumber = TempData["MetalReceiptNumber"]?.ToString();
+            <div class="alert alert-success d-flex flex-column gap-2" role="alert">
+                <div class="fw-semibold">@success (@createdNumber)</div>
+                @if (Guid.TryParse(createdId, out var receiptId))
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-success" asp-action="ReceiptDetails" asp-route-id="@receiptId">Открыть карточку</a>
+                        <a class="btn btn-sm btn-outline-success" asp-action="ReceiptDocument" asp-route-id="@receiptId">Скачать PDF накладную</a>
+                    </div>
+                }
+            </div>
+        }
         <form method="post" asp-controller="MetalWarehouse" asp-action="CreateReceipt" class="row g-3" id="metalReceiptForm">
             @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
@@ -105,8 +120,9 @@
                 </div>
             </div>
 
-            <div class="col-12 d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Сохранить приход</button>
+            <div class="col-12 d-flex gap-2 flex-wrap">
+                <button type="submit" name="submitAction" value="save" class="btn btn-primary">Сохранить приход</button>
+                <button type="submit" name="submitAction" value="saveAddNext" class="btn btn-outline-primary">Сохранить и добавить следующий</button>
                 <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Receipts">Отмена</a>
             </div>
         </form>
