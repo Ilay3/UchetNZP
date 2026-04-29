@@ -85,9 +85,18 @@
     let labelCheckRequestId = 0;
     let currentMaterialStockSummary = "";
     let currentMaterialTotalSize = 0;
+    let currentMaterialUnits = [];
     const materialNormById = new Map();
     let fallbackPartNorm = 0;
     let fallbackPartNormUnit = "";
+
+    function normalizeMaterialKey(value) {
+        if (value === undefined || value === null) {
+            return "";
+        }
+
+        return String(value).trim();
+    }
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const bulkModal = bulkModalElement ? new bootstrap.Modal(bulkModalElement) : null;
@@ -309,6 +318,7 @@
     function resetMaterialStockView() {
         currentMaterialStockSummary = "";
         currentMaterialTotalSize = 0;
+        currentMaterialUnits = [];
         if (materialUnitInput) {
             materialUnitInput.value = "—";
         }
@@ -348,7 +358,7 @@
                 option.value = item.id;
                 option.textContent = formatNameWithCode(item.name ?? "", item.code ?? "");
                 materialSelect.appendChild(option);
-                materialNormById.set(item.id, Number(item.baseConsumptionQty ?? 0));
+                materialNormById.set(normalizeMaterialKey(item.id), Number(item.baseConsumptionQty ?? 0));
             });
         }
         catch (error) {
@@ -396,7 +406,7 @@
                 option.textContent = formatNameWithCode(item.name ?? "", item.code ?? "");
                 materialSelect.appendChild(option);
                 const normValue = Number(item.baseConsumptionQty ?? 0);
-                materialNormById.set(item.id, normValue);
+                materialNormById.set(normalizeMaterialKey(item.id), normValue);
                 if (normValue > 0 && (fallbackPartNorm <= 0 || normValue < fallbackPartNorm)) {
                     fallbackPartNorm = normValue;
                 }
@@ -448,6 +458,7 @@
             const payload = await response.json();
             const summary = payload?.summary;
             const units = Array.isArray(payload?.units) ? payload.units : [];
+            currentMaterialUnits = units;
 
             if (!summary) {
                 resetMaterialStockView();
@@ -871,7 +882,7 @@
 
 
     function updateMaterialNeedInfo() {
-        const materialId = materialSelect?.value || "";
+        const materialId = normalizeMaterialKey(materialSelect?.value || "");
         const qty = Number(quantityInput?.value ?? 0);
         const norm = materialNormById.get(materialId) ?? fallbackPartNorm;
         const unit = materialUnitInput?.value && materialUnitInput.value !== "—" ? materialUnitInput.value : (fallbackPartNormUnit || "ед.");
@@ -892,7 +903,20 @@
             } else if (remainder < 0) {
                 materialRecommendationLabel.textContent = `Недостаточно материала: не хватает ${Math.abs(remainder).toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
             } else {
-                materialRecommendationLabel.textContent = `Подходит. Ожидаемый остаток: ${remainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+                const bestUnit = currentMaterialUnits
+                    .map(item => ({
+                        code: item?.code ?? "",
+                        size: Number(item?.size ?? 0),
+                    }))
+                    .filter(item => item.size >= required)
+                    .sort((a, b) => a.size - b.size)[0];
+
+                if (bestUnit) {
+                    const cutRemainder = bestUnit.size - required;
+                    materialRecommendationLabel.textContent = `Рекомендуем металл ${bestUnit.code}: взять ${required.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}, остаток после отреза ${cutRemainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+                } else {
+                    materialRecommendationLabel.textContent = `Подходит. Ожидаемый остаток: ${remainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+                }
             }
         }
     }
