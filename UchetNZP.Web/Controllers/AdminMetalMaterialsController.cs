@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -162,6 +163,13 @@ public class AdminMetalMaterialsController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreatePartNorm(AdminPartMaterialNormCreateInputModel input, CancellationToken cancellationToken)
     {
+        var rawNormValue = Request.Form["BaseConsumptionQty"].ToString();
+        if (!TryParseNorm(rawNormValue, out var parsedNorm) || parsedNorm <= 0)
+        {
+            TempData["AdminMetalMaterialsError"] = "Норма должна быть больше 0. Используйте формат 0.02 или 0,02.";
+            return RedirectToAction(nameof(Index));
+        }
+
         var existingCount = await _dbContext.MetalConsumptionNorms.CountAsync(x => x.PartId == input.PartId && x.IsActive, cancellationToken);
         if (existingCount >= 8)
         {
@@ -169,10 +177,14 @@ public class AdminMetalMaterialsController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        var duplicate = await _dbContext.MetalConsumptionNorms.AnyAsync(x => x.PartId == input.PartId && x.MetalMaterialId == input.MetalMaterialId && x.IsActive, cancellationToken);
-        if (duplicate)
+        var duplicate = await _dbContext.MetalConsumptionNorms.FirstOrDefaultAsync(x => x.PartId == input.PartId && x.MetalMaterialId == input.MetalMaterialId && x.IsActive, cancellationToken);
+        if (duplicate is not null)
         {
-            TempData["AdminMetalMaterialsError"] = "Для этой детали выбранный материал уже назначен.";
+            duplicate.BaseConsumptionQty = parsedNorm;
+            duplicate.ConsumptionUnit = "м";
+            duplicate.NormalizedConsumptionUnit = "m";
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            TempData["AdminMetalMaterialsStatus"] = "Норма для связи деталь-материал обновлена.";
             return RedirectToAction(nameof(Index));
         }
 
@@ -181,7 +193,7 @@ public class AdminMetalMaterialsController : Controller
             Id = Guid.NewGuid(),
             PartId = input.PartId,
             MetalMaterialId = input.MetalMaterialId,
-            BaseConsumptionQty = input.BaseConsumptionQty,
+            BaseConsumptionQty = parsedNorm,
             ConsumptionUnit = "м",
             NormalizedConsumptionUnit = "m",
             UnitNorm = "pcs",
@@ -281,5 +293,19 @@ public class AdminMetalMaterialsController : Controller
         }
 
         return normalizedCode;
+    }
+
+    private static bool TryParseNorm(string? rawValue, out decimal result)
+    {
+        result = 0m;
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return false;
+        }
+
+        var normalized = rawValue.Trim().Replace(" ", string.Empty);
+        return decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.CurrentCulture, out result)
+            || decimal.TryParse(normalized.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out result)
+            || decimal.TryParse(normalized.Replace('.', ','), NumberStyles.Number, new CultureInfo("ru-RU"), out result);
     }
 }

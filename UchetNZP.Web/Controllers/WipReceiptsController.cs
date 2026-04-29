@@ -119,7 +119,7 @@ public class WipReceiptsController : Controller
 
         var norm = await _dbContext.MetalConsumptionNorms
             .AsNoTracking()
-            .Where(x => x.PartId == partId && x.IsActive)
+            .Where(x => x.PartId == partId && x.IsActive && x.BaseConsumptionQty > 0 && x.MetalMaterialId.HasValue && x.MetalMaterial != null && x.MetalMaterial.IsActive)
             .OrderBy(x => x.BaseConsumptionQty)
             .Select(x => new
             {

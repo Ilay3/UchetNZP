@@ -95,7 +95,7 @@
             return "";
         }
 
-        return String(value).trim();
+        return String(value).trim().toLowerCase();
     }
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
@@ -313,6 +313,7 @@
         saveButton.disabled = cart.length === 0;
         updateLabelControlsState();
         updateLabelAvailabilityMessage();
+        updateMaterialNeedInfo();
     }
 
     function resetMaterialStockView() {
@@ -915,7 +916,17 @@
                     const cutRemainder = bestUnit.size - required;
                     materialRecommendationLabel.textContent = `Рекомендуем металл ${bestUnit.code}: взять ${required.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}, остаток после отреза ${cutRemainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
                 } else {
-                    materialRecommendationLabel.textContent = `Подходит. Ожидаемый остаток: ${remainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+                    const maxUnitSize = currentMaterialUnits
+                        .map(item => Number(item?.size ?? 0))
+                        .filter(size => Number.isFinite(size) && size > 0)
+                        .sort((a, b) => b - a)[0] ?? 0;
+
+                    if (maxUnitSize > 0) {
+                        const unitsNeeded = Math.ceil(required / maxUnitSize);
+                        materialRecommendationLabel.textContent = `Для количества нужно примерно ${unitsNeeded.toLocaleString("ru-RU")} ед. металла (если резать от максимально доступной единицы ${maxUnitSize.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}).`;
+                    } else {
+                        materialRecommendationLabel.textContent = `Подходит. Ожидаемый остаток: ${remainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+                    }
                 }
             }
         }
