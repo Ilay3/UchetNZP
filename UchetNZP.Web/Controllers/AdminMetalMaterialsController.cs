@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Models;
+using UchetNZP.Web.Infrastructure;
 
 namespace UchetNZP.Web.Controllers;
 
@@ -23,6 +24,36 @@ public class AdminMetalMaterialsController : Controller
     {
         var model = await BuildPageModelAsync(new AdminMetalMaterialCreateInputModel(), cancellationToken);
         return View("~/Views/AdminMetalMaterials/Index.cshtml", model);
+    }
+
+    [HttpGet("parts")]
+    public async Task<IActionResult> GetParts([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Parts.AsNoTracking();
+        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code);
+
+        var items = await query
+            .OrderBy(x => x.Name)
+            .Take(25)
+            .Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code))
+            .ToListAsync(cancellationToken);
+
+        return Ok(items);
+    }
+
+    [HttpGet("materials")]
+    public async Task<IActionResult> GetMaterials([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive);
+        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code);
+
+        var items = await query
+            .OrderBy(x => x.Name)
+            .Take(25)
+            .Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code))
+            .ToListAsync(cancellationToken);
+
+        return Ok(items);
     }
 
     [HttpPost("create")]

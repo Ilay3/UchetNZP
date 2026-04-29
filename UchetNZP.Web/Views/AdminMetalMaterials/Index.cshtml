@@ -14,28 +14,20 @@
         <form method="post" asp-action="CreatePartNorm" asp-controller="AdminMetalMaterials" class="row g-3 mb-3">
             @Html.AntiForgeryToken()
             <div class="col-md-4">
-                <label class="form-label">Деталь</label>
-                <select class="form-select" name="PartId" required>
-                    <option value="">Выберите деталь</option>
-                    @foreach (var part in Model.Parts)
-                    {
-                        <option value="@part.Id">@part.Name (@part.Code)</option>
-                    }
-                </select>
+                <label class="form-label" for="partLookupInput">Деталь</label>
+                <input id="partLookupInput" class="form-control" type="text" list="partLookupOptions" placeholder="Выберите деталь" autocomplete="off" required />
+                <datalist id="partLookupOptions"></datalist>
+                <input type="hidden" id="partLookupId" name="PartId" required />
             </div>
             <div class="col-md-4">
-                <label class="form-label">Материал</label>
-                <select class="form-select" name="MetalMaterialId" required>
-                    <option value="">Выберите материал</option>
-                    @foreach (var material in Model.ActiveMaterials)
-                    {
-                        <option value="@material.Id">@material.Name (@material.Code)</option>
-                    }
-                </select>
+                <label class="form-label" for="materialLookupInput">Материал</label>
+                <input id="materialLookupInput" class="form-control" type="text" list="materialLookupOptions" placeholder="Выберите материал" autocomplete="off" required />
+                <datalist id="materialLookupOptions"></datalist>
+                <input type="hidden" id="materialLookupId" name="MetalMaterialId" required />
             </div>
             <div class="col-md-2">
                 <label class="form-label">Норма</label>
-                <input class="form-control" type="number" min="0.000001" step="0.000001" name="BaseConsumptionQty" required />
+                <input class="form-control" type="number" min="0.001" step="0.001" name="BaseConsumptionQty" required />
             </div>
             <div class="col-md-2 d-flex align-items-end">
                 <button class="btn btn-primary w-100" type="submit">Добавить</button>
@@ -137,8 +129,22 @@
         <div class="card shadow-sm">
             <div class="card-header bg-light fw-semibold">Справочник материалов</div>
             <div class="card-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <input id="materialsSearchInput" type="search" class="form-control" placeholder="Поиск по названию и коду" />
+                    </div>
+                    <div class="col-md-3">
+                        <select id="materialsSortSelect" class="form-select">
+                            <option value="name-asc">Сортировка: Название (А-Я)</option>
+                            <option value="name-desc">Сортировка: Название (Я-А)</option>
+                            <option value="weight-desc">Вес (убыв.)</option>
+                            <option value="weight-asc">Вес (возр.)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3 text-md-end small text-muted d-flex align-items-center justify-content-md-end" id="materialsPagerInfo"></div>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle mb-0">
+                    <table class="table table-sm table-hover align-middle mb-0" id="materialsTable">
                         <thead class="table-light">
                             <tr>
                                 <th>Название</th>
@@ -160,7 +166,7 @@
                             {
                                 @foreach (var material in Model.Materials)
                                 {
-                                    <tr>
+                                    <tr data-name="@material.Name.ToLowerInvariant()" data-code="@(material.Code?.ToLowerInvariant() ?? string.Empty)" data-weight="@material.WeightPerUnitKg.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                                         <td class="fw-semibold">@material.Name</td>
                                         <td>@(string.IsNullOrWhiteSpace(material.Code) ? "—" : material.Code)</td>
                                         <td>@material.WeightPerUnitKg.ToString("0.###")</td>
@@ -192,6 +198,10 @@
                             }
                         </tbody>
                     </table>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="materialsPrevPage">Назад</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="materialsNextPage">Вперёд</button>
                 </div>
             </div>
         </div>
@@ -244,10 +254,29 @@
     <partial name="_ValidationScriptsPartial" />
     <script>
         (function () {
+            const namespace = window.UchetNZP || {};
+            if (typeof namespace.initSearchableInput === "function") {
+                namespace.initSearchableInput({
+                    input: document.getElementById("partLookupInput"),
+                    datalist: document.getElementById("partLookupOptions"),
+                    hiddenInput: document.getElementById("partLookupId"),
+                    fetchUrl: "/admin/metal-materials/parts",
+                    minChars: 0,
+                });
+
+                namespace.initSearchableInput({
+                    input: document.getElementById("materialLookupInput"),
+                    datalist: document.getElementById("materialLookupOptions"),
+                    hiddenInput: document.getElementById("materialLookupId"),
+                    fetchUrl: "/admin/metal-materials/materials",
+                    minChars: 0,
+                });
+            }
+
             const modalElement = document.getElementById("editMaterialModal");
-            if (!modalElement || typeof bootstrap === "undefined") return;
-            const modal = new bootstrap.Modal(modalElement);
-            document.querySelectorAll(".js-edit-material").forEach(button => {
+            if (modalElement && typeof bootstrap !== "undefined") {
+                const modal = new bootstrap.Modal(modalElement);
+                document.querySelectorAll(".js-edit-material").forEach(button => {
                 button.addEventListener("click", () => {
                     document.getElementById("edit-id").value = button.dataset.id || "";
                     document.getElementById("edit-name").value = button.dataset.name || "";
@@ -257,7 +286,50 @@
                     document.getElementById("edit-active").checked = (button.dataset.active || "") === "true";
                     modal.show();
                 });
-            });
+                });
+            }
+
+            const rows = Array.from(document.querySelectorAll("#materialsTable tbody tr[data-name]"));
+            const searchInput = document.getElementById("materialsSearchInput");
+            const sortSelect = document.getElementById("materialsSortSelect");
+            const pagerInfo = document.getElementById("materialsPagerInfo");
+            const prevButton = document.getElementById("materialsPrevPage");
+            const nextButton = document.getElementById("materialsNextPage");
+            const pageSize = 20;
+            let currentPage = 1;
+
+            function renderMaterialsTable() {
+                const term = (searchInput?.value || "").trim().toLowerCase();
+                const sorted = rows
+                    .filter(row => {
+                        const name = row.dataset.name || "";
+                        const code = row.dataset.code || "";
+                        return !term || name.includes(term) || code.includes(term);
+                    })
+                    .sort((a, b) => {
+                        const mode = sortSelect?.value || "name-asc";
+                        if (mode === "name-desc") return (b.dataset.name || "").localeCompare(a.dataset.name || "");
+                        if (mode === "weight-desc") return Number(b.dataset.weight || "0") - Number(a.dataset.weight || "0");
+                        if (mode === "weight-asc") return Number(a.dataset.weight || "0") - Number(b.dataset.weight || "0");
+                        return (a.dataset.name || "").localeCompare(b.dataset.name || "");
+                    });
+
+                const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+                currentPage = Math.min(currentPage, totalPages);
+                const from = (currentPage - 1) * pageSize;
+                const to = from + pageSize;
+                rows.forEach(row => row.classList.add("d-none"));
+                sorted.slice(from, to).forEach(row => row.classList.remove("d-none"));
+                if (pagerInfo) pagerInfo.textContent = `Показано ${sorted.length === 0 ? 0 : from + 1}-${Math.min(to, sorted.length)} из ${sorted.length}`;
+                if (prevButton) prevButton.disabled = currentPage <= 1;
+                if (nextButton) nextButton.disabled = currentPage >= totalPages;
+            }
+
+            searchInput?.addEventListener("input", () => { currentPage = 1; renderMaterialsTable(); });
+            sortSelect?.addEventListener("change", () => { currentPage = 1; renderMaterialsTable(); });
+            prevButton?.addEventListener("click", () => { currentPage -= 1; renderMaterialsTable(); });
+            nextButton?.addEventListener("click", () => { currentPage += 1; renderMaterialsTable(); });
+            renderMaterialsTable();
         })();
     </script>
 }
