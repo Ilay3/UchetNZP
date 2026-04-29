@@ -785,6 +785,7 @@ public class MetalWarehouseController : Controller
     [HttpGet("Requirements/Details/{id:guid}")]
     public async Task<IActionResult> RequirementDetails(Guid id, CancellationToken cancellationToken)
     {
+        await EnsureRequirementPlanCalculatedAsync(id, cancellationToken);
         var model = await BuildRequirementDetailsModelAsync(id, cancellationToken);
         if (model is null)
         {
@@ -1116,157 +1117,35 @@ public class MetalWarehouseController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CalculateRequirementPlan(Guid id, CancellationToken cancellationToken)
     {
-        var requirement = await _dbContext.MetalRequirements
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (requirement is null)
-        {
-            return NotFound();
-        }
-
-        if (requirement.Status == IssueCompletedStatus || requirement.Status == RequirementCancelledStatus)
-        {
-            AddAuditLog(AuditEventErrorPrevented, nameof(MetalRequirement), requirement.Id, requirement.RequirementNumber, "Попытка пересчитать план по закрытому требованию заблокирована.");
-            await _dbContext.SaveChangesAsync(cancellationToken);
-            TempData["MetalRequirementError"] = "Пересчет плана запрещен для завершенного или отмененного требования.";
-            return RedirectToAction(nameof(RequirementDetails), new { id });
-        }
-
-        var existingPlan = await _dbContext.MetalRequirementPlans
-            .Include(x => x.Items)
-            .FirstOrDefaultAsync(x => x.MetalRequirementId == id, cancellationToken);
-
-        var now = DateTime.UtcNow;
-        var userName = User?.Identity?.Name ?? "system";
-        var unit = requirement.Items.FirstOrDefault()?.Unit ?? "мм";
-        var baseRequiredQty = requirement.Items.Sum(x => x.RequiredQty);
-        var adjustedRequiredQty = requirement.Items.Sum(x => x.TotalRequiredQty > 0m ? x.TotalRequiredQty : x.RequiredQty);
-        var requiredQty = adjustedRequiredQty;
-
-        var receiptItems = await _dbContext.MetalReceiptItems
-            .AsNoTracking()
-            .Where(x => requirement.Items.Select(i => i.MetalMaterialId).Contains(x.MetalMaterialId) && !x.IsConsumed && x.SizeValue > 0m)
-            .Select(x => new
-            {
-                x.Id,
-                x.GeneratedCode,
-                x.SizeValue,
-                x.SizeUnitText,
-                UnitWeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg,
-                ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt,
-            })
-            .ToListAsync(cancellationToken);
-
-        var sortedSources = receiptItems
-            .OrderBy(x => Math.Abs(x.SizeValue - requiredQty))
-            .ThenBy(x => x.ReceiptDate)
-            .ToList();
-
-        var remainingRequired = requiredQty;
-        var planItems = new List<MetalRequirementPlanItem>();
-        var order = 1;
-
-        foreach (var source in sortedSources)
-        {
-            if (remainingRequired <= 0m)
-            {
-                planItems.Add(new MetalRequirementPlanItem
-                {
-                    Id = Guid.NewGuid(),
-                    MetalReceiptItemId = source.Id,
-                    SourceCode = source.GeneratedCode,
-                    SourceSize = source.SizeValue,
-                    SourceUnit = source.SizeUnitText,
-                    SourceWeightKg = source.UnitWeightKg,
-                    PlannedUseQty = 0m,
-                    RemainingAfterQty = source.SizeValue,
-                    LineStatus = LineStatusReserveCandidate,
-                    SortOrder = order++,
-                });
-                continue;
-            }
-
-            var plannedUse = Math.Min(source.SizeValue, remainingRequired);
-            var remainingAfter = source.SizeValue - plannedUse;
-            planItems.Add(new MetalRequirementPlanItem
-            {
-                Id = Guid.NewGuid(),
-                MetalReceiptItemId = source.Id,
-                SourceCode = source.GeneratedCode,
-                SourceSize = source.SizeValue,
-                SourceUnit = source.SizeUnitText,
-                SourceWeightKg = source.UnitWeightKg,
-                PlannedUseQty = plannedUse,
-                RemainingAfterQty = remainingAfter,
-                LineStatus = remainingAfter > 0m ? LineStatusPartialCut : LineStatusFullUse,
-                SortOrder = order++,
-            });
-
-            remainingRequired -= plannedUse;
-        }
-
-        if (remainingRequired > 0m)
-        {
-            planItems.Add(new MetalRequirementPlanItem
-            {
-                Id = Guid.NewGuid(),
-                MetalReceiptItemId = null,
-                SourceCode = "Дефицит",
-                SourceSize = 0m,
-                SourceUnit = unit,
-                PlannedUseQty = remainingRequired,
-                RemainingAfterQty = 0m,
-                LineStatus = LineStatusDeficit,
-                SortOrder = order,
-            });
-        }
-
-        var plannedQty = planItems.Where(x => x.LineStatus != LineStatusReserveCandidate && x.LineStatus != LineStatusDeficit).Sum(x => x.PlannedUseQty);
-        var deficitQty = Math.Max(0m, requiredQty - plannedQty);
-
-        if (existingPlan is null)
-        {
-            existingPlan = new MetalRequirementPlan
-            {
-                Id = Guid.NewGuid(),
-                MetalRequirementId = id,
-                CreatedAt = now,
-                CreatedBy = userName,
-            };
-            _dbContext.MetalRequirementPlans.Add(existingPlan);
-        }
-        else
-        {
-            _dbContext.MetalRequirementPlanItems.RemoveRange(existingPlan.Items);
-            existingPlan.RecalculatedAt = now;
-            existingPlan.RecalculatedBy = userName;
-        }
-
-        existingPlan.Status = deficitQty > 0m ? PlanHasDeficitStatus : PlanCalculatedStatus;
-        existingPlan.BaseRequiredQty = baseRequiredQty;
-        existingPlan.AdjustedRequiredQty = adjustedRequiredQty;
-        existingPlan.PlannedQty = plannedQty;
-        existingPlan.DeficitQty = deficitQty;
-        existingPlan.CalculationComment = deficitQty > 0m
-            ? $"Не хватает {deficitQty:0.###} {unit}."
-            : "План рассчитан без дефицита.";
-        existingPlan.Items = planItems;
-
-        requirement.Status = deficitQty > 0m ? RequirementStatusUpdated : RequirementPlannedStatus;
-        requirement.UpdatedAt = now;
-        requirement.UpdatedBy = userName;
-        AddAuditLog(
-            AuditEventRequirementPlanCalculated,
-            nameof(MetalRequirementPlan),
-            existingPlan.Id,
-            requirement.RequirementNumber,
-            deficitQty > 0m
-                ? $"План подбора рассчитан с дефицитом {deficitQty:0.###} {unit}."
-                : "План подбора рассчитан без дефицита.",
-            new { requirementId = requirement.Id, plannedQty, deficitQty });
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        TempData["MetalRequirementError"] = "Ручной пересчет отключен. План рассчитывается автоматически.";
         return RedirectToAction(nameof(RequirementDetails), new { id });
+    }
+
+    private async Task EnsureRequirementPlanCalculatedAsync(Guid requirementId, CancellationToken cancellationToken)
+    {
+        var hasPlan = await _dbContext.MetalRequirementPlans.AsNoTracking().AnyAsync(x => x.MetalRequirementId == requirementId, cancellationToken);
+        if (hasPlan) return;
+        await BuildAndSaveRequirementPlanAsync(requirementId, cancellationToken);
+    }
+
+    private async Task BuildAndSaveRequirementPlanAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var requirement = await _dbContext.MetalRequirements.Include(x => x.Items).FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (requirement is null || requirement.Status == IssueCompletedStatus || requirement.Status == RequirementCancelledStatus) return;
+        var existingPlan = await _dbContext.MetalRequirementPlans.Include(x => x.Items).FirstOrDefaultAsync(x => x.MetalRequirementId == id, cancellationToken);
+        var now = DateTime.UtcNow; var userName = User?.Identity?.Name ?? "system"; var unit = requirement.Items.FirstOrDefault()?.Unit ?? "мм";
+        var baseRequiredQty = requirement.Items.Sum(x => x.RequiredQty); var adjustedRequiredQty = requirement.Items.Sum(x => x.TotalRequiredQty > 0m ? x.TotalRequiredQty : x.RequiredQty); var requiredQty = adjustedRequiredQty;
+        var receiptItems = await _dbContext.MetalReceiptItems.AsNoTracking().Where(x => requirement.Items.Select(i => i.MetalMaterialId).Contains(x.MetalMaterialId) && !x.IsConsumed && x.SizeValue > 0m).Select(x => new { x.Id, x.GeneratedCode, x.SizeValue, x.SizeUnitText, UnitWeightKg = x.Quantity > 0 ? x.TotalWeightKg / x.Quantity : x.TotalWeightKg, ReceiptDate = x.MetalReceipt != null ? x.MetalReceipt.ReceiptDate : x.CreatedAt }).ToListAsync(cancellationToken);
+        var sortedSources = receiptItems.OrderBy(x => Math.Abs(x.SizeValue - requiredQty)).ThenBy(x => x.ReceiptDate).ToList();
+        var remainingRequired = requiredQty; var planItems = new List<MetalRequirementPlanItem>(); var order = 1;
+        foreach (var source in sortedSources){ if (remainingRequired <= 0m){ planItems.Add(new MetalRequirementPlanItem{ Id = Guid.NewGuid(), MetalReceiptItemId = source.Id, SourceCode = source.GeneratedCode, SourceSize = source.SizeValue, SourceUnit = source.SizeUnitText, SourceWeightKg = source.UnitWeightKg, PlannedUseQty = 0m, RemainingAfterQty = source.SizeValue, LineStatus = LineStatusReserveCandidate, SortOrder = order++, }); continue; } var plannedUse = Math.Min(source.SizeValue, remainingRequired); var remainingAfter = source.SizeValue - plannedUse; planItems.Add(new MetalRequirementPlanItem{ Id = Guid.NewGuid(), MetalReceiptItemId = source.Id, SourceCode = source.GeneratedCode, SourceSize = source.SizeValue, SourceUnit = source.SizeUnitText, SourceWeightKg = source.UnitWeightKg, PlannedUseQty = plannedUse, RemainingAfterQty = remainingAfter, LineStatus = remainingAfter > 0m ? LineStatusPartialCut : LineStatusFullUse, SortOrder = order++, }); remainingRequired -= plannedUse; }
+        if (remainingRequired > 0m){ planItems.Add(new MetalRequirementPlanItem{ Id = Guid.NewGuid(), MetalReceiptItemId = null, SourceCode = "Дефицит", SourceSize = 0m, SourceUnit = unit, PlannedUseQty = remainingRequired, RemainingAfterQty = 0m, LineStatus = LineStatusDeficit, SortOrder = order, }); }
+        var plannedQty = planItems.Where(x => x.LineStatus != LineStatusReserveCandidate && x.LineStatus != LineStatusDeficit).Sum(x => x.PlannedUseQty); var deficitQty = Math.Max(0m, requiredQty - plannedQty);
+        if (existingPlan is null){ existingPlan = new MetalRequirementPlan{ Id = Guid.NewGuid(), MetalRequirementId = id, CreatedAt = now, CreatedBy = userName, }; _dbContext.MetalRequirementPlans.Add(existingPlan);} else { _dbContext.MetalRequirementPlanItems.RemoveRange(existingPlan.Items); existingPlan.RecalculatedAt = now; existingPlan.RecalculatedBy = userName; }
+        existingPlan.Status = deficitQty > 0m ? PlanHasDeficitStatus : PlanCalculatedStatus; existingPlan.BaseRequiredQty = baseRequiredQty; existingPlan.AdjustedRequiredQty = adjustedRequiredQty; existingPlan.PlannedQty = plannedQty; existingPlan.DeficitQty = deficitQty; existingPlan.CalculationComment = deficitQty > 0m ? $"Не хватает {deficitQty:0.###} {unit}." : "План рассчитан без дефицита."; existingPlan.Items = planItems;
+        requirement.Status = deficitQty > 0m ? RequirementStatusUpdated : RequirementPlannedStatus; requirement.UpdatedAt = now; requirement.UpdatedBy = userName;
+        AddAuditLog(AuditEventRequirementPlanCalculated, nameof(MetalRequirementPlan), existingPlan.Id, requirement.RequirementNumber, deficitQty > 0m ? $"План подбора рассчитан с дефицитом {deficitQty:0.###} {unit}." : "План подбора рассчитан без дефицита.", new { requirementId = requirement.Id, plannedQty, deficitQty });
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     [HttpGet("Requirements/Details/{id:guid}/print/warehouse")]
