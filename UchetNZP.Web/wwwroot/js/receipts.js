@@ -86,6 +86,7 @@
     let currentMaterialStockSummary = "";
     let currentMaterialTotalSize = 0;
     let currentMaterialUnits = [];
+    let selectedMaterialUnitCode = "";
     const materialNormById = new Map();
     let fallbackPartNorm = 0;
     let fallbackPartNormUnit = "";
@@ -320,6 +321,7 @@
         currentMaterialStockSummary = "";
         currentMaterialTotalSize = 0;
         currentMaterialUnits = [];
+        selectedMaterialUnitCode = "";
         if (materialUnitInput) {
             materialUnitInput.value = "—";
         }
@@ -494,13 +496,23 @@
                     materialUnitsTableBody.innerHTML = "";
                     units.forEach(unit => {
                         const row = document.createElement("tr");
+                        const code = String(unit.code ?? "").trim();
                         const date = unit.receiptDate ? new Date(unit.receiptDate).toLocaleDateString("ru-RU") : "—";
+                        if (code && code === selectedMaterialUnitCode) {
+                            row.classList.add("table-success");
+                        }
+                        row.style.cursor = "pointer";
                         row.innerHTML = `
-                            <td>${unit.code ?? ""}</td>
+                            <td>${code}</td>
                             <td>${Number(unit.size ?? 0).toFixed(3)}</td>
                             <td>${unit.unitOfMeasure ?? ""}</td>
                             <td>${Number(unit.weightKg ?? 0).toFixed(3)}</td>
                             <td>${date}</td>`;
+                        row.addEventListener("click", () => {
+                            selectedMaterialUnitCode = code;
+                            updateMaterialNeedInfo();
+                            void loadMaterialStock(materialSelect?.value || "");
+                        });
                         materialUnitsTableBody.appendChild(row);
                     });
                 }
@@ -885,7 +897,8 @@
     function updateMaterialNeedInfo() {
         const materialId = normalizeMaterialKey(materialSelect?.value || "");
         const qty = Number(quantityInput?.value ?? 0);
-        const norm = materialNormById.get(materialId) ?? fallbackPartNorm;
+        const materialNorm = materialNormById.get(materialId);
+        const norm = materialNorm && materialNorm > 0 ? materialNorm : fallbackPartNorm;
         const unit = materialUnitInput?.value && materialUnitInput.value !== "—" ? materialUnitInput.value : (fallbackPartNormUnit || "ед.");
         const required = norm > 0 && qty > 0 ? norm * qty : 0;
         const remainder = currentMaterialTotalSize - required;
@@ -913,8 +926,9 @@
                     .sort((a, b) => a.size - b.size)[0];
 
                 if (bestUnit) {
+                    selectedMaterialUnitCode = bestUnit.code;
                     const cutRemainder = bestUnit.size - required;
-                    materialRecommendationLabel.textContent = `Рекомендуем металл ${bestUnit.code}: взять ${required.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}, остаток после отреза ${cutRemainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
+                    materialRecommendationLabel.textContent = `Рекомендуем единицу ${bestUnit.code} (подсвечена в таблице ниже): взять ${required.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}, остаток после отреза ${cutRemainder.toLocaleString("ru-RU", { maximumFractionDigits: 3 })} ${unit}.`;
                 } else {
                     const maxUnitSize = currentMaterialUnits
                         .map(item => Number(item?.size ?? 0))
