@@ -10,6 +10,7 @@
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Receipts">К списку приходов</a>
+    <a class="btn btn-outline-success" asp-controller="MetalWarehouse" asp-action="ReceiptDocument" asp-route-id="@Model.Id">PDF накладная</a>
 </div>
 
 <div class="card shadow-sm mb-4">

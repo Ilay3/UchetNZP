@@ -45,19 +45,22 @@ public class MetalWarehouseController : Controller
     private readonly ICuttingMapPdfExporter _cuttingMapPdfExporter;
     private readonly IMetalRequirementWarehousePrintDocumentService _requirementWarehousePrintDocumentService;
     private readonly IMetalReceiptItemLabelDocumentService _metalReceiptItemLabelDocumentService;
+    private readonly IMetalReceiptDocumentService _metalReceiptDocumentService;
 
     public MetalWarehouseController(
         AppDbContext dbContext,
         ICuttingMapExcelExporter cuttingMapExcelExporter,
         ICuttingMapPdfExporter cuttingMapPdfExporter,
         IMetalRequirementWarehousePrintDocumentService requirementWarehousePrintDocumentService,
-        IMetalReceiptItemLabelDocumentService metalReceiptItemLabelDocumentService)
+        IMetalReceiptItemLabelDocumentService metalReceiptItemLabelDocumentService,
+        IMetalReceiptDocumentService metalReceiptDocumentService)
     {
         _dbContext = dbContext;
         _cuttingMapExcelExporter = cuttingMapExcelExporter;
         _cuttingMapPdfExporter = cuttingMapPdfExporter;
         _requirementWarehousePrintDocumentService = requirementWarehousePrintDocumentService;
         _metalReceiptItemLabelDocumentService = metalReceiptItemLabelDocumentService;
+        _metalReceiptDocumentService = metalReceiptDocumentService;
     }
 
     [HttpGet("")]
@@ -113,7 +116,7 @@ public class MetalWarehouseController : Controller
 
     [HttpPost("Receipts/Create")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateReceipt(MetalReceiptCreateViewModel model, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateReceipt(MetalReceiptCreateViewModel model, string submitAction, CancellationToken cancellationToken)
     {
         await EnsureMetalMaterialsSeededAsync(cancellationToken);
 
@@ -241,6 +244,13 @@ public class MetalWarehouseController : Controller
         await transaction.CommitAsync(cancellationToken);
 
         TempData["MetalReceiptSuccess"] = "Приход металла успешно создан";
+        TempData["MetalReceiptId"] = receipt.Id;
+        TempData["MetalReceiptNumber"] = receipt.ReceiptNumber;
+
+        if (string.Equals(submitAction, "saveAddNext", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(CreateReceipt));
+        }
 
         return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
     }
@@ -718,6 +728,20 @@ public class MetalWarehouseController : Controller
         try
         {
             var document = await _metalReceiptItemLabelDocumentService.BuildAsync(id, detailsUrl, cancellationToken);
+            return File(document.Content, document.ContentType, document.FileName);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    [HttpGet("Receipts/{id:guid}/Document")]
+    public async Task<IActionResult> ReceiptDocument(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var document = await _metalReceiptDocumentService.BuildAsync(id, cancellationToken);
             return File(document.Content, document.ContentType, document.FileName);
         }
         catch (KeyNotFoundException)
