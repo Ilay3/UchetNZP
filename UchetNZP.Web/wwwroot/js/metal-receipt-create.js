@@ -38,7 +38,14 @@
         debugContext = {};
     }
 
-    const materialsByDisplay = new Map(materials.map(item => [item.text.toLowerCase(), item]));
+    function normalizeText(value) {
+        return String(value || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, " ");
+    }
+
+    const materialsByDisplay = new Map(materials.map(item => [normalizeText(item.text), item]));
 
     function escapeHtml(value) {
         return String(value)
@@ -173,10 +180,44 @@
             return;
         }
 
-        const rawValue = (input.value || "").trim();
-        const match = materialsByDisplay.get(rawValue.toLowerCase());
+        const rawValue = input.value || "";
+        const normalizedValue = normalizeText(rawValue);
+
+        let match = materialsByDisplay.get(normalizedValue);
+        if (!match && normalizedValue) {
+            const byId = materials.find(item => item.id.toLowerCase() === normalizedValue);
+            const startsWith = materials.filter(item => normalizeText(item.text).startsWith(normalizedValue));
+            const contains = materials.filter(item => normalizeText(item.text).includes(normalizedValue));
+            match = byId
+                || (startsWith.length === 1 ? startsWith[0] : null)
+                || (contains.length === 1 ? contains[0] : null);
+        }
+
         hidden.value = match?.id || "";
         renderUnits(line);
+    }
+
+
+    function normalizeDecimalInputValue(input) {
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const raw = (input.value || "").trim();
+        if (!raw) {
+            return;
+        }
+
+        const normalized = raw.replace(',', '.');
+        if (normalized !== raw) {
+            input.value = normalized;
+        }
+    }
+
+    function normalizeLineDecimalValues(line) {
+        line.querySelectorAll("[data-weight-input], [data-average-size-input], [data-unit-size]").forEach(input => {
+            normalizeDecimalInputValue(input);
+        });
     }
 
     function closeSuggestions(line) {
@@ -290,6 +331,10 @@
         });
 
         quantityInput?.addEventListener("input", () => renderUnits(line));
+        line.querySelectorAll("[data-weight-input], [data-average-size-input]").forEach(input => {
+            input.addEventListener("change", () => normalizeDecimalInputValue(input));
+            input.addEventListener("blur", () => normalizeDecimalInputValue(input));
+        });
         averageCheckbox?.addEventListener("change", () => renderUnits(line));
         removeButton?.addEventListener("click", () => {
             if (receiptLines().length <= 1) {
@@ -321,6 +366,7 @@
     form.addEventListener("submit", () => {
         const payloadPreview = [];
         receiptLines().forEach(line => {
+            normalizeLineDecimalValues(line);
             syncMaterialSelection(line);
 
             const materialInput = line.querySelector("[data-material-input]");
