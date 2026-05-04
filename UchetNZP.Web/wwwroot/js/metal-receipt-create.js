@@ -197,8 +197,9 @@
                 || (contains.length === 1 ? contains[0] : null);
         }
 
-        hidden.value = match?.id || "";
-        input.dataset.selectedMaterialId = match?.id || "";
+        const resolvedId = match?.id || hidden.value || selectedMaterialId || "";
+        hidden.value = resolvedId;
+        input.dataset.selectedMaterialId = resolvedId;
         renderUnits(line);
     }
 
@@ -213,7 +214,7 @@
             return;
         }
 
-        const normalized = raw.replace(',', '.');
+        const normalized = raw.replace('.', ',');
         if (normalized !== raw) {
             input.value = normalized;
         }
