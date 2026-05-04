@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Domain.Entities;
@@ -81,25 +82,51 @@ public class MetalWarehouseController : Controller
     [HttpGet("Receipts")]
     public async Task<IActionResult> Receipts(CancellationToken cancellationToken)
     {
-        var receipts = await _dbContext.MetalReceipts
+        var receiptRows = await _dbContext.MetalReceipts
             .AsNoTracking()
             .OrderByDescending(x => x.ReceiptDate)
             .ThenByDescending(x => x.CreatedAt)
-            .Select(x => new MetalReceiptListItemViewModel
+            .Select(x => new
             {
-                Id = x.Id,
-                ReceiptNumber = x.ReceiptNumber,
-                MaterialName = x.Items.OrderBy(i => i.ItemIndex).Select(i => i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty).FirstOrDefault() ?? string.Empty,
-                Quantity = x.Items.OrderBy(i => i.ItemIndex).Select(i => (int)i.Quantity).FirstOrDefault(),
-                PassportWeightKg = x.Items.OrderBy(i => i.ItemIndex).Select(i => i.PassportWeightKg).FirstOrDefault(),
-                TotalSize = x.Items.Sum(i => i.SizeValue),
-                SizeUnitText = x.Items.OrderBy(i => i.ItemIndex).Select(i => i.SizeUnitText).FirstOrDefault() ?? string.Empty,
+                x.Id,
+                x.ReceiptNumber,
+                x.ReceiptDate,
+                HasOriginalDocument = x.OriginalDocumentContent != null,
+                Items = x.Items
+                    .OrderBy(i => i.ReceiptLineIndex)
+                    .ThenBy(i => i.ItemIndex)
+                    .Select(i => new ReceiptItemSummaryProjection
+                    {
+                        ReceiptLineIndex = i.ReceiptLineIndex,
+                        ItemIndex = i.ItemIndex,
+                        MetalMaterialId = i.MetalMaterialId,
+                        MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty,
+                        Quantity = i.Quantity,
+                        PassportWeightKg = i.PassportWeightKg,
+                        SizeValue = i.SizeValue,
+                        SizeUnitText = i.SizeUnitText,
+                        IsSizeApproximate = i.IsSizeApproximate,
+                    })
+                    .ToList(),
             })
             .ToListAsync(cancellationToken);
 
         var model = new MetalReceiptListViewModel
         {
-            Receipts = receipts,
+            Receipts = receiptRows.Select(x =>
+            {
+                var lines = BuildReceiptLineSummaries(x.Items);
+                return new MetalReceiptListItemViewModel
+                {
+                    Id = x.Id,
+                    ReceiptNumber = x.ReceiptNumber,
+                    MaterialsSummary = BuildMaterialsSummary(lines),
+                    TotalQuantity = lines.Sum(line => line.Quantity),
+                    TotalPassportWeightKg = lines.Sum(line => line.PassportWeightKg),
+                    SizeSummary = BuildReceiptSizeSummary(lines),
+                    HasOriginalDocument = x.HasOriginalDocument,
+                };
+            }).ToList(),
         };
 
         return View(model);
@@ -112,6 +139,17 @@ public class MetalWarehouseController : Controller
         var model = new MetalReceiptCreateViewModel
         {
             ReceiptDate = DateTime.Today,
+            Items = new List<MetalReceiptLineInputViewModel>
+            {
+                new()
+                {
+                    Quantity = 1,
+                    Units = new List<MetalReceiptUnitInputViewModel>
+                    {
+                        new() { ItemIndex = 1 },
+                    },
+                },
+            },
         };
 
         await PopulateMaterialsAsync(model, cancellationToken);
@@ -121,6 +159,171 @@ public class MetalWarehouseController : Controller
     [HttpPost("Receipts/Create")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateReceipt(MetalReceiptCreateViewModel model, string submitAction, CancellationToken cancellationToken)
+    {
+        await EnsureMetalMaterialsSeededAsync(cancellationToken);
+        NormalizeReceiptItems(model);
+
+        var hasActiveMaterials = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .AnyAsync(x => x.IsActive, cancellationToken);
+
+        if (!hasActiveMaterials)
+        {
+            ModelState.AddModelError(string.Empty, "Справочник материалов пуст. Обратитесь к администратору.");
+        }
+
+        var materialIds = model.Items
+            .Where(x => x.MetalMaterialId.HasValue)
+            .Select(x => x.MetalMaterialId!.Value)
+            .Distinct()
+            .ToList();
+
+        var materialsById = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => materialIds.Contains(x.Id) && x.IsActive)
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+
+        for (var lineIndex = 0; lineIndex < model.Items.Count; lineIndex++)
+        {
+            var line = model.Items[lineIndex];
+            if (line.MetalMaterialId.HasValue && !materialsById.ContainsKey(line.MetalMaterialId.Value))
+            {
+                ModelState.AddModelError($"Items[{lineIndex}].MetalMaterialId", "Выбранный материал не найден или выключен.");
+            }
+        }
+
+        var originalDocument = await ReadOriginalReceiptDocumentAsync(model.OriginalDocumentPdf, cancellationToken);
+        if (!originalDocument.IsValid)
+        {
+            ModelState.AddModelError(nameof(model.OriginalDocumentPdf), originalDocument.ErrorMessage ?? "Не удалось прочитать PDF.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            await PopulateMaterialsAsync(model, cancellationToken);
+            return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
+        }
+
+        var now = DateTime.UtcNow;
+        var nextNumber = await GetNextReceiptNumberAsync(model.ReceiptDate, cancellationToken);
+        var receipt = new MetalReceipt
+        {
+            Id = Guid.NewGuid(),
+            ReceiptNumber = nextNumber,
+            ReceiptDate = ToUtcDate(model.ReceiptDate!.Value),
+            Comment = model.Comment?.Trim(),
+            OriginalDocumentFileName = originalDocument.FileName,
+            OriginalDocumentContentType = originalDocument.ContentType,
+            OriginalDocumentContent = originalDocument.Content,
+            OriginalDocumentSizeBytes = originalDocument.SizeBytes,
+            OriginalDocumentUploadedAt = originalDocument.Content is null ? null : now,
+            CreatedAt = now,
+            BatchNumber = string.Empty,
+        };
+
+        var receiptItemIndex = 1;
+        for (var lineIndex = 0; lineIndex < model.Items.Count; lineIndex++)
+        {
+            var line = model.Items[lineIndex];
+            var material = materialsById[line.MetalMaterialId!.Value];
+            var materialCode = BuildMaterialCode(material);
+            var quantity = line.Quantity!.Value;
+            var passportWeight = line.PassportWeightKg!.Value;
+            var actualWeight = passportWeight;
+            var calculatedWeight = CalculateWeightKg(line, material);
+            var deviation = actualWeight - passportWeight;
+
+            for (var unitIndex = 0; unitIndex < quantity; unitIndex++)
+            {
+                var unit = line.UseAverageSize ? null : line.Units[unitIndex];
+                var inputSize = line.UseAverageSize ? line.AverageSizeValue : unit?.SizeValue;
+                var suffix = receiptItemIndex.ToString("D3");
+                var (sizeValue, sizeUnitText) = ResolveSizeFromInputOrMass(inputSize, material, quantity, actualWeight);
+                var actualBlankSizeText = BuildActualBlankSizeText(sizeValue, sizeUnitText, line.UseAverageSize);
+                var sizePart = sizeValue.ToString("0.###", CultureInfo.InvariantCulture).Replace('.', '_');
+
+                receipt.Items.Add(new MetalReceiptItem
+                {
+                    Id = Guid.NewGuid(),
+                    MetalMaterialId = material.Id,
+                    Quantity = quantity,
+                    TotalWeightKg = actualWeight,
+                    ReceiptLineIndex = lineIndex + 1,
+                    ItemIndex = receiptItemIndex,
+                    SizeValue = sizeValue,
+                    SizeUnitText = sizeUnitText,
+                    ActualBlankSizeText = actualBlankSizeText,
+                    IsSizeApproximate = line.UseAverageSize,
+                    PassportWeightKg = passportWeight,
+                    ActualWeightKg = actualWeight,
+                    CalculatedWeightKg = calculatedWeight,
+                    WeightDeviationKg = deviation,
+                    StockCategory = ResolveStockCategory(sizeUnitText, sizeValue),
+                    GeneratedCode = $"{materialCode}-{sizePart}-{(sizeUnitText == "м2" ? "M2" : "M")}-{suffix}",
+                    CreatedAt = now,
+                });
+
+                receiptItemIndex++;
+            }
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        _dbContext.MetalReceipts.Add(receipt);
+        var nowUser = GetCurrentUserContext();
+        foreach (var item in receipt.Items)
+        {
+            _dbContext.MetalStockMovements.Add(new MetalStockMovement
+            {
+                Id = Guid.NewGuid(),
+                MovementDate = now,
+                MovementType = "Receipt",
+                MetalMaterialId = item.MetalMaterialId,
+                MetalReceiptItemId = item.Id,
+                SourceDocumentType = nameof(MetalReceipt),
+                SourceDocumentId = receipt.Id,
+                QtyBefore = 0m,
+                QtyChange = item.SizeValue,
+                QtyAfter = item.SizeValue,
+                Unit = item.SizeUnitText,
+                Comment = $"Приход по документу {receipt.ReceiptNumber}.",
+                CreatedAt = now,
+                CreatedBy = nowUser.UserName,
+            });
+        }
+
+        AddAuditLog(
+            AuditEventReceiptCreated,
+            nameof(MetalReceipt),
+            receipt.Id,
+            receipt.ReceiptNumber,
+            "Создан приход металла.",
+            new
+            {
+                receipt.ReceiptDate,
+                receipt.Comment,
+                Lines = model.Items.Count,
+                Units = receipt.Items.Count,
+                HasOriginalDocument = receipt.OriginalDocumentContent is not null,
+            });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        TempData["MetalReceiptSuccess"] = "Приход металла успешно создан";
+        TempData["MetalReceiptId"] = receipt.Id;
+        TempData["MetalReceiptNumber"] = receipt.ReceiptNumber;
+
+        if (string.Equals(submitAction, "saveAddNext", StringComparison.OrdinalIgnoreCase))
+        {
+            return RedirectToAction(nameof(CreateReceipt));
+        }
+
+        return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
+    }
+
+    [HttpPost("Receipts/Create")]
+    [ValidateAntiForgeryToken]
+    private async Task<IActionResult> CreateReceiptLegacy(MetalReceiptCreateViewModel model, string submitAction, CancellationToken cancellationToken)
     {
         await EnsureMetalMaterialsSeededAsync(cancellationToken);
 
@@ -192,7 +395,7 @@ public class MetalWarehouseController : Controller
             var suffix = (i + 1).ToString("D3");
             var (sizeValue, sizeUnitText) = ResolveSizeFromInputOrMass(unit.SizeValue, material, quantity, actualWeight);
             var actualBlankSizeText = BuildActualBlankSizeText(sizeValue, sizeUnitText);
-            var sizePart = sizeValue.ToString("0.###").Replace('.', '_');
+            var sizePart = sizeValue.ToString("0.###", CultureInfo.InvariantCulture).Replace('.', '_');
             receipt.Items.Add(new MetalReceiptItem
             {
                 Id = Guid.NewGuid(),
@@ -261,6 +464,88 @@ public class MetalWarehouseController : Controller
 
     [HttpGet("Receipts/Details/{id:guid}")]
     public async Task<IActionResult> ReceiptDetails(Guid id, CancellationToken cancellationToken)
+    {
+        var receipt = await _dbContext.MetalReceipts
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.ReceiptNumber,
+                x.ReceiptDate,
+                x.Comment,
+                x.OriginalDocumentFileName,
+                HasOriginalDocument = x.OriginalDocumentContent != null,
+                Items = x.Items
+                    .OrderBy(i => i.ReceiptLineIndex)
+                    .ThenBy(i => i.ItemIndex)
+                    .Select(i => new ReceiptItemDetailsProjection
+                    {
+                        Id = i.Id,
+                        ReceiptLineIndex = i.ReceiptLineIndex,
+                        ItemIndex = i.ItemIndex,
+                        SizeValue = i.SizeValue,
+                        SizeUnitText = i.SizeUnitText,
+                        ActualBlankSizeText = i.ActualBlankSizeText,
+                        IsSizeApproximate = i.IsSizeApproximate,
+                        GeneratedCode = i.GeneratedCode,
+                        PassportWeightKg = i.PassportWeightKg,
+                        ActualWeightKg = i.ActualWeightKg,
+                        CalculatedWeightKg = i.CalculatedWeightKg,
+                        WeightDeviationKg = i.WeightDeviationKg,
+                        Quantity = i.Quantity,
+                        MetalMaterialId = i.MetalMaterialId,
+                        MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty,
+                        MaterialCoefficient = i.MetalMaterial != null ? i.MetalMaterial.Coefficient : 0m,
+                    })
+                    .ToList(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (receipt is null || receipt.Items.Count == 0)
+        {
+            return NotFound();
+        }
+
+        var lines = BuildReceiptLineDetails(receipt.Items);
+        var first = lines[0];
+        var model = new MetalReceiptDetailsViewModel
+        {
+            Id = receipt.Id,
+            ReceiptNumber = receipt.ReceiptNumber,
+            ReceiptDate = receipt.ReceiptDate,
+            Comment = receipt.Comment,
+            MaterialName = BuildMaterialsSummary(lines),
+            PassportWeightKg = lines.Sum(x => x.PassportWeightKg),
+            CalculatedWeightKg = lines.Sum(x => x.CalculatedWeightKg),
+            WeightDeviationKg = lines.Sum(x => x.WeightDeviationKg),
+            CalculatedWeightFormula = first.CalculatedWeightFormula,
+            WeightDeviationFormula = first.WeightDeviationFormula,
+            Quantity = lines.Sum(x => x.Quantity),
+            HasOriginalDocument = receipt.HasOriginalDocument,
+            OriginalDocumentFileName = receipt.OriginalDocumentFileName,
+            Lines = lines,
+            Items = receipt.Items
+                .Select(i => new MetalReceiptDetailsItemViewModel
+                {
+                    Id = i.Id,
+                    ReceiptLineIndex = i.ReceiptLineIndex,
+                    ItemIndex = i.ItemIndex,
+                    MaterialName = i.MaterialName,
+                    SizeValue = i.SizeValue,
+                    SizeUnitText = i.SizeUnitText,
+                    ActualBlankSizeText = i.ActualBlankSizeText,
+                    IsSizeApproximate = i.IsSizeApproximate,
+                    GeneratedCode = i.GeneratedCode,
+                })
+                .ToList(),
+        };
+
+        return View("~/Views/MetalWarehouse/ReceiptDetails.cshtml", model);
+    }
+
+    [HttpGet("Receipts/Details/{id:guid}")]
+    private async Task<IActionResult> ReceiptDetailsLegacy(Guid id, CancellationToken cancellationToken)
     {
         var receipt = await _dbContext.MetalReceipts
             .AsNoTracking()
@@ -747,6 +1032,35 @@ public class MetalWarehouseController : Controller
         {
             return NotFound();
         }
+    }
+
+    [HttpGet("Receipts/{id:guid}/OriginalDocument")]
+    public async Task<IActionResult> ReceiptOriginalDocument(Guid id, CancellationToken cancellationToken)
+    {
+        var document = await _dbContext.MetalReceipts
+            .AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.OriginalDocumentFileName,
+                x.OriginalDocumentContentType,
+                x.OriginalDocumentContent,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (document?.OriginalDocumentContent is null || document.OriginalDocumentContent.Length == 0)
+        {
+            return NotFound();
+        }
+
+        var fileName = string.IsNullOrWhiteSpace(document.OriginalDocumentFileName)
+            ? $"Оригинал_{id:N}.pdf"
+            : document.OriginalDocumentFileName;
+        var contentType = string.IsNullOrWhiteSpace(document.OriginalDocumentContentType)
+            ? "application/pdf"
+            : document.OriginalDocumentContentType;
+
+        return File(document.OriginalDocumentContent, contentType, fileName);
     }
 
     [HttpGet("Requirements")]
@@ -1714,9 +2028,155 @@ public class MetalWarehouseController : Controller
         return valueElement.TryGetDecimal(out var value) ? value : null;
     }
 
+    private static IReadOnlyList<ReceiptLineSummary> BuildReceiptLineSummaries(IEnumerable<ReceiptItemSummaryProjection> items)
+    {
+        return items
+            .GroupBy(x => new
+            {
+                LineIndex = x.ReceiptLineIndex <= 0 ? x.ItemIndex : x.ReceiptLineIndex,
+                x.MetalMaterialId,
+                x.MaterialName,
+            })
+            .OrderBy(x => x.Key.LineIndex)
+            .Select(group =>
+            {
+                var lineItems = group.OrderBy(x => x.ItemIndex).ToList();
+                var first = lineItems[0];
+                var quantity = first.Quantity > 0m ? (int)first.Quantity : lineItems.Count;
+                return new ReceiptLineSummary(
+                    group.Key.LineIndex,
+                    string.IsNullOrWhiteSpace(group.Key.MaterialName) ? "-" : group.Key.MaterialName,
+                    quantity,
+                    first.PassportWeightKg,
+                    lineItems.Sum(x => x.SizeValue),
+                    first.SizeUnitText,
+                    BuildLineSizeSummary(lineItems),
+                    lineItems.Any(x => x.IsSizeApproximate));
+            })
+            .ToList();
+    }
+
+    private static IReadOnlyList<MetalReceiptDetailsLineViewModel> BuildReceiptLineDetails(IEnumerable<ReceiptItemDetailsProjection> items)
+    {
+        return items
+            .GroupBy(x => new
+            {
+                LineIndex = x.ReceiptLineIndex <= 0 ? x.ItemIndex : x.ReceiptLineIndex,
+                x.MetalMaterialId,
+                x.MaterialName,
+            })
+            .OrderBy(x => x.Key.LineIndex)
+            .Select(group =>
+            {
+                var lineItems = group.OrderBy(x => x.ItemIndex).ToList();
+                var first = lineItems[0];
+                var quantity = first.Quantity > 0m ? (int)first.Quantity : lineItems.Count;
+                return new MetalReceiptDetailsLineViewModel
+                {
+                    LineIndex = group.Key.LineIndex,
+                    MaterialName = string.IsNullOrWhiteSpace(group.Key.MaterialName) ? "-" : group.Key.MaterialName,
+                    Quantity = quantity,
+                    PassportWeightKg = first.PassportWeightKg,
+                    CalculatedWeightKg = first.CalculatedWeightKg,
+                    WeightDeviationKg = first.WeightDeviationKg,
+                    CalculatedWeightFormula = BuildCalculatedWeightFormula(first.PassportWeightKg, first.MaterialCoefficient, first.CalculatedWeightKg),
+                    WeightDeviationFormula = BuildWeightDeviationFormula(first.ActualWeightKg, first.PassportWeightKg, first.WeightDeviationKg),
+                    SizeSummary = BuildLineSizeSummary(lineItems),
+                    UsesAverageSize = lineItems.Any(x => x.IsSizeApproximate),
+                };
+            })
+            .ToList();
+    }
+
+    private static string BuildMaterialsSummary(IEnumerable<ReceiptLineSummary> lines)
+        => BuildMaterialsSummary(lines.Select(x => x.MaterialName));
+
+    private static string BuildMaterialsSummary(IEnumerable<MetalReceiptDetailsLineViewModel> lines)
+        => BuildMaterialsSummary(lines.Select(x => x.MaterialName));
+
+    private static string BuildMaterialsSummary(IEnumerable<string> materialNames)
+    {
+        var names = materialNames
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .ToList();
+
+        if (names.Count == 0)
+        {
+            return "-";
+        }
+
+        if (names.Count == 1)
+        {
+            return names[0];
+        }
+
+        return $"{names.Count} металла: {string.Join("; ", names.Take(3))}{(names.Count > 3 ? "; ..." : string.Empty)}";
+    }
+
+    private static string BuildReceiptSizeSummary(IEnumerable<ReceiptLineSummary> lines)
+    {
+        var totals = lines
+            .Where(x => !string.IsNullOrWhiteSpace(x.UnitText))
+            .GroupBy(x => x.UnitText)
+            .Select(x => $"{FormatDecimal(x.Sum(line => line.TotalSize))} {x.Key}")
+            .ToList();
+
+        return totals.Count == 0 ? "-" : string.Join("; ", totals);
+    }
+
+    private static string BuildLineSizeSummary(IEnumerable<ReceiptItemSummaryProjection> lineItems)
+    {
+        var items = lineItems.ToList();
+        if (items.Count == 0)
+        {
+            return "-";
+        }
+
+        var first = items[0];
+        var unit = first.SizeUnitText;
+        if (items.Any(x => x.IsSizeApproximate))
+        {
+            return $"примерно {FormatDecimal(first.SizeValue)} {unit}";
+        }
+
+        var min = items.Min(x => x.SizeValue);
+        var max = items.Max(x => x.SizeValue);
+        return min == max
+            ? $"{FormatDecimal(min)} {unit}"
+            : $"{FormatDecimal(min)}-{FormatDecimal(max)} {unit}";
+    }
+
+    private static string BuildLineSizeSummary(IEnumerable<ReceiptItemDetailsProjection> lineItems)
+    {
+        var items = lineItems.ToList();
+        if (items.Count == 0)
+        {
+            return "-";
+        }
+
+        var first = items[0];
+        var unit = first.SizeUnitText;
+        if (items.Any(x => x.IsSizeApproximate))
+        {
+            return $"примерно {FormatDecimal(first.SizeValue)} {unit}";
+        }
+
+        var min = items.Min(x => x.SizeValue);
+        var max = items.Max(x => x.SizeValue);
+        return min == max
+            ? $"{FormatDecimal(min)} {unit}"
+            : $"{FormatDecimal(min)}-{FormatDecimal(max)} {unit}";
+    }
+
     private static decimal CalculateWeightKg(MetalReceiptCreateViewModel model, MetalMaterial material)
     {
         return Math.Round((model.PassportWeightKg ?? 0m) * (material.Coefficient <= 0m ? 1m : material.Coefficient), 3);
+    }
+
+    private static decimal CalculateWeightKg(MetalReceiptLineInputViewModel line, MetalMaterial material)
+    {
+        return Math.Round((line.PassportWeightKg ?? 0m) * (material.Coefficient <= 0m ? 1m : material.Coefficient), 3);
     }
 
     private static (decimal SizeValue, string UnitText) ResolveSizeFromInputOrMass(decimal? sizeValue, MetalMaterial material, int quantity, decimal actualWeight)
@@ -1760,8 +2220,11 @@ public class MetalWarehouseController : Controller
         };
     }
 
-    private static string BuildActualBlankSizeText(decimal sizeValue, string unitText)
-        => $"{Math.Round(sizeValue, 3):0.###} {unitText}";
+    private static string BuildActualBlankSizeText(decimal sizeValue, string unitText, bool isApproximate = false)
+    {
+        var valueText = $"{Math.Round(sizeValue, 3).ToString("0.###", CultureInfo.InvariantCulture)} {unitText}";
+        return isApproximate ? $"примерно {valueText}" : valueText;
+    }
 
     private static string BuildCalculatedWeightFormula(decimal passportWeightKg, decimal coefficient, decimal calculatedWeightKg)
     {
@@ -1838,8 +2301,125 @@ public class MetalWarehouseController : Controller
             _ => DateTime.SpecifyKind(dateOnly, DateTimeKind.Utc),
         };
     }
+
+    private static void NormalizeReceiptItems(MetalReceiptCreateViewModel model)
+    {
+        if (model.Items.Count == 0 && (model.MetalMaterialId.HasValue || model.Quantity.HasValue || model.PassportWeightKg.HasValue || model.Units.Count > 0))
+        {
+            model.Items.Add(new MetalReceiptLineInputViewModel
+            {
+                MetalMaterialId = model.MetalMaterialId,
+                PassportWeightKg = model.PassportWeightKg,
+                Quantity = model.Quantity,
+                Units = model.Units,
+            });
+        }
+
+        if (model.Items.Count == 0)
+        {
+            model.Items.Add(new MetalReceiptLineInputViewModel
+            {
+                Quantity = 1,
+                Units = new List<MetalReceiptUnitInputViewModel>
+                {
+                    new() { ItemIndex = 1 },
+                },
+            });
+        }
+
+        foreach (var line in model.Items)
+        {
+            if (line.UseAverageSize)
+            {
+                line.Units.Clear();
+                continue;
+            }
+
+            if (!line.Quantity.HasValue || line.Quantity.Value <= 0)
+            {
+                continue;
+            }
+
+            var quantity = line.Quantity.Value;
+            if (line.Units.Count != quantity)
+            {
+                line.Units = Enumerable.Range(1, quantity)
+                    .Select(i => new MetalReceiptUnitInputViewModel
+                    {
+                        ItemIndex = i,
+                        SizeValue = line.Units.FirstOrDefault(x => x.ItemIndex == i)?.SizeValue,
+                    })
+                    .ToList();
+                continue;
+            }
+
+            for (var i = 0; i < line.Units.Count; i++)
+            {
+                if (line.Units[i].ItemIndex <= 0)
+                {
+                    line.Units[i].ItemIndex = i + 1;
+                }
+            }
+        }
+    }
+
+    private sealed record OriginalReceiptDocumentReadResult(
+        bool IsValid,
+        string? FileName,
+        string? ContentType,
+        byte[]? Content,
+        long? SizeBytes,
+        string? ErrorMessage);
+
+    private static async Task<OriginalReceiptDocumentReadResult> ReadOriginalReceiptDocumentAsync(IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file is null || file.Length == 0)
+        {
+            return new OriginalReceiptDocumentReadResult(true, null, null, null, null, null);
+        }
+
+        if (file.Length > MetalReceiptCreateViewModel.MaxOriginalDocumentSizeBytes)
+        {
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "PDF слишком большой. Максимум 25 МБ.");
+        }
+
+        if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Можно прикрепить только PDF-файл.");
+        }
+
+        await using var stream = file.OpenReadStream();
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory, cancellationToken);
+        var content = memory.ToArray();
+
+        if (content.Length < 4 || content[0] != 0x25 || content[1] != 0x50 || content[2] != 0x44 || content[3] != 0x46)
+        {
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл не похож на PDF. Проверьте, что выбран скан в формате PDF.");
+        }
+
+        var safeFileName = Path.GetFileName(file.FileName);
+        if (string.IsNullOrWhiteSpace(safeFileName))
+        {
+            safeFileName = "original.pdf";
+        }
+
+        return new OriginalReceiptDocumentReadResult(
+            true,
+            safeFileName,
+            string.IsNullOrWhiteSpace(file.ContentType) ? "application/pdf" : file.ContentType,
+            content,
+            file.Length,
+            null);
+    }
+
     private async Task PopulateMaterialsAsync(MetalReceiptCreateViewModel model, CancellationToken cancellationToken)
     {
+        var selectedMaterialIds = model.Items
+            .Where(x => x.MetalMaterialId.HasValue)
+            .Select(x => x.MetalMaterialId!.Value)
+            .ToHashSet();
+
         model.Materials = await _dbContext.MetalMaterials
             .AsNoTracking()
             .Where(x => x.IsActive)
@@ -1848,7 +2428,7 @@ public class MetalWarehouseController : Controller
             {
                 Value = x.Id.ToString(),
                 Text = string.IsNullOrWhiteSpace(x.Code) ? x.Name : $"{x.Name} ({x.Code})",
-                Selected = model.MetalMaterialId.HasValue && model.MetalMaterialId.Value == x.Id,
+                Selected = selectedMaterialIds.Contains(x.Id),
             })
             .ToListAsync(cancellationToken);
 
@@ -1882,6 +2462,31 @@ public class MetalWarehouseController : Controller
 
         _dbContext.MetalMaterials.AddRange(seed);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<string> GetNextReceiptNumberAsync(DateTime? receiptDate, CancellationToken cancellationToken)
+    {
+        const string prefix = "ПРИХОД-МЕТАЛЛА";
+        var datePart = receiptDate?.ToString("yyyyMMdd") ?? DateTime.UtcNow.ToString("yyyyMMdd");
+
+        var lastNumber = await _dbContext.MetalReceipts
+            .AsNoTracking()
+            .Where(x => x.ReceiptNumber.StartsWith(prefix))
+            .OrderByDescending(x => x.ReceiptNumber)
+            .Select(x => x.ReceiptNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var numericPart = 0;
+        if (!string.IsNullOrWhiteSpace(lastNumber))
+        {
+            var match = Regex.Match(lastNumber, @"-№(?<sequence>\d+)$");
+            if (match.Success)
+            {
+                _ = int.TryParse(match.Groups["sequence"].Value, out numericPart);
+            }
+        }
+
+        return $"{prefix}-{datePart}-№{(numericPart + 1):D4}";
     }
 
     private async Task<string> GetNextReceiptNumberAsync(
@@ -1932,8 +2537,8 @@ public class MetalWarehouseController : Controller
         var min = sizes.Min();
         var max = sizes.Max();
         return min == max
-            ? min.ToString("0.###")
-            : $"{min:0.###}-{max:0.###}";
+            ? FormatDecimal(min)
+            : $"{FormatDecimal(min)}-{FormatDecimal(max)}";
     }
 
     private static string BuildMaterialCode(MetalMaterial material)
@@ -1974,3 +2579,69 @@ internal sealed class RequirementDetailsItemProjection
 
     public string? MaterialCode { get; init; }
 }
+
+internal sealed class ReceiptItemSummaryProjection
+{
+    public int ReceiptLineIndex { get; init; }
+
+    public int ItemIndex { get; init; }
+
+    public Guid MetalMaterialId { get; init; }
+
+    public string MaterialName { get; init; } = string.Empty;
+
+    public decimal Quantity { get; init; }
+
+    public decimal PassportWeightKg { get; init; }
+
+    public decimal SizeValue { get; init; }
+
+    public string SizeUnitText { get; init; } = string.Empty;
+
+    public bool IsSizeApproximate { get; init; }
+}
+
+internal sealed class ReceiptItemDetailsProjection
+{
+    public Guid Id { get; init; }
+
+    public int ReceiptLineIndex { get; init; }
+
+    public int ItemIndex { get; init; }
+
+    public Guid MetalMaterialId { get; init; }
+
+    public string MaterialName { get; init; } = string.Empty;
+
+    public decimal Quantity { get; init; }
+
+    public decimal PassportWeightKg { get; init; }
+
+    public decimal ActualWeightKg { get; init; }
+
+    public decimal CalculatedWeightKg { get; init; }
+
+    public decimal WeightDeviationKg { get; init; }
+
+    public decimal MaterialCoefficient { get; init; }
+
+    public decimal SizeValue { get; init; }
+
+    public string SizeUnitText { get; init; } = string.Empty;
+
+    public string ActualBlankSizeText { get; init; } = string.Empty;
+
+    public bool IsSizeApproximate { get; init; }
+
+    public string GeneratedCode { get; init; } = string.Empty;
+}
+
+internal sealed record ReceiptLineSummary(
+    int LineIndex,
+    string MaterialName,
+    int Quantity,
+    decimal PassportWeightKg,
+    decimal TotalSize,
+    string UnitText,
+    string SizeSummary,
+    bool UsesAverageSize);

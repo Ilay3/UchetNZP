@@ -25,6 +25,83 @@ public interface IWipBatchReportPdfExporter
     byte[] Export(WipBatchReportFilterViewModel filter, IReadOnlyList<WipBatchReportItemViewModel> items, decimal totalQuantity);
 }
 
+public interface IReceiptReportPdfExporter
+{
+    byte[] Export(ReceiptReportFilterViewModel filter, IReadOnlyList<ReceiptReportItemViewModel> items, decimal totalQuantity);
+}
+
+public class ReceiptReportPdfExporter : IReceiptReportPdfExporter
+{
+    public byte[] Export(ReceiptReportFilterViewModel filter, IReadOnlyList<ReceiptReportItemViewModel> items, decimal totalQuantity)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        ArgumentNullException.ThrowIfNull(items);
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4.Landscape());
+                page.Margin(20);
+                page.DefaultTextStyle(x => x.FontSize(10));
+                page.Content().Column(column =>
+                {
+                    column.Item().Text("Отчет по запускам НЗП").FontSize(16).Bold();
+                    column.Item().Text($"Период: {filter.From:dd.MM.yyyy} - {filter.To:dd.MM.yyyy}");
+                    column.Item().Text($"Суммарное количество: {totalQuantity:0.###}");
+
+                    column.Item().PaddingTop(10).Table(table =>
+                    {
+                        table.ColumnsDefinition(cols =>
+                        {
+                            cols.RelativeColumn(1);
+                            cols.RelativeColumn(3);
+                            cols.RelativeColumn(1);
+                            cols.RelativeColumn(1);
+                            cols.RelativeColumn(1);
+                            cols.RelativeColumn(3);
+                        });
+
+                        AddHeaderCell(table, "Дата");
+                        AddHeaderCell(table, "Деталь");
+                        AddHeaderCell(table, "Ярлык");
+                        AddHeaderCell(table, "Операция");
+                        AddHeaderCell(table, "Количество");
+                        AddHeaderCell(table, "Комментарий");
+
+                        foreach (var item in items)
+                        {
+                            AddDataCell(table, item.Date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture));
+                            AddDataCell(table, NameWithCodeFormatter.getNameWithCode(item.PartName, item.PartCode));
+                            AddDataCell(table, item.LabelNumber ?? "-");
+                            AddDataCell(table, item.OpNumber);
+                            AddDataCell(table, item.Quantity.ToString("0.###", CultureInfo.InvariantCulture));
+                            AddDataCell(table, item.Comment ?? "-");
+                        }
+
+                        if (items.Count == 0)
+                        {
+                            table.Cell().ColumnSpan(6).Border(1).Padding(4).Text("Данные не найдены").Italic();
+                        }
+                    });
+                });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
+    private static void AddHeaderCell(TableDescriptor table, string text)
+    {
+        table.Cell().Border(1).Background(Colors.Grey.Lighten3).Padding(4).Text(text).Bold();
+    }
+
+    private static void AddDataCell(TableDescriptor table, string text)
+    {
+        table.Cell().Border(1).Padding(4).Text(text);
+    }
+}
+
 public class ScrapReportPdfExporter : IScrapReportPdfExporter
 {
     public byte[] Export(ScrapReportFilterViewModel filter, IReadOnlyList<ScrapReportItemViewModel> items)

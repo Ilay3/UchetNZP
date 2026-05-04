@@ -24,6 +24,7 @@ public class ReportsController : Controller
     private readonly IScrapReportPdfExporter _scrapReportPdfExporter;
     private readonly ITransferPeriodReportPdfExporter _transferPeriodReportPdfExporter;
     private readonly IWipBatchReportPdfExporter _wipBatchReportPdfExporter;
+    private readonly IReceiptReportPdfExporter _receiptReportPdfExporter;
     private readonly IWipBatchInventoryDocumentExporter _wipBatchInventoryDocumentExporter;
     private readonly IWipLabelLookupService _labelLookupService;
 
@@ -35,6 +36,7 @@ public class ReportsController : Controller
         IScrapReportPdfExporter scrapReportPdfExporter,
         ITransferPeriodReportPdfExporter transferPeriodReportPdfExporter,
         IWipBatchReportPdfExporter wipBatchReportPdfExporter,
+        IReceiptReportPdfExporter receiptReportPdfExporter,
         IWipBatchInventoryDocumentExporter wipBatchInventoryDocumentExporter,
         IWipLabelLookupService labelLookupService)
     {
@@ -45,12 +47,28 @@ public class ReportsController : Controller
         _scrapReportPdfExporter = scrapReportPdfExporter ?? throw new ArgumentNullException(nameof(scrapReportPdfExporter));
         _transferPeriodReportPdfExporter = transferPeriodReportPdfExporter ?? throw new ArgumentNullException(nameof(transferPeriodReportPdfExporter));
         _wipBatchReportPdfExporter = wipBatchReportPdfExporter ?? throw new ArgumentNullException(nameof(wipBatchReportPdfExporter));
+        _receiptReportPdfExporter = receiptReportPdfExporter ?? throw new ArgumentNullException(nameof(receiptReportPdfExporter));
         _wipBatchInventoryDocumentExporter = wipBatchInventoryDocumentExporter ?? throw new ArgumentNullException(nameof(wipBatchInventoryDocumentExporter));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
     }
 
     [HttpGet("receipts")]
     public async Task<IActionResult> ReceiptReport([FromQuery] ReceiptReportQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await LoadReceiptReportAsync(query, cancellationToken).ConfigureAwait(false);
+        return View("~/Views/Reports/ReceiptReport.cshtml", model);
+    }
+
+    [HttpGet("receipts/export-pdf")]
+    public async Task<IActionResult> ReceiptReportExportPdf([FromQuery] ReceiptReportQuery? query, CancellationToken cancellationToken)
+    {
+        var model = await LoadReceiptReportAsync(query, cancellationToken).ConfigureAwait(false);
+        var content = _receiptReportPdfExporter.Export(model.Filter, model.Items, model.TotalQuantity);
+        var fileName = $"receipt-report-{model.Filter.From:yyyyMMdd}-{model.Filter.To:yyyyMMdd}.pdf";
+        return File(content, "application/pdf", fileName);
+    }
+
+    private async Task<ReceiptReportViewModel> LoadReceiptReportAsync(ReceiptReportQuery? query, CancellationToken cancellationToken)
     {
         var now = DateTime.Now.Date;
         var defaultFrom = now.AddDays(-6);
@@ -121,7 +139,7 @@ public class ReportsController : Controller
             items,
             items.Sum(x => x.Quantity));
 
-        return View("~/Views/Reports/ReceiptReport.cshtml", model);
+        return model;
     }
 
     [HttpGet("scrap")]

@@ -1,16 +1,30 @@
 (function () {
-    const quantityInput = document.getElementById("Quantity") || document.getElementById("quantityInput");
-    const unitsContainer = document.getElementById("unitsContainer");
-    const materialInput = document.getElementById("materialInput");
-    const materialIdInput = document.getElementById("materialId");
-    const materialOptions = document.getElementById("materialOptions");
-    const materialSuggestions = document.getElementById("materialSuggestions");
-    const unitTextHint = document.getElementById("unitTextHint");
-    const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
-    const debugContextRaw = document.getElementById("receiptDebugContext")?.textContent ?? "{}";
+    const form = document.getElementById("metalReceiptForm");
+    const itemsContainer = document.getElementById("receiptItemsContainer");
+    const addLineButton = document.getElementById("addReceiptLine");
+    const lineTemplate = document.getElementById("receiptLineTemplate");
+    const materialsRaw = document.getElementById("materialOptionsJson")?.textContent ?? "[]";
     const materialUnitKindMapRaw = document.getElementById("materialUnitKindMap")?.textContent ?? "{}";
+    const debugContextRaw = document.getElementById("receiptDebugContext")?.textContent ?? "{}";
+    const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
+
+    if (!form || !itemsContainer || !addLineButton || !lineTemplate) {
+        return;
+    }
+
+    let materials = [];
     let materialUnitKindMap = {};
     let debugContext = {};
+
+    try {
+        materials = JSON.parse(materialsRaw).map(item => ({
+            id: String(item.id || ""),
+            text: String(item.text || ""),
+            search: String(item.text || "").toLowerCase(),
+        })).filter(item => item.id && item.text);
+    } catch {
+        materials = [];
+    }
 
     try {
         materialUnitKindMap = JSON.parse(materialUnitKindMapRaw);
@@ -24,41 +38,10 @@
         debugContext = {};
     }
 
-    if (!quantityInput || !unitsContainer || !materialInput || !materialIdInput || !materialOptions || !materialSuggestions) {
-        return;
-    }
-
-    const materialsByDisplay = new Map();
-    const materials = Array.from(materialOptions.querySelectorAll("option")).map(option => {
-        const text = (option.getAttribute("value") || "").trim();
-        const id = (option.getAttribute("data-id") || "").trim();
-        if (text && id) {
-            materialsByDisplay.set(text.toLowerCase(), { id, text });
-        }
-        return text && id ? { id, text, search: text.toLowerCase() } : null;
-    }).filter(Boolean);
-
-    const suggestionLimit = 30;
-    let suggestionRenderTimer = null;
-
-    function syncMaterialSelection() {
-        const rawValue = (materialInput.value || "").trim();
-        if (!rawValue) {
-            materialIdInput.value = "";
-            return;
-        }
-
-        const match = materialsByDisplay.get(rawValue.toLowerCase());
-        materialIdInput.value = match?.id || "";
-    }
-
-    function closeSuggestions() {
-        materialSuggestions.classList.add("d-none");
-        materialSuggestions.innerHTML = "";
-    }
+    const materialsByDisplay = new Map(materials.map(item => [item.text.toLowerCase(), item]));
 
     function escapeHtml(value) {
-        return value
+        return String(value)
             .replaceAll("&", "&amp;")
             .replaceAll("<", "&lt;")
             .replaceAll(">", "&gt;")
@@ -66,180 +49,306 @@
             .replaceAll("'", "&#39;");
     }
 
-    function renderMaterialSuggestions() {
-        const query = (materialInput.value || "").trim().toLowerCase();
-        if (!query || query.length < 2) {
-            closeSuggestions();
-            return;
+    function receiptLines() {
+        return Array.from(itemsContainer.querySelectorAll("[data-receipt-line]"));
+    }
+
+    function getLineIndex(line) {
+        return Number.parseInt(line.dataset.lineIndex || "0", 10) || 0;
+    }
+
+    function getMaterialId(line) {
+        return (line.querySelector("[data-material-id]")?.value || "").trim();
+    }
+
+    function getUnitText(line) {
+        const materialId = getMaterialId(line);
+        return materialUnitKindMap[materialId] === "SquareMeter" ? "м²" : "м";
+    }
+
+    function setValidationTarget(line, field, index) {
+        line.querySelectorAll(`[data-valmsg-for$=".${field}"]`).forEach(span => {
+            span.setAttribute("data-valmsg-for", `Items[${index}].${field}`);
+        });
+    }
+
+    function applyLineIndex(line, index) {
+        line.dataset.lineIndex = String(index);
+        const title = line.querySelector("[data-line-title]");
+        if (title) {
+            title.textContent = `Металл ${index + 1}`;
         }
 
-        const filtered = materials
-            .filter(item => item.search.includes(query))
-            .slice(0, suggestionLimit);
+        const materialId = line.querySelector("[data-material-id]");
+        const weight = line.querySelector("[data-weight-input]");
+        const quantity = line.querySelector("[data-quantity-input]");
+        const averageHidden = Array.from(line.querySelectorAll("input[type='hidden']"))
+            .find(input => /\.UseAverageSize$/.test(input.name));
+        const averageCheckbox = line.querySelector("[data-average-checkbox]");
+        const averageSize = line.querySelector("[data-average-size-input]");
 
-        if (filtered.length === 0) {
-            closeSuggestions();
-            return;
-        }
+        if (materialId) materialId.name = `Items[${index}].MetalMaterialId`;
+        if (weight) weight.name = `Items[${index}].PassportWeightKg`;
+        if (quantity) quantity.name = `Items[${index}].Quantity`;
+        if (averageHidden) averageHidden.name = `Items[${index}].UseAverageSize`;
+        if (averageCheckbox) averageCheckbox.name = `Items[${index}].UseAverageSize`;
+        if (averageSize) averageSize.name = `Items[${index}].AverageSizeValue`;
 
-        materialSuggestions.innerHTML = filtered.map(item => `
-            <button type="button" class="list-group-item list-group-item-action" data-id="${escapeHtml(item.id)}" data-text="${escapeHtml(item.text)}">
-                ${escapeHtml(item.text)}
-            </button>`).join("");
-        materialSuggestions.classList.remove("d-none");
+        setValidationTarget(line, "MetalMaterialId", index);
+        setValidationTarget(line, "PassportWeightKg", index);
+        setValidationTarget(line, "Quantity", index);
+        setValidationTarget(line, "AverageSizeValue", index);
+        setValidationTarget(line, "Units", index);
     }
 
-    function getSelectedMaterialId() {
-        return (materialIdInput.value || "").trim();
-    }
-
-    function getSelectedMaterialDisplay() {
-        return (materialInput.value || "").trim();
-    }
-
-    function getUnitText() {
-        const materialId = getSelectedMaterialId();
-        const unitKind = materialUnitKindMap[materialId];
-        return unitKind === "SquareMeter" ? "м²" : "м";
-    }
-
-    function resolveActualBlankText(sizeValue) {
-        const unitText = getUnitText();
-        return sizeValue ? `${sizeValue} ${unitText}` : "—";
-    }
-
-    function currentUnitValues() {
-        const result = new Map();
-        unitsContainer.querySelectorAll("input[data-index]").forEach(input => {
+    function currentUnitValues(line) {
+        const values = new Map();
+        line.querySelectorAll("[data-unit-size]").forEach(input => {
             const index = Number.parseInt(input.dataset.index || "", 10);
             if (!Number.isNaN(index)) {
-                result.set(index, input.value);
+                values.set(index, input.value);
             }
         });
-        return result;
+        return values;
     }
 
-    function renderUnitInputs() {
-        const count = Number.parseInt(quantityInput.value || "0", 10);
-        const safeCount = Number.isNaN(count) || count < 1 ? 0 : Math.min(count, 200);
-        const unitText = getUnitText();
-        const values = currentUnitValues();
+    function renderUnits(line) {
+        const lineIndex = getLineIndex(line);
+        const unitText = getUnitText(line);
+        const averageCheckbox = line.querySelector("[data-average-checkbox]");
+        const averageSection = line.querySelector("[data-average-section]");
+        const unitsSection = line.querySelector("[data-units-section]");
+        const unitsContainer = line.querySelector("[data-units-container]");
+        const quantityInput = line.querySelector("[data-quantity-input]");
+        const isAverage = averageCheckbox?.checked === true;
 
-        if (unitTextHint) {
-            unitTextHint.textContent = unitText;
+        line.querySelectorAll("[data-unit-text]").forEach(item => {
+            item.textContent = unitText;
+        });
+
+        averageSection?.classList.toggle("d-none", !isAverage);
+        unitsSection?.classList.toggle("d-none", isAverage);
+
+        if (!unitsContainer || isAverage) {
+            return;
         }
 
+        const count = Number.parseInt(quantityInput?.value || "0", 10);
+        const safeCount = Number.isNaN(count) || count < 1 ? 0 : Math.min(count, 200);
+        const values = currentUnitValues(line);
         unitsContainer.innerHTML = "";
 
         if (safeCount === 0) {
-            unitsContainer.innerHTML = '<div class="col-12 text-muted">Укажите количество, чтобы заполнить размеры по единицам.</div>';
+            unitsContainer.innerHTML = '<div class="col-12 text-muted">Введите количество, чтобы появились поля размеров.</div>';
+            return;
+        }
+
+        if (count > 200) {
+            unitsContainer.innerHTML = '<div class="col-12"><div class="alert alert-warning mb-0">Для такой большой партии включите среднюю длину. Так не придется заполнять сотни полей.</div></div>';
             return;
         }
 
         for (let i = 1; i <= safeCount; i += 1) {
             const col = document.createElement("div");
-            col.className = "col-md-6";
+            col.className = "col-sm-6 col-lg-3";
             col.innerHTML = `
-                <div class="border rounded p-3 bg-white">
-                    <div class="fw-semibold mb-2">Единица ${i}</div>
-                    <label class="form-label">Размер в ${unitText}</label>
-                    <input type="hidden" name="Units[${i - 1}].ItemIndex" value="${i}" />
-                    <input type="number"
-                           id="Units_${i - 1}__SizeValue"
-                           class="form-control"
-                           name="Units[${i - 1}].SizeValue"
-                           data-index="${i}"
-                           min="0.001"
-                           step="0.001"
-                           value="${values.get(i) ?? ""}"
-                           />
-                    <div class="form-text">Фактический размер заготовки: <span data-actual-size="${i}">${resolveActualBlankText(values.get(i) ?? "")}</span></div>
-                    <span class="text-danger field-validation-valid"
-                          data-valmsg-for="Units[${i - 1}].SizeValue"
-                          data-valmsg-replace="true"></span>
-                </div>`;
+                <label class="form-label small mb-1">Штука ${i}</label>
+                <input type="hidden" name="Items[${lineIndex}].Units[${i - 1}].ItemIndex" value="${i}" />
+                <input class="form-control"
+                       type="number"
+                       min="0.001"
+                       step="0.001"
+                       name="Items[${lineIndex}].Units[${i - 1}].SizeValue"
+                       value="${escapeHtml(values.get(i) ?? "")}"
+                       data-unit-size
+                       data-index="${i}" />`;
             unitsContainer.appendChild(col);
-        }
-
-        unitsContainer.querySelectorAll("input[data-index]").forEach(input => {
-            input.addEventListener("input", () => {
-                const index = input.dataset.index;
-                const marker = unitsContainer.querySelector(`[data-actual-size="${index}"]`);
-                if (marker) {
-                    marker.textContent = resolveActualBlankText(input.value);
-                }
-            });
-        });
-
-        if (window.jQuery && window.jQuery.validator && window.jQuery.validator.unobtrusive) {
-            const form = document.getElementById("metalReceiptForm");
-            if (form) {
-                window.jQuery(form).removeData("validator");
-                window.jQuery(form).removeData("unobtrusiveValidation");
-                window.jQuery.validator.unobtrusive.parse(form);
-            }
         }
     }
 
-    quantityInput.addEventListener("input", renderUnitInputs);
-    materialInput.addEventListener("input", () => {
-        syncMaterialSelection();
-        if (suggestionRenderTimer) {
-            clearTimeout(suggestionRenderTimer);
-        }
-        suggestionRenderTimer = setTimeout(renderMaterialSuggestions, 120);
-    });
-    materialInput.addEventListener("change", () => {
-        syncMaterialSelection();
-        renderUnitInputs();
-    });
-    materialInput.addEventListener("focus", renderMaterialSuggestions);
-    materialInput.addEventListener("blur", () => {
-        setTimeout(closeSuggestions, 120);
-    });
-    materialSuggestions.addEventListener("mousedown", event => {
-        const button = event.target.closest("button[data-id]");
-        if (!button) {
+    function syncMaterialSelection(line) {
+        const input = line.querySelector("[data-material-input]");
+        const hidden = line.querySelector("[data-material-id]");
+        if (!input || !hidden) {
             return;
         }
-        event.preventDefault();
-        materialInput.value = button.dataset.text || "";
-        materialIdInput.value = button.dataset.id || "";
-        closeSuggestions();
-        renderUnitInputs();
+
+        const rawValue = (input.value || "").trim();
+        const match = materialsByDisplay.get(rawValue.toLowerCase());
+        hidden.value = match?.id || "";
+        renderUnits(line);
+    }
+
+    function closeSuggestions(line) {
+        const suggestions = line.querySelector("[data-material-suggestions]");
+        if (!suggestions) return;
+        suggestions.classList.add("d-none");
+        suggestions.innerHTML = "";
+    }
+
+    function renderMaterialSuggestions(line) {
+        const input = line.querySelector("[data-material-input]");
+        const suggestions = line.querySelector("[data-material-suggestions]");
+        if (!input || !suggestions) {
+            return;
+        }
+
+        const query = (input.value || "").trim().toLowerCase();
+        if (query.length < 2) {
+            closeSuggestions(line);
+            return;
+        }
+
+        const filtered = materials
+            .filter(item => item.search.includes(query))
+            .slice(0, 30);
+
+        if (filtered.length === 0) {
+            closeSuggestions(line);
+            return;
+        }
+
+        suggestions.innerHTML = filtered.map(item => `
+            <button type="button" class="list-group-item list-group-item-action" data-id="${escapeHtml(item.id)}" data-text="${escapeHtml(item.text)}">
+                ${escapeHtml(item.text)}
+            </button>`).join("");
+        suggestions.classList.remove("d-none");
+    }
+
+    function refreshRemoveButtons() {
+        const lines = receiptLines();
+        lines.forEach(line => {
+            const button = line.querySelector("[data-remove-line]");
+            if (button) {
+                button.classList.toggle("d-none", lines.length <= 1);
+            }
+        });
+    }
+
+    function reindexLines() {
+        receiptLines().forEach((line, index) => {
+            applyLineIndex(line, index);
+            renderUnits(line);
+        });
+        refreshRemoveButtons();
+        reparseValidation();
+    }
+
+    function reparseValidation() {
+        if (window.jQuery && window.jQuery.validator && window.jQuery.validator.unobtrusive) {
+            window.jQuery(form).removeData("validator");
+            window.jQuery(form).removeData("unobtrusiveValidation");
+            window.jQuery.validator.unobtrusive.parse(form);
+        }
+    }
+
+    function setupLine(line) {
+        if (line.dataset.bound === "true") {
+            return;
+        }
+
+        line.dataset.bound = "true";
+        const materialInput = line.querySelector("[data-material-input]");
+        const suggestions = line.querySelector("[data-material-suggestions]");
+        const quantityInput = line.querySelector("[data-quantity-input]");
+        const averageCheckbox = line.querySelector("[data-average-checkbox]");
+        const removeButton = line.querySelector("[data-remove-line]");
+
+        materialInput?.addEventListener("input", () => {
+            materialInput.setCustomValidity("");
+            syncMaterialSelection(line);
+            renderMaterialSuggestions(line);
+        });
+        materialInput?.addEventListener("focus", () => renderMaterialSuggestions(line));
+        materialInput?.addEventListener("blur", () => {
+            setTimeout(() => closeSuggestions(line), 120);
+        });
+        materialInput?.addEventListener("change", () => {
+            syncMaterialSelection(line);
+            renderUnits(line);
+        });
+
+        suggestions?.addEventListener("mousedown", event => {
+            const button = event.target.closest("button[data-id]");
+            if (!button) {
+                return;
+            }
+
+            event.preventDefault();
+            if (materialInput) {
+                materialInput.value = button.dataset.text || "";
+                materialInput.setCustomValidity("");
+            }
+
+            const hidden = line.querySelector("[data-material-id]");
+            if (hidden) {
+                hidden.value = button.dataset.id || "";
+            }
+
+            closeSuggestions(line);
+            renderUnits(line);
+        });
+
+        quantityInput?.addEventListener("input", () => renderUnits(line));
+        averageCheckbox?.addEventListener("change", () => renderUnits(line));
+        removeButton?.addEventListener("click", () => {
+            if (receiptLines().length <= 1) {
+                return;
+            }
+
+            line.remove();
+            reindexLines();
+        });
+
+        syncMaterialSelection(line);
+        renderUnits(line);
+    }
+
+    addLineButton.addEventListener("click", () => {
+        const index = receiptLines().length;
+        const html = lineTemplate.innerHTML
+            .replaceAll("__index__", String(index))
+            .replaceAll("__number__", String(index + 1));
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = html.trim();
+        const line = wrapper.firstElementChild;
+        itemsContainer.appendChild(line);
+        setupLine(line);
+        reindexLines();
+        line.querySelector("[data-material-input]")?.focus();
     });
 
-    const form = document.getElementById("metalReceiptForm");
-    form?.addEventListener("submit", () => {
-        syncMaterialSelection();
+    form.addEventListener("submit", () => {
+        const payloadPreview = [];
+        receiptLines().forEach(line => {
+            syncMaterialSelection(line);
 
-        const payloadPreview = {
-            receiptDate: document.getElementById("ReceiptDate")?.value || null,
-            materialDisplay: getSelectedMaterialDisplay(),
-            materialId: materialIdInput.value || null,
-            quantity: quantityInput.value || null,
-            passportWeightKg: document.getElementById("PassportWeightKg")?.value || null,
-        };
+            const materialInput = line.querySelector("[data-material-input]");
+            const materialId = getMaterialId(line);
+            if (materialInput) {
+                materialInput.setCustomValidity(materialId ? "" : "Выберите материал из подсказок.");
+            }
 
-        if (materialIdInput.value) {
-            materialInput.setCustomValidity("");
-        } else if (getSelectedMaterialDisplay()) {
-            materialInput.setCustomValidity("Выберите материал из списка подсказок.");
-        } else {
-            materialInput.setCustomValidity("");
-        }
+            payloadPreview.push({
+                material: materialInput?.value || null,
+                materialId: materialId || null,
+                quantity: line.querySelector("[data-quantity-input]")?.value || null,
+                useAverageSize: line.querySelector("[data-average-checkbox]")?.checked === true,
+            });
+        });
 
         try {
             sessionStorage.setItem(debugStorageKey, JSON.stringify({
                 submittedAt: new Date().toISOString(),
-                payloadPreview,
+                receiptDate: document.getElementById("ReceiptDate")?.value || null,
+                lines: payloadPreview,
             }));
         } catch {
             // ignore
         }
     });
 
-    form?.addEventListener("invalid", event => {
+    form.addEventListener("invalid", event => {
         const target = event.target;
         if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) {
             return;
@@ -253,12 +362,8 @@
         });
     }, true);
 
-    materialInput.addEventListener("input", () => {
-        materialInput.setCustomValidity("");
-    });
-
-    syncMaterialSelection();
-    renderUnitInputs();
+    receiptLines().forEach(setupLine);
+    reindexLines();
 
     try {
         const previousSubmitRaw = sessionStorage.getItem(debugStorageKey);

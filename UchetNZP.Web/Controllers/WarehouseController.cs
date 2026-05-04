@@ -278,6 +278,43 @@ public class WarehouseController : Controller
             Parts = parts,
             Items = items,
             PartGroups = partGroups,
+            Areas = new[]
+            {
+                new WarehouseAreaViewModel
+                {
+                    Key = "wip",
+                    Title = "НЗП",
+                    Description = "Текущий склад незавершенного производства",
+                    IsActive = true,
+                    IsEnabled = true,
+                },
+                new WarehouseAreaViewModel
+                {
+                    Key = "finished",
+                    Title = "Готовые детали",
+                    Description = "Задел под отдельный учет готовых деталей",
+                    IsActive = false,
+                    IsEnabled = false,
+                },
+                new WarehouseAreaViewModel
+                {
+                    Key = "components",
+                    Title = "Комплектующие",
+                    Description = "Задел под отдельный учет комплектующих",
+                    IsActive = false,
+                    IsEnabled = false,
+                },
+            },
+            MovementTypes = new[]
+            {
+                new WarehouseMovementTypeViewModel { Title = "Приход", IsEnabled = false },
+                new WarehouseMovementTypeViewModel { Title = "Расход", IsEnabled = false },
+            },
+            MovementSources = new[]
+            {
+                new WarehouseMovementSourceViewModel { Title = "Ручной", IsEnabled = false },
+                new WarehouseMovementSourceViewModel { Title = "Автоматический", IsEnabled = false },
+            },
             TotalQuantity = totalQuantity,
             StatusMessage = statusMessage,
             ErrorMessage = errorMessage,

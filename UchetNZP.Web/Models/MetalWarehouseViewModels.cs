@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace UchetNZP.Web.Models;
@@ -137,15 +138,21 @@ public class MetalReceiptListItemViewModel
 
     public string ReceiptNumber { get; init; } = string.Empty;
 
-    public string MaterialName { get; init; } = string.Empty;
+    public string MaterialsSummary { get; init; } = string.Empty;
 
-    public int Quantity { get; init; }
+    public int TotalQuantity { get; init; }
 
-    public decimal PassportWeightKg { get; init; }
+    public decimal TotalPassportWeightKg { get; init; }
 
-    public decimal TotalSize { get; init; }
+    public string SizeSummary { get; init; } = string.Empty;
 
-    public string SizeUnitText { get; init; } = string.Empty;
+    public bool HasOriginalDocument { get; init; }
+
+    public string MaterialName => MaterialsSummary;
+
+    public int Quantity => TotalQuantity;
+
+    public decimal PassportWeightKg => TotalPassportWeightKg;
 }
 
 public class MetalReceiptListViewModel
@@ -160,8 +167,28 @@ public class MetalReceiptUnitInputViewModel
     public decimal? SizeValue { get; set; }
 }
 
+public class MetalReceiptLineInputViewModel
+{
+    public Guid? MetalMaterialId { get; set; }
+
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Вес должен быть больше 0.")]
+    public decimal? PassportWeightKg { get; set; }
+
+    [Range(1, 9999, ErrorMessage = "Количество должно быть больше 0.")]
+    public int? Quantity { get; set; }
+
+    public bool UseAverageSize { get; set; }
+
+    [Range(0.000001d, 999999999999d, ErrorMessage = "Средний размер должен быть больше 0.")]
+    public decimal? AverageSizeValue { get; set; }
+
+    public List<MetalReceiptUnitInputViewModel> Units { get; set; } = new();
+}
+
 public class MetalReceiptCreateViewModel : IValidatableObject
 {
+    public const long MaxOriginalDocumentSizeBytes = 25L * 1024L * 1024L;
+
     [Required(ErrorMessage = "Дата прихода обязательна.")]
     [DataType(DataType.Date)]
     public DateTime? ReceiptDate { get; set; }
@@ -186,11 +213,122 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
     public List<MetalReceiptUnitInputViewModel> Units { get; set; } = new();
 
+    public List<MetalReceiptLineInputViewModel> Items { get; set; } = new();
+
+    public IFormFile? OriginalDocumentPdf { get; set; }
+
     public IReadOnlyDictionary<Guid, string> MaterialUnitKinds { get; set; } = new Dictionary<Guid, string>();
 
     public IReadOnlyCollection<SelectListItem> Materials { get; set; } = Array.Empty<SelectListItem>();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (OriginalDocumentPdf is { Length: > 0 } file)
+        {
+            if (file.Length > MaxOriginalDocumentSizeBytes)
+            {
+                yield return new ValidationResult(
+                    "PDF слишком большой. Максимум 25 МБ.",
+                    new[] { nameof(OriginalDocumentPdf) });
+            }
+
+            if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                yield return new ValidationResult(
+                    "Можно прикрепить только PDF-файл.",
+                    new[] { nameof(OriginalDocumentPdf) });
+            }
+        }
+
+        var lines = Items.Count > 0
+            ? Items
+            : BuildLegacyLines();
+
+        if (lines.Count == 0)
+        {
+            yield return new ValidationResult("Добавьте хотя бы один металл.", new[] { nameof(Items) });
+            yield break;
+        }
+
+        for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+        {
+            var line = lines[lineIndex];
+            var lineNumber = lineIndex + 1;
+
+            if (!line.MetalMaterialId.HasValue)
+            {
+                yield return new ValidationResult(
+                    $"Выберите материал в строке {lineNumber}.",
+                    new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.MetalMaterialId)}" });
+            }
+
+            if (!line.PassportWeightKg.HasValue || line.PassportWeightKg.Value <= 0m)
+            {
+                yield return new ValidationResult(
+                    $"Укажите вес по документу в строке {lineNumber}.",
+                    new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.PassportWeightKg)}" });
+            }
+
+            if (!line.Quantity.HasValue || line.Quantity.Value <= 0)
+            {
+                yield return new ValidationResult(
+                    $"Укажите количество в строке {lineNumber}.",
+                    new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.Quantity)}" });
+                continue;
+            }
+
+            if (line.UseAverageSize)
+            {
+                if (!line.AverageSizeValue.HasValue || line.AverageSizeValue.Value <= 0m)
+                {
+                    yield return new ValidationResult(
+                        $"Укажите средний размер в строке {lineNumber}.",
+                        new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.AverageSizeValue)}" });
+                }
+
+                continue;
+            }
+
+            if (line.Units.Count != line.Quantity.Value)
+            {
+                yield return new ValidationResult(
+                    $"Количество полей размеров в строке {lineNumber} должно совпадать с количеством.",
+                    new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.Units)}" });
+                continue;
+            }
+
+            foreach (var unit in line.Units.Where(x => x.SizeValue.HasValue))
+            {
+                if (unit.SizeValue!.Value <= 0m)
+                {
+                    yield return new ValidationResult(
+                        $"Размер для единицы №{unit.ItemIndex} в строке {lineNumber} должен быть больше 0.",
+                        new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.Units)}" });
+                }
+            }
+        }
+    }
+
+    private List<MetalReceiptLineInputViewModel> BuildLegacyLines()
+    {
+        if (!MetalMaterialId.HasValue && !Quantity.HasValue && !PassportWeightKg.HasValue && Units.Count == 0)
+        {
+            return new List<MetalReceiptLineInputViewModel>();
+        }
+
+        return new List<MetalReceiptLineInputViewModel>
+        {
+            new()
+            {
+                MetalMaterialId = MetalMaterialId,
+                PassportWeightKg = PassportWeightKg,
+                Quantity = Quantity,
+                Units = Units,
+            },
+        };
+    }
+
+    private IEnumerable<ValidationResult> ValidateLegacy(ValidationContext validationContext)
     {
         if (!Quantity.HasValue || Quantity.Value <= 0)
         {
@@ -228,7 +366,11 @@ public class MetalReceiptDetailsItemViewModel
 {
     public Guid Id { get; init; }
 
+    public int ReceiptLineIndex { get; init; }
+
     public int ItemIndex { get; init; }
+
+    public string MaterialName { get; init; } = string.Empty;
 
     public decimal SizeValue { get; init; }
 
@@ -236,7 +378,32 @@ public class MetalReceiptDetailsItemViewModel
     
     public string ActualBlankSizeText { get; init; } = string.Empty;
 
+    public bool IsSizeApproximate { get; init; }
+
     public string GeneratedCode { get; init; } = string.Empty;
+}
+
+public class MetalReceiptDetailsLineViewModel
+{
+    public int LineIndex { get; init; }
+
+    public string MaterialName { get; init; } = string.Empty;
+
+    public int Quantity { get; init; }
+
+    public decimal PassportWeightKg { get; init; }
+
+    public decimal CalculatedWeightKg { get; init; }
+
+    public decimal WeightDeviationKg { get; init; }
+
+    public string CalculatedWeightFormula { get; init; } = string.Empty;
+
+    public string WeightDeviationFormula { get; init; } = string.Empty;
+
+    public string SizeSummary { get; init; } = string.Empty;
+
+    public bool UsesAverageSize { get; init; }
 }
 
 public class MetalReceiptDetailsViewModel
@@ -262,6 +429,12 @@ public class MetalReceiptDetailsViewModel
     public string WeightDeviationFormula { get; init; } = string.Empty;
 
     public int Quantity { get; init; }
+
+    public bool HasOriginalDocument { get; init; }
+
+    public string? OriginalDocumentFileName { get; init; }
+
+    public IReadOnlyCollection<MetalReceiptDetailsLineViewModel> Lines { get; init; } = Array.Empty<MetalReceiptDetailsLineViewModel>();
 
     public IReadOnlyCollection<MetalReceiptDetailsItemViewModel> Items { get; init; } = Array.Empty<MetalReceiptDetailsItemViewModel>();
 }

@@ -57,6 +57,7 @@ builder.Services.AddSingleton<IWipBatchReportExcelExporter, WipBatchReportExcelE
 builder.Services.AddSingleton<IScrapReportPdfExporter, ScrapReportPdfExporter>();
 builder.Services.AddSingleton<ITransferPeriodReportPdfExporter, TransferPeriodReportPdfExporter>();
 builder.Services.AddSingleton<IWipBatchReportPdfExporter, WipBatchReportPdfExporter>();
+builder.Services.AddSingleton<IReceiptReportPdfExporter, ReceiptReportPdfExporter>();
 builder.Services.AddSingleton<IWipBatchInventoryDocumentExporter, WipBatchInventoryDocumentExporter>();
 builder.Services.AddScoped<IWipEscortLabelDocumentService, WipEscortLabelDocumentService>();
 builder.Services.AddScoped<IMetalRequirementWarehousePrintDocumentService, MetalRequirementWarehousePrintDocumentService>();
@@ -65,7 +66,6 @@ builder.Services.AddScoped<IMetalReceiptDocumentService, MetalReceiptDocumentSer
 builder.Services.AddSingleton<IWipHistoryExcelExporter, WipHistoryExcelExporter>();
 builder.Services.AddSingleton<ICuttingMapExcelExporter, CuttingMapExcelExporter>();
 builder.Services.AddSingleton<ICuttingMapPdfExporter, CuttingMapPdfExporter>();
-builder.Services.AddHostedService<WarehouseDailyResetService>();
 
 var app = builder.Build();
 

@@ -16,6 +16,16 @@ public class MetalReceipt
 
     public string? Comment { get; set; }
 
+    public string? OriginalDocumentFileName { get; set; }
+
+    public string? OriginalDocumentContentType { get; set; }
+
+    public byte[]? OriginalDocumentContent { get; set; }
+
+    public long? OriginalDocumentSizeBytes { get; set; }
+
+    public DateTime? OriginalDocumentUploadedAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public virtual ICollection<MetalReceiptItem> Items { get; set; } = new List<MetalReceiptItem>();

@@ -5,7 +5,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-6 fw-semibold">Приход металла</h1>
-    <p class="lead mb-0">Журнал поступлений металла в складской модуль.</p>
+    <p class="lead mb-0">Журнал поступлений металла на склад.</p>
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-3">
@@ -32,15 +32,16 @@
                         <th>Номер</th>
                         <th>Металл</th>
                         <th>Количество, шт</th>
-                        <th>Паспортный вес, кг</th>
-                        <th>Сумма, м/м²</th>
+                        <th>Вес, кг</th>
+                        <th>Сумма</th>
+                        <th>Оригинал</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (Model.Receipts.Count == 0)
                     {
                         <tr>
-                            <td colspan="5" class="py-4">
+                            <td colspan="6" class="py-4">
                                 <div class="fw-semibold">Поступлений пока нет</div>
                                 <div class="text-muted">Когда вы добавите первый приход металла, он появится в этой таблице.</div>
                             </td>
@@ -52,10 +53,26 @@
                         {
                             <tr role="button" ondblclick="window.location='@Url.Action("ReceiptDetails", "MetalWarehouse", new { id = receipt.Id })'">
                                 <td class="fw-semibold">@receipt.ReceiptNumber</td>
-                                <td>@receipt.MaterialName</td>
-                                <td>@receipt.Quantity</td>
-                                <td>@receipt.PassportWeightKg.ToString("0.###")</td>
-                                <td>@receipt.TotalSize.ToString("0.###") @receipt.SizeUnitText</td>
+                                <td>@receipt.MaterialsSummary</td>
+                                <td>@receipt.TotalQuantity</td>
+                                <td>@receipt.TotalPassportWeightKg.ToString("0.###")</td>
+                                <td>@receipt.SizeSummary</td>
+                                <td>
+                                    @if (receipt.HasOriginalDocument)
+                                    {
+                                        <a class="btn btn-sm btn-outline-success"
+                                           asp-controller="MetalWarehouse"
+                                           asp-action="ReceiptOriginalDocument"
+                                           asp-route-id="@receipt.Id"
+                                           onclick="event.stopPropagation();">
+                                            PDF
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
                             </tr>
                         }
                     }

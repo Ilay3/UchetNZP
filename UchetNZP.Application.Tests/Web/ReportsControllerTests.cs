@@ -99,6 +99,7 @@ public class ReportsControllerTests
             new StubScrapPdfExporter(),
             new StubTransferPdfExporter(),
             new StubWipBatchPdfExporter(),
+            new StubReceiptPdfExporter(),
             new StubWipBatchInventoryDocumentExporter(),
             new WipLabelLookupService(dbContext));
 
@@ -165,6 +166,7 @@ public class ReportsControllerTests
             new StubScrapPdfExporter(),
             new StubTransferPdfExporter(),
             new StubWipBatchPdfExporter(),
+            new StubReceiptPdfExporter(),
             new StubWipBatchInventoryDocumentExporter(),
             new WipLabelLookupService(dbContext));
 
@@ -257,6 +259,7 @@ public class ReportsControllerTests
             new StubScrapPdfExporter(),
             new StubTransferPdfExporter(),
             new StubWipBatchPdfExporter(),
+            new StubReceiptPdfExporter(),
             new StubWipBatchInventoryDocumentExporter(),
             new WipLabelLookupService(dbContext));
 
@@ -272,6 +275,71 @@ public class ReportsControllerTests
         var cellText = Assert.Single(row.Cells[day]);
 
         Assert.Contains("00001/1", cellText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReceiptReportExportPdf_ReturnsPdfForFilteredRows()
+    {
+        await using var dbContext = CreateContext();
+
+        var partId = Guid.NewGuid();
+        var sectionId = Guid.NewGuid();
+        var labelId = Guid.NewGuid();
+        var reportDate = DateTime.SpecifyKind(new DateTime(2026, 3, 2), DateTimeKind.Unspecified);
+        var receiptDateUtc = DateTime.SpecifyKind(reportDate.Date, DateTimeKind.Local).ToUniversalTime();
+
+        dbContext.Parts.Add(new Part { Id = partId, Name = "Корпус", Code = "A-01" });
+        dbContext.Sections.Add(new Section { Id = sectionId, Name = "Сборка" });
+        dbContext.WipLabels.Add(new WipLabel
+        {
+            Id = labelId,
+            PartId = partId,
+            LabelDate = reportDate,
+            LabelYear = reportDate.Year,
+            Quantity = 6m,
+            RemainingQuantity = 6m,
+            Number = "00009",
+            IsAssigned = true,
+        });
+        dbContext.WipReceipts.Add(new WipReceipt
+        {
+            Id = Guid.NewGuid(),
+            PartId = partId,
+            SectionId = sectionId,
+            OpNumber = 20,
+            ReceiptDate = receiptDateUtc,
+            Quantity = 6m,
+            Comment = "Проверка PDF",
+            WipLabelId = labelId,
+        });
+
+        await dbContext.SaveChangesAsync();
+
+        var receiptPdfExporter = new StubReceiptPdfExporter();
+        var controller = new ReportsController(
+            dbContext,
+            new StubScrapExporter(),
+            new StubTransferExporter(),
+            new StubWipBatchExporter(),
+            new StubScrapPdfExporter(),
+            new StubTransferPdfExporter(),
+            new StubWipBatchPdfExporter(),
+            receiptPdfExporter,
+            new StubWipBatchInventoryDocumentExporter(),
+            new WipLabelLookupService(dbContext));
+
+        var result = await controller.ReceiptReportExportPdf(
+            new ReportsController.ReceiptReportQuery(reportDate, reportDate, null, "Корпус", null, null),
+            CancellationToken.None);
+
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("application/pdf", fileResult.ContentType);
+        Assert.EndsWith(".pdf", fileResult.FileDownloadName, StringComparison.OrdinalIgnoreCase);
+
+        var item = Assert.Single(receiptPdfExporter.Items!);
+        Assert.Equal("00009", item.LabelNumber);
+        Assert.Equal("020", item.OpNumber);
+        Assert.Equal(6m, receiptPdfExporter.TotalQuantity);
     }
 
     private static AppDbContext CreateContext()
@@ -319,6 +387,20 @@ public class ReportsControllerTests
     {
         public byte[] Export(WipBatchReportFilterViewModel filter, System.Collections.Generic.IReadOnlyList<WipBatchReportItemViewModel> items, decimal totalQuantity)
             => Array.Empty<byte>();
+    }
+
+    private sealed class StubReceiptPdfExporter : IReceiptReportPdfExporter
+    {
+        public System.Collections.Generic.IReadOnlyList<ReceiptReportItemViewModel>? Items { get; private set; }
+
+        public decimal TotalQuantity { get; private set; }
+
+        public byte[] Export(ReceiptReportFilterViewModel filter, System.Collections.Generic.IReadOnlyList<ReceiptReportItemViewModel> items, decimal totalQuantity)
+        {
+            Items = items;
+            TotalQuantity = totalQuantity;
+            return new byte[] { 1, 2, 3 };
+        }
     }
 
     private sealed class StubWipBatchInventoryDocumentExporter : IWipBatchInventoryDocumentExporter

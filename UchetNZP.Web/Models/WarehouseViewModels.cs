@@ -15,6 +15,12 @@ public class WarehouseIndexViewModel
 
     public IReadOnlyCollection<WarehousePartGroupViewModel> PartGroups { get; init; } = Array.Empty<WarehousePartGroupViewModel>();
 
+    public IReadOnlyCollection<WarehouseAreaViewModel> Areas { get; init; } = Array.Empty<WarehouseAreaViewModel>();
+
+    public IReadOnlyCollection<WarehouseMovementTypeViewModel> MovementTypes { get; init; } = Array.Empty<WarehouseMovementTypeViewModel>();
+
+    public IReadOnlyCollection<WarehouseMovementSourceViewModel> MovementSources { get; init; } = Array.Empty<WarehouseMovementSourceViewModel>();
+
     public decimal TotalQuantity { get; init; }
 
     public string? StatusMessage { get; init; }
@@ -26,6 +32,33 @@ public class WarehouseIndexViewModel
     public int PageSize { get; init; }
 
     public int TotalPages { get; init; }
+}
+
+public class WarehouseAreaViewModel
+{
+    public string Key { get; init; } = string.Empty;
+
+    public string Title { get; init; } = string.Empty;
+
+    public string Description { get; init; } = string.Empty;
+
+    public bool IsActive { get; init; }
+
+    public bool IsEnabled { get; init; }
+}
+
+public class WarehouseMovementTypeViewModel
+{
+    public string Title { get; init; } = string.Empty;
+
+    public bool IsEnabled { get; init; }
+}
+
+public class WarehouseMovementSourceViewModel
+{
+    public string Title { get; init; } = string.Empty;
+
+    public bool IsEnabled { get; init; }
 }
 
 public class WarehouseItemRowViewModel

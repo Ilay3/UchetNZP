@@ -14,6 +14,8 @@ public class MetalReceiptItem
 
     public decimal TotalWeightKg { get; set; }
 
+    public int ReceiptLineIndex { get; set; }
+
     public int ItemIndex { get; set; }
 
     public decimal SizeValue { get; set; }
@@ -21,6 +23,8 @@ public class MetalReceiptItem
     public string SizeUnitText { get; set; } = string.Empty;
     
     public string ActualBlankSizeText { get; set; } = string.Empty;
+
+    public bool IsSizeApproximate { get; set; }
 
     public decimal PassportWeightKg { get; set; }
 

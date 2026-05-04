@@ -45,7 +45,7 @@ public class MetalWarehouseControllerReceiptTests
             },
         };
 
-        var result = await controller.CreateReceipt(model, CancellationToken.None);
+        var result = await controller.CreateReceipt(model, string.Empty, CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectToActionResult>(result);
         Assert.Equal(nameof(MetalWarehouseController.ReceiptDetails), redirect.ActionName);
@@ -92,7 +92,7 @@ public class MetalWarehouseControllerReceiptTests
             },
         };
 
-        var result = await controller.CreateReceipt(model, CancellationToken.None);
+        var result = await controller.CreateReceipt(model, string.Empty, CancellationToken.None);
 
         Assert.IsType<RedirectToActionResult>(result);
         var items = await dbContext.MetalReceiptItems
@@ -103,6 +103,98 @@ public class MetalWarehouseControllerReceiptTests
         Assert.All(items, x => Assert.Equal(2m, x.SizeValue));
         Assert.All(items, x => Assert.Equal("м", x.SizeUnitText));
         Assert.All(items, x => Assert.Equal("2 м", x.ActualBlankSizeText));
+    }
+
+    [Fact]
+    public async Task CreateReceipt_SavesMultipleMaterialsAverageSizeAndOriginalPdf()
+    {
+        await using var dbContext = CreateContext();
+        var sheet = new MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = "Лист 09Г2С t=4",
+            Code = "LIST09G2S4",
+            UnitKind = "SquareMeter",
+            MassPerSquareMeterKg = 1.2m,
+            StockUnit = "m2",
+            IsActive = true,
+        };
+        var rod = new MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = "Пруток 20Г",
+            Code = "PRUT20G",
+            UnitKind = "Meter",
+            MassPerMeterKg = 2m,
+            StockUnit = "m",
+            IsActive = true,
+        };
+        dbContext.MetalMaterials.AddRange(sheet, rod);
+        await dbContext.SaveChangesAsync();
+
+        var pdfBytes = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D, 1, 2, 3 };
+        await using var pdfStream = new MemoryStream(pdfBytes);
+        var formFile = new FormFile(pdfStream, 0, pdfBytes.Length, nameof(MetalReceiptCreateViewModel.OriginalDocumentPdf), "scan.pdf")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "application/pdf",
+        };
+
+        var controller = CreateController(dbContext);
+        var model = new MetalReceiptCreateViewModel
+        {
+            ReceiptDate = new DateTime(2026, 4, 27),
+            OriginalDocumentPdf = formFile,
+            Items = new List<MetalReceiptLineInputViewModel>
+            {
+                new()
+                {
+                    MetalMaterialId = sheet.Id,
+                    Quantity = 2,
+                    PassportWeightKg = 100m,
+                    Units = new List<MetalReceiptUnitInputViewModel>
+                    {
+                        new() { ItemIndex = 1, SizeValue = 2.5m },
+                        new() { ItemIndex = 2, SizeValue = 2.6m },
+                    },
+                },
+                new()
+                {
+                    MetalMaterialId = rod.Id,
+                    Quantity = 3,
+                    PassportWeightKg = 36m,
+                    UseAverageSize = true,
+                    AverageSizeValue = 6m,
+                },
+            },
+        };
+
+        var result = await controller.CreateReceipt(model, string.Empty, CancellationToken.None);
+
+        Assert.IsType<RedirectToActionResult>(result);
+        var receipt = await dbContext.MetalReceipts.SingleAsync();
+        Assert.Equal("scan.pdf", receipt.OriginalDocumentFileName);
+        Assert.Equal("application/pdf", receipt.OriginalDocumentContentType);
+        Assert.Equal(pdfBytes, receipt.OriginalDocumentContent);
+
+        var items = await dbContext.MetalReceiptItems
+            .OrderBy(x => x.ItemIndex)
+            .ToListAsync();
+        Assert.Equal(5, items.Count);
+        Assert.Equal(new[] { 1, 1, 2, 2, 2 }, items.Select(x => x.ReceiptLineIndex).ToArray());
+        Assert.False(items[0].IsSizeApproximate);
+        Assert.All(items.Skip(2), x =>
+        {
+            Assert.True(x.IsSizeApproximate);
+            Assert.Equal(6m, x.SizeValue);
+            Assert.Equal("примерно 6 м", x.ActualBlankSizeText);
+        });
+
+        var original = await controller.ReceiptOriginalDocument(receipt.Id, CancellationToken.None);
+        var file = Assert.IsType<FileContentResult>(original);
+        Assert.Equal("scan.pdf", file.FileDownloadName);
+        Assert.Equal("application/pdf", file.ContentType);
+        Assert.Equal(pdfBytes, file.FileContents);
     }
 
     [Fact]
@@ -177,7 +269,8 @@ public class MetalWarehouseControllerReceiptTests
             new NoOpCuttingMapExcelExporter(),
             new NoOpCuttingMapPdfExporter(),
             new NoOpWarehousePrintService(),
-            new NoOpMetalReceiptItemLabelDocumentService())
+            new NoOpMetalReceiptItemLabelDocumentService(),
+            new NoOpMetalReceiptDocumentService())
         {
             ControllerContext = new ControllerContext
             {
@@ -226,7 +319,13 @@ public class MetalWarehouseControllerReceiptTests
 
     private sealed class NoOpMetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocumentService
     {
-        public Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, string qrTarget, CancellationToken cancellationToken = default)
-            => Task.FromResult(new MetalReceiptItemLabelDocumentResult("label.pdf", "application/pdf", Array.Empty<byte>(), qrTarget));
+        public Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new MetalReceiptItemLabelDocumentResult("label.pdf", "application/pdf", Array.Empty<byte>(), receiptItemId.ToString()));
+    }
+
+    private sealed class NoOpMetalReceiptDocumentService : IMetalReceiptDocumentService
+    {
+        public Task<MetalReceiptDocumentResult> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new MetalReceiptDocumentResult("receipt.pdf", "application/pdf", Array.Empty<byte>()));
     }
 }

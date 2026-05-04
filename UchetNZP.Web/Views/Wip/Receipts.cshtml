@@ -4,7 +4,7 @@
 
 <div class="page-header mb-4">
     <h1 class="display-5 fw-semibold">Запуск партии НЗП</h1>
-    <p class="lead">Заполните поля по порядку: деталь, операция, материал, ярлык и количество.</p>
+    <p class="lead">Заполните поля по порядку: деталь, операция, материал заготовки при необходимости, ярлык и количество.</p>
 </div>
 
 <div class="card shadow-sm mb-4">
@@ -22,7 +22,7 @@
                 <label class="form-label" for="receiptLabelSearchInput">Ярлык детали</label>
                 <input id="receiptLabelSearchInput" class="form-control form-control-lg" type="text" inputmode="numeric" placeholder="Введите номер ярлыка вручную (например, 12345 или 12345/1)" autocomplete="off" aria-describedby="receiptLabelHelp" />
                 <input type="hidden" id="receiptLabelId" />
-                <div class="form-text" id="receiptLabelHelp">Ярлык выбирается только вручную. Автоматический подбор отключён для упрощения работы.</div>
+                <div class="form-text" id="receiptLabelHelp">Ярлык выбирается только вручную.</div>
                 <div id="receiptLabelMessage" class="alert alert-warning d-none mt-3" role="alert"></div>
             </div>
             <div class="col-lg-4">
@@ -51,9 +51,15 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header bg-light fw-semibold">Материал заготовки</div>
-    <div class="card-body">
+<div class="card shadow-sm mb-4" id="receiptMaterialSelectionCard">
+    <div class="card-header bg-light fw-semibold d-flex flex-column flex-md-row justify-content-between gap-2">
+        <span>Материал заготовки</span>
+        <div class="form-check form-switch fw-normal">
+            <input class="form-check-input" type="checkbox" role="switch" id="receiptUseMaterialCheckbox" checked />
+            <label class="form-check-label" for="receiptUseMaterialCheckbox">Выбирать материал заготовки</label>
+        </div>
+    </div>
+    <div class="card-body" id="receiptMaterialSelectionBody">
         <div class="row g-3">
             <div class="col-xl-5">
                 <label class="form-label" for="receiptMaterialSelect">Материал</label>
@@ -95,7 +101,7 @@
     </div>
 </div>
 
-<div class="card shadow-sm mb-4">
+<div class="card shadow-sm mb-4" id="receiptMaterialUnitsCard">
     <div class="card-header bg-light fw-semibold">Доступные единицы металла</div>
     <div class="card-body">
         <div class="table-responsive">

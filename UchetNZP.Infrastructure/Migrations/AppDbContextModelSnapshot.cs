@@ -667,13 +667,30 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<byte[]>("OriginalDocumentContent")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("OriginalDocumentContentType")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("OriginalDocumentFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("character varying(260)");
+
+                    b.Property<long?>("OriginalDocumentSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("OriginalDocumentUploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("ReceiptDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ReceiptNumber")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("SupplierOrSource")
                         .HasMaxLength(256)
@@ -723,10 +740,13 @@ namespace UchetNZP.Infrastructure.Migrations
 
                     b.Property<string>("GeneratedCode")
                         .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<bool>("IsConsumed")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsSizeApproximate")
                         .HasColumnType("boolean");
 
                     b.Property<int>("ItemIndex")
@@ -754,6 +774,9 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
+
+                    b.Property<int>("ReceiptLineIndex")
+                        .HasColumnType("integer");
 
                     b.Property<string>("SizeUnitText")
                         .IsRequired()

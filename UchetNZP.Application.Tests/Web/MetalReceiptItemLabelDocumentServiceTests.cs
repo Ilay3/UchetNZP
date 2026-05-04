@@ -58,18 +58,17 @@ public class MetalReceiptItemLabelDocumentServiceTests
         await dbContext.SaveChangesAsync();
 
         var service = new MetalReceiptItemLabelDocumentService(dbContext);
-        var qrTarget = $"https://localhost/MetalWarehouse/Stock/Item/{itemId}";
 
-        var result = await service.BuildAsync(itemId, qrTarget);
+        var result = await service.BuildAsync(itemId);
 
         Assert.Equal("application/pdf", result.ContentType);
-        Assert.Equal(qrTarget, result.QrPayload);
+        Assert.Contains("LIST35T6-001", result.QrPayload, StringComparison.Ordinal);
         Assert.Contains("LIST35T6-001", result.FileName);
         Assert.NotEmpty(result.Content);
     }
 
     [Fact]
-    public async Task ReceiptItemLabel_BuildsAbsoluteStockItemUrlForQr()
+    public async Task ReceiptItemLabel_ReturnsGeneratedItemLabelFile()
     {
         await using var dbContext = CreateContext();
         var fakeLabelService = new CapturingMetalReceiptItemLabelDocumentService();
@@ -78,7 +77,8 @@ public class MetalReceiptItemLabelDocumentServiceTests
             new NoOpCuttingMapExcelExporter(),
             new NoOpCuttingMapPdfExporter(),
             new NoOpWarehousePrintService(),
-            fakeLabelService)
+            fakeLabelService,
+            new NoOpMetalReceiptDocumentService())
         {
             ControllerContext = new ControllerContext
             {
@@ -95,7 +95,7 @@ public class MetalReceiptItemLabelDocumentServiceTests
 
         var fileResult = Assert.IsType<FileContentResult>(result);
         Assert.Equal("application/pdf", fileResult.ContentType);
-        Assert.Equal($"https://example.local/MetalWarehouse/Stock/Item/{itemId}", fakeLabelService.LastQrTarget);
+        Assert.Equal(itemId, fakeLabelService.LastReceiptItemId);
     }
 
     private static AppDbContext CreateContext()
@@ -110,12 +110,12 @@ public class MetalReceiptItemLabelDocumentServiceTests
 
     private sealed class CapturingMetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocumentService
     {
-        public string? LastQrTarget { get; private set; }
+        public Guid? LastReceiptItemId { get; private set; }
 
-        public Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, string qrTarget, CancellationToken cancellationToken = default)
+        public Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, CancellationToken cancellationToken = default)
         {
-            LastQrTarget = qrTarget;
-            return Task.FromResult(new MetalReceiptItemLabelDocumentResult("label.pdf", "application/pdf", new byte[] { 1, 2, 3 }, qrTarget));
+            LastReceiptItemId = receiptItemId;
+            return Task.FromResult(new MetalReceiptItemLabelDocumentResult("label.pdf", "application/pdf", new byte[] { 1, 2, 3 }, receiptItemId.ToString()));
         }
     }
 
@@ -133,6 +133,12 @@ public class MetalReceiptItemLabelDocumentServiceTests
     {
         public Task<MetalRequirementWarehousePrintDocumentResult> BuildAsync(Guid requirementId, CancellationToken cancellationToken = default)
             => Task.FromResult(new MetalRequirementWarehousePrintDocumentResult("dummy.docx", Array.Empty<byte>()));
+    }
+
+    private sealed class NoOpMetalReceiptDocumentService : IMetalReceiptDocumentService
+    {
+        public Task<MetalReceiptDocumentResult> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new MetalReceiptDocumentResult("receipt.pdf", "application/pdf", Array.Empty<byte>()));
     }
 
     private sealed class TestTempDataProvider : ITempDataProvider

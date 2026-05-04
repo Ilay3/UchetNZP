@@ -14,7 +14,7 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
 
         builder.Property(x => x.ReceiptNumber)
             .IsRequired()
-            .HasMaxLength(32);
+            .HasMaxLength(128);
 
         builder.Property(x => x.ReceiptDate)
             .IsRequired();
@@ -28,6 +28,12 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
 
         builder.Property(x => x.Comment)
             .HasMaxLength(256);
+
+        builder.Property(x => x.OriginalDocumentFileName)
+            .HasMaxLength(260);
+
+        builder.Property(x => x.OriginalDocumentContentType)
+            .HasMaxLength(128);
 
         builder.Property(x => x.CreatedAt)
             .IsRequired();

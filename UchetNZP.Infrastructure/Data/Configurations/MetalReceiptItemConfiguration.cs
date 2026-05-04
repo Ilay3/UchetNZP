@@ -20,6 +20,9 @@ public class MetalReceiptItemConfiguration : IEntityTypeConfiguration<MetalRecei
             .HasPrecision(12, 3)
             .IsRequired();
 
+        builder.Property(x => x.ReceiptLineIndex)
+            .IsRequired();
+
         builder.Property(x => x.ItemIndex)
             .IsRequired();
 
@@ -34,6 +37,9 @@ public class MetalReceiptItemConfiguration : IEntityTypeConfiguration<MetalRecei
         builder.Property(x => x.ActualBlankSizeText)
             .IsRequired()
             .HasMaxLength(64);
+
+        builder.Property(x => x.IsSizeApproximate)
+            .IsRequired();
 
         builder.Property(x => x.PassportWeightKg)
             .HasPrecision(12, 3)

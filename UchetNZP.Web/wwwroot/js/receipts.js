@@ -51,6 +51,9 @@
     const bulkLabelsInput = document.getElementById("receiptBulkLabelsInput");
     const bulkConfirmButton = document.getElementById("receiptBulkConfirmButton");
     const materialSelect = document.getElementById("receiptMaterialSelect");
+    const materialRequiredCheckbox = document.getElementById("receiptUseMaterialCheckbox");
+    const materialSelectionBody = document.getElementById("receiptMaterialSelectionBody");
+    const materialUnitsCard = document.getElementById("receiptMaterialUnitsCard");
     const materialUnitInput = document.getElementById("receiptMaterialUnitInput");
     const materialAvailableLabel = document.getElementById("receiptMaterialAvailableLabel");
     const materialUnitsCountLabel = document.getElementById("receiptMaterialUnitsCountLabel");
@@ -107,6 +110,20 @@
 
     const labelNumberPattern = /^\d{1,5}(?:\/\d{1,5})?$/;
 
+    function isMaterialSelectionEnabled() {
+        return materialRequiredCheckbox ? materialRequiredCheckbox.checked : true;
+    }
+
+    function applyMaterialSelectionVisibility() {
+        const enabled = isMaterialSelectionEnabled();
+        materialSelectionBody?.classList.toggle("d-none", !enabled);
+        materialUnitsCard?.classList.toggle("d-none", !enabled);
+
+        if (materialSelect) {
+            materialSelect.disabled = !enabled;
+        }
+    }
+
     function collectDraftState() {
         return {
             part: partLookup.getSelected(),
@@ -114,6 +131,7 @@
             quantity: quantityInput.value || "",
             comment: commentInput.value || "",
             labelNumber: labelSearchInput?.value || "",
+            useMaterial: isMaterialSelectionEnabled(),
             metalMaterialId: materialSelect?.value || "",
             cart,
         };
@@ -128,8 +146,17 @@
             return;
         }
 
+        if (materialRequiredCheckbox && state.useMaterial === false) {
+            materialRequiredCheckbox.checked = false;
+        }
+
+        applyMaterialSelectionVisibility();
+
         if (state.part?.id) {
             partLookup.setSelected({ id: state.part.id, name: state.part.name, code: state.part.code ?? null });
+            if (isMaterialSelectionEnabled()) {
+                await loadPartMaterials(state.part.id);
+            }
             await loadOperations(state.part.id);
         }
 
@@ -145,7 +172,7 @@
         if (labelSearchInput && typeof state.labelNumber === "string") {
             labelSearchInput.value = state.labelNumber;
         }
-        if (materialSelect && typeof state.metalMaterialId === "string") {
+        if (isMaterialSelectionEnabled() && materialSelect && typeof state.metalMaterialId === "string") {
             materialSelect.value = state.metalMaterialId;
             await loadMaterialStock(state.metalMaterialId);
         }
@@ -194,7 +221,12 @@
             return;
         }
 
-        await loadPartMaterials(part.id);
+        if (isMaterialSelectionEnabled()) {
+            await loadPartMaterials(part.id);
+        }
+        else {
+            resetMaterialStockView();
+        }
         loadOperations(part.id);
         updateFormState();
         saveDraft();
@@ -211,6 +243,29 @@
 
     materialSelect?.addEventListener("change", async () => {
         await loadMaterialStock(materialSelect.value || "");
+        updateFormState();
+        saveDraft();
+    });
+
+    materialRequiredCheckbox?.addEventListener("change", async () => {
+        applyMaterialSelectionVisibility();
+
+        if (isMaterialSelectionEnabled()) {
+            const part = partLookup.getSelected();
+            if (part?.id) {
+                await loadPartMaterials(part.id);
+            }
+            else {
+                await loadMaterials();
+            }
+        }
+        else {
+            if (materialSelect) {
+                materialSelect.value = "";
+            }
+            resetMaterialStockView();
+        }
+
         updateFormState();
         saveDraft();
     });
@@ -258,7 +313,7 @@
         }
 
         const selectedMaterialId = materialSelect?.value || "";
-        if (!selectedMaterialId) {
+        if (isMaterialSelectionEnabled() && !selectedMaterialId) {
             return false;
         }
 
@@ -302,7 +357,7 @@
 
         const quantity = Number(quantityInput.value);
         const selectedMaterialId = materialSelect?.value || "";
-        return Boolean(quantity && quantity >= 1 && dateInput.value && selectedMaterialId);
+        return Boolean(quantity && quantity >= 1 && dateInput.value && (!isMaterialSelectionEnabled() || selectedMaterialId));
     }
 
     function updateFormState() {
@@ -375,6 +430,12 @@
             return;
         }
 
+        if (!isMaterialSelectionEnabled()) {
+            materialSelect.value = "";
+            resetMaterialStockView();
+            return;
+        }
+
         materialSelect.innerHTML = "<option value=\"\">Выберите материал</option>";
         resetMaterialStockView();
         materialNormById.clear();
@@ -442,6 +503,11 @@
     }
 
     async function loadMaterialStock(materialId) {
+        if (!isMaterialSelectionEnabled()) {
+            resetMaterialStockView();
+            return;
+        }
+
         if (!materialId) {
             resetMaterialStockView();
             materialEmptyState?.classList.remove("d-none");
@@ -895,6 +961,19 @@
 
 
     function updateMaterialNeedInfo() {
+        if (!isMaterialSelectionEnabled()) {
+            if (materialNormPerPartLabel) {
+                materialNormPerPartLabel.textContent = "—";
+            }
+            if (materialRequiredLabel) {
+                materialRequiredLabel.textContent = "—";
+            }
+            if (materialRecommendationLabel) {
+                materialRecommendationLabel.textContent = "Материал заготовки не выбирается для этого запуска.";
+            }
+            return;
+        }
+
         const materialId = normalizeMaterialKey(materialSelect?.value || "");
         const qty = Number(quantityInput?.value ?? 0);
         const materialNorm = materialNormById.get(materialId);
@@ -1089,9 +1168,16 @@
         quantityInput.value = item.quantity;
         commentInput.value = item.comment ?? "";
         dateInput.value = item.date;
-        if (materialSelect) {
+        if (materialRequiredCheckbox) {
+            materialRequiredCheckbox.checked = Boolean(item.metalMaterialId);
+        }
+        applyMaterialSelectionVisibility();
+        if (materialSelect && isMaterialSelectionEnabled()) {
             materialSelect.value = item.metalMaterialId ?? "";
             await loadMaterialStock(materialSelect.value);
+        }
+        else {
+            resetMaterialStockView();
         }
 
         if (labelSearchInput) {
@@ -1144,7 +1230,7 @@
             return;
         }
 
-        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay } = state;
+        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay, materialStockSummary } = state;
         const manualLabelNumber = getManualLabelNumber();
         if (manualLabelNumber && isLabelAlreadyInCart(manualLabelNumber)) {
             alert("Этот ярлык уже есть в корзине. Дублирование ярлыков запрещено.");
@@ -1185,7 +1271,7 @@
             isAssigned: labelIsAssigned,
             metalMaterialId,
             materialDisplay,
-            materialStockSummary: currentMaterialStockSummary,
+            materialStockSummary,
         };
 
         cart.push(item);
@@ -1226,8 +1312,9 @@
             return null;
         }
 
-        const metalMaterialId = materialSelect?.value || null;
-        if (!metalMaterialId) {
+        const useMaterial = isMaterialSelectionEnabled();
+        const metalMaterialId = useMaterial ? (materialSelect?.value || null) : null;
+        if (useMaterial && !metalMaterialId) {
             alert("Выберите материал заготовки.");
             return null;
         }
@@ -1237,9 +1324,12 @@
         const pending = pendingAdjustments.get(key) ?? 0;
         const partDisplay = formatNameWithCode(part.name, part.code);
         const operationDisplay = `${selectedOperation.opNumber} ${selectedOperation.operationName ?? ""}`.trim();
-        const materialDisplay = materialSelect?.selectedOptions?.[0]?.textContent?.trim() || "—";
+        const materialDisplay = useMaterial
+            ? (materialSelect?.selectedOptions?.[0]?.textContent?.trim() || "—")
+            : "Без материала";
+        const materialStockSummary = useMaterial ? currentMaterialStockSummary : "";
 
-        return { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay };
+        return { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay, materialStockSummary };
     }
 
     function openBulkModal() {
@@ -1299,7 +1389,7 @@
             return;
         }
 
-        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay } = state;
+        const { part, section, quantity, date, partDisplay, operationDisplay, key, base, pending, metalMaterialId, materialDisplay, materialStockSummary } = state;
         const duplicateLabels = parsedLabels.filter(labelNumber => isLabelAlreadyInCart(labelNumber));
         if (duplicateLabels.length > 0) {
             alert(`Следующие ярлыки уже есть в корзине: ${duplicateLabels.join(", ")}. Удалите дубликаты и повторите.`);
@@ -1338,7 +1428,7 @@
                 isAssigned: true,
                 metalMaterialId,
                 materialDisplay,
-                materialStockSummary: currentMaterialStockSummary,
+                materialStockSummary,
             });
         });
 
@@ -1591,6 +1681,7 @@
 
     void checkLabelExistsInSystem();
     resetMaterialStockView();
+    applyMaterialSelectionVisibility();
     void loadMaterials();
     updateFormState();
     renderHistory();
