@@ -171,6 +171,8 @@ public class MetalReceiptLineInputViewModel
 {
     public Guid? MetalMaterialId { get; set; }
 
+    public string? MaterialInputText { get; set; }
+
     [Range(0.000001d, 999999999999d, ErrorMessage = "Вес должен быть больше 0.")]
     public decimal? PassportWeightKg { get; set; }
 

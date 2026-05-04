@@ -32,7 +32,7 @@
 
 <form method="post" asp-controller="MetalWarehouse" asp-action="CreateReceipt" class="row g-3" id="metalReceiptForm" enctype="multipart/form-data">
     @Html.AntiForgeryToken()
-    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+    <div asp-validation-summary="All" class="text-danger"></div>
 
     @if (Model.Materials.Count == 0)
     {
@@ -93,6 +93,7 @@
                                    value="@selectedMaterialText"
                                    placeholder="Начните писать название или код"
                                    autocomplete="off"
+                                   name="Items[@i].MaterialInputText"
                                    data-material-input />
                             <div class="list-group position-absolute w-100 shadow-sm d-none"
                                  style="z-index: 1050; max-height: 260px; overflow-y: auto;"
@@ -202,7 +203,7 @@
         <div class="row g-3">
             <div class="col-lg-6 position-relative">
                 <label class="form-label">Материал</label>
-                <input class="form-control form-control-lg" type="text" placeholder="Начните писать название или код" autocomplete="off" data-material-input />
+                <input class="form-control form-control-lg" type="text" placeholder="Начните писать название или код" autocomplete="off" name="Items[__index__].MaterialInputText" data-material-input />
                 <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 1050; max-height: 260px; overflow-y: auto;" data-material-suggestions></div>
                 <input type="hidden" name="Items[__index__].MetalMaterialId" data-material-id />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].MetalMaterialId" data-valmsg-replace="true"></span>

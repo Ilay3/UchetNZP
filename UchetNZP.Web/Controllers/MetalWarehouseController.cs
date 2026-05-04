@@ -163,6 +163,32 @@ public class MetalWarehouseController : Controller
         await EnsureMetalMaterialsSeededAsync(cancellationToken);
         NormalizeReceiptItems(model);
 
+
+        var activeMaterials = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.Name, x.Code })
+            .ToListAsync(cancellationToken);
+
+        foreach (var line in model.Items)
+        {
+            if (line.MetalMaterialId.HasValue || string.IsNullOrWhiteSpace(line.MaterialInputText))
+            {
+                continue;
+            }
+
+            var normalizedInput = NormalizeMaterialLookupText(line.MaterialInputText);
+            var matches = activeMaterials
+                .Where(x => NormalizeMaterialLookupText($"{x.Name} ({x.Code})") == normalizedInput
+                    || NormalizeMaterialLookupText(x.Name) == normalizedInput
+                    || NormalizeMaterialLookupText(x.Code) == normalizedInput)
+                .ToList();
+
+            if (matches.Count == 1)
+            {
+                line.MetalMaterialId = matches[0].Id;
+            }
+        }
         var hasActiveMaterials = await _dbContext.MetalMaterials
             .AsNoTracking()
             .AnyAsync(x => x.IsActive, cancellationToken);
@@ -338,6 +364,32 @@ public class MetalWarehouseController : Controller
                 .ToList();
         }
 
+
+        var activeMaterials = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.Name, x.Code })
+            .ToListAsync(cancellationToken);
+
+        foreach (var line in model.Items)
+        {
+            if (line.MetalMaterialId.HasValue || string.IsNullOrWhiteSpace(line.MaterialInputText))
+            {
+                continue;
+            }
+
+            var normalizedInput = NormalizeMaterialLookupText(line.MaterialInputText);
+            var matches = activeMaterials
+                .Where(x => NormalizeMaterialLookupText($"{x.Name} ({x.Code})") == normalizedInput
+                    || NormalizeMaterialLookupText(x.Name) == normalizedInput
+                    || NormalizeMaterialLookupText(x.Code) == normalizedInput)
+                .ToList();
+
+            if (matches.Count == 1)
+            {
+                line.MetalMaterialId = matches[0].Id;
+            }
+        }
         var hasActiveMaterials = await _dbContext.MetalMaterials
             .AsNoTracking()
             .AnyAsync(x => x.IsActive, cancellationToken);
@@ -2300,6 +2352,11 @@ public class MetalWarehouseController : Controller
             DateTimeKind.Local => dateOnly.ToUniversalTime(),
             _ => DateTime.SpecifyKind(dateOnly, DateTimeKind.Utc),
         };
+    }
+
+    private static string NormalizeMaterialLookupText(string? value)
+    {
+        return string.Join(" ", (value ?? string.Empty).Trim().ToLowerInvariant().Split(new[] { " ", "\t", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries));
     }
 
     private static void NormalizeReceiptItems(MetalReceiptCreateViewModel model)
