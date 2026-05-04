@@ -197,6 +197,29 @@
         renderUnits(line);
     }
 
+
+    function normalizeDecimalInputValue(input) {
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const raw = (input.value || "").trim();
+        if (!raw) {
+            return;
+        }
+
+        const normalized = raw.replace(',', '.');
+        if (normalized !== raw) {
+            input.value = normalized;
+        }
+    }
+
+    function normalizeLineDecimalValues(line) {
+        line.querySelectorAll("[data-weight-input], [data-average-size-input], [data-unit-size]").forEach(input => {
+            normalizeDecimalInputValue(input);
+        });
+    }
+
     function closeSuggestions(line) {
         const suggestions = line.querySelector("[data-material-suggestions]");
         if (!suggestions) return;
@@ -308,6 +331,10 @@
         });
 
         quantityInput?.addEventListener("input", () => renderUnits(line));
+        line.querySelectorAll("[data-weight-input], [data-average-size-input]").forEach(input => {
+            input.addEventListener("change", () => normalizeDecimalInputValue(input));
+            input.addEventListener("blur", () => normalizeDecimalInputValue(input));
+        });
         averageCheckbox?.addEventListener("change", () => renderUnits(line));
         removeButton?.addEventListener("click", () => {
             if (receiptLines().length <= 1) {
@@ -339,6 +366,7 @@
     form.addEventListener("submit", () => {
         const payloadPreview = [];
         receiptLines().forEach(line => {
+            normalizeLineDecimalValues(line);
             syncMaterialSelection(line);
 
             const materialInput = line.querySelector("[data-material-input]");
