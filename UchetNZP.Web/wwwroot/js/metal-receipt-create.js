@@ -299,8 +299,6 @@
         receiptLines().forEach((line, index) => {
             applyLineIndex(line, index);
             renderUnits(line);
-            const completed = Boolean(getMaterialId(line) && (line.querySelector("[data-weight-input]")?.value || "").trim());
-            setCollapsed(line, completed);
         });
         refreshRemoveButtons();
         reparseValidation();
@@ -362,7 +360,6 @@
             closeSuggestions(line);
             renderUnits(line);
             updateLineHeader(line);
-            setCollapsed(line, true);
         };
 
         suggestions?.addEventListener("mousedown", applySuggestionSelection);

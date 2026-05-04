@@ -275,7 +275,7 @@ public class MetalWarehouseController : Controller
             var passportWeight = line.PassportWeightKg!.Value;
             var actualWeight = passportWeight;
             var calculatedWeight = CalculateWeightKg(line, material);
-            var deviation = actualWeight - passportWeight;
+            var deviation = calculatedWeight - passportWeight;
 
             for (var unitIndex = 0; unitIndex < quantity; unitIndex++)
             {
