@@ -182,8 +182,12 @@
 
         const rawValue = input.value || "";
         const normalizedValue = normalizeText(rawValue);
+        const selectedMaterialId = (input.dataset.selectedMaterialId || "").trim();
 
         let match = materialsByDisplay.get(normalizedValue);
+        if (!match && selectedMaterialId) {
+            match = materials.find(item => item.id === selectedMaterialId) || null;
+        }
         if (!match && normalizedValue) {
             const byId = materials.find(item => item.id.toLowerCase() === normalizedValue);
             const startsWith = materials.filter(item => normalizeText(item.text).startsWith(normalizedValue));
@@ -194,6 +198,7 @@
         }
 
         hidden.value = match?.id || "";
+        input.dataset.selectedMaterialId = match?.id || "";
         renderUnits(line);
     }
 
@@ -309,7 +314,7 @@
             renderUnits(line);
         });
 
-        suggestions?.addEventListener("mousedown", event => {
+        const applySuggestionSelection = event => {
             const button = event.target.closest("button[data-id]");
             if (!button) {
                 return;
@@ -318,6 +323,7 @@
             event.preventDefault();
             if (materialInput) {
                 materialInput.value = button.dataset.text || "";
+                materialInput.dataset.selectedMaterialId = button.dataset.id || "";
                 materialInput.setCustomValidity("");
             }
 
@@ -328,7 +334,10 @@
 
             closeSuggestions(line);
             renderUnits(line);
-        });
+        };
+
+        suggestions?.addEventListener("mousedown", applySuggestionSelection);
+        suggestions?.addEventListener("click", applySuggestionSelection);
 
         quantityInput?.addEventListener("input", () => renderUnits(line));
         line.querySelectorAll("[data-weight-input], [data-average-size-input]").forEach(input => {
