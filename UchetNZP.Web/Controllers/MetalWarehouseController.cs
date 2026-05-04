@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -48,6 +49,7 @@ public class MetalWarehouseController : Controller
     private readonly IMetalRequirementWarehousePrintDocumentService _requirementWarehousePrintDocumentService;
     private readonly IMetalReceiptItemLabelDocumentService _metalReceiptItemLabelDocumentService;
     private readonly IMetalReceiptDocumentService _metalReceiptDocumentService;
+    private readonly ILogger<MetalWarehouseController> _logger;
 
     public MetalWarehouseController(
         AppDbContext dbContext,
@@ -55,7 +57,8 @@ public class MetalWarehouseController : Controller
         ICuttingMapPdfExporter cuttingMapPdfExporter,
         IMetalRequirementWarehousePrintDocumentService requirementWarehousePrintDocumentService,
         IMetalReceiptItemLabelDocumentService metalReceiptItemLabelDocumentService,
-        IMetalReceiptDocumentService metalReceiptDocumentService)
+        IMetalReceiptDocumentService metalReceiptDocumentService,
+        ILogger<MetalWarehouseController> logger)
     {
         _dbContext = dbContext;
         _cuttingMapExcelExporter = cuttingMapExcelExporter;
@@ -63,6 +66,7 @@ public class MetalWarehouseController : Controller
         _requirementWarehousePrintDocumentService = requirementWarehousePrintDocumentService;
         _metalReceiptItemLabelDocumentService = metalReceiptItemLabelDocumentService;
         _metalReceiptDocumentService = metalReceiptDocumentService;
+        _logger = logger;
     }
 
     [HttpGet("")]
@@ -226,6 +230,20 @@ public class MetalWarehouseController : Controller
 
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("Metal receipt create validation failed. Items: {Items}; Errors: {Errors}",
+                model.Items.Select((x, i) => new
+                {
+                    Line = i + 1,
+                    x.MetalMaterialId,
+                    x.MaterialInputText,
+                    x.Quantity,
+                    x.PassportWeightKg,
+                    UnitSizes = x.Units.Select(u => new { u.ItemIndex, u.SizeValue }).ToList(),
+                }).ToList(),
+                ModelState.Where(ms => ms.Value?.Errors.Count > 0)
+                    .SelectMany(ms => ms.Value!.Errors.Select(e => $"{ms.Key}: {e.ErrorMessage}"))
+                    .ToList());
+
             await PopulateMaterialsAsync(model, cancellationToken);
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
@@ -410,6 +428,20 @@ public class MetalWarehouseController : Controller
 
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("Metal receipt create validation failed. Items: {Items}; Errors: {Errors}",
+                model.Items.Select((x, i) => new
+                {
+                    Line = i + 1,
+                    x.MetalMaterialId,
+                    x.MaterialInputText,
+                    x.Quantity,
+                    x.PassportWeightKg,
+                    UnitSizes = x.Units.Select(u => new { u.ItemIndex, u.SizeValue }).ToList(),
+                }).ToList(),
+                ModelState.Where(ms => ms.Value?.Errors.Count > 0)
+                    .SelectMany(ms => ms.Value!.Errors.Select(e => $"{ms.Key}: {e.ErrorMessage}"))
+                    .ToList());
+
             await PopulateMaterialsAsync(model, cancellationToken);
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
@@ -436,6 +468,20 @@ public class MetalWarehouseController : Controller
 
         if (!ModelState.IsValid)
         {
+            _logger.LogWarning("Metal receipt create validation failed. Items: {Items}; Errors: {Errors}",
+                model.Items.Select((x, i) => new
+                {
+                    Line = i + 1,
+                    x.MetalMaterialId,
+                    x.MaterialInputText,
+                    x.Quantity,
+                    x.PassportWeightKg,
+                    UnitSizes = x.Units.Select(u => new { u.ItemIndex, u.SizeValue }).ToList(),
+                }).ToList(),
+                ModelState.Where(ms => ms.Value?.Errors.Count > 0)
+                    .SelectMany(ms => ms.Value!.Errors.Select(e => $"{ms.Key}: {e.ErrorMessage}"))
+                    .ToList());
+
             await PopulateMaterialsAsync(model, cancellationToken);
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }

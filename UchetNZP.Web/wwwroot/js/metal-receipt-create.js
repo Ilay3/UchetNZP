@@ -388,10 +388,13 @@
             payloadPreview.push({
                 material: materialInput?.value || null,
                 materialId: materialId || null,
+                selectedMaterialId: materialInput?.dataset?.selectedMaterialId || null,
                 quantity: line.querySelector("[data-quantity-input]")?.value || null,
                 useAverageSize: line.querySelector("[data-average-checkbox]")?.checked === true,
             });
         });
+
+        console.log("[MetalReceipt] Submit payload preview", payloadPreview);
 
         try {
             sessionStorage.setItem(debugStorageKey, JSON.stringify({
