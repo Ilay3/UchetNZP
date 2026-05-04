@@ -195,7 +195,6 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     [DataType(DataType.Date)]
     public DateTime? ReceiptDate { get; set; }
 
-    [Required(ErrorMessage = "Материал обязателен.")]
     public Guid? MetalMaterialId { get; set; }
 
     [Range(0.000001d, 999999999999d, ErrorMessage = "Вес должен быть больше 0.")]
