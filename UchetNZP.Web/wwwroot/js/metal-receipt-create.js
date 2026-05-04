@@ -73,6 +73,31 @@
         return materialUnitKindMap[materialId] === "SquareMeter" ? "м²" : "м";
     }
 
+    function getMaterialText(line) {
+        const input = line.querySelector("[data-material-input]");
+        return (input?.value || "").trim();
+    }
+
+    function updateLineHeader(line, index = getLineIndex(line)) {
+        const materialName = getMaterialText(line);
+        const title = line.querySelector("[data-line-title]");
+        const summary = line.querySelector("[data-line-summary]");
+        if (title) {
+            title.textContent = materialName || `Металл ${index + 1}`;
+        }
+
+        if (summary) {
+            const qty = line.querySelector("[data-quantity-input]")?.value || "0";
+            const weight = line.querySelector("[data-weight-input]")?.value || "—";
+            summary.textContent = materialName ? `шт: ${qty}, кг: ${weight}` : "Не заполнено";
+        }
+    }
+
+    function setCollapsed(line, collapsed) {
+        line.dataset.collapsed = collapsed ? "true" : "false";
+    }
+
+
     function setValidationTarget(line, field, index) {
         line.querySelectorAll(`[data-valmsg-for$=".${field}"]`).forEach(span => {
             span.setAttribute("data-valmsg-for", `Items[${index}].${field}`);
@@ -81,10 +106,7 @@
 
     function applyLineIndex(line, index) {
         line.dataset.lineIndex = String(index);
-        const title = line.querySelector("[data-line-title]");
-        if (title) {
-            title.textContent = `Металл ${index + 1}`;
-        }
+        updateLineHeader(line, index);
 
         const materialId = line.querySelector("[data-material-id]");
         const weight = line.querySelector("[data-weight-input]");
@@ -201,6 +223,7 @@
         hidden.value = resolvedId;
         input.dataset.selectedMaterialId = resolvedId;
         renderUnits(line);
+        updateLineHeader(line);
     }
 
 
@@ -276,6 +299,8 @@
         receiptLines().forEach((line, index) => {
             applyLineIndex(line, index);
             renderUnits(line);
+            const completed = Boolean(getMaterialId(line) && (line.querySelector("[data-weight-input]")?.value || "").trim());
+            setCollapsed(line, completed);
         });
         refreshRemoveButtons();
         reparseValidation();
@@ -300,6 +325,7 @@
         const quantityInput = line.querySelector("[data-quantity-input]");
         const averageCheckbox = line.querySelector("[data-average-checkbox]");
         const removeButton = line.querySelector("[data-remove-line]");
+        const toggleButton = line.querySelector("[data-line-toggle]");
 
         materialInput?.addEventListener("input", () => {
             materialInput.setCustomValidity("");
@@ -335,17 +361,24 @@
 
             closeSuggestions(line);
             renderUnits(line);
+            updateLineHeader(line);
+            setCollapsed(line, true);
         };
 
         suggestions?.addEventListener("mousedown", applySuggestionSelection);
         suggestions?.addEventListener("click", applySuggestionSelection);
 
-        quantityInput?.addEventListener("input", () => renderUnits(line));
+        quantityInput?.addEventListener("input", () => { renderUnits(line); updateLineHeader(line); });
         line.querySelectorAll("[data-weight-input], [data-average-size-input]").forEach(input => {
-            input.addEventListener("change", () => normalizeDecimalInputValue(input));
-            input.addEventListener("blur", () => normalizeDecimalInputValue(input));
+            input.addEventListener("change", () => { normalizeDecimalInputValue(input); updateLineHeader(line); });
+            input.addEventListener("blur", () => { normalizeDecimalInputValue(input); updateLineHeader(line); });
         });
         averageCheckbox?.addEventListener("change", () => renderUnits(line));
+
+        toggleButton?.addEventListener("click", () => {
+            const isCollapsed = line.dataset.collapsed === "true";
+            setCollapsed(line, !isCollapsed);
+        });
         removeButton?.addEventListener("click", () => {
             if (receiptLines().length <= 1) {
                 return;
@@ -357,6 +390,7 @@
 
         syncMaterialSelection(line);
         renderUnits(line);
+        updateLineHeader(line);
     }
 
     addLineButton.addEventListener("click", () => {
@@ -369,6 +403,7 @@
         const line = wrapper.firstElementChild;
         itemsContainer.appendChild(line);
         setupLine(line);
+        setCollapsed(line, false);
         reindexLines();
         line.querySelector("[data-material-input]")?.focus();
     });

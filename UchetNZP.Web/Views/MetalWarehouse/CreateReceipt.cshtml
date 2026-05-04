@@ -79,13 +79,18 @@
                 var unitClass = line.UseAverageSize ? "d-none" : string.Empty;
                 var weightValue = line.PassportWeightKg?.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
                 var averageSizeValue = line.AverageSizeValue?.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
-                <section class="border rounded p-3 bg-white receipt-line" data-receipt-line data-line-index="@i">
-                    <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                        <h3 class="h5 mb-0" data-line-title>Металл @(i + 1)</h3>
-                        <button type="button" class="btn btn-outline-danger btn-sm" data-remove-line>Убрать</button>
+                <section class="card shadow-sm border-0 receipt-line" data-receipt-line data-line-index="@i">
+                    <div class="card-header bg-light-subtle border-bottom-0">
+                        <div class="d-flex align-items-center justify-content-between gap-3">
+                            <button type="button" class="btn btn-link text-decoration-none p-0 text-start flex-grow-1 fw-semibold" data-line-toggle>
+                                <span data-line-title>Металл @(i + 1)</span>
+                                <small class="text-muted ms-2" data-line-summary>Не заполнено</small>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" data-remove-line>Убрать</button>
+                        </div>
                     </div>
 
-                    <div class="row g-3">
+                    <div class="card-body row g-3" data-line-body>
                         <div class="col-lg-6 position-relative">
                             <label class="form-label">Материал</label>
                             <input class="form-control form-control-lg"
@@ -194,13 +199,18 @@
 </form>
 
 <template id="receiptLineTemplate">
-    <section class="border rounded p-3 bg-white receipt-line" data-receipt-line data-line-index="__index__">
-        <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-            <h3 class="h5 mb-0" data-line-title>Металл __number__</h3>
-            <button type="button" class="btn btn-outline-danger btn-sm" data-remove-line>Убрать</button>
+    <section class="card shadow-sm border-0 receipt-line" data-receipt-line data-line-index="__index__">
+        <div class="card-header bg-light-subtle border-bottom-0">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+                <button type="button" class="btn btn-link text-decoration-none p-0 text-start flex-grow-1 fw-semibold" data-line-toggle>
+                    <span data-line-title>Металл __number__</span>
+                    <small class="text-muted ms-2" data-line-summary>Не заполнено</small>
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-line>Убрать</button>
+            </div>
         </div>
 
-        <div class="row g-3">
+        <div class="card-body row g-3" data-line-body>
             <div class="col-lg-6 position-relative">
                 <label class="form-label">Материал</label>
                 <input class="form-control form-control-lg" type="text" placeholder="Начните писать название или код" autocomplete="off" name="Items[__index__].MaterialInputText" data-material-input />
@@ -244,6 +254,13 @@
         </div>
     </section>
 </template>
+
+
+<style>
+    .receipt-line[data-collapsed="true"] [data-line-body] { display:none; }
+    .receipt-line [data-line-toggle] { color: var(--bs-body-color); }
+    .receipt-line [data-line-toggle]:hover { color: var(--bs-primary); }
+</style>
 
 @section Scripts
 {
