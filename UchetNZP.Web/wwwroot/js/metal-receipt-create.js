@@ -38,7 +38,14 @@
         debugContext = {};
     }
 
-    const materialsByDisplay = new Map(materials.map(item => [item.text.toLowerCase(), item]));
+    function normalizeText(value) {
+        return String(value || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, " ");
+    }
+
+    const materialsByDisplay = new Map(materials.map(item => [normalizeText(item.text), item]));
 
     function escapeHtml(value) {
         return String(value)
@@ -173,8 +180,19 @@
             return;
         }
 
-        const rawValue = (input.value || "").trim();
-        const match = materialsByDisplay.get(rawValue.toLowerCase());
+        const rawValue = input.value || "";
+        const normalizedValue = normalizeText(rawValue);
+
+        let match = materialsByDisplay.get(normalizedValue);
+        if (!match && normalizedValue) {
+            const byId = materials.find(item => item.id.toLowerCase() === normalizedValue);
+            const startsWith = materials.filter(item => normalizeText(item.text).startsWith(normalizedValue));
+            const contains = materials.filter(item => normalizeText(item.text).includes(normalizedValue));
+            match = byId
+                || (startsWith.length === 1 ? startsWith[0] : null)
+                || (contains.length === 1 ? contains[0] : null);
+        }
+
         hidden.value = match?.id || "";
         renderUnits(line);
     }
