@@ -3,6 +3,7 @@
     ViewData["Title"] = "Добавить приход металла";
     var materialOptionsJson = System.Text.Json.JsonSerializer.Serialize(Model.Materials.Select(x => new { id = x.Value, text = x.Text }));
     var materialUnitKindJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialUnitKinds);
+    var materialCoefficientJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialCoefficients);
 }
 
 <div class="page-header mb-4">
@@ -91,7 +92,19 @@
                     </div>
 
                     <div class="card-body row g-3" data-line-body>
-                        <div class="col-lg-6 position-relative">
+                        <div class="col-lg-3">
+                            <div class="border rounded-3 bg-light p-3 h-100">
+                                <div class="fw-semibold mb-2">Справка по массе</div>
+                                <div class="small text-muted d-flex flex-column gap-1" data-weight-info>
+                                    <div>Коэффициент: <span data-info-coefficient>—</span></div>
+                                    <div>Паспортная: <span data-info-passport>—</span> кг</div>
+                                    <div>Расчётная: <span data-info-calculated>—</span> кг</div>
+                                    <div>Отклонение: <span data-info-deviation>—</span> кг</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-5 position-relative">
                             <label class="form-label">Материал</label>
                             <input class="form-control form-control-lg"
                                    type="text"
@@ -211,7 +224,19 @@
         </div>
 
         <div class="card-body row g-3" data-line-body>
-            <div class="col-lg-6 position-relative">
+            <div class="col-lg-3">
+                <div class="border rounded-3 bg-light p-3 h-100">
+                    <div class="fw-semibold mb-2">Справка по массе</div>
+                    <div class="small text-muted d-flex flex-column gap-1" data-weight-info>
+                        <div>Коэффициент: <span data-info-coefficient>—</span></div>
+                        <div>Паспортная: <span data-info-passport>—</span> кг</div>
+                        <div>Расчётная: <span data-info-calculated>—</span> кг</div>
+                        <div>Отклонение: <span data-info-deviation>—</span> кг</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-5 position-relative">
                 <label class="form-label">Материал</label>
                 <input class="form-control form-control-lg" type="text" placeholder="Начните писать название или код" autocomplete="off" name="Items[__index__].MaterialInputText" data-material-input />
                 <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 1050; max-height: 260px; overflow-y: auto;" data-material-suggestions></div>
@@ -270,6 +295,7 @@
 
 <script id="materialOptionsJson" type="application/json">@Html.Raw(materialOptionsJson)</script>
 <script id="materialUnitKindMap" type="application/json">@Html.Raw(materialUnitKindJson)</script>
+<script id="materialCoefficientMap" type="application/json">@Html.Raw(materialCoefficientJson)</script>
 <script id="receiptDebugContext" type="application/json">@System.Text.Json.JsonSerializer.Serialize(new
 {
     IsPostBack = string.Equals(Context.Request.Method, "POST", StringComparison.OrdinalIgnoreCase),

@@ -5,6 +5,7 @@
     const lineTemplate = document.getElementById("receiptLineTemplate");
     const materialsRaw = document.getElementById("materialOptionsJson")?.textContent ?? "[]";
     const materialUnitKindMapRaw = document.getElementById("materialUnitKindMap")?.textContent ?? "{}";
+    const materialCoefficientMapRaw = document.getElementById("materialCoefficientMap")?.textContent ?? "{}";
     const debugContextRaw = document.getElementById("receiptDebugContext")?.textContent ?? "{}";
     const debugStorageKey = "uchetnzp.metalReceipt.lastSubmit";
 
@@ -15,6 +16,7 @@
     let materials = [];
     let materialUnitKindMap = {};
     let debugContext = {};
+    let materialCoefficientMap = {};
 
     try {
         materials = JSON.parse(materialsRaw).map(item => ({
@@ -30,6 +32,12 @@
         materialUnitKindMap = JSON.parse(materialUnitKindMapRaw);
     } catch {
         materialUnitKindMap = {};
+    }
+
+    try {
+        materialCoefficientMap = JSON.parse(materialCoefficientMapRaw);
+    } catch {
+        materialCoefficientMap = {};
     }
 
     try {
@@ -195,6 +203,26 @@
         }
     }
 
+
+    function updateWeightInfo(line) {
+        const materialId = getMaterialId(line);
+        const coefficientRaw = materialCoefficientMap[materialId];
+        const coefficient = Number.parseFloat(String(coefficientRaw ?? "1").replace(",", "."));
+        const safeCoefficient = Number.isFinite(coefficient) && coefficient > 0 ? coefficient : 1;
+        const passportRaw = line.querySelector("[data-weight-input]")?.value || "";
+        const passport = Number.parseFloat(String(passportRaw).replace(",", "."));
+        const hasPassport = Number.isFinite(passport);
+        const calculated = hasPassport ? passport * safeCoefficient : NaN;
+        const deviation = hasPassport ? calculated - passport : NaN;
+
+        const fmt = value => Number.isFinite(value) ? value.toFixed(3).replace(/\.000$/, "") : "—";
+        const set = (selector, value) => { const el = line.querySelector(selector); if (el) el.textContent = value; };
+        set("[data-info-coefficient]", fmt(safeCoefficient));
+        set("[data-info-passport]", fmt(passport));
+        set("[data-info-calculated]", fmt(calculated));
+        set("[data-info-deviation]", fmt(deviation));
+    }
+
     function syncMaterialSelection(line) {
         const input = line.querySelector("[data-material-input]");
         const hidden = line.querySelector("[data-material-id]");
@@ -224,6 +252,7 @@
         input.dataset.selectedMaterialId = resolvedId;
         renderUnits(line);
         updateLineHeader(line);
+        updateWeightInfo(line);
     }
 
 
@@ -299,8 +328,6 @@
         receiptLines().forEach((line, index) => {
             applyLineIndex(line, index);
             renderUnits(line);
-            const completed = Boolean(getMaterialId(line) && (line.querySelector("[data-weight-input]")?.value || "").trim());
-            setCollapsed(line, completed);
         });
         refreshRemoveButtons();
         reparseValidation();
@@ -362,7 +389,7 @@
             closeSuggestions(line);
             renderUnits(line);
             updateLineHeader(line);
-            setCollapsed(line, true);
+        updateWeightInfo(line);
         };
 
         suggestions?.addEventListener("mousedown", applySuggestionSelection);
@@ -370,8 +397,8 @@
 
         quantityInput?.addEventListener("input", () => { renderUnits(line); updateLineHeader(line); });
         line.querySelectorAll("[data-weight-input], [data-average-size-input]").forEach(input => {
-            input.addEventListener("change", () => { normalizeDecimalInputValue(input); updateLineHeader(line); });
-            input.addEventListener("blur", () => { normalizeDecimalInputValue(input); updateLineHeader(line); });
+            input.addEventListener("change", () => { normalizeDecimalInputValue(input); updateLineHeader(line); updateWeightInfo(line); });
+            input.addEventListener("blur", () => { normalizeDecimalInputValue(input); updateLineHeader(line); updateWeightInfo(line); });
         });
         averageCheckbox?.addEventListener("change", () => renderUnits(line));
 
@@ -391,6 +418,7 @@
         syncMaterialSelection(line);
         renderUnits(line);
         updateLineHeader(line);
+        updateWeightInfo(line);
     }
 
     addLineButton.addEventListener("click", () => {

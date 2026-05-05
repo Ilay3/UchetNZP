@@ -275,7 +275,7 @@ public class MetalWarehouseController : Controller
             var passportWeight = line.PassportWeightKg!.Value;
             var actualWeight = passportWeight;
             var calculatedWeight = CalculateWeightKg(line, material);
-            var deviation = actualWeight - passportWeight;
+            var deviation = calculatedWeight - passportWeight;
 
             for (var unitIndex = 0; unitIndex < quantity; unitIndex++)
             {
@@ -2540,6 +2540,12 @@ public class MetalWarehouseController : Controller
             .Where(x => x.IsActive)
             .Select(x => new { x.Id, x.UnitKind })
             .ToDictionaryAsync(x => x.Id, x => x.UnitKind, cancellationToken);
+
+        model.MaterialCoefficients = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.Coefficient })
+            .ToDictionaryAsync(x => x.Id, x => x.Coefficient > 0m ? x.Coefficient : 1m, cancellationToken);
 
         if (model.Materials.Count == 0)
         {
