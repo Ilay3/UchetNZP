@@ -3,6 +3,8 @@
     ViewData["Title"] = "Добавить приход металла";
     var materialOptionsJson = System.Text.Json.JsonSerializer.Serialize(Model.Materials.Select(x => new { id = x.Value, text = x.Text }));
     var materialUnitKindJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialUnitKinds);
+    var materialCoefficientJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialCoefficients);
+    var materialWeightPerUnitJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialWeightPerUnitKg);
 }
 
 <div class="page-header mb-4">
@@ -110,7 +112,7 @@
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].MetalMaterialId" data-valmsg-replace="true"></span>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">Вес по документу, кг</label>
                             <input class="form-control form-control-lg"
                                    type="number"
@@ -122,7 +124,7 @@
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].PassportWeightKg" data-valmsg-replace="true"></span>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label">Количество, шт</label>
                             <input class="form-control form-control-lg"
                                    type="number"
@@ -162,8 +164,10 @@
                         </div>
 
                         <div class="col-12 @unitClass" data-units-section>
-                            <div class="fw-semibold mb-2">Размер каждой штуки, <span data-unit-text>м</span></div>
-                            <div class="row g-2" data-units-container>
+                            <div class="row g-3">
+                                <div class="col-lg-8">
+                                    <div class="fw-semibold mb-2">Размер каждой штуки, <span data-unit-text>м</span></div>
+                                    <div class="row g-2" data-units-container>
                                 @for (var unitIndex = 0; unitIndex < line.Units.Count; unitIndex++)
                                 {
                                     var unit = line.Units[unitIndex];
@@ -182,6 +186,21 @@
                                                data-index="@itemIndex" />
                                     </div>
                                 }
+                                    </div>
+                                </div>
+                                <div class="col-lg-4">
+                                    <div class="border rounded-3 bg-light p-3 h-100">
+                                        <div class="fw-semibold mb-2">Справка по массе</div>
+                                        <div class="small text-muted d-flex flex-column gap-1" data-weight-info>
+                                            <div>Вес 1м/1м²: <span data-info-weight-per-unit>—</span> кг</div>
+                                            <div>Коэффициент: <span data-info-coefficient>—</span></div>
+                                            <div>Сумма размеров: <span data-info-total-size>—</span> <span data-unit-text>м</span></div>
+                                            <div>Расчётная: <span data-info-calculated>—</span> кг</div>
+                                            <div>Паспортная: <span data-info-passport>—</span> кг</div>
+                                            <div>Отклонение: <span data-info-deviation>—</span> кг</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].Units" data-valmsg-replace="true"></span>
                         </div>
@@ -219,13 +238,13 @@
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].MetalMaterialId" data-valmsg-replace="true"></span>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">Вес по документу, кг</label>
                 <input class="form-control form-control-lg" type="number" min="0.001" step="0.001" name="Items[__index__].PassportWeightKg" data-weight-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].PassportWeightKg" data-valmsg-replace="true"></span>
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">Количество, шт</label>
                 <input class="form-control form-control-lg" type="number" min="1" step="1" name="Items[__index__].Quantity" value="1" data-quantity-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].Quantity" data-valmsg-replace="true"></span>
@@ -247,8 +266,25 @@
             </div>
 
             <div class="col-12" data-units-section>
-                <div class="fw-semibold mb-2">Размер каждой штуки, <span data-unit-text>м</span></div>
-                <div class="row g-2" data-units-container></div>
+                <div class="row g-3">
+                    <div class="col-lg-8">
+                        <div class="fw-semibold mb-2">Размер каждой штуки, <span data-unit-text>м</span></div>
+                        <div class="row g-2" data-units-container></div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="border rounded-3 bg-light p-3 h-100">
+                            <div class="fw-semibold mb-2">Справка по массе</div>
+                            <div class="small text-muted d-flex flex-column gap-1" data-weight-info>
+                                <div>Вес 1м/1м²: <span data-info-weight-per-unit>—</span> кг</div>
+                                <div>Коэффициент: <span data-info-coefficient>—</span></div>
+                                <div>Сумма размеров: <span data-info-total-size>—</span> <span data-unit-text>м</span></div>
+                                <div>Расчётная: <span data-info-calculated>—</span> кг</div>
+                                <div>Паспортная: <span data-info-passport>—</span> кг</div>
+                                <div>Отклонение: <span data-info-deviation>—</span> кг</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].Units" data-valmsg-replace="true"></span>
             </div>
         </div>
@@ -270,6 +306,8 @@
 
 <script id="materialOptionsJson" type="application/json">@Html.Raw(materialOptionsJson)</script>
 <script id="materialUnitKindMap" type="application/json">@Html.Raw(materialUnitKindJson)</script>
+<script id="materialCoefficientMap" type="application/json">@Html.Raw(materialCoefficientJson)</script>
+<script id="materialWeightPerUnitMap" type="application/json">@Html.Raw(materialWeightPerUnitJson)</script>
 <script id="receiptDebugContext" type="application/json">@System.Text.Json.JsonSerializer.Serialize(new
 {
     IsPostBack = string.Equals(Context.Request.Method, "POST", StringComparison.OrdinalIgnoreCase),
