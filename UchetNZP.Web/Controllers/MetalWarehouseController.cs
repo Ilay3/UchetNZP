@@ -2541,6 +2541,12 @@ public class MetalWarehouseController : Controller
             .Select(x => new { x.Id, x.UnitKind })
             .ToDictionaryAsync(x => x.Id, x => x.UnitKind, cancellationToken);
 
+        model.MaterialCoefficients = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.Coefficient })
+            .ToDictionaryAsync(x => x.Id, x => x.Coefficient > 0m ? x.Coefficient : 1m, cancellationToken);
+
         if (model.Materials.Count == 0)
         {
             ModelState.AddModelError(string.Empty, "Нет доступных материалов для прихода. Добавьте материалы в справочник.");
