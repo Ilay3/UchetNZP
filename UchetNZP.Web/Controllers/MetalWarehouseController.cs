@@ -2547,6 +2547,17 @@ public class MetalWarehouseController : Controller
             .Select(x => new { x.Id, x.Coefficient })
             .ToDictionaryAsync(x => x.Id, x => x.Coefficient > 0m ? x.Coefficient : 1m, cancellationToken);
 
+        model.MaterialWeightPerUnitKg = await _dbContext.MetalMaterials
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.WeightPerUnitKg, x.MassPerMeterKg, x.MassPerSquareMeterKg })
+            .ToDictionaryAsync(
+                x => x.Id,
+                x => (x.WeightPerUnitKg ?? 0m) > 0m
+                    ? x.WeightPerUnitKg!.Value
+                    : (x.MassPerMeterKg > 0m ? x.MassPerMeterKg : (x.MassPerSquareMeterKg > 0m ? x.MassPerSquareMeterKg : 0m)),
+                cancellationToken);
+
         if (model.Materials.Count == 0)
         {
             ModelState.AddModelError(string.Empty, "Нет доступных материалов для прихода. Добавьте материалы в справочник.");

@@ -222,6 +222,8 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
     public IReadOnlyDictionary<Guid, decimal> MaterialCoefficients { get; set; } = new Dictionary<Guid, decimal>();
 
+    public IReadOnlyDictionary<Guid, decimal> MaterialWeightPerUnitKg { get; set; } = new Dictionary<Guid, decimal>();
+
     public IReadOnlyCollection<SelectListItem> Materials { get; set; } = Array.Empty<SelectListItem>();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
