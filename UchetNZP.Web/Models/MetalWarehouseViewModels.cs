@@ -138,11 +138,23 @@ public class MetalReceiptListItemViewModel
 
     public string ReceiptNumber { get; init; } = string.Empty;
 
+    public string? SupplierDisplay { get; init; }
+
+    public string? SupplierDocumentNumber { get; init; }
+
     public string MaterialsSummary { get; init; } = string.Empty;
 
     public int TotalQuantity { get; init; }
 
     public decimal TotalPassportWeightKg { get; init; }
+
+    public decimal PricePerKg { get; init; }
+
+    public decimal AmountWithoutVat { get; init; }
+
+    public decimal VatAmount { get; init; }
+
+    public decimal TotalAmountWithVat { get; init; }
 
     public string SizeSummary { get; init; } = string.Empty;
 
@@ -195,6 +207,26 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     [DataType(DataType.Date)]
     public DateTime? ReceiptDate { get; set; }
 
+    public Guid? SupplierId { get; set; }
+
+    public string? SupplierInputText { get; set; }
+
+    [Required(ErrorMessage = "Номер документа поставщика обязателен.")]
+    [StringLength(128, ErrorMessage = "Номер документа не должен превышать 128 символов.")]
+    public string? SupplierDocumentNumber { get; set; }
+
+    [Required(ErrorMessage = "Цена обязательна.")]
+    [Range(0.0001d, 999999999999d, ErrorMessage = "Цена должна быть больше 0.")]
+    public decimal? PricePerKg { get; set; }
+
+    public decimal VatRatePercent { get; set; }
+
+    public decimal AmountWithoutVat { get; set; }
+
+    public decimal VatAmount { get; set; }
+
+    public decimal TotalAmountWithVat { get; set; }
+
     public Guid? MetalMaterialId { get; set; }
 
     [Range(0.000001d, 999999999999d, ErrorMessage = "Вес должен быть больше 0.")]
@@ -225,6 +257,8 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     public IReadOnlyDictionary<Guid, decimal> MaterialWeightPerUnitKg { get; set; } = new Dictionary<Guid, decimal>();
 
     public IReadOnlyCollection<SelectListItem> Materials { get; set; } = Array.Empty<SelectListItem>();
+
+    public IReadOnlyCollection<SelectListItem> Suppliers { get; set; } = Array.Empty<SelectListItem>();
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
@@ -419,6 +453,10 @@ public class MetalReceiptDetailsViewModel
 
     public DateTime ReceiptDate { get; init; }
 
+    public string SupplierDisplay { get; init; } = string.Empty;
+
+    public string? SupplierDocumentNumber { get; init; }
+
     public string? Comment { get; init; }
 
     public string MaterialName { get; init; } = string.Empty;
@@ -434,6 +472,16 @@ public class MetalReceiptDetailsViewModel
     public string WeightDeviationFormula { get; init; } = string.Empty;
 
     public int Quantity { get; init; }
+
+    public decimal PricePerKg { get; init; }
+
+    public decimal AmountWithoutVat { get; init; }
+
+    public decimal VatRatePercent { get; init; }
+
+    public decimal VatAmount { get; init; }
+
+    public decimal TotalAmountWithVat { get; init; }
 
     public bool HasOriginalDocument { get; init; }
 

@@ -62,6 +62,8 @@ public class AppDbContext : DbContext
 
     public DbSet<MetalMaterial> MetalMaterials => Set<MetalMaterial>();
 
+    public DbSet<MetalSupplier> MetalSuppliers => Set<MetalSupplier>();
+
     public DbSet<MetalReceipt> MetalReceipts => Set<MetalReceipt>();
 
     public DbSet<MetalReceiptItem> MetalReceiptItems => Set<MetalReceiptItem>();
@@ -82,6 +84,8 @@ public class AppDbContext : DbContext
 
     public DbSet<MetalStockMovement> MetalStockMovements => Set<MetalStockMovement>();
     public DbSet<MetalAuditLog> MetalAuditLogs => Set<MetalAuditLog>();
+
+    public DbSet<SystemParameter> SystemParameters => Set<SystemParameter>();
 
     public DbSet<PartToMaterialRule> PartToMaterialRules => Set<PartToMaterialRule>();
 

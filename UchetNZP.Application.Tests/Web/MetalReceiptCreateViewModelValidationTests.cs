@@ -20,11 +20,13 @@ public class MetalReceiptCreateViewModelValidationTests
             CultureInfo.CurrentCulture = ruCulture;
             CultureInfo.CurrentUICulture = ruCulture;
 
-            var model = new MetalReceiptCreateViewModel
-            {
-                ReceiptDate = new DateTime(2026, 4, 23),
-                MetalMaterialId = Guid.NewGuid(),
-                TotalWeightKg = 0.000001m,
+                var model = new MetalReceiptCreateViewModel
+                {
+                    ReceiptDate = new DateTime(2026, 4, 23),
+                    SupplierDocumentNumber = "DOC-1",
+                    PricePerKg = 114.04m,
+                    MetalMaterialId = Guid.NewGuid(),
+                    TotalWeightKg = 0.000001m,
                 Quantity = 1,
                 Units = new List<MetalReceiptUnitInputViewModel>
                 {

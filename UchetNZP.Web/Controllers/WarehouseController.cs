@@ -282,25 +282,17 @@ public class WarehouseController : Controller
             {
                 new WarehouseAreaViewModel
                 {
-                    Key = "wip",
-                    Title = "НЗП",
-                    Description = "Текущий склад незавершенного производства",
+                    Key = "finished",
+                    Title = "Готовые детали",
+                    Description = "Продукция автоматически попадает сюда после завершения НЗП",
                     IsActive = true,
                     IsEnabled = true,
                 },
                 new WarehouseAreaViewModel
                 {
-                    Key = "finished",
-                    Title = "Готовые детали",
-                    Description = "Задел под отдельный учет готовых деталей",
-                    IsActive = false,
-                    IsEnabled = false,
-                },
-                new WarehouseAreaViewModel
-                {
                     Key = "components",
                     Title = "Комплектующие",
-                    Description = "Задел под отдельный учет комплектующих",
+                    Description = "Отдельный учет комплектующих требует отдельного типа складской записи",
                     IsActive = false,
                     IsEnabled = false,
                 },

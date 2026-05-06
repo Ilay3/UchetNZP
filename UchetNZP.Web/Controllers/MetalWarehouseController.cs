@@ -42,6 +42,8 @@ public class MetalWarehouseController : Controller
     private const string AuditEventIssueCompleted = "IssueCompleted";
     private const string AuditEventStockChanged = "StockChanged";
     private const string AuditEventErrorPrevented = "ErrorPrevented";
+    private const string VatRatePercentParameterKey = "MetalReceipt.VatRatePercent";
+    private const decimal DefaultVatRatePercent = 22m;
 
     private readonly AppDbContext _dbContext;
     private readonly ICuttingMapExcelExporter _cuttingMapExcelExporter;
@@ -95,6 +97,15 @@ public class MetalWarehouseController : Controller
                 x.Id,
                 x.ReceiptNumber,
                 x.ReceiptDate,
+                x.SupplierOrSource,
+                x.SupplierIdentifierSnapshot,
+                x.SupplierNameSnapshot,
+                x.SupplierInnSnapshot,
+                x.SupplierDocumentNumber,
+                x.PricePerKg,
+                x.AmountWithoutVat,
+                x.VatAmount,
+                x.TotalAmountWithVat,
                 HasOriginalDocument = x.OriginalDocumentContent != null,
                 Items = x.Items
                     .OrderBy(i => i.ReceiptLineIndex)
@@ -124,9 +135,15 @@ public class MetalWarehouseController : Controller
                 {
                     Id = x.Id,
                     ReceiptNumber = x.ReceiptNumber,
+                    SupplierDisplay = BuildSupplierDisplay(x.SupplierIdentifierSnapshot, x.SupplierNameSnapshot, x.SupplierInnSnapshot, x.SupplierOrSource),
+                    SupplierDocumentNumber = x.SupplierDocumentNumber,
                     MaterialsSummary = BuildMaterialsSummary(lines),
                     TotalQuantity = lines.Sum(line => line.Quantity),
                     TotalPassportWeightKg = lines.Sum(line => line.PassportWeightKg),
+                    PricePerKg = x.PricePerKg,
+                    AmountWithoutVat = x.AmountWithoutVat,
+                    VatAmount = x.VatAmount,
+                    TotalAmountWithVat = x.TotalAmountWithVat,
                     SizeSummary = BuildReceiptSizeSummary(lines),
                     HasOriginalDocument = x.HasOriginalDocument,
                 };
@@ -140,9 +157,12 @@ public class MetalWarehouseController : Controller
     public async Task<IActionResult> CreateReceipt(CancellationToken cancellationToken)
     {
         await EnsureMetalMaterialsSeededAsync(cancellationToken);
+        await EnsureMetalSuppliersSeededAsync(cancellationToken);
+        await EnsureMetalReceiptParametersSeededAsync(cancellationToken);
         var model = new MetalReceiptCreateViewModel
         {
             ReceiptDate = DateTime.Today,
+            VatRatePercent = await GetVatRatePercentAsync(cancellationToken),
             Items = new List<MetalReceiptLineInputViewModel>
             {
                 new()
@@ -156,7 +176,7 @@ public class MetalWarehouseController : Controller
             },
         };
 
-        await PopulateMaterialsAsync(model, cancellationToken);
+        await PopulateReceiptLookupsAsync(model, cancellationToken);
         return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
     }
 
@@ -165,7 +185,11 @@ public class MetalWarehouseController : Controller
     public async Task<IActionResult> CreateReceipt(MetalReceiptCreateViewModel model, string submitAction, CancellationToken cancellationToken)
     {
         await EnsureMetalMaterialsSeededAsync(cancellationToken);
+        await EnsureMetalSuppliersSeededAsync(cancellationToken);
+        await EnsureMetalReceiptParametersSeededAsync(cancellationToken);
         NormalizeReceiptItems(model);
+        var vatRatePercent = await GetVatRatePercentAsync(cancellationToken);
+        RecalculateReceiptFinancials(model, vatRatePercent);
 
 
         var activeMaterials = await _dbContext.MetalMaterials
@@ -193,6 +217,29 @@ public class MetalWarehouseController : Controller
                 line.MetalMaterialId = matches[0].Id;
             }
         }
+
+        var activeSuppliers = await _dbContext.MetalSuppliers
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.Identifier, x.Name, x.Inn })
+            .ToListAsync(cancellationToken);
+
+        if (!model.SupplierId.HasValue && !string.IsNullOrWhiteSpace(model.SupplierInputText))
+        {
+            var normalizedSupplierInput = NormalizeSupplierLookupText(model.SupplierInputText);
+            var matches = activeSuppliers
+                .Where(x => NormalizeSupplierLookupText(BuildSupplierDisplay(x.Identifier, x.Name, x.Inn)) == normalizedSupplierInput
+                    || NormalizeSupplierLookupText(x.Identifier) == normalizedSupplierInput
+                    || NormalizeSupplierLookupText(x.Name) == normalizedSupplierInput
+                    || NormalizeSupplierLookupText(x.Inn) == normalizedSupplierInput)
+                .ToList();
+
+            if (matches.Count == 1)
+            {
+                model.SupplierId = matches[0].Id;
+            }
+        }
+
         var hasActiveMaterials = await _dbContext.MetalMaterials
             .AsNoTracking()
             .AnyAsync(x => x.IsActive, cancellationToken);
@@ -200,6 +247,24 @@ public class MetalWarehouseController : Controller
         if (!hasActiveMaterials)
         {
             ModelState.AddModelError(string.Empty, "Справочник материалов пуст. Обратитесь к администратору.");
+        }
+
+        if (activeSuppliers.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Справочник поставщиков пуст. Добавьте поставщика перед приходом.");
+        }
+
+        var supplier = model.SupplierId.HasValue
+            ? activeSuppliers.FirstOrDefault(x => x.Id == model.SupplierId.Value)
+            : null;
+
+        if (!model.SupplierId.HasValue)
+        {
+            ModelState.AddModelError(nameof(model.SupplierId), "Выберите поставщика из списка по ИНН или наименованию.");
+        }
+        else if (supplier is null)
+        {
+            ModelState.AddModelError(nameof(model.SupplierId), "Выбранный поставщик не найден или выключен.");
         }
 
         var materialIds = model.Items
@@ -244,17 +309,29 @@ public class MetalWarehouseController : Controller
                     .SelectMany(ms => ms.Value!.Errors.Select(e => $"{ms.Key}: {e.ErrorMessage}"))
                     .ToList());
 
-            await PopulateMaterialsAsync(model, cancellationToken);
+            await PopulateReceiptLookupsAsync(model, cancellationToken);
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
 
         var now = DateTime.UtcNow;
         var nextNumber = await GetNextReceiptNumberAsync(model.ReceiptDate, cancellationToken);
+        var supplierDisplay = BuildSupplierDisplay(supplier!.Identifier, supplier.Name, supplier.Inn);
         var receipt = new MetalReceipt
         {
             Id = Guid.NewGuid(),
             ReceiptNumber = nextNumber,
             ReceiptDate = ToUtcDate(model.ReceiptDate!.Value),
+            MetalSupplierId = supplier.Id,
+            SupplierOrSource = supplierDisplay,
+            SupplierIdentifierSnapshot = supplier.Identifier,
+            SupplierNameSnapshot = supplier.Name,
+            SupplierInnSnapshot = supplier.Inn,
+            SupplierDocumentNumber = model.SupplierDocumentNumber?.Trim(),
+            PricePerKg = model.PricePerKg!.Value,
+            AmountWithoutVat = model.AmountWithoutVat,
+            VatRatePercent = model.VatRatePercent,
+            VatAmount = model.VatAmount,
+            TotalAmountWithVat = model.TotalAmountWithVat,
             Comment = model.Comment?.Trim(),
             OriginalDocumentFileName = originalDocument.FileName,
             OriginalDocumentContentType = originalDocument.ContentType,
@@ -344,6 +421,13 @@ public class MetalWarehouseController : Controller
             new
             {
                 receipt.ReceiptDate,
+                Supplier = supplierDisplay,
+                receipt.SupplierDocumentNumber,
+                receipt.PricePerKg,
+                receipt.AmountWithoutVat,
+                receipt.VatRatePercent,
+                receipt.VatAmount,
+                receipt.TotalAmountWithVat,
                 receipt.Comment,
                 Lines = model.Items.Count,
                 Units = receipt.Items.Count,
@@ -442,7 +526,7 @@ public class MetalWarehouseController : Controller
                     .SelectMany(ms => ms.Value!.Errors.Select(e => $"{ms.Key}: {e.ErrorMessage}"))
                     .ToList());
 
-            await PopulateMaterialsAsync(model, cancellationToken);
+            await PopulateReceiptLookupsAsync(model, cancellationToken);
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
 
@@ -482,7 +566,7 @@ public class MetalWarehouseController : Controller
                     .SelectMany(ms => ms.Value!.Errors.Select(e => $"{ms.Key}: {e.ErrorMessage}"))
                     .ToList());
 
-            await PopulateMaterialsAsync(model, cancellationToken);
+            await PopulateReceiptLookupsAsync(model, cancellationToken);
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
 
@@ -571,6 +655,16 @@ public class MetalWarehouseController : Controller
                 x.Id,
                 x.ReceiptNumber,
                 x.ReceiptDate,
+                x.SupplierOrSource,
+                x.SupplierIdentifierSnapshot,
+                x.SupplierNameSnapshot,
+                x.SupplierInnSnapshot,
+                x.SupplierDocumentNumber,
+                x.PricePerKg,
+                x.AmountWithoutVat,
+                x.VatRatePercent,
+                x.VatAmount,
+                x.TotalAmountWithVat,
                 x.Comment,
                 x.OriginalDocumentFileName,
                 HasOriginalDocument = x.OriginalDocumentContent != null,
@@ -612,6 +706,8 @@ public class MetalWarehouseController : Controller
             Id = receipt.Id,
             ReceiptNumber = receipt.ReceiptNumber,
             ReceiptDate = receipt.ReceiptDate,
+            SupplierDisplay = BuildSupplierDisplay(receipt.SupplierIdentifierSnapshot, receipt.SupplierNameSnapshot, receipt.SupplierInnSnapshot, receipt.SupplierOrSource),
+            SupplierDocumentNumber = receipt.SupplierDocumentNumber,
             Comment = receipt.Comment,
             MaterialName = BuildMaterialsSummary(lines),
             PassportWeightKg = lines.Sum(x => x.PassportWeightKg),
@@ -620,6 +716,11 @@ public class MetalWarehouseController : Controller
             CalculatedWeightFormula = first.CalculatedWeightFormula,
             WeightDeviationFormula = first.WeightDeviationFormula,
             Quantity = lines.Sum(x => x.Quantity),
+            PricePerKg = receipt.PricePerKg,
+            AmountWithoutVat = receipt.AmountWithoutVat,
+            VatRatePercent = receipt.VatRatePercent,
+            VatAmount = receipt.VatAmount,
+            TotalAmountWithVat = receipt.TotalAmountWithVat,
             HasOriginalDocument = receipt.HasOriginalDocument,
             OriginalDocumentFileName = receipt.OriginalDocumentFileName,
             Lines = lines,
@@ -2405,6 +2506,27 @@ public class MetalWarehouseController : Controller
         return string.Join(" ", (value ?? string.Empty).Trim().ToLowerInvariant().Split(new[] { " ", "\t", "\r", "\n" }, StringSplitOptions.RemoveEmptyEntries));
     }
 
+    private static string NormalizeSupplierLookupText(string? value)
+    {
+        return NormalizeMaterialLookupText(value);
+    }
+
+    private static string BuildSupplierDisplay(string? identifier, string? name, string? inn, string? fallback = null)
+    {
+        if (string.IsNullOrWhiteSpace(identifier) && string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(inn))
+        {
+            return string.IsNullOrWhiteSpace(fallback) ? "—" : fallback;
+        }
+
+        var main = string.IsNullOrWhiteSpace(identifier)
+            ? (name ?? string.Empty).Trim()
+            : string.IsNullOrWhiteSpace(name)
+                ? identifier.Trim()
+                : $"{identifier.Trim()} · {name.Trim()}";
+
+        return string.IsNullOrWhiteSpace(inn) ? main : $"{main} · ИНН {inn.Trim()}";
+    }
+
     private static void NormalizeReceiptItems(MetalReceiptCreateViewModel model)
     {
         if (model.Items.Count == 0 && (model.MetalMaterialId.HasValue || model.Quantity.HasValue || model.PassportWeightKg.HasValue || model.Units.Count > 0))
@@ -2516,6 +2638,14 @@ public class MetalWarehouseController : Controller
             null);
     }
 
+    private async Task PopulateReceiptLookupsAsync(MetalReceiptCreateViewModel model, CancellationToken cancellationToken)
+    {
+        await PopulateMaterialsAsync(model, cancellationToken);
+        await PopulateSuppliersAsync(model, cancellationToken);
+        model.VatRatePercent = await GetVatRatePercentAsync(cancellationToken);
+        RecalculateReceiptFinancials(model, model.VatRatePercent);
+    }
+
     private async Task PopulateMaterialsAsync(MetalReceiptCreateViewModel model, CancellationToken cancellationToken)
     {
         var selectedMaterialIds = model.Items
@@ -2564,6 +2694,43 @@ public class MetalWarehouseController : Controller
         }
     }
 
+    private async Task PopulateSuppliersAsync(MetalReceiptCreateViewModel model, CancellationToken cancellationToken)
+    {
+        var suppliers = await _dbContext.MetalSuppliers
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+
+        model.Suppliers = suppliers
+            .Select(x => new SelectListItem
+            {
+                Value = x.Id.ToString(),
+                Text = BuildSupplierDisplay(x.Identifier, x.Name, x.Inn),
+                Selected = model.SupplierId.HasValue && x.Id == model.SupplierId.Value,
+            })
+            .ToList();
+
+        if (model.Suppliers.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, "Нет доступных поставщиков для прихода. Добавьте поставщиков в справочник.");
+        }
+    }
+
+    private static void RecalculateReceiptFinancials(MetalReceiptCreateViewModel model, decimal vatRatePercent)
+    {
+        model.VatRatePercent = vatRatePercent;
+
+        var passportWeightKg = model.Items.Count > 0
+            ? model.Items.Where(x => x.PassportWeightKg.HasValue).Sum(x => x.PassportWeightKg!.Value)
+            : model.PassportWeightKg ?? 0m;
+
+        var pricePerKg = model.PricePerKg ?? 0m;
+        model.AmountWithoutVat = Math.Round(passportWeightKg * pricePerKg, 2, MidpointRounding.AwayFromZero);
+        model.VatAmount = Math.Round(model.AmountWithoutVat * vatRatePercent / 100m, 2, MidpointRounding.AwayFromZero);
+        model.TotalAmountWithVat = model.AmountWithoutVat + model.VatAmount;
+    }
+
     private async Task EnsureMetalMaterialsSeededAsync(CancellationToken cancellationToken)
     {
         var hasActiveMaterials = await _dbContext.MetalMaterials.AnyAsync(x => x.IsActive, cancellationToken);
@@ -2582,6 +2749,59 @@ public class MetalWarehouseController : Controller
 
         _dbContext.MetalMaterials.AddRange(seed);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureMetalSuppliersSeededAsync(CancellationToken cancellationToken)
+    {
+        var hasActiveSuppliers = await _dbContext.MetalSuppliers.AnyAsync(x => x.IsActive, cancellationToken);
+        if (hasActiveSuppliers)
+        {
+            return;
+        }
+
+        _dbContext.MetalSuppliers.Add(new MetalSupplier
+        {
+            Id = Guid.NewGuid(),
+            Identifier = "00-001828",
+            Name = "АО \"Металлоторг\"",
+            Inn = "1234567890",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task EnsureMetalReceiptParametersSeededAsync(CancellationToken cancellationToken)
+    {
+        var hasVatRate = await _dbContext.SystemParameters
+            .AnyAsync(x => x.Key == VatRatePercentParameterKey, cancellationToken);
+
+        if (hasVatRate)
+        {
+            return;
+        }
+
+        _dbContext.SystemParameters.Add(new SystemParameter
+        {
+            Key = VatRatePercentParameterKey,
+            DecimalValue = DefaultVatRatePercent,
+            Description = "Ставка НДС для прихода металла, %",
+            UpdatedAt = DateTime.UtcNow,
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<decimal> GetVatRatePercentAsync(CancellationToken cancellationToken)
+    {
+        var value = await _dbContext.SystemParameters
+            .AsNoTracking()
+            .Where(x => x.Key == VatRatePercentParameterKey)
+            .Select(x => x.DecimalValue)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return value is > 0m ? value.Value : DefaultVatRatePercent;
     }
 
     private async Task<string> GetNextReceiptNumberAsync(DateTime? receiptDate, CancellationToken cancellationToken)

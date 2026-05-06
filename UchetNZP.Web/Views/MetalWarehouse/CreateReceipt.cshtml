@@ -2,9 +2,12 @@
 @{
     ViewData["Title"] = "Добавить приход металла";
     var materialOptionsJson = System.Text.Json.JsonSerializer.Serialize(Model.Materials.Select(x => new { id = x.Value, text = x.Text }));
+    var supplierOptionsJson = System.Text.Json.JsonSerializer.Serialize(Model.Suppliers.Select(x => new { id = x.Value, text = x.Text }));
     var materialUnitKindJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialUnitKinds);
     var materialCoefficientJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialCoefficients);
     var materialWeightPerUnitJson = System.Text.Json.JsonSerializer.Serialize(Model.MaterialWeightPerUnitKg);
+    var selectedSupplierText = Model.Suppliers.FirstOrDefault(x => x.Value == Model.SupplierId?.ToString())?.Text ?? Model.SupplierInputText ?? string.Empty;
+    var priceValue = Model.PricePerKg?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
 }
 
 <div class="page-header mb-4">
@@ -53,6 +56,63 @@
         <span asp-validation-for="ReceiptDate" class="text-danger"></span>
     </div>
 
+    <div class="col-md-5 position-relative">
+        <label class="form-label">Поставщик</label>
+        <input class="form-control form-control-lg"
+               type="text"
+               name="SupplierInputText"
+               value="@selectedSupplierText"
+               placeholder="ИНН или наименование"
+               autocomplete="off"
+               data-supplier-input />
+        <div class="list-group position-absolute w-100 shadow-sm d-none"
+             style="z-index: 1050; max-height: 260px; overflow-y: auto;"
+             data-supplier-suggestions></div>
+        <input type="hidden" asp-for="SupplierId" data-supplier-id />
+        <span asp-validation-for="SupplierId" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-2">
+        <label asp-for="SupplierDocumentNumber" class="form-label">№ документа</label>
+        <input asp-for="SupplierDocumentNumber" class="form-control form-control-lg" maxlength="128" />
+        <span asp-validation-for="SupplierDocumentNumber" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-2">
+        <label asp-for="PricePerKg" class="form-label">Цена, руб/кг</label>
+        <input asp-for="PricePerKg" class="form-control form-control-lg" type="number" min="0.0001" step="0.0001" value="@priceValue" data-price-input />
+        <span asp-validation-for="PricePerKg" class="text-danger"></span>
+    </div>
+
+    <div class="col-12">
+        <div class="row g-2" data-financial-summary data-vat-rate="@Model.VatRatePercent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">
+            <div class="col-md-3">
+                <div class="border rounded-3 bg-light p-3 h-100">
+                    <div class="small text-muted">Масса по паспорту</div>
+                    <div class="fs-5 fw-semibold"><span data-financial-passport-weight>@Model.Items.Sum(x => x.PassportWeightKg ?? 0m).ToString("0.###")</span> кг</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded-3 bg-light p-3 h-100">
+                    <div class="small text-muted">Сумма без НДС</div>
+                    <div class="fs-5 fw-semibold"><span data-financial-without-vat>@Model.AmountWithoutVat.ToString("0.00")</span> руб.</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded-3 bg-light p-3 h-100">
+                    <div class="small text-muted">НДС @Model.VatRatePercent.ToString("0.##")%</div>
+                    <div class="fs-5 fw-semibold"><span data-financial-vat>@Model.VatAmount.ToString("0.00")</span> руб.</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border rounded-3 bg-light p-3 h-100">
+                    <div class="small text-muted">Всего с НДС</div>
+                    <div class="fs-5 fw-semibold"><span data-financial-total>@Model.TotalAmountWithVat.ToString("0.00")</span> руб.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="col-md-5">
         <label asp-for="OriginalDocumentPdf" class="form-label">Оригинал документа, PDF</label>
         <input asp-for="OriginalDocumentPdf" class="form-control form-control-lg" type="file" accept="application/pdf,.pdf" />
@@ -60,9 +120,9 @@
         <span asp-validation-for="OriginalDocumentPdf" class="text-danger"></span>
     </div>
 
-    <div class="col-12">
+    <div class="col-md-7">
         <label asp-for="Comment" class="form-label">Комментарий</label>
-        <textarea asp-for="Comment" class="form-control" rows="2" placeholder="Номер накладной, поставщик или примечание"></textarea>
+        <textarea asp-for="Comment" class="form-control" rows="2" placeholder="Примечание к приходу"></textarea>
         <span asp-validation-for="Comment" class="text-danger"></span>
     </div>
 
@@ -329,6 +389,7 @@
 }
 
 <script id="materialOptionsJson" type="application/json">@Html.Raw(materialOptionsJson)</script>
+<script id="supplierOptionsJson" type="application/json">@Html.Raw(supplierOptionsJson)</script>
 <script id="materialUnitKindMap" type="application/json">@Html.Raw(materialUnitKindJson)</script>
 <script id="materialCoefficientMap" type="application/json">@Html.Raw(materialCoefficientJson)</script>
 <script id="materialWeightPerUnitMap" type="application/json">@Html.Raw(materialWeightPerUnitJson)</script>

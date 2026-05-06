@@ -22,6 +22,12 @@
     <div class="card-body row g-3">
         <div class="col-md-3"><strong>Номер:</strong> @Model.ReceiptNumber</div>
         <div class="col-md-3"><strong>Дата:</strong> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div>
+        <div class="col-md-3"><strong>Документ поставщика:</strong> @(string.IsNullOrWhiteSpace(Model.SupplierDocumentNumber) ? "—" : Model.SupplierDocumentNumber)</div>
+        <div class="col-md-3"><strong>Цена, руб/кг:</strong> @Model.PricePerKg.ToString("0.####")</div>
+        <div class="col-md-6"><strong>Поставщик:</strong> @(string.IsNullOrWhiteSpace(Model.SupplierDisplay) ? "—" : Model.SupplierDisplay)</div>
+        <div class="col-md-3"><strong>Сумма без НДС:</strong> @Model.AmountWithoutVat.ToString("0.00")</div>
+        <div class="col-md-3"><strong>НДС @Model.VatRatePercent.ToString("0.##")%:</strong> @Model.VatAmount.ToString("0.00")</div>
+        <div class="col-md-3"><strong>Всего с НДС:</strong> @Model.TotalAmountWithVat.ToString("0.00")</div>
         <div class="col-md-3"><strong>Всего штук:</strong> @Model.Quantity</div>
         <div class="col-md-3"><strong>Вес, кг:</strong> @Model.PassportWeightKg.ToString("0.###")</div>
         <div class="col-md-6"><strong>Материалы:</strong> @Model.MaterialName</div>

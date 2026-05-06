@@ -33,6 +33,13 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
             {
                 x.ReceiptNumber,
                 x.ReceiptDate,
+                x.SupplierOrSource,
+                x.SupplierDocumentNumber,
+                x.PricePerKg,
+                x.AmountWithoutVat,
+                x.VatRatePercent,
+                x.VatAmount,
+                x.TotalAmountWithVat,
                 x.Comment,
                 Items = x.Items
                     .OrderBy(i => i.ItemIndex)
@@ -63,6 +70,8 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
                 {
                     col.Item().Text("Товарная накладная по приёму ТМЦ").Bold().FontSize(16);
                     col.Item().Text($"Документ № {receipt.ReceiptNumber} от {receipt.ReceiptDate.ToLocalTime():dd.MM.yyyy}");
+                    col.Item().Text($"Документ поставщика: {receipt.SupplierDocumentNumber ?? "—"}");
+                    col.Item().Text($"Поставщик: {receipt.SupplierOrSource ?? "—"}");
                     col.Item().Text($"Склад: Металло-склад");
                 });
 
@@ -100,7 +109,14 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
                     }
                 });
 
-                page.Footer().AlignRight().Text($"Комментарий: {receipt.Comment ?? "—"}");
+                page.Footer().Column(col =>
+                {
+                    col.Item().AlignRight().Text($"Цена: {receipt.PricePerKg.ToString("0.####", CultureInfo.InvariantCulture)} руб/кг");
+                    col.Item().AlignRight().Text($"Сумма без НДС: {receipt.AmountWithoutVat.ToString("0.00", CultureInfo.InvariantCulture)} руб.");
+                    col.Item().AlignRight().Text($"НДС {receipt.VatRatePercent.ToString("0.##", CultureInfo.InvariantCulture)}%: {receipt.VatAmount.ToString("0.00", CultureInfo.InvariantCulture)} руб.");
+                    col.Item().AlignRight().Text($"Всего с НДС: {receipt.TotalAmountWithVat.ToString("0.00", CultureInfo.InvariantCulture)} руб.");
+                    col.Item().AlignRight().Text($"Комментарий: {receipt.Comment ?? "—"}");
+                });
             });
         }).GeneratePdf();
 

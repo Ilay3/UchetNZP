@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Controllers;
@@ -28,13 +29,18 @@ public class MetalWarehouseControllerReceiptTests
             StockUnit = "m2",
             IsActive = true,
         };
+        var supplier = CreateSupplier();
         dbContext.MetalMaterials.Add(material);
+        dbContext.MetalSuppliers.Add(supplier);
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(dbContext);
         var model = new MetalReceiptCreateViewModel
         {
             ReceiptDate = new DateTime(2026, 4, 27),
+            SupplierId = supplier.Id,
+            SupplierDocumentNumber = "DOC-001",
+            PricePerKg = 114.04m,
             MetalMaterialId = material.Id,
             Quantity = 2,
             PassportWeightKg = 100m,
@@ -76,12 +82,17 @@ public class MetalWarehouseControllerReceiptTests
             IsActive = true,
         };
         dbContext.MetalMaterials.Add(material);
+        var supplier = CreateSupplier();
+        dbContext.MetalSuppliers.Add(supplier);
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(dbContext);
         var model = new MetalReceiptCreateViewModel
         {
             ReceiptDate = new DateTime(2026, 4, 27),
+            SupplierId = supplier.Id,
+            SupplierDocumentNumber = "DOC-002",
+            PricePerKg = 114.04m,
             MetalMaterialId = material.Id,
             Quantity = 2,
             PassportWeightKg = 8m,
@@ -129,7 +140,9 @@ public class MetalWarehouseControllerReceiptTests
             StockUnit = "m",
             IsActive = true,
         };
+        var supplier = CreateSupplier();
         dbContext.MetalMaterials.AddRange(sheet, rod);
+        dbContext.MetalSuppliers.Add(supplier);
         await dbContext.SaveChangesAsync();
 
         var pdfBytes = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D, 1, 2, 3 };
@@ -144,6 +157,9 @@ public class MetalWarehouseControllerReceiptTests
         var model = new MetalReceiptCreateViewModel
         {
             ReceiptDate = new DateTime(2026, 4, 27),
+            SupplierId = supplier.Id,
+            SupplierDocumentNumber = "DOC-003",
+            PricePerKg = 114.04m,
             OriginalDocumentPdf = formFile,
             Items = new List<MetalReceiptLineInputViewModel>
             {
@@ -176,6 +192,12 @@ public class MetalWarehouseControllerReceiptTests
         Assert.Equal("scan.pdf", receipt.OriginalDocumentFileName);
         Assert.Equal("application/pdf", receipt.OriginalDocumentContentType);
         Assert.Equal(pdfBytes, receipt.OriginalDocumentContent);
+        Assert.Equal(supplier.Id, receipt.MetalSupplierId);
+        Assert.Equal("DOC-003", receipt.SupplierDocumentNumber);
+        Assert.Equal(114.04m, receipt.PricePerKg);
+        Assert.Equal(15509.44m, receipt.AmountWithoutVat);
+        Assert.Equal(3412.08m, receipt.VatAmount);
+        Assert.Equal(18921.52m, receipt.TotalAmountWithVat);
 
         var items = await dbContext.MetalReceiptItems
             .OrderBy(x => x.ItemIndex)
@@ -270,7 +292,8 @@ public class MetalWarehouseControllerReceiptTests
             new NoOpCuttingMapPdfExporter(),
             new NoOpWarehousePrintService(),
             new NoOpMetalReceiptItemLabelDocumentService(),
-            new NoOpMetalReceiptDocumentService())
+            new NoOpMetalReceiptDocumentService(),
+            NullLogger<MetalWarehouseController>.Instance)
         {
             ControllerContext = new ControllerContext
             {
@@ -290,6 +313,19 @@ public class MetalWarehouseControllerReceiptTests
             .Options;
 
         return new AppDbContext(options);
+    }
+
+    private static MetalSupplier CreateSupplier()
+    {
+        return new MetalSupplier
+        {
+            Id = Guid.NewGuid(),
+            Identifier = "00-001828",
+            Name = "АО \"Металлоторг\"",
+            Inn = "1234567890",
+            IsActive = true,
+            CreatedAt = new DateTime(2026, 4, 27, 0, 0, 0, DateTimeKind.Utc),
+        };
     }
 
     private sealed class NoOpCuttingMapExcelExporter : ICuttingMapExcelExporter

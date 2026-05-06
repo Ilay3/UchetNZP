@@ -30,10 +30,15 @@
                 <thead class="table-light">
                     <tr>
                         <th>Номер</th>
+                        <th>Поставщик</th>
+                        <th>Документ</th>
                         <th>Металл</th>
                         <th>Количество, шт</th>
                         <th>Вес, кг</th>
-                        <th>Сумма</th>
+                        <th>Цена</th>
+                        <th>Сумма без НДС</th>
+                        <th>НДС</th>
+                        <th>Всего</th>
                         <th>Оригинал</th>
                     </tr>
                 </thead>
@@ -41,7 +46,7 @@
                     @if (Model.Receipts.Count == 0)
                     {
                         <tr>
-                            <td colspan="6" class="py-4">
+                            <td colspan="11" class="py-4">
                                 <div class="fw-semibold">Поступлений пока нет</div>
                                 <div class="text-muted">Когда вы добавите первый приход металла, он появится в этой таблице.</div>
                             </td>
@@ -53,10 +58,15 @@
                         {
                             <tr role="button" ondblclick="window.location='@Url.Action("ReceiptDetails", "MetalWarehouse", new { id = receipt.Id })'">
                                 <td class="fw-semibold">@receipt.ReceiptNumber</td>
+                                <td>@(string.IsNullOrWhiteSpace(receipt.SupplierDisplay) ? "—" : receipt.SupplierDisplay)</td>
+                                <td>@(string.IsNullOrWhiteSpace(receipt.SupplierDocumentNumber) ? "—" : receipt.SupplierDocumentNumber)</td>
                                 <td>@receipt.MaterialsSummary</td>
                                 <td>@receipt.TotalQuantity</td>
                                 <td>@receipt.TotalPassportWeightKg.ToString("0.###")</td>
-                                <td>@receipt.SizeSummary</td>
+                                <td>@receipt.PricePerKg.ToString("0.####")</td>
+                                <td>@receipt.AmountWithoutVat.ToString("0.00")</td>
+                                <td>@receipt.VatAmount.ToString("0.00")</td>
+                                <td>@receipt.TotalAmountWithVat.ToString("0.00")</td>
                                 <td>
                                     @if (receipt.HasOriginalDocument)
                                     {

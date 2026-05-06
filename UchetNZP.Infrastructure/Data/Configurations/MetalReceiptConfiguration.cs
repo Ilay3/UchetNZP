@@ -22,12 +22,44 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
         builder.Property(x => x.SupplierOrSource)
             .HasMaxLength(256);
 
+        builder.Property(x => x.SupplierIdentifierSnapshot)
+            .HasMaxLength(64);
+
+        builder.Property(x => x.SupplierNameSnapshot)
+            .HasMaxLength(256);
+
+        builder.Property(x => x.SupplierInnSnapshot)
+            .HasMaxLength(12);
+
+        builder.Property(x => x.SupplierDocumentNumber)
+            .HasMaxLength(128);
+
         builder.Property(x => x.BatchNumber)
             .IsRequired()
             .HasMaxLength(32);
 
         builder.Property(x => x.Comment)
             .HasMaxLength(256);
+
+        builder.Property(x => x.PricePerKg)
+            .HasPrecision(14, 4)
+            .IsRequired();
+
+        builder.Property(x => x.AmountWithoutVat)
+            .HasPrecision(14, 2)
+            .IsRequired();
+
+        builder.Property(x => x.VatRatePercent)
+            .HasPrecision(5, 2)
+            .IsRequired();
+
+        builder.Property(x => x.VatAmount)
+            .HasPrecision(14, 2)
+            .IsRequired();
+
+        builder.Property(x => x.TotalAmountWithVat)
+            .HasPrecision(14, 2)
+            .IsRequired();
 
         builder.Property(x => x.OriginalDocumentFileName)
             .HasMaxLength(260);
@@ -42,5 +74,12 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
             .IsUnique();
 
         builder.HasIndex(x => x.ReceiptDate);
+
+        builder.HasIndex(x => x.MetalSupplierId);
+
+        builder.HasOne(x => x.MetalSupplier)
+            .WithMany(x => x.Receipts)
+            .HasForeignKey(x => x.MetalSupplierId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

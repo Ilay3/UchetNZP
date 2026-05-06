@@ -4,6 +4,7 @@
     const addLineButton = document.getElementById("addReceiptLine");
     const lineTemplate = document.getElementById("receiptLineTemplate");
     const materialsRaw = document.getElementById("materialOptionsJson")?.textContent ?? "[]";
+    const suppliersRaw = document.getElementById("supplierOptionsJson")?.textContent ?? "[]";
     const materialUnitKindMapRaw = document.getElementById("materialUnitKindMap")?.textContent ?? "{}";
     const materialCoefficientMapRaw = document.getElementById("materialCoefficientMap")?.textContent ?? "{}";
     const materialWeightPerUnitMapRaw = document.getElementById("materialWeightPerUnitMap")?.textContent ?? "{}";
@@ -15,6 +16,7 @@
     }
 
     let materials = [];
+    let suppliers = [];
     let materialUnitKindMap = {};
     let debugContext = {};
     let materialCoefficientMap = {};
@@ -28,6 +30,16 @@
         })).filter(item => item.id && item.text);
     } catch {
         materials = [];
+    }
+
+    try {
+        suppliers = JSON.parse(suppliersRaw).map(item => ({
+            id: String(item.id || ""),
+            text: String(item.text || ""),
+            search: String(item.text || "").toLowerCase(),
+        })).filter(item => item.id && item.text);
+    } catch {
+        suppliers = [];
     }
 
     try {
@@ -62,6 +74,7 @@
     }
 
     const materialsByDisplay = new Map(materials.map(item => [normalizeText(item.text), item]));
+    const suppliersByDisplay = new Map(suppliers.map(item => [normalizeText(item.text), item]));
 
     function escapeHtml(value) {
         return String(value)
@@ -92,6 +105,15 @@
     function getMaterialText(line) {
         const input = line.querySelector("[data-material-input]");
         return (input?.value || "").trim();
+    }
+
+    function getSupplierId() {
+        return (document.querySelector("[data-supplier-id]")?.value || "").trim();
+    }
+
+    function setText(selector, value) {
+        const el = document.querySelector(selector);
+        if (el) el.textContent = value;
     }
 
     function updateLineHeader(line, index = getLineIndex(line)) {
@@ -253,6 +275,39 @@
         set("[data-info-deviation]", fmt(deviation));
     }
 
+    function updateFinancialSummary() {
+        const summary = document.querySelector("[data-financial-summary]");
+        if (!summary) {
+            return;
+        }
+
+        const vatRate = Number.parseFloat(String(summary.dataset.vatRate ?? "22").replace(",", "."));
+        const safeVatRate = Number.isFinite(vatRate) && vatRate >= 0 ? vatRate : 22;
+        const priceRaw = document.querySelector("[data-price-input]")?.value || "";
+        const price = Number.parseFloat(String(priceRaw).replace(",", "."));
+        const safePrice = Number.isFinite(price) && price > 0 ? price : 0;
+
+        let passportWeight = 0;
+        receiptLines().forEach(line => {
+            const weightRaw = line.querySelector("[data-weight-input]")?.value || "";
+            const weight = Number.parseFloat(String(weightRaw).replace(",", "."));
+            if (Number.isFinite(weight) && weight > 0) {
+                passportWeight += weight;
+            }
+        });
+
+        const amountWithoutVat = passportWeight * safePrice;
+        const vatAmount = amountWithoutVat * safeVatRate / 100;
+        const total = amountWithoutVat + vatAmount;
+        const formatWeight = value => Number.isFinite(value) ? value.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 3 }) : "0";
+        const formatMoney = value => Number.isFinite(value) ? value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00";
+
+        setText("[data-financial-passport-weight]", formatWeight(passportWeight));
+        setText("[data-financial-without-vat]", formatMoney(amountWithoutVat));
+        setText("[data-financial-vat]", formatMoney(vatAmount));
+        setText("[data-financial-total]", formatMoney(total));
+    }
+
     function syncMaterialSelection(line) {
         const input = line.querySelector("[data-material-input]");
         const hidden = line.querySelector("[data-material-id]");
@@ -283,6 +338,36 @@
         renderUnits(line);
         updateLineHeader(line);
         updateWeightInfo(line);
+        updateFinancialSummary();
+    }
+
+    function syncSupplierSelection() {
+        const input = document.querySelector("[data-supplier-input]");
+        const hidden = document.querySelector("[data-supplier-id]");
+        if (!input || !hidden) {
+            return;
+        }
+
+        const rawValue = input.value || "";
+        const normalizedValue = normalizeText(rawValue);
+        const selectedSupplierId = (input.dataset.selectedSupplierId || "").trim();
+
+        let match = suppliersByDisplay.get(normalizedValue);
+        if (!match && selectedSupplierId) {
+            match = suppliers.find(item => item.id === selectedSupplierId) || null;
+        }
+        if (!match && normalizedValue) {
+            const byId = suppliers.find(item => item.id.toLowerCase() === normalizedValue);
+            const startsWith = suppliers.filter(item => normalizeText(item.text).startsWith(normalizedValue));
+            const contains = suppliers.filter(item => normalizeText(item.text).includes(normalizedValue));
+            match = byId
+                || (startsWith.length === 1 ? startsWith[0] : null)
+                || (contains.length === 1 ? contains[0] : null);
+        }
+
+        const resolvedId = match?.id || hidden.value || selectedSupplierId || "";
+        hidden.value = resolvedId;
+        input.dataset.selectedSupplierId = resolvedId;
     }
 
 
@@ -306,6 +391,42 @@
         line.querySelectorAll("[data-weight-input], [data-average-size-input], [data-unit-size]").forEach(input => {
             normalizeDecimalInputValue(input);
         });
+    }
+
+    function closeSupplierSuggestions() {
+        const suggestions = document.querySelector("[data-supplier-suggestions]");
+        if (!suggestions) return;
+        suggestions.classList.add("d-none");
+        suggestions.innerHTML = "";
+    }
+
+    function renderSupplierSuggestions() {
+        const input = document.querySelector("[data-supplier-input]");
+        const suggestions = document.querySelector("[data-supplier-suggestions]");
+        if (!input || !suggestions) {
+            return;
+        }
+
+        const query = (input.value || "").trim().toLowerCase();
+        if (query.length < 2) {
+            closeSupplierSuggestions();
+            return;
+        }
+
+        const filtered = suppliers
+            .filter(item => item.search.includes(query))
+            .slice(0, 30);
+
+        if (filtered.length === 0) {
+            closeSupplierSuggestions();
+            return;
+        }
+
+        suggestions.innerHTML = filtered.map(item => `
+            <button type="button" class="list-group-item list-group-item-action" data-id="${escapeHtml(item.id)}" data-text="${escapeHtml(item.text)}">
+                ${escapeHtml(item.text)}
+            </button>`).join("");
+        suggestions.classList.remove("d-none");
     }
 
     function closeSuggestions(line) {
@@ -425,17 +546,18 @@
         suggestions?.addEventListener("mousedown", applySuggestionSelection);
         suggestions?.addEventListener("click", applySuggestionSelection);
 
-        quantityInput?.addEventListener("input", () => { renderUnits(line); updateLineHeader(line); updateWeightInfo(line); });
+        quantityInput?.addEventListener("input", () => { renderUnits(line); updateLineHeader(line); updateWeightInfo(line); updateFinancialSummary(); });
         line.querySelectorAll("[data-weight-input], [data-average-size-input], [data-unit-size]").forEach(input => {
-            input.addEventListener("change", () => { normalizeDecimalInputValue(input); updateLineHeader(line); updateWeightInfo(line); });
-            input.addEventListener("blur", () => { normalizeDecimalInputValue(input); updateLineHeader(line); updateWeightInfo(line); });
+            input.addEventListener("change", () => { normalizeDecimalInputValue(input); updateLineHeader(line); updateWeightInfo(line); updateFinancialSummary(); });
+            input.addEventListener("blur", () => { normalizeDecimalInputValue(input); updateLineHeader(line); updateWeightInfo(line); updateFinancialSummary(); });
         });
-        averageCheckbox?.addEventListener("change", () => { renderUnits(line); updateWeightInfo(line); });
+        averageCheckbox?.addEventListener("change", () => { renderUnits(line); updateWeightInfo(line); updateFinancialSummary(); });
 
         line.addEventListener("input", event => {
             const target = event.target;
             if (target instanceof HTMLInputElement && target.matches("[data-unit-size], [data-average-size-input], [data-weight-input]")) {
                 updateWeightInfo(line);
+                updateFinancialSummary();
             }
         });
 
@@ -456,6 +578,49 @@
         renderUnits(line);
         updateLineHeader(line);
         updateWeightInfo(line);
+        updateFinancialSummary();
+    }
+
+    function setupSupplierAutocomplete() {
+        const input = document.querySelector("[data-supplier-input]");
+        const suggestions = document.querySelector("[data-supplier-suggestions]");
+        if (!input || !suggestions) {
+            return;
+        }
+
+        input.addEventListener("input", () => {
+            input.setCustomValidity("");
+            syncSupplierSelection();
+            renderSupplierSuggestions();
+        });
+        input.addEventListener("focus", renderSupplierSuggestions);
+        input.addEventListener("blur", () => {
+            setTimeout(closeSupplierSuggestions, 120);
+        });
+        input.addEventListener("change", syncSupplierSelection);
+
+        const applySuggestionSelection = event => {
+            const button = event.target.closest("button[data-id]");
+            if (!button) {
+                return;
+            }
+
+            event.preventDefault();
+            input.value = button.dataset.text || "";
+            input.dataset.selectedSupplierId = button.dataset.id || "";
+            input.setCustomValidity("");
+
+            const hidden = document.querySelector("[data-supplier-id]");
+            if (hidden) {
+                hidden.value = button.dataset.id || "";
+            }
+
+            closeSupplierSuggestions();
+        };
+
+        suggestions.addEventListener("mousedown", applySuggestionSelection);
+        suggestions.addEventListener("click", applySuggestionSelection);
+        syncSupplierSelection();
     }
 
     addLineButton.addEventListener("click", () => {
@@ -475,6 +640,16 @@
 
     form.addEventListener("submit", () => {
         const payloadPreview = [];
+        const priceInput = document.querySelector("[data-price-input]");
+        if (priceInput) {
+            normalizeDecimalInputValue(priceInput);
+        }
+        syncSupplierSelection();
+        const supplierInput = document.querySelector("[data-supplier-input]");
+        const supplierId = getSupplierId();
+        if (supplierInput) {
+            supplierInput.setCustomValidity(supplierId ? "" : "Выберите поставщика из подсказок.");
+        }
         receiptLines().forEach(line => {
             normalizeLineDecimalValues(line);
             syncMaterialSelection(line);
@@ -500,6 +675,8 @@
             sessionStorage.setItem(debugStorageKey, JSON.stringify({
                 submittedAt: new Date().toISOString(),
                 receiptDate: document.getElementById("ReceiptDate")?.value || null,
+                supplierId: supplierId || null,
+                price: priceInput?.value || null,
                 lines: payloadPreview,
             }));
         } catch {
@@ -521,8 +698,15 @@
         });
     }, true);
 
+    document.querySelector("[data-price-input]")?.addEventListener("input", updateFinancialSummary);
+    document.querySelector("[data-price-input]")?.addEventListener("change", event => {
+        normalizeDecimalInputValue(event.target);
+        updateFinancialSummary();
+    });
+    setupSupplierAutocomplete();
     receiptLines().forEach(setupLine);
     reindexLines();
+    updateFinancialSummary();
 
     try {
         const previousSubmitRaw = sessionStorage.getItem(debugStorageKey);

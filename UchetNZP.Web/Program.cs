@@ -79,12 +79,16 @@ using (var scope = app.Services.CreateScope())
         await EnsureMetalReceiptItemConsumptionColumnsAsync(db, CancellationToken.None);
         await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
+        await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
+        await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
     else
     {
         await db.Database.EnsureCreatedAsync(CancellationToken.None);
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
+        await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
+        await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
 }
@@ -212,6 +216,44 @@ static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, Cancellati
     await in_db.SaveChangesAsync(in_cancellationToken);
 }
 
+static async Task EnsureMetalSuppliersSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    if (await in_db.MetalSuppliers.AnyAsync(x => x.IsActive, in_cancellationToken))
+    {
+        return;
+    }
+
+    in_db.MetalSuppliers.Add(new UchetNZP.Domain.Entities.MetalSupplier
+    {
+        Id = Guid.NewGuid(),
+        Identifier = "00-001828",
+        Name = "АО \"Металлоторг\"",
+        Inn = "1234567890",
+        IsActive = true,
+        CreatedAt = DateTime.UtcNow,
+    });
+
+    await in_db.SaveChangesAsync(in_cancellationToken);
+}
+
+static async Task EnsureMetalReceiptParametersSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    const string vatRateKey = "MetalReceipt.VatRatePercent";
+    if (await in_db.SystemParameters.AnyAsync(x => x.Key == vatRateKey, in_cancellationToken))
+    {
+        return;
+    }
+
+    in_db.SystemParameters.Add(new UchetNZP.Domain.Entities.SystemParameter
+    {
+        Key = vatRateKey,
+        DecimalValue = 22m,
+        Description = "Ставка НДС для прихода металла, %",
+        UpdatedAt = DateTime.UtcNow,
+    });
+
+    await in_db.SaveChangesAsync(in_cancellationToken);
+}
 
 static async Task EnsureMetalConsumptionNormsSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
 {

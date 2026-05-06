@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using UchetNZP.Domain.Entities;
 using UchetNZP.Infrastructure.Data;
 using UchetNZP.Web.Controllers;
@@ -78,7 +79,8 @@ public class MetalReceiptItemLabelDocumentServiceTests
             new NoOpCuttingMapPdfExporter(),
             new NoOpWarehousePrintService(),
             fakeLabelService,
-            new NoOpMetalReceiptDocumentService())
+            new NoOpMetalReceiptDocumentService(),
+            NullLogger<MetalWarehouseController>.Instance)
         {
             ControllerContext = new ControllerContext
             {

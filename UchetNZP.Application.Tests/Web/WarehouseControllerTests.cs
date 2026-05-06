@@ -166,8 +166,9 @@ public class WarehouseControllerTests
         Assert.Equal(20, model.PageSize);
         Assert.Equal(0, model.TotalPages);
         Assert.Single(model.Parts);
-        Assert.Equal(3, model.Areas.Count);
-        Assert.Contains(model.Areas, x => x.Key == "finished" && !x.IsEnabled);
+        Assert.Equal(2, model.Areas.Count);
+        Assert.DoesNotContain(model.Areas, x => x.Key == "wip");
+        Assert.Contains(model.Areas, x => x.Key == "finished" && x.IsActive && x.IsEnabled);
         Assert.Contains(model.MovementTypes, x => x.Title == "Приход" && !x.IsEnabled);
     }
 
