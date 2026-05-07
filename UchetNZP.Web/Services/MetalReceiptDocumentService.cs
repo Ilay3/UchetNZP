@@ -92,7 +92,7 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
             if (body is not null)
             {
                 FillHeaderAndTotals(body, receipt, itemRows);
-                FillItemsTable(body, itemRows, receipt.ReceiptNumber);
+                FillItemsTable(body, itemRows);
                 document.MainDocumentPart?.Document?.Save();
             }
         }
@@ -124,7 +124,7 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         }
     }
 
-    private static void FillItemsTable(Body body, IReadOnlyCollection<ReceiptPrintItemRow> items, string receiptNumber)
+    private static void FillItemsTable(Body body, IReadOnlyCollection<ReceiptPrintItemRow> items)
     {
         var templateRow = body.Descendants<TableRow>().FirstOrDefault(row =>
             RowContainsAnyToken(
@@ -164,9 +164,6 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
 
         templateRow.Remove();
 
-        // В некоторых шаблонах {{chek}} ошибочно используется в заголовке, не только в строке таблицы.
-        // После генерации строк очищаем/подставляем остатки, чтобы в выходном документе не оставались токены.
-        ReplaceToken(body, "{{chek}}", receiptNumber ?? string.Empty);
     }
 
     private static bool RowContainsAnyToken(TableRow row, params string[] tokens)
