@@ -276,6 +276,25 @@
         set("[data-info-deviation]", fmt(deviation));
     }
 
+
+    function updateLineFinancialSummary(line, safePrice, safeVatRate) {
+        const weightRaw = line.querySelector("[data-weight-input]")?.value || "";
+        const weight = Number.parseFloat(String(weightRaw).replace(",", "."));
+        const safeWeight = Number.isFinite(weight) && weight > 0 ? weight : 0;
+        const amountWithoutVat = safeWeight * safePrice;
+        const vatAmount = amountWithoutVat * safeVatRate / 100;
+        const total = amountWithoutVat + vatAmount;
+        const formatWeight = value => Number.isFinite(value) ? value.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 3 }) : "0";
+        const formatMoney = value => Number.isFinite(value) ? value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00";
+
+        const set = (selector, value) => { const el = line.querySelector(selector); if (el) el.textContent = value; };
+        set("[data-line-price]", formatMoney(safePrice));
+        set("[data-line-passport-weight]", formatWeight(safeWeight));
+        set("[data-line-without-vat]", formatMoney(amountWithoutVat));
+        set("[data-line-vat]", formatMoney(vatAmount));
+        set("[data-line-total]", formatMoney(total));
+    }
+
     function updateFinancialSummary() {
         const summary = document.querySelector("[data-financial-summary]");
         if (!summary) {
@@ -295,6 +314,7 @@
             if (Number.isFinite(weight) && weight > 0) {
                 passportWeight += weight;
             }
+            updateLineFinancialSummary(line, safePrice, safeVatRate);
         });
 
         const amountWithoutVat = passportWeight * safePrice;

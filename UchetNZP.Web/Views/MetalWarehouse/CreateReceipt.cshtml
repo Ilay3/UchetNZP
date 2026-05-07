@@ -214,6 +214,17 @@
                                    data-quantity-input />
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].Quantity" data-valmsg-replace="true"></span>
                         </div>
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-white" data-line-financial-summary>
+                                <div class="row g-3">
+                                    <div class="col-md-3"><div class="small text-muted">Цена, руб/кг</div><div class="fw-semibold" data-line-price>0,00</div></div>
+                                    <div class="col-md-3"><div class="small text-muted">Масса по паспорту</div><div class="fw-semibold"><span data-line-passport-weight>0</span> кг</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Сумма без НДС</div><div class="fw-semibold"><span data-line-without-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">НДС 22%</div><div class="fw-semibold"><span data-line-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Всего с НДС</div><div class="fw-semibold"><span data-line-total>0,00</span> руб.</div></div>
+                                </div>
+                            </div>
+                        </div>
 
                         <div class="col-12">
                             <input type="hidden" name="Items[@i].UseAverageSize" value="false" />
@@ -302,6 +313,10 @@
                             <li>Наименование поставщика — <code>{{supplier_name}}</code></li>
                             <li>Код поставщика — <code>{{supplier_code}}</code></li>
                             <li>№ документа — <code>{{supplier_document_number}}</code></li>
+<<<<<<< codex/improve-metal-warehouse-receipt-interface
+                            <li>Порядковый номер строки (счётчик) — <code>{{chek}}</code> (1, 2, 3...)</li>
+=======
+>>>>>>> master
                         </ul>
                     </div>
                     <div class="col-lg-6">
@@ -395,6 +410,17 @@
                 <input class="form-control form-control-lg" type="number" min="1" step="1" name="Items[__index__].Quantity" value="1" data-quantity-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].Quantity" data-valmsg-replace="true"></span>
             </div>
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-white" data-line-financial-summary>
+                                <div class="row g-3">
+                                    <div class="col-md-3"><div class="small text-muted">Цена, руб/кг</div><div class="fw-semibold" data-line-price>0,00</div></div>
+                                    <div class="col-md-3"><div class="small text-muted">Масса по паспорту</div><div class="fw-semibold"><span data-line-passport-weight>0</span> кг</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Сумма без НДС</div><div class="fw-semibold"><span data-line-without-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">НДС 22%</div><div class="fw-semibold"><span data-line-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Всего с НДС</div><div class="fw-semibold"><span data-line-total>0,00</span> руб.</div></div>
+                                </div>
+                            </div>
+                        </div>
 
             <div class="col-12">
                 <input type="hidden" name="Items[__index__].UseAverageSize" value="false" />
