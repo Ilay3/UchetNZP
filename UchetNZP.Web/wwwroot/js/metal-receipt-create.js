@@ -276,6 +276,28 @@
         set("[data-info-deviation]", fmt(deviation));
     }
 
+
+    function updateLineFinancialSummary(line, defaultPrice, safeVatRate) {
+        const weightRaw = line.querySelector("[data-weight-input]")?.value || "";
+        const weight = Number.parseFloat(String(weightRaw).replace(",", "."));
+        const safeWeight = Number.isFinite(weight) && weight > 0 ? weight : 0;
+        const linePriceRaw = line.querySelector("[data-line-price-input]")?.value || "";
+        const linePrice = Number.parseFloat(String(linePriceRaw).replace(",", "."));
+        const safePrice = Number.isFinite(linePrice) && linePrice > 0 ? linePrice : defaultPrice;
+        const amountWithoutVat = safeWeight * safePrice;
+        const vatAmount = amountWithoutVat * safeVatRate / 100;
+        const total = amountWithoutVat + vatAmount;
+        const formatWeight = value => Number.isFinite(value) ? value.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 3 }) : "0";
+        const formatMoney = value => Number.isFinite(value) ? value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0,00";
+
+        const set = (selector, value) => { const el = line.querySelector(selector); if (el) el.textContent = value; };
+        set("[data-line-price]", formatMoney(safePrice));
+        set("[data-line-passport-weight]", formatWeight(safeWeight));
+        set("[data-line-without-vat]", formatMoney(amountWithoutVat));
+        set("[data-line-vat]", formatMoney(vatAmount));
+        set("[data-line-total]", formatMoney(total));
+    }
+
     function updateFinancialSummary() {
         const summary = document.querySelector("[data-financial-summary]");
         if (!summary) {
@@ -284,9 +306,9 @@
 
         const vatRate = Number.parseFloat(String(summary.dataset.vatRate ?? "22").replace(",", "."));
         const safeVatRate = Number.isFinite(vatRate) && vatRate >= 0 ? vatRate : 22;
-        const priceRaw = document.querySelector("[data-price-input]")?.value || "";
-        const price = Number.parseFloat(String(priceRaw).replace(",", "."));
-        const safePrice = Number.isFinite(price) && price > 0 ? price : 0;
+        const defaultPriceRaw = document.querySelector("[data-price-input]")?.value || "0";
+        const defaultPrice = Number.parseFloat(String(defaultPriceRaw).replace(",", "."));
+        const safeDefaultPrice = Number.isFinite(defaultPrice) && defaultPrice > 0 ? defaultPrice : 0;
 
         let passportWeight = 0;
         receiptLines().forEach(line => {
@@ -295,9 +317,17 @@
             if (Number.isFinite(weight) && weight > 0) {
                 passportWeight += weight;
             }
+            updateLineFinancialSummary(line, safeDefaultPrice, safeVatRate);
         });
 
-        const amountWithoutVat = passportWeight * safePrice;
+        let amountWithoutVat = 0;
+        receiptLines().forEach(line => {
+            const weightRaw = line.querySelector("[data-weight-input]")?.value || "";
+            const weight = Number.parseFloat(String(weightRaw).replace(",", "."));
+            const linePriceRaw = line.querySelector("[data-line-price-input]")?.value || "";
+            const linePrice = Number.parseFloat(String(linePriceRaw).replace(",", "."));
+            if (Number.isFinite(weight) && weight > 0 && Number.isFinite(linePrice) && linePrice > 0) amountWithoutVat += weight * linePrice;
+        });
         const vatAmount = amountWithoutVat * safeVatRate / 100;
         const total = amountWithoutVat + vatAmount;
         const formatWeight = value => Number.isFinite(value) ? value.toLocaleString("ru-RU", { minimumFractionDigits: 0, maximumFractionDigits: 3 }) : "0";
@@ -700,6 +730,7 @@
     }, true);
 
     document.querySelector("[data-price-input]")?.addEventListener("input", updateFinancialSummary);
+    itemsContainer.addEventListener("input", event => { if (event.target?.matches?.("[data-line-price-input]")) updateFinancialSummary(); });
     document.querySelector("[data-price-input]")?.addEventListener("change", event => {
         normalizeDecimalInputValue(event.target);
         updateFinancialSummary();

@@ -58,14 +58,17 @@
     </div>
 
     <div class="col-md-5 position-relative">
-        <label class="form-label d-flex justify-content-between">Поставщик <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">+</button></label>
-        <input class="form-control form-control-lg"
-               type="text"
-               name="SupplierInputText"
-               value="@selectedSupplierText"
-               placeholder="ИНН или наименование"
-               autocomplete="off"
-               data-supplier-input />
+        <label class="form-label">Поставщик</label>
+        <div class="input-group input-group-lg minimal-plus-input">
+            <input class="form-control"
+                   type="text"
+                   name="SupplierInputText"
+                   value="@selectedSupplierText"
+                   placeholder="ИНН или наименование"
+                   autocomplete="off"
+                   data-supplier-input />
+            <button type="button" class="btn btn-outline-primary" title="Добавить поставщика" data-bs-toggle="modal" data-bs-target="#addSupplierModal">+</button>
+        </div>
         <div class="list-group position-absolute w-100 shadow-sm d-none"
              style="z-index: 1050; max-height: 260px; overflow-y: auto;"
              data-supplier-suggestions></div>
@@ -91,35 +94,31 @@
         <input asp-for="VatAccount" class="form-control form-control-lg" readonly />
     </div>
 
-    <div class="col-md-2">
-        <label asp-for="PricePerKg" class="form-label">Цена, руб/кг</label>
-        <input asp-for="PricePerKg" class="form-control form-control-lg" type="number" min="0.0001" step="0.0001" value="@priceValue" data-price-input />
-        <span asp-validation-for="PricePerKg" class="text-danger"></span>
-    </div>
+    <input asp-for="PricePerKg" type="hidden" value="@priceValue" data-price-input />
 
     <div class="col-12">
-        <div class="row g-2" data-financial-summary data-vat-rate="@Model.VatRatePercent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">
+        <div class="row g-2 receipt-financial-summary" data-financial-summary data-vat-rate="@Model.VatRatePercent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">
             <div class="col-md-3">
                 <div class="border rounded-3 bg-light p-3 h-100">
-                    <div class="small text-muted">Масса по паспорту</div>
+                    <div class="small text-uppercase text-muted">Масса по паспорту</div>
                     <div class="fs-5 fw-semibold"><span data-financial-passport-weight>@Model.Items.Sum(x => x.PassportWeightKg ?? 0m).ToString("0.###")</span> кг</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="border rounded-3 bg-light p-3 h-100">
-                    <div class="small text-muted">Сумма без НДС</div>
+                    <div class="small text-uppercase text-muted">Сумма без НДС</div>
                     <div class="fs-5 fw-semibold"><span data-financial-without-vat>@Model.AmountWithoutVat.ToString("0.00")</span> руб.</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="border rounded-3 bg-light p-3 h-100">
-                    <div class="small text-muted">НДС @Model.VatRatePercent.ToString("0.##")%</div>
+                    <div class="small text-uppercase text-muted">НДС @Model.VatRatePercent.ToString("0.##")%</div>
                     <div class="fs-5 fw-semibold"><span data-financial-vat>@Model.VatAmount.ToString("0.00")</span> руб.</div>
                 </div>
             </div>
             <div class="col-md-3">
                 <div class="border rounded-3 bg-light p-3 h-100">
-                    <div class="small text-muted">Всего с НДС</div>
+                    <div class="small text-uppercase text-muted">Всего с НДС</div>
                     <div class="fs-5 fw-semibold"><span data-financial-total>@Model.TotalAmountWithVat.ToString("0.00")</span> руб.</div>
                 </div>
             </div>
@@ -167,14 +166,17 @@
 
                     <div class="card-body row g-3" data-line-body>
                         <div class="col-lg-8 position-relative">
-                            <label class="form-label d-flex justify-content-between">Материал <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addMaterialModal">+</button></label>
-                            <input class="form-control form-control-lg"
-                                   type="text"
+                            <label class="form-label">Материал</label>
+                            <div class="input-group input-group-lg minimal-plus-input">
+                                <input class="form-control"
+                                       type="text"
                                    value="@selectedMaterialText"
                                    placeholder="Начните писать название или код"
                                    autocomplete="off"
-                                   name="Items[@i].MaterialInputText"
-                                   data-material-input />
+                                       name="Items[@i].MaterialInputText"
+                                       data-material-input />
+                                <button type="button" class="btn btn-outline-primary" title="Добавить материал" data-bs-toggle="modal" data-bs-target="#addMaterialModal">+</button>
+                            </div>
                             <div class="list-group position-absolute w-100 shadow-sm d-none"
                                  style="z-index: 1050; max-height: 260px; overflow-y: auto;"
                                  data-material-suggestions></div>
@@ -185,6 +187,17 @@
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].MetalMaterialId" data-valmsg-replace="true"></span>
                         </div>
 
+                        <div class="col-md-2">
+                            <label class="form-label">Цена, руб/кг</label>
+                            <input class="form-control form-control-lg"
+                                   type="number"
+                                   min="0.0001"
+                                   step="0.0001"
+                                   name="Items[@i].PricePerKg"
+                                   value="@line.PricePerKg?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)"
+                                   data-line-price-input />
+                            <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].PricePerKg" data-valmsg-replace="true"></span>
+                        </div>
                         <div class="col-md-2">
                             <label class="form-label">Вес по документу, кг</label>
                             <input class="form-control form-control-lg"
@@ -207,6 +220,17 @@
                                    value="@line.Quantity"
                                    data-quantity-input />
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].Quantity" data-valmsg-replace="true"></span>
+                        </div>
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-white" data-line-financial-summary>
+                                <div class="row g-3">
+                                    <div class="col-md-3"><div class="small text-muted">Цена, руб/кг</div><div class="fw-semibold" data-line-price>0,00</div></div>
+                                    <div class="col-md-3"><div class="small text-muted">Масса по паспорту</div><div class="fw-semibold"><span data-line-passport-weight>0</span> кг</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Сумма без НДС</div><div class="fw-semibold"><span data-line-without-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">НДС 22%</div><div class="fw-semibold"><span data-line-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Всего с НДС</div><div class="fw-semibold"><span data-line-total>0,00</span> руб.</div></div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-12">
@@ -283,6 +307,48 @@
         </div>
     </div>
 
+
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h3 class="h6 mb-3">Атрибуты для шаблона печати (Приходный ордер)</h3>
+                <div class="row g-3 small">
+                    <div class="col-lg-6">
+                        <div class="fw-semibold mb-1">Шапка документа</div>
+                        <ul class="mb-0">
+                            <li>Дата — <code>{{receipt_date}}</code></li>
+                            <li>Наименование поставщика — <code>{{supplier_name}}</code></li>
+                            <li>Код поставщика — <code>{{supplier_code}}</code></li>
+                            <li>№ документа — <code>{{supplier_document_number}}</code></li>
+                            <li>Порядковый номер строки (счётчик) — <code>{{chek}}</code> (1, 2, 3...)</li>
+                        </ul>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="fw-semibold mb-1">Строка материала</div>
+                        <ul class="mb-0">
+                            <li>Наименование материала — <code>{{item_material_name}}</code></li>
+                            <li>Номер материала — <code>{{item_material_code}}</code></li>
+                            <li>Вес по документу, кг — <code>{{item_weight_kg}}</code></li>
+                            <li>Цена — <code>{{item_price_per_kg}}</code></li>
+                            <li>Сумма без НДС — <code>{{item_amount_without_vat}}</code></li>
+                            <li>Сумма НДС 22% — <code>{{item_vat_amount}}</code></li>
+                            <li>Всего с НДС — <code>{{item_total_with_vat}}</code></li>
+                        </ul>
+                    </div>
+                    <div class="col-12">
+                        <div class="fw-semibold mb-1">Итоги по всем материалам</div>
+                        <ul class="mb-0">
+                            <li>Вес по документу, кг — <code>{{total_weight_kg}}</code></li>
+                            <li>Сумма без НДС — <code>{{total_amount_without_vat}}</code></li>
+                            <li>Сумма НДС 22% — <code>{{total_vat_amount}}</code></li>
+                            <li>Всего с НДС — <code>{{total_amount_with_vat}}</code></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="col-12 d-flex gap-2 flex-wrap">
         <button type="submit" name="submitAction" value="save" class="btn btn-primary btn-lg">Сохранить приход</button>
         <button type="submit" name="submitAction" value="saveAddNext" class="btn btn-outline-primary btn-lg">Сохранить и добавить следующий</button>
@@ -328,10 +394,19 @@
         <div class="card-body row g-3" data-line-body>
             <div class="col-lg-8 position-relative">
                 <label class="form-label">Материал</label>
-                <input class="form-control form-control-lg" type="text" placeholder="Начните писать название или код" autocomplete="off" name="Items[__index__].MaterialInputText" data-material-input />
+                <div class="input-group input-group-lg minimal-plus-input">
+                    <input class="form-control" type="text" placeholder="Начните писать название или код" autocomplete="off" name="Items[__index__].MaterialInputText" data-material-input />
+                    <button type="button" class="btn btn-outline-primary" title="Добавить материал" data-bs-toggle="modal" data-bs-target="#addMaterialModal">+</button>
+                </div>
                 <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 1050; max-height: 260px; overflow-y: auto;" data-material-suggestions></div>
                 <input type="hidden" name="Items[__index__].MetalMaterialId" data-material-id />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].MetalMaterialId" data-valmsg-replace="true"></span>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Цена, руб/кг</label>
+                <input class="form-control form-control-lg" type="number" min="0.0001" step="0.0001" name="Items[__index__].PricePerKg" data-line-price-input />
+                <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].PricePerKg" data-valmsg-replace="true"></span>
             </div>
 
             <div class="col-md-2">
@@ -345,6 +420,17 @@
                 <input class="form-control form-control-lg" type="number" min="1" step="1" name="Items[__index__].Quantity" value="1" data-quantity-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].Quantity" data-valmsg-replace="true"></span>
             </div>
+                        <div class="col-12">
+                            <div class="border rounded-3 p-3 bg-white" data-line-financial-summary>
+                                <div class="row g-3">
+                                    <div class="col-md-3"><div class="small text-muted">Цена, руб/кг</div><div class="fw-semibold" data-line-price>0,00</div></div>
+                                    <div class="col-md-3"><div class="small text-muted">Масса по паспорту</div><div class="fw-semibold"><span data-line-passport-weight>0</span> кг</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Сумма без НДС</div><div class="fw-semibold"><span data-line-without-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">НДС 22%</div><div class="fw-semibold"><span data-line-vat>0,00</span> руб.</div></div>
+                                    <div class="col-md-2"><div class="small text-muted">Всего с НДС</div><div class="fw-semibold"><span data-line-total>0,00</span> руб.</div></div>
+                                </div>
+                            </div>
+                        </div>
 
             <div class="col-12">
                 <input type="hidden" name="Items[__index__].UseAverageSize" value="false" />
@@ -392,6 +478,9 @@
     .receipt-line[data-collapsed="true"] [data-line-body] { display:none; }
     .receipt-line [data-line-toggle] { color: var(--bs-body-color); }
     .receipt-line [data-line-toggle]:hover { color: var(--bs-primary); }
+    .minimal-plus-input .btn { min-width: 3rem; font-weight: 600; }
+    .receipt-financial-summary .border { border-color: #dfe3e8 !important; background: #fff !important; }
+    .receipt-financial-summary .fs-5 { letter-spacing: .01em; }
 </style>
 
 @section Scripts

@@ -10,6 +10,8 @@ public class MetalReceiptItem
 
     public Guid MetalMaterialId { get; set; }
 
+    public decimal PricePerKg { get; set; }
+
     public decimal Quantity { get; set; }
 
     public decimal TotalWeightKg { get; set; }

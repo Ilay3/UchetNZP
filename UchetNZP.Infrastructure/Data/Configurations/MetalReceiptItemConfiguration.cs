@@ -12,6 +12,10 @@ public class MetalReceiptItemConfiguration : IEntityTypeConfiguration<MetalRecei
 
         builder.HasKey(x => x.Id);
 
+        builder.Property(x => x.PricePerKg)
+            .HasPrecision(18, 4)
+            .IsRequired();
+
         builder.Property(x => x.Quantity)
             .HasPrecision(12, 3)
             .IsRequired();
