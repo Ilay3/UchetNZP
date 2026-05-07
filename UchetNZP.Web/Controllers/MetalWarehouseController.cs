@@ -1360,6 +1360,10 @@ public class MetalWarehouseController : Controller
         try
         {
             var document = await _metalReceiptDocumentService.BuildPdfAsync(id, cancellationToken);
+<<<<<<< codex/fix-line-number-in-receipt-document-ihws17
+=======
+            Response.Headers.ContentDisposition = $"inline; filename=\"{document.FileName}\"";
+>>>>>>> master
             return File(document.Content, document.ContentType);
         }
         catch (KeyNotFoundException)
