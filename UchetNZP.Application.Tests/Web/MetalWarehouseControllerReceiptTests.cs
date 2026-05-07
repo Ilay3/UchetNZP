@@ -145,12 +145,12 @@ public class MetalWarehouseControllerReceiptTests
         dbContext.MetalSuppliers.Add(supplier);
         await dbContext.SaveChangesAsync();
 
-        var pdfBytes = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D, 1, 2, 3 };
-        await using var pdfStream = new MemoryStream(pdfBytes);
-        var formFile = new FormFile(pdfStream, 0, pdfBytes.Length, nameof(MetalReceiptCreateViewModel.OriginalDocumentPdf), "scan.pdf")
+        var docxBytes = new byte[] { 0x50, 0x4B, 0x03, 0x04, 1, 2, 3, 4 };
+        await using var docxStream = new MemoryStream(docxBytes);
+        var formFile = new FormFile(docxStream, 0, docxBytes.Length, nameof(MetalReceiptCreateViewModel.OriginalDocumentPdf), "scan.docx")
         {
             Headers = new HeaderDictionary(),
-            ContentType = "application/pdf",
+            ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         };
 
         var controller = CreateController(dbContext);
@@ -189,9 +189,9 @@ public class MetalWarehouseControllerReceiptTests
 
         Assert.IsType<RedirectToActionResult>(result);
         var receipt = await dbContext.MetalReceipts.SingleAsync();
-        Assert.Equal("scan.pdf", receipt.OriginalDocumentFileName);
-        Assert.Equal("application/pdf", receipt.OriginalDocumentContentType);
-        Assert.Equal(pdfBytes, receipt.OriginalDocumentContent);
+        Assert.Equal("scan.docx", receipt.OriginalDocumentFileName);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", receipt.OriginalDocumentContentType);
+        Assert.Equal(docxBytes, receipt.OriginalDocumentContent);
         Assert.Equal(supplier.Id, receipt.MetalSupplierId);
         Assert.Equal("DOC-003", receipt.SupplierDocumentNumber);
         Assert.Equal(114.04m, receipt.PricePerKg);
@@ -214,9 +214,9 @@ public class MetalWarehouseControllerReceiptTests
 
         var original = await controller.ReceiptOriginalDocument(receipt.Id, CancellationToken.None);
         var file = Assert.IsType<FileContentResult>(original);
-        Assert.Equal("scan.pdf", file.FileDownloadName);
-        Assert.Equal("application/pdf", file.ContentType);
-        Assert.Equal(pdfBytes, file.FileContents);
+        Assert.Equal("scan.docx", file.FileDownloadName);
+        Assert.Equal("application/vnd.openxmlformats-officedocument.wordprocessingml.document", file.ContentType);
+        Assert.Equal(docxBytes, file.FileContents);
     }
 
     [Fact]
@@ -356,12 +356,12 @@ public class MetalWarehouseControllerReceiptTests
     private sealed class NoOpMetalReceiptItemLabelDocumentService : IMetalReceiptItemLabelDocumentService
     {
         public Task<MetalReceiptItemLabelDocumentResult> BuildAsync(Guid receiptItemId, CancellationToken cancellationToken = default)
-            => Task.FromResult(new MetalReceiptItemLabelDocumentResult("label.pdf", "application/pdf", Array.Empty<byte>(), receiptItemId.ToString()));
+            => Task.FromResult(new MetalReceiptItemLabelDocumentResult("label.pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Array.Empty<byte>(), receiptItemId.ToString()));
     }
 
     private sealed class NoOpMetalReceiptDocumentService : IMetalReceiptDocumentService
     {
         public Task<MetalReceiptDocumentResult> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
-            => Task.FromResult(new MetalReceiptDocumentResult("receipt.pdf", "application/pdf", Array.Empty<byte>()));
+            => Task.FromResult(new MetalReceiptDocumentResult("receipt.pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Array.Empty<byte>()));
     }
 }

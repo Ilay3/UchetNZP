@@ -275,14 +275,14 @@ public class MetalReceiptCreateViewModel : IValidatableObject
             if (file.Length > MaxOriginalDocumentSizeBytes)
             {
                 yield return new ValidationResult(
-                    "PDF слишком большой. Максимум 25 МБ.",
+                    "Файл слишком большой. Максимум 25 МБ.",
                     new[] { nameof(OriginalDocumentPdf) });
             }
 
-            if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(Path.GetExtension(file.FileName), ".docx", StringComparison.OrdinalIgnoreCase))
             {
                 yield return new ValidationResult(
-                    "Можно прикрепить только PDF-файл.",
+                    "Можно прикрепить только DOCX-файл.",
                     new[] { nameof(OriginalDocumentPdf) });
             }
         }

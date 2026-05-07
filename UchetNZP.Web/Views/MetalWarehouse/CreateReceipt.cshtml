@@ -126,9 +126,9 @@
     </div>
 
     <div class="col-md-5">
-        <label asp-for="OriginalDocumentPdf" class="form-label">Оригинал документа, PDF</label>
-        <input asp-for="OriginalDocumentPdf" class="form-control form-control-lg" type="file" accept="application/pdf,.pdf" />
-        <div class="form-text">Скан или копия документа поставщика. Потом его можно скачать из карточки прихода.</div>
+        <label asp-for="OriginalDocumentPdf" class="form-label">Оригинал документа, DOCX</label>
+        <input asp-for="OriginalDocumentPdf" class="form-control form-control-lg" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+        <div class="form-text">Word-документ поставщика. Потом его можно скачать из карточки прихода.</div>
         <span asp-validation-for="OriginalDocumentPdf" class="text-danger"></span>
     </div>
 
