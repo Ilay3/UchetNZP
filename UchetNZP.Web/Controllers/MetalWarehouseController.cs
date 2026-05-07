@@ -349,7 +349,7 @@ public class MetalWarehouseController : Controller
         var originalDocument = await ReadOriginalReceiptDocumentAsync(model.OriginalDocumentPdf, cancellationToken);
         if (!originalDocument.IsValid)
         {
-            ModelState.AddModelError(nameof(model.OriginalDocumentPdf), originalDocument.ErrorMessage ?? "Не удалось прочитать DOCX.");
+            ModelState.AddModelError(nameof(model.OriginalDocumentPdf), originalDocument.ErrorMessage ?? "Не удалось прочитать PDF.");
         }
 
         if (!ModelState.IsValid)
@@ -510,7 +510,7 @@ public class MetalWarehouseController : Controller
             return RedirectToAction(nameof(CreateReceipt));
         }
 
-        return RedirectToAction(nameof(ReceiptDocument), new { id = receipt.Id });
+        return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
     }
 
     [HttpPost("Receipts/AddSupplierInline")]
@@ -762,7 +762,7 @@ public class MetalWarehouseController : Controller
             return RedirectToAction(nameof(CreateReceipt));
         }
 
-        return RedirectToAction(nameof(ReceiptDocument), new { id = receipt.Id });
+        return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
     }
 
     [HttpGet("Receipts/Details/{id:guid}")]
@@ -1360,7 +1360,13 @@ public class MetalWarehouseController : Controller
         try
         {
             var document = await _metalReceiptDocumentService.BuildPdfAsync(id, cancellationToken);
-
+<<<<<<< codex/fix-line-number-in-receipt-document-ihws17
+=======
+            Response.Headers.ContentDisposition = $"inline; filename=\"{document.FileName}\"";
+>>>>>>> master
+=======
+            Response.Headers.ContentDisposition = $"inline; filename=\"{document.FileName}\"";
+>>>>>>> master
             return File(document.Content, document.ContentType);
         }
         catch (KeyNotFoundException)
@@ -1389,10 +1395,10 @@ public class MetalWarehouseController : Controller
         }
 
         var fileName = string.IsNullOrWhiteSpace(document.OriginalDocumentFileName)
-            ? $"Оригинал_{id:N}.docx"
+            ? $"Оригинал_{id:N}.pdf"
             : document.OriginalDocumentFileName;
         var contentType = string.IsNullOrWhiteSpace(document.OriginalDocumentContentType)
-            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ? "application/pdf"
             : document.OriginalDocumentContentType;
 
         return File(document.OriginalDocumentContent, contentType, fileName);
@@ -2744,9 +2750,9 @@ public class MetalWarehouseController : Controller
             return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл слишком большой. Максимум 25 МБ.");
         }
 
-        if (!string.Equals(Path.GetExtension(file.FileName), ".docx", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
         {
-            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Можно прикрепить только DOCX-файл.");
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Можно прикрепить только PDF-файл.");
         }
 
         await using var stream = file.OpenReadStream();
@@ -2754,21 +2760,21 @@ public class MetalWarehouseController : Controller
         await stream.CopyToAsync(memory, cancellationToken);
         var content = memory.ToArray();
 
-        if (content.Length < 4 || content[0] != 0x50 || content[1] != 0x4B)
+        if (content.Length < 4 || content[0] != 0x25 || content[1] != 0x50 || content[2] != 0x44 || content[3] != 0x46)
         {
-            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл не похож на DOCX. Проверьте, что выбран документ Word.");
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл не похож на PDF. Проверьте, что выбран PDF-документ.");
         }
 
         var safeFileName = Path.GetFileName(file.FileName);
         if (string.IsNullOrWhiteSpace(safeFileName))
         {
-            safeFileName = "original.docx";
+            safeFileName = "original.pdf";
         }
 
         return new OriginalReceiptDocumentReadResult(
             true,
             safeFileName,
-            string.IsNullOrWhiteSpace(file.ContentType) ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : file.ContentType,
+            string.IsNullOrWhiteSpace(file.ContentType) ? "application/pdf" : file.ContentType,
             content,
             file.Length,
             null);

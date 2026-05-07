@@ -279,10 +279,10 @@ public class MetalReceiptCreateViewModel : IValidatableObject
                     new[] { nameof(OriginalDocumentPdf) });
             }
 
-            if (!string.Equals(Path.GetExtension(file.FileName), ".docx", StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
             {
                 yield return new ValidationResult(
-                    "Можно прикрепить только DOCX-файл.",
+                    "Можно прикрепить только PDF-файл.",
                     new[] { nameof(OriginalDocumentPdf) });
             }
         }
