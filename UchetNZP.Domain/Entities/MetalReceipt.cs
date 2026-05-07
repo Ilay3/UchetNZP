@@ -21,6 +21,9 @@ public class MetalReceipt
     public string? SupplierInnSnapshot { get; set; }
 
     public string? SupplierDocumentNumber { get; set; }
+    public string? InvoiceOrUpiNumber { get; set; }
+    public string AccountingAccount { get; set; } = "10.01";
+    public string VatAccount { get; set; } = "19.03";
 
     public string BatchNumber { get; set; } = string.Empty;
 

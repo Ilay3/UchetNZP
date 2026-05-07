@@ -17,6 +17,7 @@
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Receipts">К списку приходов</a>
+    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Suppliers">Справочник поставщиков</a>
 </div>
 
 @if (TempData["MetalReceiptSuccess"] is string success)
@@ -57,7 +58,7 @@
     </div>
 
     <div class="col-md-5 position-relative">
-        <label class="form-label">Поставщик</label>
+        <label class="form-label d-flex justify-content-between">Поставщик <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">+</button></label>
         <input class="form-control form-control-lg"
                type="text"
                name="SupplierInputText"
@@ -76,6 +77,18 @@
         <label asp-for="SupplierDocumentNumber" class="form-label">№ документа</label>
         <input asp-for="SupplierDocumentNumber" class="form-control form-control-lg" maxlength="128" />
         <span asp-validation-for="SupplierDocumentNumber" class="text-danger"></span>
+    </div>
+    <div class="col-md-2">
+        <label asp-for="InvoiceOrUpiNumber" class="form-label">Накладная, УПД №</label>
+        <input asp-for="InvoiceOrUpiNumber" class="form-control form-control-lg" maxlength="128" />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="AccountingAccount" class="form-label">Счет учета</label>
+        <input asp-for="AccountingAccount" class="form-control form-control-lg" readonly />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="VatAccount" class="form-label">Счет НДС</label>
+        <input asp-for="VatAccount" class="form-control form-control-lg" readonly />
     </div>
 
     <div class="col-md-2">
@@ -153,20 +166,8 @@
                     </div>
 
                     <div class="card-body row g-3" data-line-body>
-                        <div class="col-lg-3">
-                            <div class="border rounded-3 bg-light p-3 h-100">
-                                <div class="fw-semibold mb-2">Справка по массе</div>
-                                <div class="small text-muted d-flex flex-column gap-1" data-weight-info>
-                                    <div>Коэффициент: <span data-info-coefficient>—</span></div>
-                                    <div>Паспортная: <span data-info-passport>—</span> кг</div>
-                                    <div>Расчётная: <span data-info-calculated>—</span> кг</div>
-                                    <div>Отклонение: <span data-info-deviation>—</span> кг</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="col-lg-5 position-relative">
-                            <label class="form-label">Материал</label>
+                        <div class="col-lg-8 position-relative">
+                            <label class="form-label d-flex justify-content-between">Материал <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addMaterialModal">+</button></label>
                             <input class="form-control form-control-lg"
                                    type="text"
                                    value="@selectedMaterialText"
@@ -288,6 +289,29 @@
         <a class="btn btn-outline-secondary btn-lg" asp-controller="MetalWarehouse" asp-action="Receipts">Отмена</a>
     </div>
 </form>
+<div class="modal fade" id="addSupplierModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Новый поставщик</h5></div>
+    <div class="modal-body">
+      <input class="form-control mb-2" placeholder="Код" data-inline-supplier-identifier />
+      <input class="form-control mb-2" placeholder="Наименование" data-inline-supplier-name />
+      <input class="form-control" placeholder="ИНН" data-inline-supplier-inn />
+      <div class="text-danger small mt-2" data-inline-supplier-error></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-primary" data-inline-supplier-save>Сохранить</button></div>
+  </div></div>
+</div>
+<div class="modal fade" id="addMaterialModal" tabindex="-1">
+  <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Новый материал</h5></div>
+    <div class="modal-body">
+      <input class="form-control mb-2" placeholder="Наименование" data-inline-material-name />
+      <input class="form-control mb-2" placeholder="Код" data-inline-material-code />
+      <select class="form-select mb-2" data-inline-material-unit><option value="Meter">м</option><option value="SquareMeter">м²</option></select>
+      <input class="form-control" type="number" step="0.001" min="0.001" placeholder="Вес 1 ед., кг" data-inline-material-weight />
+      <div class="text-danger small mt-2" data-inline-material-error></div>
+    </div>
+    <div class="modal-footer"><button type="button" class="btn btn-primary" data-inline-material-save>Сохранить</button></div>
+  </div></div>
+</div>
 
 <template id="receiptLineTemplate">
     <section class="card shadow-sm border-0 receipt-line" data-receipt-line data-line-index="__index__">
@@ -302,19 +326,7 @@
         </div>
 
         <div class="card-body row g-3" data-line-body>
-            <div class="col-lg-3">
-                <div class="border rounded-3 bg-light p-3 h-100">
-                    <div class="fw-semibold mb-2">Справка по массе</div>
-                    <div class="small text-muted d-flex flex-column gap-1" data-weight-info>
-                        <div>Коэффициент: <span data-info-coefficient>—</span></div>
-                        <div>Паспортная: <span data-info-passport>—</span> кг</div>
-                        <div>Расчётная: <span data-info-calculated>—</span> кг</div>
-                        <div>Отклонение: <span data-info-deviation>—</span> кг</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-lg-5 position-relative">
+            <div class="col-lg-8 position-relative">
                 <label class="form-label">Материал</label>
                 <input class="form-control form-control-lg" type="text" placeholder="Начните писать название или код" autocomplete="off" name="Items[__index__].MaterialInputText" data-material-input />
                 <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 1050; max-height: 260px; overflow-y: auto;" data-material-suggestions></div>

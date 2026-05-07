@@ -33,6 +33,14 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
 
         builder.Property(x => x.SupplierDocumentNumber)
             .HasMaxLength(128);
+        builder.Property(x => x.InvoiceOrUpiNumber)
+            .HasMaxLength(128);
+        builder.Property(x => x.AccountingAccount)
+            .IsRequired()
+            .HasMaxLength(16);
+        builder.Property(x => x.VatAccount)
+            .IsRequired()
+            .HasMaxLength(16);
 
         builder.Property(x => x.BatchNumber)
             .IsRequired()

@@ -162,6 +162,8 @@ public class MetalWarehouseController : Controller
         var model = new MetalReceiptCreateViewModel
         {
             ReceiptDate = DateTime.Today,
+            AccountingAccount = "10.01",
+            VatAccount = "19.03",
             VatRatePercent = await GetVatRatePercentAsync(cancellationToken),
             Items = new List<MetalReceiptLineInputViewModel>
             {
@@ -178,6 +180,63 @@ public class MetalWarehouseController : Controller
 
         await PopulateReceiptLookupsAsync(model, cancellationToken);
         return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
+    }
+
+    [HttpGet("Suppliers")]
+    public async Task<IActionResult> Suppliers(CancellationToken cancellationToken)
+    {
+        await EnsureMetalSuppliersSeededAsync(cancellationToken);
+        var model = new MetalSuppliersDirectoryViewModel
+        {
+            Suppliers = await GetSuppliersDirectoryItemsAsync(cancellationToken),
+        };
+
+        return View("~/Views/MetalWarehouse/Suppliers.cshtml", model);
+    }
+
+    [HttpPost("Suppliers")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Suppliers(MetalSuppliersDirectoryViewModel model, CancellationToken cancellationToken)
+    {
+        await EnsureMetalSuppliersSeededAsync(cancellationToken);
+
+        var normalizedInn = Regex.Replace(model.Inn ?? string.Empty, @"\D", string.Empty);
+        if (normalizedInn.Length is not (10 or 12))
+        {
+            ModelState.AddModelError(nameof(model.Inn), "ИНН должен содержать 10 или 12 цифр.");
+        }
+
+        var duplicateExists = await _dbContext.MetalSuppliers
+            .AsNoTracking()
+            .AnyAsync(x => x.IsActive
+                && (x.Identifier == model.Identifier.Trim()
+                    || x.Inn == normalizedInn
+                    || x.Name == model.Name.Trim()), cancellationToken);
+
+        if (duplicateExists)
+        {
+            ModelState.AddModelError(string.Empty, "Поставщик с таким кодом, ИНН или наименованием уже есть.");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            model.Suppliers = await GetSuppliersDirectoryItemsAsync(cancellationToken);
+            return View("~/Views/MetalWarehouse/Suppliers.cshtml", model);
+        }
+
+        _dbContext.MetalSuppliers.Add(new MetalSupplier
+        {
+            Id = Guid.NewGuid(),
+            Identifier = model.Identifier.Trim(),
+            Name = model.Name.Trim(),
+            Inn = normalizedInn,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        TempData["MetalSuppliersSuccess"] = "Поставщик добавлен в справочник.";
+        return RedirectToAction(nameof(Suppliers));
     }
 
     [HttpPost("Receipts/Create")]
@@ -327,6 +386,9 @@ public class MetalWarehouseController : Controller
             SupplierNameSnapshot = supplier.Name,
             SupplierInnSnapshot = supplier.Inn,
             SupplierDocumentNumber = model.SupplierDocumentNumber?.Trim(),
+            InvoiceOrUpiNumber = model.InvoiceOrUpiNumber?.Trim(),
+            AccountingAccount = "10.01",
+            VatAccount = "19.03",
             PricePerKg = model.PricePerKg!.Value,
             AmountWithoutVat = model.AmountWithoutVat,
             VatRatePercent = model.VatRatePercent,
@@ -447,6 +509,60 @@ public class MetalWarehouseController : Controller
         }
 
         return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
+    }
+
+    [HttpPost("Receipts/AddSupplierInline")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddSupplierInline([FromBody] MetalSupplierInlineCreateModel model, CancellationToken cancellationToken)
+    {
+        var inn = Regex.Replace(model.Inn ?? string.Empty, @"\D", string.Empty);
+        if (string.IsNullOrWhiteSpace(model.Identifier) || string.IsNullOrWhiteSpace(model.Name) || inn.Length is not (10 or 12))
+        {
+            return BadRequest(new { message = "Заполните код, наименование и корректный ИНН (10/12 цифр)." });
+        }
+
+        var supplier = new MetalSupplier
+        {
+            Id = Guid.NewGuid(),
+            Identifier = model.Identifier.Trim(),
+            Name = model.Name.Trim(),
+            Inn = inn,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+        };
+        _dbContext.MetalSuppliers.Add(supplier);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Json(new { id = supplier.Id, text = BuildSupplierDisplay(supplier.Identifier, supplier.Name, supplier.Inn) });
+    }
+
+    [HttpPost("Receipts/AddMaterialInline")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AddMaterialInline([FromBody] MetalMaterialInlineCreateModel model, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(model.Name))
+        {
+            return BadRequest(new { message = "Укажите наименование материала." });
+        }
+
+        var unitKind = model.UnitKind == "SquareMeter" ? "SquareMeter" : "Meter";
+        var weight = model.WeightPerUnitKg > 0m ? model.WeightPerUnitKg : 1m;
+        var material = new MetalMaterial
+        {
+            Id = Guid.NewGuid(),
+            Name = model.Name.Trim(),
+            Code = (model.Code ?? string.Empty).Trim(),
+            UnitKind = unitKind,
+            MassPerMeterKg = unitKind == "Meter" ? weight : 0m,
+            MassPerSquareMeterKg = unitKind == "SquareMeter" ? weight : 0m,
+            CoefConsumption = 1m,
+            StockUnit = unitKind == "SquareMeter" ? "m2" : "m",
+            WeightPerUnitKg = weight,
+            Coefficient = 1m,
+            IsActive = true,
+        };
+        _dbContext.MetalMaterials.Add(material);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return Json(new { id = material.Id, text = string.IsNullOrWhiteSpace(material.Code) ? material.Name : $"{material.Name} ({material.Code})", unitKind = material.UnitKind, weightPerUnitKg = weight, coefficient = 1m });
     }
 
     [HttpPost("Receipts/Create")]
@@ -2715,6 +2831,23 @@ public class MetalWarehouseController : Controller
         {
             ModelState.AddModelError(string.Empty, "Нет доступных поставщиков для прихода. Добавьте поставщиков в справочник.");
         }
+    }
+
+    private async Task<IReadOnlyCollection<MetalSupplierListItemViewModel>> GetSuppliersDirectoryItemsAsync(CancellationToken cancellationToken)
+    {
+        return await _dbContext.MetalSuppliers
+            .AsNoTracking()
+            .OrderByDescending(x => x.IsActive)
+            .ThenBy(x => x.Name)
+            .Select(x => new MetalSupplierListItemViewModel
+            {
+                Id = x.Id,
+                Identifier = x.Identifier,
+                Name = x.Name,
+                Inn = x.Inn,
+                IsActive = x.IsActive,
+            })
+            .ToListAsync(cancellationToken);
     }
 
     private static void RecalculateReceiptFinancials(MetalReceiptCreateViewModel model, decimal vatRatePercent)

@@ -215,6 +215,13 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     [StringLength(128, ErrorMessage = "Номер документа не должен превышать 128 символов.")]
     public string? SupplierDocumentNumber { get; set; }
 
+    [StringLength(128, ErrorMessage = "Накладная/УПД не должна превышать 128 символов.")]
+    public string? InvoiceOrUpiNumber { get; set; }
+
+    public string AccountingAccount { get; set; } = "10.01";
+
+    public string VatAccount { get; set; } = "19.03";
+
     [Required(ErrorMessage = "Цена обязательна.")]
     [Range(0.0001d, 999999999999d, ErrorMessage = "Цена должна быть больше 0.")]
     public decimal? PricePerKg { get; set; }
@@ -399,6 +406,47 @@ public class MetalReceiptCreateViewModel : IValidatableObject
             }
         }
     }
+}
+
+public class MetalSupplierListItemViewModel
+{
+    public Guid Id { get; init; }
+    public string Identifier { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string Inn { get; init; } = string.Empty;
+    public bool IsActive { get; init; }
+}
+
+public class MetalSuppliersDirectoryViewModel
+{
+    [Required(ErrorMessage = "Код поставщика обязателен.")]
+    [StringLength(32)]
+    public string Identifier { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Наименование обязательно.")]
+    [StringLength(256)]
+    public string Name { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "ИНН обязателен.")]
+    [StringLength(12)]
+    public string Inn { get; set; } = string.Empty;
+
+    public IReadOnlyCollection<MetalSupplierListItemViewModel> Suppliers { get; set; } = Array.Empty<MetalSupplierListItemViewModel>();
+}
+
+public class MetalSupplierInlineCreateModel
+{
+    public string Identifier { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Inn { get; set; } = string.Empty;
+}
+
+public class MetalMaterialInlineCreateModel
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Code { get; set; }
+    public string UnitKind { get; set; } = "Meter";
+    public decimal WeightPerUnitKg { get; set; } = 1m;
 }
 
 public class MetalReceiptDetailsItemViewModel
