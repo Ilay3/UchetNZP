@@ -135,7 +135,9 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
                 "{{item_price_per_kg}}",
                 "{{item_amount_without_vat}}",
                 "{{item_vat_amount}}",
-                "{{item_total_with_vat}}"));
+                "{{item_total_with_vat}}",
+                "{{chek}}",
+                "{{check}}"));
 
         if (templateRow is null)
         {
@@ -152,6 +154,7 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         {
             var row = (TableRow)templateRow.CloneNode(true);
             ReplaceToken(row, "{{chek}}", item.RowNumber);
+            ReplaceToken(row, "{{check}}", item.RowNumber);
             ReplaceToken(row, "{{item_material_name}}", item.MaterialName);
             ReplaceToken(row, "{{item_material_code}}", item.MaterialCode);
             ReplaceToken(row, "{{item_weight_kg}}", item.WeightKg);
