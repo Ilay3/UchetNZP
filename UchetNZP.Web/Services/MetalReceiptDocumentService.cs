@@ -1,8 +1,4 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
 using UchetNZP.Infrastructure.Data;
 
 namespace UchetNZP.Web.Services;
@@ -16,12 +12,15 @@ public sealed record MetalReceiptDocumentResult(string FileName, string ContentT
 
 public class MetalReceiptDocumentService : IMetalReceiptDocumentService
 {
-    private readonly AppDbContext _dbContext;
+    private const string TemplateRelativePath = "Templates/Documents/Приходный ордер.docx";
 
-    public MetalReceiptDocumentService(AppDbContext dbContext)
+    private readonly AppDbContext _dbContext;
+    private readonly IWebHostEnvironment _environment;
+
+    public MetalReceiptDocumentService(AppDbContext dbContext, IWebHostEnvironment environment)
     {
         _dbContext = dbContext;
-        QuestPDF.Settings.License = LicenseType.Community;
+        _environment = environment;
     }
 
     public async Task<MetalReceiptDocumentResult> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
@@ -29,97 +28,20 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         var receipt = await _dbContext.MetalReceipts
             .AsNoTracking()
             .Where(x => x.Id == receiptId)
-            .Select(x => new
-            {
-                x.ReceiptNumber,
-                x.ReceiptDate,
-                x.SupplierOrSource,
-                x.SupplierDocumentNumber,
-                x.PricePerKg,
-                x.AmountWithoutVat,
-                x.VatRatePercent,
-                x.VatAmount,
-                x.TotalAmountWithVat,
-                x.Comment,
-                Items = x.Items
-                    .OrderBy(i => i.ItemIndex)
-                    .Select(i => new
-                    {
-                        i.ItemIndex,
-                        MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty,
-                        i.ActualBlankSizeText,
-                        i.SizeValue,
-                        i.SizeUnitText,
-                        i.GeneratedCode,
-                    }).ToList(),
-            })
+            .Select(x => new { x.ReceiptNumber })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (receipt is null)
             throw new KeyNotFoundException();
 
-        var pdf = Document.Create(container =>
-        {
-            container.Page(page =>
-            {
-                page.Size(PageSizes.A4);
-                page.Margin(20);
-                page.DefaultTextStyle(x => x.FontSize(11));
+        var templatePath = Path.Combine(_environment.ContentRootPath, TemplateRelativePath);
+        if (!File.Exists(templatePath))
+            throw new FileNotFoundException("Шаблон печатной формы приходного ордера не найден в проекте.", templatePath);
 
-                page.Header().Column(col =>
-                {
-                    col.Item().Text("Товарная накладная по приёму ТМЦ").Bold().FontSize(16);
-                    col.Item().Text($"Документ № {receipt.ReceiptNumber} от {receipt.ReceiptDate.ToLocalTime():dd.MM.yyyy}");
-                    col.Item().Text($"Документ поставщика: {receipt.SupplierDocumentNumber ?? "—"}");
-                    col.Item().Text($"Поставщик: {receipt.SupplierOrSource ?? "—"}");
-                    col.Item().Text($"Склад: Металло-склад");
-                });
+        var content = await File.ReadAllBytesAsync(templatePath, cancellationToken);
+        var fileName = $"Приходный_ордер_{receipt.ReceiptNumber}.docx";
+        const string contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
-                page.Content().PaddingTop(12).Table(table =>
-                {
-                    table.ColumnsDefinition(columns =>
-                    {
-                        columns.ConstantColumn(30);
-                        columns.RelativeColumn(3);
-                        columns.RelativeColumn(2);
-                        columns.RelativeColumn(1);
-                        columns.RelativeColumn(2);
-                    });
-
-                    table.Header(header =>
-                    {
-                        header.Cell().Text("№").Bold();
-                        header.Cell().Text("Материал").Bold();
-                        header.Cell().Text("Размер").Bold();
-                        header.Cell().Text("Ед.").Bold();
-                        header.Cell().Text("Код").Bold();
-                    });
-
-                    foreach (var item in receipt.Items)
-                    {
-                        var sizeText = string.IsNullOrWhiteSpace(item.ActualBlankSizeText)
-                            ? item.SizeValue.ToString("0.###", CultureInfo.InvariantCulture)
-                            : item.ActualBlankSizeText;
-
-                        table.Cell().Text(item.ItemIndex.ToString(CultureInfo.InvariantCulture));
-                        table.Cell().Text(item.MaterialName);
-                        table.Cell().Text(sizeText);
-                        table.Cell().Text(item.SizeUnitText);
-                        table.Cell().Text(item.GeneratedCode);
-                    }
-                });
-
-                page.Footer().Column(col =>
-                {
-                    col.Item().AlignRight().Text($"Цена: {receipt.PricePerKg.ToString("0.####", CultureInfo.InvariantCulture)} руб/кг");
-                    col.Item().AlignRight().Text($"Сумма без НДС: {receipt.AmountWithoutVat.ToString("0.00", CultureInfo.InvariantCulture)} руб.");
-                    col.Item().AlignRight().Text($"НДС {receipt.VatRatePercent.ToString("0.##", CultureInfo.InvariantCulture)}%: {receipt.VatAmount.ToString("0.00", CultureInfo.InvariantCulture)} руб.");
-                    col.Item().AlignRight().Text($"Всего с НДС: {receipt.TotalAmountWithVat.ToString("0.00", CultureInfo.InvariantCulture)} руб.");
-                    col.Item().AlignRight().Text($"Комментарий: {receipt.Comment ?? "—"}");
-                });
-            });
-        }).GeneratePdf();
-
-        return new MetalReceiptDocumentResult($"Накладная_{receipt.ReceiptNumber}.pdf", "application/pdf", pdf);
+        return new MetalReceiptDocumentResult(fileName, contentType, content);
     }
 }

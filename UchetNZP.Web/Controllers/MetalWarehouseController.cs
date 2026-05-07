@@ -349,7 +349,7 @@ public class MetalWarehouseController : Controller
         var originalDocument = await ReadOriginalReceiptDocumentAsync(model.OriginalDocumentPdf, cancellationToken);
         if (!originalDocument.IsValid)
         {
-            ModelState.AddModelError(nameof(model.OriginalDocumentPdf), originalDocument.ErrorMessage ?? "Не удалось прочитать PDF.");
+            ModelState.AddModelError(nameof(model.OriginalDocumentPdf), originalDocument.ErrorMessage ?? "Не удалось прочитать DOCX.");
         }
 
         if (!ModelState.IsValid)
@@ -1374,10 +1374,10 @@ public class MetalWarehouseController : Controller
         }
 
         var fileName = string.IsNullOrWhiteSpace(document.OriginalDocumentFileName)
-            ? $"Оригинал_{id:N}.pdf"
+            ? $"Оригинал_{id:N}.docx"
             : document.OriginalDocumentFileName;
         var contentType = string.IsNullOrWhiteSpace(document.OriginalDocumentContentType)
-            ? "application/pdf"
+            ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             : document.OriginalDocumentContentType;
 
         return File(document.OriginalDocumentContent, contentType, fileName);
@@ -2726,12 +2726,12 @@ public class MetalWarehouseController : Controller
 
         if (file.Length > MetalReceiptCreateViewModel.MaxOriginalDocumentSizeBytes)
         {
-            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "PDF слишком большой. Максимум 25 МБ.");
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл слишком большой. Максимум 25 МБ.");
         }
 
-        if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(Path.GetExtension(file.FileName), ".docx", StringComparison.OrdinalIgnoreCase))
         {
-            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Можно прикрепить только PDF-файл.");
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Можно прикрепить только DOCX-файл.");
         }
 
         await using var stream = file.OpenReadStream();
@@ -2739,21 +2739,21 @@ public class MetalWarehouseController : Controller
         await stream.CopyToAsync(memory, cancellationToken);
         var content = memory.ToArray();
 
-        if (content.Length < 4 || content[0] != 0x25 || content[1] != 0x50 || content[2] != 0x44 || content[3] != 0x46)
+        if (content.Length < 4 || content[0] != 0x50 || content[1] != 0x4B)
         {
-            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл не похож на PDF. Проверьте, что выбран скан в формате PDF.");
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл не похож на DOCX. Проверьте, что выбран документ Word.");
         }
 
         var safeFileName = Path.GetFileName(file.FileName);
         if (string.IsNullOrWhiteSpace(safeFileName))
         {
-            safeFileName = "original.pdf";
+            safeFileName = "original.docx";
         }
 
         return new OriginalReceiptDocumentReadResult(
             true,
             safeFileName,
-            string.IsNullOrWhiteSpace(file.ContentType) ? "application/pdf" : file.ContentType,
+            string.IsNullOrWhiteSpace(file.ContentType) ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : file.ContentType,
             content,
             file.Length,
             null);
