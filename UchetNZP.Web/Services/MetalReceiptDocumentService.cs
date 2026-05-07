@@ -167,12 +167,39 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
 
     private static void ReplaceToken(OpenXmlElement root, string token, string value)
     {
-        foreach (var text in root.Descendants<Text>())
+        var safeValue = value ?? string.Empty;
+
+        foreach (var paragraph in root.Descendants<Paragraph>())
         {
-            if (text.Text.Contains(token, StringComparison.Ordinal))
-            {
-                text.Text = text.Text.Replace(token, value ?? string.Empty, StringComparison.Ordinal);
-            }
+            ReplaceTokenInTextContainer(paragraph, token, safeValue);
+        }
+
+        foreach (var cell in root.Descendants<TableCell>())
+        {
+            ReplaceTokenInTextContainer(cell, token, safeValue);
+        }
+    }
+
+    private static void ReplaceTokenInTextContainer(OpenXmlElement container, string token, string value)
+    {
+        var textNodes = container.Descendants<Text>().ToList();
+        if (textNodes.Count == 0)
+        {
+            return;
+        }
+
+        var combinedText = string.Concat(textNodes.Select(x => x.Text));
+        if (!combinedText.Contains(token, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var replacedText = combinedText.Replace(token, value, StringComparison.Ordinal);
+        textNodes[0].Text = replacedText;
+
+        for (var i = 1; i < textNodes.Count; i++)
+        {
+            textNodes[i].Text = string.Empty;
         }
     }
 
