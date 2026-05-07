@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System;
 using System.Threading;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Localization;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using UchetNZP.Application.Abstractions;
 using UchetNZP.Application.Services;
@@ -15,7 +17,20 @@ var builder = WebApplication.CreateBuilder(args);
 
 QuestPDF.Settings.License = LicenseType.Community;
 
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllersWithViews(options =>
+{
+    options.ModelBindingMessageProvider.SetValueMustNotBeNullAccessor(_ => "Поле обязательно для заполнения.");
+    options.ModelBindingMessageProvider.SetValueIsInvalidAccessor(value => $"Значение '{value}' имеет неверный формат. Используйте число в формате 123,59.");
+    options.ModelBindingMessageProvider.SetValueMustBeANumberAccessor(_ => "Введите число в формате 123,59.");
+});
+
+var ruCulture = CultureInfo.GetCultureInfo("ru-RU");
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    options.DefaultRequestCulture = new RequestCulture(ruCulture);
+    options.SupportedCultures = new[] { ruCulture };
+    options.SupportedUICultures = new[] { ruCulture };
+});
 builder.Host.UseWindowsService();
 
 builder.Services.Configure<MaintenanceOptions>(builder.Configuration.GetSection("Maintenance"));
@@ -81,6 +96,7 @@ using (var scope = app.Services.CreateScope())
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
         await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
+        await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
     else
@@ -89,6 +105,7 @@ using (var scope = app.Services.CreateScope())
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
         await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
+        await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
 }
@@ -101,6 +118,8 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+app.UseRequestLocalization();
 
 app.UseRouting();
 
@@ -148,6 +167,19 @@ static async Task EnsureMetalReceiptItemConsumptionColumnsAsync(AppDbContext in_
         in_cancellationToken);
 }
 
+
+static async Task EnsureMetalReceiptFinanceColumnsAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    await in_db.Database.ExecuteSqlRawAsync(
+        """
+        ALTER TABLE "MetalReceipts"
+            ADD COLUMN IF NOT EXISTS "AccountingAccount" character varying(16) NOT NULL DEFAULT '10.01';
+
+        ALTER TABLE "MetalReceipts"
+            ADD COLUMN IF NOT EXISTS "VatAccount" character varying(16) NOT NULL DEFAULT '19.01';
+        """,
+        in_cancellationToken);
+}
 static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
 {
     if (await in_db.MetalMaterials.AnyAsync(in_cancellationToken))
