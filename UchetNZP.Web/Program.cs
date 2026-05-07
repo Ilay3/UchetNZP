@@ -178,8 +178,36 @@ static async Task EnsureMetalReceiptFinanceColumnsAsync(AppDbContext in_db, Canc
         ALTER TABLE "MetalReceipts"
             ADD COLUMN IF NOT EXISTS "VatAccount" character varying(16) NOT NULL DEFAULT '19.01';
 
-                ALTER TABLE "MetalReceipts"
-        ADD COLUMN IF NOT EXISTS "InvoiceOrUpiNumber" character varying(128);
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'MetalReceiptItems'
+                  AND column_name = 'priceperkg'
+            )
+            AND NOT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'MetalReceiptItems'
+                  AND column_name = 'PricePerKg'
+            ) THEN
+                EXECUTE 'ALTER TABLE "MetalReceiptItems" RENAME COLUMN priceperkg TO "PricePerKg"';
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'MetalReceiptItems'
+                  AND column_name = 'PricePerKg'
+            ) THEN
+                EXECUTE 'ALTER TABLE "MetalReceiptItems" ADD COLUMN "PricePerKg" numeric(18,4) NOT NULL DEFAULT 0';
+            END IF;
+        END
+        $$;
         """,
 
 
