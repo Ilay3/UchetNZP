@@ -190,9 +190,9 @@
                         <div class="col-md-2">
                             <label class="form-label">Цена, руб/кг</label>
                             <input class="form-control form-control-lg"
-                                   type="number"
-                                   min="0.0001"
-                                   step="0.0001"
+                                   type="text"
+                                   inputmode="decimal"
+                                   pattern="^\d+(,\d{1,4})?$"
                                    name="Items[@i].PricePerKg"
                                    value="@line.PricePerKg?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)"
                                    data-line-price-input />
@@ -405,7 +405,7 @@
 
             <div class="col-md-2">
                 <label class="form-label">Цена, руб/кг</label>
-                <input class="form-control form-control-lg" type="number" min="0.0001" step="0.0001" name="Items[__index__].PricePerKg" data-line-price-input />
+                <input class="form-control form-control-lg" type="text" inputmode="decimal" pattern="^\d+(,\d{1,4})?$" name="Items[__index__].PricePerKg" data-line-price-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].PricePerKg" data-valmsg-replace="true"></span>
             </div>
 
