@@ -1354,6 +1354,21 @@ public class MetalWarehouseController : Controller
         }
     }
 
+    [HttpGet("Receipts/{id:guid}/DocumentPdf")]
+    public async Task<IActionResult> ReceiptDocumentPdf(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var document = await _metalReceiptDocumentService.BuildPdfAsync(id, cancellationToken);
+            Response.Headers.ContentDisposition = $"inline; filename=\"{document.FileName}\"";
+            return File(document.Content, document.ContentType);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
     [HttpGet("Receipts/{id:guid}/OriginalDocument")]
     public async Task<IActionResult> ReceiptOriginalDocument(Guid id, CancellationToken cancellationToken)
     {
