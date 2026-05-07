@@ -11,11 +11,30 @@
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Receipts">К списку приходов</a>
     <a class="btn btn-outline-success" asp-controller="MetalWarehouse" asp-action="ReceiptDocument" asp-route-id="@Model.Id">Приходный ордер (DOCX)</a>
+    <a id="receiptPdfPrintButton" class="btn btn-outline-danger" asp-controller="MetalWarehouse" asp-action="ReceiptDocumentPdf" asp-route-id="@Model.Id">
+        <span class="receipt-pdf-print-label">Печать в браузере (PDF)</span>
+        <span class="receipt-pdf-print-loading d-none">Готовим PDF…</span>
+    </a>
     @if (Model.HasOriginalDocument)
     {
         <a class="btn btn-success" asp-controller="MetalWarehouse" asp-action="ReceiptOriginalDocument" asp-route-id="@Model.Id">Оригинал DOCX</a>
     }
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const btn = document.getElementById("receiptPdfPrintButton");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+        btn.classList.add("disabled");
+        btn.setAttribute("aria-disabled", "true");
+        const normal = btn.querySelector(".receipt-pdf-print-label");
+        const loading = btn.querySelector(".receipt-pdf-print-loading");
+        if (normal) normal.classList.add("d-none");
+        if (loading) loading.classList.remove("d-none");
+    });
+});
+</script>
 
 <div class="card shadow-sm mb-4">
     <div class="card-header bg-light fw-semibold">Документ</div>

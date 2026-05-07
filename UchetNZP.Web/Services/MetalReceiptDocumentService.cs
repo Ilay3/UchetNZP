@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
@@ -10,6 +11,7 @@ namespace UchetNZP.Web.Services;
 public interface IMetalReceiptDocumentService
 {
     Task<MetalReceiptDocumentResult> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default);
+    Task<MetalReceiptDocumentResult> BuildPdfAsync(Guid receiptId, CancellationToken cancellationToken = default);
 }
 
 public sealed record MetalReceiptDocumentResult(string FileName, string ContentType, byte[] Content);
@@ -20,11 +22,13 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
 
     private readonly AppDbContext _dbContext;
     private readonly IWebHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
 
-    public MetalReceiptDocumentService(AppDbContext dbContext, IWebHostEnvironment environment)
+    public MetalReceiptDocumentService(AppDbContext dbContext, IWebHostEnvironment environment, IConfiguration configuration)
     {
         _dbContext = dbContext;
         _environment = environment;
+        _configuration = configuration;
     }
 
     public async Task<MetalReceiptDocumentResult> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
@@ -103,6 +107,52 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         return new MetalReceiptDocumentResult(fileName, contentType, memoryStream.ToArray());
     }
 
+    public async Task<MetalReceiptDocumentResult> BuildPdfAsync(Guid receiptId, CancellationToken cancellationToken = default)
+    {
+        var docx = await BuildAsync(receiptId, cancellationToken);
+        var sofficePath = _configuration["LibreOffice:ExecutablePath"];
+        if (string.IsNullOrWhiteSpace(sofficePath) || !File.Exists(sofficePath))
+            throw new FileNotFoundException("Не найден путь к LibreOffice (LibreOffice:ExecutablePath).", sofficePath);
+
+        var tempRoot = Path.Combine(Path.GetTempPath(), "uchetnzp-receipts", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+        try
+        {
+            var docxPath = Path.Combine(tempRoot, docx.FileName);
+            await File.WriteAllBytesAsync(docxPath, docx.Content, cancellationToken);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = sofficePath,
+                Arguments = $"--headless --convert-to pdf --outdir \"{tempRoot}\" \"{docxPath}\"",
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+
+            using var process = Process.Start(psi) ?? throw new InvalidOperationException("Не удалось запустить LibreOffice.");
+            await process.WaitForExitAsync(cancellationToken);
+            if (process.ExitCode != 0)
+            {
+                var err = await process.StandardError.ReadToEndAsync(cancellationToken);
+                throw new InvalidOperationException($"LibreOffice завершился с ошибкой: {err}");
+            }
+
+            var pdfPath = Path.ChangeExtension(docxPath, ".pdf");
+            if (!File.Exists(pdfPath))
+                throw new FileNotFoundException("LibreOffice не создал PDF файл.", pdfPath);
+
+            var pdfBytes = await File.ReadAllBytesAsync(pdfPath, cancellationToken);
+            return new MetalReceiptDocumentResult(Path.GetFileName(pdfPath), "application/pdf", pdfBytes);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, true);
+        }
+    }
+
     private static void FillHeaderAndTotals(Body body, ReceiptProjection receipt, IReadOnlyCollection<ReceiptPrintItemRow> items)
     {
         var totalWeight = items.Sum(x => ParseDecimal(x.WeightKg));
@@ -135,7 +185,9 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
                 "{{item_price_per_kg}}",
                 "{{item_amount_without_vat}}",
                 "{{item_vat_amount}}",
-                "{{item_total_with_vat}}"));
+                "{{item_total_with_vat}}",
+                "{{chek}}",
+                "{{check}}"));
 
         if (templateRow is null)
         {
@@ -152,6 +204,7 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         {
             var row = (TableRow)templateRow.CloneNode(true);
             ReplaceToken(row, "{{chek}}", item.RowNumber);
+            ReplaceToken(row, "{{check}}", item.RowNumber);
             ReplaceToken(row, "{{item_material_name}}", item.MaterialName);
             ReplaceToken(row, "{{item_material_code}}", item.MaterialCode);
             ReplaceToken(row, "{{item_weight_kg}}", item.WeightKg);
