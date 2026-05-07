@@ -181,6 +181,9 @@ public class MetalReceiptUnitInputViewModel
 
 public class MetalReceiptLineInputViewModel
 {
+    [Range(0.0001d, 999999999999d, ErrorMessage = "Цена должна быть больше 0.")]
+    public decimal? PricePerKg { get; set; }
+
     public Guid? MetalMaterialId { get; set; }
 
     public string? MaterialInputText { get; set; }
@@ -222,8 +225,6 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
     public string VatAccount { get; set; } = "19.03";
 
-    [Required(ErrorMessage = "Цена обязательна.")]
-    [Range(0.0001d, 999999999999d, ErrorMessage = "Цена должна быть больше 0.")]
     public decimal? PricePerKg { get; set; }
 
     public decimal VatRatePercent { get; set; }
@@ -315,6 +316,13 @@ public class MetalReceiptCreateViewModel : IValidatableObject
                     new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.PassportWeightKg)}" });
             }
 
+            if (!line.PricePerKg.HasValue || line.PricePerKg.Value <= 0m)
+            {
+                yield return new ValidationResult(
+                    $"Укажите цену в строке {lineNumber}.",
+                    new[] { $"{nameof(Items)}[{lineIndex}].{nameof(MetalReceiptLineInputViewModel.PricePerKg)}" });
+            }
+
             if (!line.Quantity.HasValue || line.Quantity.Value <= 0)
             {
                 yield return new ValidationResult(
@@ -368,6 +376,7 @@ public class MetalReceiptCreateViewModel : IValidatableObject
             {
                 MetalMaterialId = MetalMaterialId,
                 PassportWeightKg = PassportWeightKg,
+                PricePerKg = PricePerKg,
                 Quantity = Quantity,
                 Units = Units,
             },

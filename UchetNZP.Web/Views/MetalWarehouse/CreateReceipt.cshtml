@@ -94,11 +94,7 @@
         <input asp-for="VatAccount" class="form-control form-control-lg" readonly />
     </div>
 
-    <div class="col-md-2">
-        <label asp-for="PricePerKg" class="form-label">Цена, руб/кг</label>
-        <input asp-for="PricePerKg" class="form-control form-control-lg" type="number" min="0.0001" step="0.0001" value="@priceValue" data-price-input />
-        <span asp-validation-for="PricePerKg" class="text-danger"></span>
-    </div>
+    <input asp-for="PricePerKg" type="hidden" value="@priceValue" data-price-input />
 
     <div class="col-12">
         <div class="row g-2 receipt-financial-summary" data-financial-summary data-vat-rate="@Model.VatRatePercent.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)">
@@ -191,6 +187,17 @@
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].MetalMaterialId" data-valmsg-replace="true"></span>
                         </div>
 
+                        <div class="col-md-2">
+                            <label class="form-label">Цена, руб/кг</label>
+                            <input class="form-control form-control-lg"
+                                   type="number"
+                                   min="0.0001"
+                                   step="0.0001"
+                                   name="Items[@i].PricePerKg"
+                                   value="@line.PricePerKg?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)"
+                                   data-line-price-input />
+                            <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].PricePerKg" data-valmsg-replace="true"></span>
+                        </div>
                         <div class="col-md-2">
                             <label class="form-label">Вес по документу, кг</label>
                             <input class="form-control form-control-lg"
@@ -313,10 +320,7 @@
                             <li>Наименование поставщика — <code>{{supplier_name}}</code></li>
                             <li>Код поставщика — <code>{{supplier_code}}</code></li>
                             <li>№ документа — <code>{{supplier_document_number}}</code></li>
-<<<<<<< codex/improve-metal-warehouse-receipt-interface
                             <li>Порядковый номер строки (счётчик) — <code>{{chek}}</code> (1, 2, 3...)</li>
-=======
->>>>>>> master
                         </ul>
                     </div>
                     <div class="col-lg-6">
@@ -397,6 +401,12 @@
                 <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 1050; max-height: 260px; overflow-y: auto;" data-material-suggestions></div>
                 <input type="hidden" name="Items[__index__].MetalMaterialId" data-material-id />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].MetalMaterialId" data-valmsg-replace="true"></span>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">Цена, руб/кг</label>
+                <input class="form-control form-control-lg" type="number" min="0.0001" step="0.0001" name="Items[__index__].PricePerKg" data-line-price-input />
+                <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].PricePerKg" data-valmsg-replace="true"></span>
             </div>
 
             <div class="col-md-2">

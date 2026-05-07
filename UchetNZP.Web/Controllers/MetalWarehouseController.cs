@@ -362,6 +362,7 @@ public class MetalWarehouseController : Controller
                     x.MaterialInputText,
                     x.Quantity,
                     x.PassportWeightKg,
+                    x.PricePerKg,
                     UnitSizes = x.Units.Select(u => new { u.ItemIndex, u.SizeValue }).ToList(),
                 }).ToList(),
                 ModelState.Where(ms => ms.Value?.Errors.Count > 0)
@@ -389,7 +390,7 @@ public class MetalWarehouseController : Controller
             InvoiceOrUpiNumber = model.InvoiceOrUpiNumber?.Trim(),
             AccountingAccount = "10.01",
             VatAccount = "19.03",
-            PricePerKg = model.PricePerKg!.Value,
+            PricePerKg = model.Items.FirstOrDefault()?.PricePerKg ?? model.PricePerKg ?? 0m,
             AmountWithoutVat = model.AmountWithoutVat,
             VatRatePercent = model.VatRatePercent,
             VatAmount = model.VatAmount,
@@ -438,6 +439,7 @@ public class MetalWarehouseController : Controller
                     ActualBlankSizeText = actualBlankSizeText,
                     IsSizeApproximate = line.UseAverageSize,
                     PassportWeightKg = passportWeight,
+                    PricePerKg = model.PricePerKg ?? 0m,
                     ActualWeightKg = actualWeight,
                     CalculatedWeightKg = calculatedWeight,
                     WeightDeviationKg = deviation,
@@ -508,7 +510,7 @@ public class MetalWarehouseController : Controller
             return RedirectToAction(nameof(CreateReceipt));
         }
 
-        return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
+        return RedirectToAction(nameof(ReceiptDocument), new { id = receipt.Id });
     }
 
     [HttpPost("Receipts/AddSupplierInline")]
@@ -636,6 +638,7 @@ public class MetalWarehouseController : Controller
                     x.MaterialInputText,
                     x.Quantity,
                     x.PassportWeightKg,
+                    x.PricePerKg,
                     UnitSizes = x.Units.Select(u => new { u.ItemIndex, u.SizeValue }).ToList(),
                 }).ToList(),
                 ModelState.Where(ms => ms.Value?.Errors.Count > 0)
@@ -676,6 +679,7 @@ public class MetalWarehouseController : Controller
                     x.MaterialInputText,
                     x.Quantity,
                     x.PassportWeightKg,
+                    x.PricePerKg,
                     UnitSizes = x.Units.Select(u => new { u.ItemIndex, u.SizeValue }).ToList(),
                 }).ToList(),
                 ModelState.Where(ms => ms.Value?.Errors.Count > 0)
@@ -705,6 +709,7 @@ public class MetalWarehouseController : Controller
                 SizeUnitText = sizeUnitText,
                 ActualBlankSizeText = actualBlankSizeText,
                 PassportWeightKg = passportWeight,
+                    PricePerKg = model.PricePerKg ?? 0m,
                 ActualWeightKg = actualWeight,
                 CalculatedWeightKg = calculatedWeight,
                 WeightDeviationKg = deviation,
@@ -757,7 +762,7 @@ public class MetalWarehouseController : Controller
             return RedirectToAction(nameof(CreateReceipt));
         }
 
-        return RedirectToAction(nameof(ReceiptDetails), new { id = receipt.Id });
+        return RedirectToAction(nameof(ReceiptDocument), new { id = receipt.Id });
     }
 
     [HttpGet("Receipts/Details/{id:guid}")]
@@ -2858,8 +2863,10 @@ public class MetalWarehouseController : Controller
             ? model.Items.Where(x => x.PassportWeightKg.HasValue).Sum(x => x.PassportWeightKg!.Value)
             : model.PassportWeightKg ?? 0m;
 
-        var pricePerKg = model.PricePerKg ?? 0m;
-        model.AmountWithoutVat = Math.Round(passportWeightKg * pricePerKg, 2, MidpointRounding.AwayFromZero);
+        var amountWithoutVat = model.Items.Count > 0
+            ? model.Items.Sum(x => (x.PassportWeightKg ?? 0m) * (x.PricePerKg ?? 0m))
+            : passportWeightKg * (model.PricePerKg ?? 0m);
+        model.AmountWithoutVat = Math.Round(amountWithoutVat, 2, MidpointRounding.AwayFromZero);
         model.VatAmount = Math.Round(model.AmountWithoutVat * vatRatePercent / 100m, 2, MidpointRounding.AwayFromZero);
         model.TotalAmountWithVat = model.AmountWithoutVat + model.VatAmount;
     }
