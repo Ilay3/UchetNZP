@@ -127,15 +127,16 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
     private static void FillItemsTable(Body body, IReadOnlyCollection<ReceiptPrintItemRow> items)
     {
         var templateRow = body.Descendants<TableRow>().FirstOrDefault(row =>
-            row.Descendants<Text>().Any(text =>
-                text.Text.Contains("{{chek}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{item_material_name}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{item_material_code}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{item_weight_kg}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{item_price_per_kg}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{item_amount_without_vat}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{item_vat_amount}}", StringComparison.Ordinal) ||
-                text.Text.Contains("{{item_total_with_vat}}", StringComparison.Ordinal)));
+            RowContainsAnyToken(
+                row,
+                "{{item_material_name}}",
+                "{{item_material_code}}",
+                "{{item_weight_kg}}",
+                "{{item_price_per_kg}}",
+                "{{item_amount_without_vat}}",
+                "{{item_vat_amount}}",
+                "{{item_total_with_vat}}",
+                "{{chek}}"));
 
         if (templateRow is null)
         {
@@ -163,6 +164,16 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         }
 
         templateRow.Remove();
+
+        // В некоторых шаблонах {{chek}} ошибочно используется в заголовке, не только в строке таблицы.
+        // После генерации строк очищаем/подставляем остатки, чтобы в выходном документе не оставались токены.
+        ReplaceToken(body, "{{chek}}", items.FirstOrDefault()?.RowNumber ?? string.Empty);
+    }
+
+    private static bool RowContainsAnyToken(TableRow row, params string[] tokens)
+    {
+        var rowText = string.Concat(row.Descendants<Text>().Select(x => x.Text));
+        return tokens.Any(token => rowText.Contains(token, StringComparison.Ordinal));
     }
 
     private static void ReplaceToken(OpenXmlElement root, string token, string value)
