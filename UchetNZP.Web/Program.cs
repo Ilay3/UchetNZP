@@ -177,7 +177,12 @@ static async Task EnsureMetalReceiptFinanceColumnsAsync(AppDbContext in_db, Canc
 
         ALTER TABLE "MetalReceipts"
             ADD COLUMN IF NOT EXISTS "VatAccount" character varying(16) NOT NULL DEFAULT '19.01';
+
+                ALTER TABLE "MetalReceipts"
+        ADD COLUMN IF NOT EXISTS "InvoiceOrUpiNumber" character varying(128);
         """,
+
+
         in_cancellationToken);
 }
 static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
