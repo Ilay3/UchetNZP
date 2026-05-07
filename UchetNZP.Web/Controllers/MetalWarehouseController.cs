@@ -439,7 +439,7 @@ public class MetalWarehouseController : Controller
                     ActualBlankSizeText = actualBlankSizeText,
                     IsSizeApproximate = line.UseAverageSize,
                     PassportWeightKg = passportWeight,
-                    PricePerKg = model.PricePerKg ?? 0m,
+                    PricePerKg = line.PricePerKg ?? model.PricePerKg ?? 0m,
                     ActualWeightKg = actualWeight,
                     CalculatedWeightKg = calculatedWeight,
                     WeightDeviationKg = deviation,
