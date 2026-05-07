@@ -75,6 +75,7 @@
 
     const materialsByDisplay = new Map(materials.map(item => [normalizeText(item.text), item]));
     const suppliersByDisplay = new Map(suppliers.map(item => [normalizeText(item.text), item]));
+    const antiForgeryToken = form.querySelector("input[name='__RequestVerificationToken']")?.value || "";
 
     function escapeHtml(value) {
         return String(value)
@@ -703,6 +704,52 @@
         normalizeDecimalInputValue(event.target);
         updateFinancialSummary();
     });
+
+    async function postJson(url, payload) {
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "RequestVerificationToken": antiForgeryToken },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Ошибка сохранения.");
+        return data;
+    }
+
+    document.querySelector("[data-inline-supplier-save]")?.addEventListener("click", async () => {
+        const error = document.querySelector("[data-inline-supplier-error]");
+        try {
+            const created = await postJson("/MetalWarehouse/Receipts/AddSupplierInline", {
+                identifier: document.querySelector("[data-inline-supplier-identifier]")?.value || "",
+                name: document.querySelector("[data-inline-supplier-name]")?.value || "",
+                inn: document.querySelector("[data-inline-supplier-inn]")?.value || ""
+            });
+            const item = { id: String(created.id), text: String(created.text), search: String(created.text).toLowerCase() };
+            suppliers.push(item); suppliersByDisplay.set(normalizeText(item.text), item);
+            document.querySelector("[data-supplier-input]").value = item.text;
+            document.querySelector("[data-supplier-id]").value = item.id;
+            error.textContent = "";
+        } catch (e) { error.textContent = e.message; }
+    });
+
+    document.querySelector("[data-inline-material-save]")?.addEventListener("click", async () => {
+        const error = document.querySelector("[data-inline-material-error]");
+        try {
+            const created = await postJson("/MetalWarehouse/Receipts/AddMaterialInline", {
+                name: document.querySelector("[data-inline-material-name]")?.value || "",
+                code: document.querySelector("[data-inline-material-code]")?.value || "",
+                unitKind: document.querySelector("[data-inline-material-unit]")?.value || "Meter",
+                weightPerUnitKg: Number.parseFloat(document.querySelector("[data-inline-material-weight]")?.value || "0")
+            });
+            const item = { id: String(created.id), text: String(created.text), search: String(created.text).toLowerCase() };
+            materials.push(item); materialsByDisplay.set(normalizeText(item.text), item);
+            materialUnitKindMap[item.id] = created.unitKind || "Meter";
+            materialCoefficientMap[item.id] = created.coefficient || 1;
+            materialWeightPerUnitMap[item.id] = created.weightPerUnitKg || 1;
+            error.textContent = "";
+        } catch (e) { error.textContent = e.message; }
+    });
+
     setupSupplierAutocomplete();
     receiptLines().forEach(setupLine);
     reindexLines();
