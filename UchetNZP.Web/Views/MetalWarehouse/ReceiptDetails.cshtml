@@ -10,9 +10,8 @@
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Receipts">К списку приходов</a>
-    <a class="btn btn-outline-success" asp-controller="MetalWarehouse" asp-action="ReceiptDocumentPdf" asp-route-id="@Model.Id">Печать (PDF)</a>
     <a id="receiptPdfPrintButton" class="btn btn-outline-danger" asp-controller="MetalWarehouse" asp-action="ReceiptDocumentPdf" asp-route-id="@Model.Id">
-        <span class="receipt-pdf-print-label">Печать в браузере (PDF)</span>
+        <span class="receipt-pdf-print-label">Печать в браузере</span>
         <span class="receipt-pdf-print-loading d-none">Готовим PDF…</span>
     </a>
     @if (Model.HasOriginalDocument)
