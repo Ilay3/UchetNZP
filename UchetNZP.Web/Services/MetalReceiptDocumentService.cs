@@ -154,11 +154,16 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         }
     }
 
-    private static void FillHeaderAndTotals(Body body, ReceiptProjection receipt, IReadOnlyCollection<ReceiptPrintItemRow> items)
+    private static void FillHeaderAndTotals(
+    Body body,
+    ReceiptProjection receipt,
+    IReadOnlyCollection<ReceiptPrintItemRow> items)
     {
         var totalWeight = items.Sum(x => ParseDecimal(x.WeightKg));
+
         var placeholders = new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["{{receipt_number}}"] = FormatReceiptNumberForPrint(receipt.ReceiptNumber),
             ["{{receipt_date}}"] = receipt.ReceiptDate.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
             ["{{supplier_name}}"] = receipt.SupplierName ?? string.Empty,
             ["{{supplier_code}}"] = receipt.SupplierCode ?? string.Empty,
@@ -169,10 +174,35 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
             ["{{total_amount_with_vat}}"] = FormatDecimal(receipt.TotalAmountWithVat),
         };
 
-        foreach (var placeholder in placeholders)
-        {
-            ReplaceToken(body, placeholder.Key, placeholder.Value);
-        }
+        ReplaceTokens(body, placeholders);
+    }
+
+    private static string FormatReceiptNumberForPrint(string receiptNumber)
+    {
+        if (string.IsNullOrWhiteSpace(receiptNumber))
+            return string.Empty;
+
+        var value = receiptNumber.Trim();
+
+        // Пример: ПРИХОД МЕТАЛЛА-20260508-№0013 -> 0013
+        var numberAfterSignMatch = Regex.Match(
+            value,
+            @"(?:№|#)\s*(?<number>\d+)\s*$",
+            RegexOptions.CultureInvariant);
+
+        if (numberAfterSignMatch.Success)
+            return numberAfterSignMatch.Groups["number"].Value;
+
+        // Пример: ПРИХОД-МЕТАЛЛА-20260508-0013 -> 0013
+        var lastDigitsMatch = Regex.Match(
+            value,
+            @"(?<number>\d+)\s*$",
+            RegexOptions.CultureInvariant);
+
+        if (lastDigitsMatch.Success)
+            return lastDigitsMatch.Groups["number"].Value;
+
+        return value;
     }
 
     private static void FillItemsTable(Body body, IReadOnlyCollection<ReceiptPrintItemRow> items)
@@ -180,20 +210,18 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         var templateRow = body.Descendants<TableRow>().FirstOrDefault(row =>
             RowContainsAnyToken(
                 row,
+                "{{chek}}",
+                "{{check}}",
                 "{{item_material_name}}",
                 "{{item_material_code}}",
                 "{{item_weight_kg}}",
                 "{{item_price_per_kg}}",
                 "{{item_amount_without_vat}}",
                 "{{item_vat_amount}}",
-                "{{item_total_with_vat}}",
-                "{{chek}}",
-                "{{check}}"));
+                "{{item_total_with_vat}}"));
 
         if (templateRow is null)
-        {
             return;
-        }
 
         if (items.Count == 0)
         {
@@ -204,20 +232,26 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         foreach (var item in items)
         {
             var row = (TableRow)templateRow.CloneNode(true);
-            ReplaceToken(row, "{{chek}}", item.RowNumber);
-            ReplaceToken(row, "{{check}}", item.RowNumber);
-            ReplaceToken(row, "{{item_material_name}}", item.MaterialName);
-            ReplaceToken(row, "{{item_material_code}}", item.MaterialCode);
-            ReplaceToken(row, "{{item_weight_kg}}", item.WeightKg);
-            ReplaceToken(row, "{{item_price_per_kg}}", item.PricePerKg);
-            ReplaceToken(row, "{{item_amount_without_vat}}", item.AmountWithoutVat);
-            ReplaceToken(row, "{{item_vat_amount}}", item.VatAmount);
-            ReplaceToken(row, "{{item_total_with_vat}}", item.TotalWithVat);
+
+            var placeholders = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["{{chek}}"] = item.RowNumber,
+                ["{{check}}"] = item.RowNumber,
+                ["{{item_material_name}}"] = item.MaterialName,
+                ["{{item_material_code}}"] = item.MaterialCode,
+                ["{{item_weight_kg}}"] = item.WeightKg,
+                ["{{item_price_per_kg}}"] = item.PricePerKg,
+                ["{{item_amount_without_vat}}"] = item.AmountWithoutVat,
+                ["{{item_vat_amount}}"] = item.VatAmount,
+                ["{{item_total_with_vat}}"] = item.TotalWithVat,
+            };
+
+            ReplaceTokens(row, placeholders);
+
             templateRow.Parent!.InsertBefore(row, templateRow);
         }
 
         templateRow.Remove();
-
     }
 
     private static bool RowContainsAnyToken(TableRow row, params string[] tokens)
@@ -227,37 +261,41 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         return tokens.Any(token => normalizedRowText.Contains(token, StringComparison.Ordinal));
     }
 
-    private static void ReplaceToken(OpenXmlElement root, string token, string value)
+    private static void ReplaceTokens(OpenXmlElement root, IReadOnlyDictionary<string, string> tokens)
     {
-        var safeValue = value ?? string.Empty;
-
         foreach (var paragraph in root.Descendants<Paragraph>())
         {
-            ReplaceTokenInTextContainer(paragraph, token, safeValue);
-        }
-
-        foreach (var cell in root.Descendants<TableCell>())
-        {
-            ReplaceTokenInTextContainer(cell, token, safeValue);
+            ReplaceTokensInTextContainer(paragraph, tokens);
         }
     }
 
-    private static void ReplaceTokenInTextContainer(OpenXmlElement container, string token, string value)
+    private static void ReplaceTokensInTextContainer(
+        OpenXmlElement container,
+        IReadOnlyDictionary<string, string> tokens)
     {
         var textNodes = container.Descendants<Text>().ToList();
+
         if (textNodes.Count == 0)
-        {
             return;
+
+        var originalText = string.Concat(textNodes.Select(x => x.Text));
+        var normalizedText = NormalizeTemplateTokens(originalText);
+
+        var replacedText = normalizedText;
+
+        foreach (var token in tokens)
+        {
+            var normalizedToken = NormalizeTemplateTokens(token.Key);
+
+            replacedText = replacedText.Replace(
+                normalizedToken,
+                token.Value ?? string.Empty,
+                StringComparison.Ordinal);
         }
 
-        var combinedText = string.Concat(textNodes.Select(x => x.Text));
-        var normalizedText = NormalizeTemplateTokens(combinedText);
-        if (!normalizedText.Contains(token, StringComparison.Ordinal))
-        {
+        if (replacedText == normalizedText)
             return;
-        }
 
-        var replacedText = normalizedText.Replace(token, value, StringComparison.Ordinal);
         textNodes[0].Text = replacedText;
 
         for (var i = 1; i < textNodes.Count; i++)
@@ -268,12 +306,28 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
 
     private static string NormalizeTemplateTokens(string text)
     {
-        return Regex.Replace(text, @"\{\{[^{}]+\}\}", match =>
-        {
-            var inner = match.Value[2..^2];
-            var compactInner = string.Concat(inner.Where(c => !char.IsWhiteSpace(c)));
-            return $"{{{{{compactInner}}}}}";
-        });
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        return Regex.Replace(
+            text,
+            @"\{\{(?<inner>.*?)\}\}",
+            match =>
+            {
+                var inner = match.Groups["inner"].Value;
+
+                var compactInner = string.Concat(
+                    inner.Where(c =>
+                        !char.IsWhiteSpace(c)
+                        && c != '\u00A0'
+                        && c != '\u200B'
+                        && c != '\u200C'
+                        && c != '\u200D'
+                        && c != '\uFEFF'));
+
+                return $"{{{{{compactInner}}}}}";
+            },
+            RegexOptions.Singleline);
     }
 
     private static string FormatDecimal(decimal value)
@@ -314,7 +368,7 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         public string MaterialCode { get; init; } = string.Empty;
         public string WeightKg { get; init; } = string.Empty;
         public string PricePerKg { get; init; } = string.Empty;
-        public string AmountWithoutVat { get; init; } = string.Empty;
+        public string AmountWithoutVat { get; init; } = string.Empty; 
         public string VatAmount { get; init; } = string.Empty;
         public string TotalWithVat { get; init; } = string.Empty;
     }
