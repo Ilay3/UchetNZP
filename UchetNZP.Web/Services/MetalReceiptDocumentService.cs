@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
@@ -222,7 +223,8 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
     private static bool RowContainsAnyToken(TableRow row, params string[] tokens)
     {
         var rowText = string.Concat(row.Descendants<Text>().Select(x => x.Text));
-        return tokens.Any(token => rowText.Contains(token, StringComparison.Ordinal));
+        var normalizedRowText = NormalizeTemplateTokens(rowText);
+        return tokens.Any(token => normalizedRowText.Contains(token, StringComparison.Ordinal));
     }
 
     private static void ReplaceToken(OpenXmlElement root, string token, string value)
@@ -249,18 +251,29 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         }
 
         var combinedText = string.Concat(textNodes.Select(x => x.Text));
-        if (!combinedText.Contains(token, StringComparison.Ordinal))
+        var normalizedText = NormalizeTemplateTokens(combinedText);
+        if (!normalizedText.Contains(token, StringComparison.Ordinal))
         {
             return;
         }
 
-        var replacedText = combinedText.Replace(token, value, StringComparison.Ordinal);
+        var replacedText = normalizedText.Replace(token, value, StringComparison.Ordinal);
         textNodes[0].Text = replacedText;
 
         for (var i = 1; i < textNodes.Count; i++)
         {
             textNodes[i].Text = string.Empty;
         }
+    }
+
+    private static string NormalizeTemplateTokens(string text)
+    {
+        return Regex.Replace(text, @"\{\{[^{}]+\}\}", match =>
+        {
+            var inner = match.Value[2..^2];
+            var compactInner = string.Concat(inner.Where(c => !char.IsWhiteSpace(c)));
+            return $"{{{{{compactInner}}}}}";
+        });
     }
 
     private static string FormatDecimal(decimal value)
