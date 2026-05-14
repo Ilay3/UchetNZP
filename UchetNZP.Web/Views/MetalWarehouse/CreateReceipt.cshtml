@@ -12,12 +12,11 @@
 
 <div class="page-header mb-4">
     <h1 class="display-6 fw-semibold">Добавить приход металла</h1>
-    <p class="lead mb-0">Один документ может содержать несколько металлов. Для больших партий можно указать одну среднюю длину.</p>
+    <p class="lead mb-0">Структура шапки и строк приведена к документу 1С: поставщик, склад, договор, счета и строки номенклатуры в кг.</p>
 </div>
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-outline-primary" asp-controller="MetalWarehouse" asp-action="Receipts">К списку приходов</a>
-    <a class="btn btn-outline-secondary" asp-controller="MetalWarehouse" asp-action="Suppliers">Справочник поставщиков</a>
 </div>
 
 @if (TempData["MetalReceiptSuccess"] is string success)
@@ -51,13 +50,49 @@
         </div>
     }
 
-    <div class="col-md-3">
+    <div class="col-md-2">
         <label asp-for="ReceiptDate" class="form-label">Дата прихода</label>
         <input asp-for="ReceiptDate" class="form-control form-control-lg" type="date" />
         <span asp-validation-for="ReceiptDate" class="text-danger"></span>
     </div>
 
-    <div class="col-md-5 position-relative">
+    <div class="col-md-3">
+        <label asp-for="OrganizationName" class="form-label">Организация</label>
+        <input asp-for="OrganizationName" class="form-control form-control-lg" />
+        <span asp-validation-for="OrganizationName" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-3">
+        <label asp-for="WarehouseName" class="form-label">Склад</label>
+        <input asp-for="WarehouseName" class="form-control form-control-lg" />
+        <span asp-validation-for="WarehouseName" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-2">
+        <label asp-for="OperationType" class="form-label">Операция 1С</label>
+        <input asp-for="OperationType" class="form-control form-control-lg" />
+        <span asp-validation-for="OperationType" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-2">
+        <label asp-for="CurrencyCode" class="form-label">Валюта</label>
+        <input asp-for="CurrencyCode" class="form-control form-control-lg text-uppercase" maxlength="3" />
+        <span asp-validation-for="CurrencyCode" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-2">
+        <label asp-for="BatchNumber" class="form-label">Партия</label>
+        <input asp-for="BatchNumber" class="form-control form-control-lg" maxlength="32" placeholder="Партия/серия" />
+        <span asp-validation-for="BatchNumber" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-2">
+        <label asp-for="ResponsibleUserName" class="form-label">Ответственный</label>
+        <input asp-for="ResponsibleUserName" class="form-control form-control-lg" readonly />
+        <span asp-validation-for="ResponsibleUserName" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-4 position-relative">
         <label class="form-label">Поставщик</label>
         <div class="input-group input-group-lg minimal-plus-input">
             <input class="form-control"
@@ -67,7 +102,6 @@
                    placeholder="ИНН или наименование"
                    autocomplete="off"
                    data-supplier-input />
-            <button type="button" class="btn btn-outline-primary" title="Добавить поставщика" data-bs-toggle="modal" data-bs-target="#addSupplierModal">+</button>
         </div>
         <div class="list-group position-absolute w-100 shadow-sm d-none"
              style="z-index: 1050; max-height: 260px; overflow-y: auto;"
@@ -82,8 +116,17 @@
         <span asp-validation-for="SupplierDocumentNumber" class="text-danger"></span>
     </div>
     <div class="col-md-2">
+        <label asp-for="SupplierDocumentDate" class="form-label">Дата документа</label>
+        <input asp-for="SupplierDocumentDate" class="form-control form-control-lg" type="date" />
+        <span asp-validation-for="SupplierDocumentDate" class="text-danger"></span>
+    </div>
+    <div class="col-md-2">
         <label asp-for="InvoiceOrUpiNumber" class="form-label">Накладная, УПД №</label>
         <input asp-for="InvoiceOrUpiNumber" class="form-control form-control-lg" maxlength="128" />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="ContractName" class="form-label">Договор</label>
+        <input asp-for="ContractName" class="form-control form-control-lg" maxlength="256" />
     </div>
     <div class="col-md-2">
         <label asp-for="AccountingAccount" class="form-label">Счет учета</label>
@@ -92,6 +135,14 @@
     <div class="col-md-2">
         <label asp-for="VatAccount" class="form-label">Счет НДС</label>
         <input asp-for="VatAccount" class="form-control form-control-lg" readonly />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="SettlementAccount" class="form-label">Счет расчетов</label>
+        <input asp-for="SettlementAccount" class="form-control form-control-lg" readonly />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="AdvanceAccount" class="form-label">Счет авансов</label>
+        <input asp-for="AdvanceAccount" class="form-control form-control-lg" readonly />
     </div>
 
     <input asp-for="PricePerKg" type="hidden" value="@priceValue" data-price-input />
@@ -126,9 +177,9 @@
     </div>
 
     <div class="col-md-5">
-        <label asp-for="OriginalDocumentPdf" class="form-label">Оригинал документа, PDF</label>
-        <input asp-for="OriginalDocumentPdf" class="form-control form-control-lg" type="file" accept=".pdf,application/pdf" />
-        <div class="form-text">PDF-документ поставщика. Потом его можно скачать из карточки прихода.</div>
+        <label asp-for="OriginalDocumentPdf" class="form-label">Оригинал документа</label>
+        <input asp-for="OriginalDocumentPdf" class="form-control form-control-lg" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+        <div class="form-text">PDF или DOCX поставщика. Потом его можно скачать из карточки прихода.</div>
         <span asp-validation-for="OriginalDocumentPdf" class="text-danger"></span>
     </div>
 
@@ -175,7 +226,6 @@
                                    autocomplete="off"
                                        name="Items[@i].MaterialInputText"
                                        data-material-input />
-                                <button type="button" class="btn btn-outline-primary" title="Добавить материал" data-bs-toggle="modal" data-bs-target="#addMaterialModal">+</button>
                             </div>
                             <div class="list-group position-absolute w-100 shadow-sm d-none"
                                  style="z-index: 1050; max-height: 260px; overflow-y: auto;"
@@ -192,14 +242,14 @@
                             <input class="form-control form-control-lg"
                                    type="text"
                                    inputmode="decimal"
-                                   pattern="^\d+(,\d{1,4})?$"
+                                   pattern="^\d+([,.]\d{1,4})?$"
                                    name="Items[@i].PricePerKg"
                                    value="@line.PricePerKg?.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)"
                                    data-line-price-input />
                             <span class="text-danger field-validation-valid" data-valmsg-for="Items[@i].PricePerKg" data-valmsg-replace="true"></span>
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label">Вес по документу, кг</label>
+                            <label class="form-label">Количество 1С, кг</label>
                             <input class="form-control form-control-lg"
                                    type="number"
                                    min="0.001"
@@ -211,7 +261,7 @@
                         </div>
 
                         <div class="col-md-2">
-                            <label class="form-label">Количество, шт</label>
+                            <label class="form-label">Складских единиц, шт</label>
                             <input class="form-control form-control-lg"
                                    type="number"
                                    min="1"
@@ -243,9 +293,9 @@
                                        value="true"
                                        @(line.UseAverageSize ? "checked" : string.Empty)
                                        data-average-checkbox />
-                                <label class="form-check-label fw-semibold">Ввести одну среднюю длину для всей партии</label>
+                                <label class="form-check-label fw-semibold">Размер одной строкой</label>
                             </div>
-                            <div class="form-text">Включайте для прутков, труб и других партий, где каждую штуку перемерить сложно.</div>
+                            <div class="form-text">Можно оставить пустым: складской размер будет рассчитан из веса и коэффициента материала.</div>
                         </div>
 
                         <div class="col-md-4 @averageClass" data-average-section>
@@ -307,78 +357,11 @@
         </div>
     </div>
 
-
-    <div class="col-12">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body">
-                <h3 class="h6 mb-3">Атрибуты для шаблона печати (Приходный ордер)</h3>
-                <div class="row g-3 small">
-                    <div class="col-lg-6">
-                        <div class="fw-semibold mb-1">Шапка документа</div>
-                        <ul class="mb-0">
-                            <li>Дата — <code>{{receipt_date}}</code></li>
-                            <li>Наименование поставщика — <code>{{supplier_name}}</code></li>
-                            <li>Код поставщика — <code>{{supplier_code}}</code></li>
-                            <li>№ документа — <code>{{supplier_document_number}}</code></li>
-                            <li>Порядковый номер строки (счётчик) — <code>{{chek}}</code> (1, 2, 3...)</li>
-                        </ul>
-                    </div>
-                    <div class="col-lg-6">
-                        <div class="fw-semibold mb-1">Строка материала</div>
-                        <ul class="mb-0">
-                            <li>Наименование материала — <code>{{item_material_name}}</code></li>
-                            <li>Номер материала — <code>{{item_material_code}}</code></li>
-                            <li>Вес по документу, кг — <code>{{item_weight_kg}}</code></li>
-                            <li>Цена — <code>{{item_price_per_kg}}</code></li>
-                            <li>Сумма без НДС — <code>{{item_amount_without_vat}}</code></li>
-                            <li>Сумма НДС 22% — <code>{{item_vat_amount}}</code></li>
-                            <li>Всего с НДС — <code>{{item_total_with_vat}}</code></li>
-                        </ul>
-                    </div>
-                    <div class="col-12">
-                        <div class="fw-semibold mb-1">Итоги по всем материалам</div>
-                        <ul class="mb-0">
-                            <li>Вес по документу, кг — <code>{{total_weight_kg}}</code></li>
-                            <li>Сумма без НДС — <code>{{total_amount_without_vat}}</code></li>
-                            <li>Сумма НДС 22% — <code>{{total_vat_amount}}</code></li>
-                            <li>Всего с НДС — <code>{{total_amount_with_vat}}</code></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div class="col-12 d-flex gap-2 flex-wrap">
         <button type="submit" name="submitAction" value="save" class="btn btn-primary btn-lg">Сохранить приход</button>
-        <button type="submit" name="submitAction" value="saveAddNext" class="btn btn-outline-primary btn-lg">Сохранить и добавить следующий</button>
         <a class="btn btn-outline-secondary btn-lg" asp-controller="MetalWarehouse" asp-action="Receipts">Отмена</a>
     </div>
 </form>
-<div class="modal fade" id="addSupplierModal" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Новый поставщик</h5></div>
-    <div class="modal-body">
-      <input class="form-control mb-2" placeholder="Код" data-inline-supplier-identifier />
-      <input class="form-control mb-2" placeholder="Наименование" data-inline-supplier-name />
-      <input class="form-control" placeholder="ИНН" data-inline-supplier-inn />
-      <div class="text-danger small mt-2" data-inline-supplier-error></div>
-    </div>
-    <div class="modal-footer"><button type="button" class="btn btn-primary" data-inline-supplier-save>Сохранить</button></div>
-  </div></div>
-</div>
-<div class="modal fade" id="addMaterialModal" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Новый материал</h5></div>
-    <div class="modal-body">
-      <input class="form-control mb-2" placeholder="Наименование" data-inline-material-name />
-      <input class="form-control mb-2" placeholder="Код" data-inline-material-code />
-      <select class="form-select mb-2" data-inline-material-unit><option value="Meter">м</option><option value="SquareMeter">м²</option></select>
-      <input class="form-control" type="number" step="0.001" min="0.001" placeholder="Вес 1 ед., кг" data-inline-material-weight />
-      <div class="text-danger small mt-2" data-inline-material-error></div>
-    </div>
-    <div class="modal-footer"><button type="button" class="btn btn-primary" data-inline-material-save>Сохранить</button></div>
-  </div></div>
-</div>
-
 <template id="receiptLineTemplate">
     <section class="card shadow-sm border-0 receipt-line" data-receipt-line data-line-index="__index__">
         <div class="card-header bg-light-subtle border-bottom-0">
@@ -396,7 +379,6 @@
                 <label class="form-label">Материал</label>
                 <div class="input-group input-group-lg minimal-plus-input">
                     <input class="form-control" type="text" placeholder="Начните писать название или код" autocomplete="off" name="Items[__index__].MaterialInputText" data-material-input />
-                    <button type="button" class="btn btn-outline-primary" title="Добавить материал" data-bs-toggle="modal" data-bs-target="#addMaterialModal">+</button>
                 </div>
                 <div class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 1050; max-height: 260px; overflow-y: auto;" data-material-suggestions></div>
                 <input type="hidden" name="Items[__index__].MetalMaterialId" data-material-id />
@@ -405,18 +387,18 @@
 
             <div class="col-md-2">
                 <label class="form-label">Цена, руб/кг</label>
-                <input class="form-control form-control-lg" type="text" inputmode="decimal" pattern="^\d+(,\d{1,4})?$" name="Items[__index__].PricePerKg" data-line-price-input />
+                <input class="form-control form-control-lg" type="text" inputmode="decimal" pattern="^\d+([,.]\d{1,4})?$" name="Items[__index__].PricePerKg" data-line-price-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].PricePerKg" data-valmsg-replace="true"></span>
             </div>
 
             <div class="col-md-2">
-                <label class="form-label">Вес по документу, кг</label>
+                <label class="form-label">Количество 1С, кг</label>
                 <input class="form-control form-control-lg" type="number" min="0.001" step="0.001" name="Items[__index__].PassportWeightKg" data-weight-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].PassportWeightKg" data-valmsg-replace="true"></span>
             </div>
 
             <div class="col-md-2">
-                <label class="form-label">Количество, шт</label>
+                <label class="form-label">Складских единиц, шт</label>
                 <input class="form-control form-control-lg" type="number" min="1" step="1" name="Items[__index__].Quantity" value="1" data-quantity-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].Quantity" data-valmsg-replace="true"></span>
             </div>
@@ -435,19 +417,19 @@
             <div class="col-12">
                 <input type="hidden" name="Items[__index__].UseAverageSize" value="false" />
                 <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" role="switch" name="Items[__index__].UseAverageSize" value="true" data-average-checkbox />
-                    <label class="form-check-label fw-semibold">Ввести одну среднюю длину для всей партии</label>
+                    <input class="form-check-input" type="checkbox" role="switch" name="Items[__index__].UseAverageSize" value="true" checked data-average-checkbox />
+                    <label class="form-check-label fw-semibold">Размер одной строкой</label>
                 </div>
-                <div class="form-text">Включайте для прутков, труб и других партий, где каждую штуку перемерить нереально.</div>
+                <div class="form-text">Можно оставить пустым: складской размер будет рассчитан из веса и коэффициента материала.</div>
             </div>
 
-            <div class="col-md-4 d-none" data-average-section>
+            <div class="col-md-4" data-average-section>
                 <label class="form-label">Средний размер, <span data-unit-text>м</span></label>
                 <input class="form-control form-control-lg" type="number" min="0.001" step="0.001" name="Items[__index__].AverageSizeValue" data-average-size-input />
                 <span class="text-danger field-validation-valid" data-valmsg-for="Items[__index__].AverageSizeValue" data-valmsg-replace="true"></span>
             </div>
 
-            <div class="col-12" data-units-section>
+            <div class="col-12 d-none" data-units-section>
                 <div class="row g-3">
                     <div class="col-lg-8">
                         <div class="fw-semibold mb-2">Размер каждой штуки, <span data-unit-text>м</span></div>

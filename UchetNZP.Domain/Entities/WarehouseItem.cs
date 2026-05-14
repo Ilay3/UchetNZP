@@ -6,9 +6,27 @@ public class WarehouseItem
 {
     public Guid Id { get; set; }
 
-    public Guid PartId { get; set; }
+    public Guid? PartId { get; set; }
+
+    public Guid? AssemblyUnitId { get; set; }
 
     public Guid? TransferId { get; set; }
+
+    public string MovementType { get; set; } = WarehouseMovementKind.Receipt;
+
+    public string SourceType { get; set; } = WarehouseMovementKind.AutomaticTransfer;
+
+    public string? DocumentNumber { get; set; }
+
+    public string? ControlCardNumber { get; set; }
+
+    public string? ControllerName { get; set; }
+
+    public string? MasterName { get; set; }
+
+    public string? AcceptedByName { get; set; }
+
+    public Guid? CreatedByUserId { get; set; }
 
     public decimal Quantity { get; set; }
 
@@ -21,6 +39,8 @@ public class WarehouseItem
     public string? Comment { get; set; }
 
     public virtual Part? Part { get; set; }
+
+    public virtual WarehouseAssemblyUnit? AssemblyUnit { get; set; }
 
     public virtual WipTransfer? Transfer { get; set; }
 

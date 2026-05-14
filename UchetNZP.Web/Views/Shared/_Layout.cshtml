@@ -3,7 +3,7 @@
 @using UchetNZP.Web.Configuration
 @inject IOptions<BackgroundBubblesOptions> BackgroundBubblesOptions
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -17,177 +17,187 @@
 <body>
     <div id="backgroundBubblesRoot" class="background-bubbles" aria-hidden="true"></div>
 
-    <div class="app-content-layer">
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-light app-surface border-bottom shadow-sm mb-4">
-            <div class="container-fluid">
-                <a class="navbar-brand fw-semibold" asp-area="" asp-controller="Home" asp-action="Index">Учёт НЗП</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Переключить навигацию">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-lg-inline-flex justify-content-between align-items-lg-center gap-3">
-                    <ul class="navbar-nav flex-grow-1 gap-3">
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="operationsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    Расчёт до конца маршрута
-                            </a>
+    @{
+        var currentController = (ViewContext.RouteData.Values["controller"] as string) ?? string.Empty;
+        var currentAction = (ViewContext.RouteData.Values["action"] as string) ?? string.Empty;
+        var pageTitle = ViewData["Title"]?.ToString() ?? "Рабочая область";
+    }
 
-                            <ul class="dropdown-menu shadow" aria-labelledby="operationsMenu">
-                                
-                                <li>
-                                        <a class="dropdown-item" asp-area="" asp-controller="WipLaunches" asp-action="Index">Расчёт до конца маршрута</a>
-                                </li>
+    <div class="app-shell app-content-layer">
+        <aside class="app-sidebar offcanvas-lg offcanvas-start" tabindex="-1" id="appSidebar" aria-labelledby="appSidebarTitle">
 
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="WipLaunches" asp-action="History">История расчётов</a>
-                                </li>
+            <div class="offcanvas-body app-sidebar__body">
+                <a class="app-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <span class="app-brand__mark">НЗП</span>
+                    <span>
+                        <strong>Учёт НЗП</strong>
+                        <small>производственный контур</small>
+                    </span>
+                </a>
 
-                            </ul>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="operationsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Операции
-                            </a>
+                <nav class="app-nav" aria-label="Основная навигация">
+                    <div class="app-nav__section">
+                        <div class="app-nav__title">Работа</div>
+                        <a class="app-nav__link @(currentController == "Home" ? "active" : string.Empty)" asp-area="" asp-controller="Home" asp-action="Index">
+                            <i class="bi bi-grid-1x2" aria-hidden="true"></i>
+                            <span>Главная</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "WipLaunches" && currentAction == "Index" ? "active" : string.Empty)" asp-area="" asp-controller="WipLaunches" asp-action="Index">
+                            <i class="bi bi-diagram-3" aria-hidden="true"></i>
+                            <span>Расчёт маршрута</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "WipReceipts" ? "active" : string.Empty)" asp-area="" asp-controller="WipReceipts" asp-action="Index">
+                            <i class="bi bi-plus-square" aria-hidden="true"></i>
+                            <span>Запуск партии</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "WipTransfers" ? "active" : string.Empty)" asp-area="" asp-controller="WipTransfers" asp-action="Index">
+                            <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                            <span>Переход партии</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "WipHistory" || (currentController == "WipLaunches" && currentAction == "History") ? "active" : string.Empty)" asp-area="" asp-controller="WipHistory" asp-action="Index">
+                            <i class="bi bi-clock-history" aria-hidden="true"></i>
+                            <span>История НЗП</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Warehouse" ? "active" : string.Empty)" asp-area="" asp-controller="Warehouse" asp-action="Index">
+                            <i class="bi bi-box-seam" aria-hidden="true"></i>
+                            <span>Склад СГДУ</span>
+                        </a>
+                    </div>
 
-                            <ul class="dropdown-menu shadow" aria-labelledby="operationsMenu">
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="WipReceipts" asp-action="Index">Запуск партии</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="WipTransfers" asp-action="Index">Переход партии</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Warehouse" asp-action="Index">Склад (Не работает)</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="WipHistory" asp-action="Index">История</a>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="metalWarehouseMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Склад металла
-                            </a>
-                            <ul class="dropdown-menu shadow" aria-labelledby="metalWarehouseMenu">
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="MetalWarehouse" asp-action="Index">Стартовая страница</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="MetalWarehouse" asp-action="Receipts">Приход металла</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="MetalWarehouse" asp-action="Stock">Остатки металла</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="MetalWarehouse" asp-action="Requirements">Требования производства</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="MetalWarehouse" asp-action="Issues">Выдачи по требованиям</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="MetalWarehouse" asp-action="Movements">История движений</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="AdminMetalMaterials" asp-action="Index">Админ: материалы</a>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="reportsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Отчёты
-                            </a>
-                            <ul class="dropdown-menu shadow" aria-labelledby="reportsMenu">
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="ReceiptReport">Отчёт по запуску</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="TransferPeriodReport">Отчёт по переходам</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="ScrapReport">Отчёт по браку</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="WipBatchReport">Остатки на партиях</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Reports" asp-action="LabelMovementReport">Движение ярлыка</a>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle text-uppercase small fw-semibold" href="#" id="adminMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Технологические процессы
-                            </a>
-                            <ul class="dropdown-menu shadow" aria-labelledby="adminMenu">
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Routes" asp-action="Index">Маршруты деталей</a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" asp-area="" asp-controller="Routes" asp-action="Import">Маршруты (импорт)</a>
-                                </li>
-                                
-                            </ul>
-                        </li>
-                    </ul>
+                    <div class="app-nav__section">
+                        <div class="app-nav__title">Склад металла</div>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Index" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Index">
+                            <i class="bi bi-speedometer2" aria-hidden="true"></i>
+                            <span>Обзор</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Receipts" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Receipts">
+                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
+                            <span>Приход металла</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Stock" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Stock">
+                            <i class="bi bi-layers" aria-hidden="true"></i>
+                            <span>Остатки</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Requirements" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Requirements">
+                            <i class="bi bi-clipboard-check" aria-hidden="true"></i>
+                            <span>Требования</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Issues" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Issues">
+                            <i class="bi bi-box-arrow-up" aria-hidden="true"></i>
+                            <span>Выдачи</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Movements" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Movements">
+                            <i class="bi bi-activity" aria-hidden="true"></i>
+                            <span>Движения</span>
+                        </a>
+                    </div>
 
-                    <form id="navbarLabelSearchForm"
-                          class="d-flex flex-column flex-lg-row gap-2 my-3 my-lg-0"
-                          method="get"
-                          asp-area=""
-                          asp-controller="Reports"
-                          asp-action="LabelMovementReport"
-                          autocomplete="off"
-                          novalidate>
-                        <label for="navbarLabelSearchInput" class="form-label mb-0 small text-muted">Ярлык</label>
-                        <div class="input-group input-group-sm">
-                            <input id="navbarLabelSearchInput"
-                                   class="form-control"
-                                   type="text"
-                                   name="label"
-                                   list="navbarLabelSearchOptions"
-                                   placeholder="12345 или 12345/1"
-                                   inputmode="numeric"
-                                   aria-describedby="navbarLabelSearchError"
-                                   maxlength="11" />
-                            <datalist id="navbarLabelSearchOptions"></datalist>
-                            <button type="submit" class="btn btn-outline-primary">Найти</button>
-                        </div>
-                        <div id="navbarLabelSearchError" class="invalid-feedback d-block d-none"></div>
-                    </form>
-                </div>
+                    <div class="app-nav__section">
+                        <div class="app-nav__title">Отчеты и справочники</div>
+                        <a class="app-nav__link @(currentController == "ReceiptReport" ? "active" : string.Empty)" asp-area="" asp-controller="Reports" asp-action="ReceiptReport">
+                            <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
+                            <span>Отчет по запускам</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Reports" && currentAction == "TransferPeriodReport" ? "active" : string.Empty)" asp-area="" asp-controller="Reports" asp-action="TransferPeriodReport">
+                            <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
+                            <span>Отчёт по переходам</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Reports" && currentAction == "ScrapReport" ? "active" : string.Empty)" asp-area="" asp-controller="Reports" asp-action="ScrapReport">
+                            <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
+                            <span>Отчёт по браку</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Reports" && currentAction == "WipBatchReport" ? "active" : string.Empty)" asp-area="" asp-controller="Reports" asp-action="WipBatchReport">
+                            <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
+                            <span>Остатки на партиях</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Reports" && currentAction == "LabelMovementReport" ? "active" : string.Empty)" asp-area="" asp-controller="Reports" asp-action="LabelMovementReport">
+                            <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
+                            <span>Движение ярлыка</span>
+                        </a>
+                       
+                        <a class="app-nav__link @(currentController == "Routes" ? "active" : string.Empty)" asp-area="" asp-controller="Routes" asp-action="Index">
+                            <i class="bi bi-signpost-split" aria-hidden="true"></i>
+                            <span>Маршруты</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "AdminMetalMaterials" ? "active" : string.Empty)" asp-area="" asp-controller="AdminMetalMaterials" asp-action="Index">
+                            <i class="bi bi-database-gear" aria-hidden="true"></i>
+                            <span>Материалы</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "AdminWip" ? "active" : string.Empty)" asp-area="" asp-controller="AdminWip" asp-action="Index">
+                            <i class="bi bi-sliders" aria-hidden="true"></i>
+                            <span>Админ НЗП</span>
+                        </a>
+                    </div>
+                </nav>
             </div>
-        </nav>
-    </header>
-    <div class="container pb-5">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
+        </aside>
 
-    <div class="toast-container position-fixed top-0 end-0 p-3" id="appToastContainer" aria-live="polite" aria-atomic="true"></div>
+        <div class="app-main">
+            <header class="app-topbar">
+                <div class="app-topbar__left">
+                    <button class="btn btn-icon app-menu-button d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#appSidebar" aria-controls="appSidebar" aria-label="Открыть навигацию">
+                        <i class="bi bi-list" aria-hidden="true"></i>
+                    </button>
+                    <div class="app-topbar__title">
+                        <span>Рабочая область</span>
+                        <strong>@pageTitle</strong>
+                    </div>
+                </div>
 
-    <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-labelledby="appConfirmModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="appConfirmModalLabel">Подтверждение</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                <form id="navbarLabelSearchForm"
+                      class="app-label-search"
+                      method="get"
+                      asp-area=""
+                      asp-controller="Reports"
+                      asp-action="LabelMovementReport"
+                      autocomplete="off"
+                      novalidate>
+                    <label for="navbarLabelSearchInput" class="form-label">Ярлык</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-upc-scan" aria-hidden="true"></i></span>
+                        <input id="navbarLabelSearchInput"
+                               class="form-control"
+                               type="text"
+                               name="label"
+                               list="navbarLabelSearchOptions"
+                               placeholder="12345 или 12345/1"
+                               inputmode="numeric"
+                               aria-describedby="navbarLabelSearchError"
+                               maxlength="11" />
+                        <datalist id="navbarLabelSearchOptions"></datalist>
+                        <button type="submit" class="btn btn-primary">Найти</button>
+                    </div>
+                    <div id="navbarLabelSearchError" class="invalid-feedback d-block d-none"></div>
+                </form>
+            </header>
+
+            <main role="main" class="app-page">
+                <div class="app-page__inner">
+                    @RenderBody()
                 </div>
-                <div class="modal-body">
-                    <p class="mb-2" id="appConfirmModalMessage">Подтвердите действие.</p>
-                    <div class="fw-semibold" id="appConfirmModalEntity"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-danger" id="appConfirmModalSubmit">Удалить</button>
+            </main>
+
+            <div class="toast-container position-fixed top-0 end-0 p-3" id="appToastContainer" aria-live="polite" aria-atomic="true"></div>
+
+            <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-labelledby="appConfirmModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="appConfirmModalLabel">Подтверждение</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="mb-2" id="appConfirmModalMessage">Подтвердите действие.</p>
+                            <div class="fw-semibold" id="appConfirmModalEntity"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                            <button type="button" class="btn btn-danger" id="appConfirmModalSubmit">Удалить</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-
-
-
     </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>

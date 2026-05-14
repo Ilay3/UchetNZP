@@ -20,11 +20,11 @@
     @Html.AntiForgeryToken()
     <div asp-validation-summary="All" class="text-danger"></div>
 
-    <div class="col-md-3">
+    <div class="col-md-2">
         <label asp-for="Identifier" class="form-label">Код</label>
         <input asp-for="Identifier" class="form-control" placeholder="00-001828" />
     </div>
-    <div class="col-md-5">
+    <div class="col-md-4">
         <label asp-for="Name" class="form-label">Наименование</label>
         <input asp-for="Name" class="form-control" placeholder="АО &quot;Металлоторг&quot;" />
     </div>
@@ -32,17 +32,68 @@
         <label asp-for="Inn" class="form-label">ИНН</label>
         <input asp-for="Inn" class="form-control" placeholder="1234567890" />
     </div>
-    <div class="col-md-2 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary w-100">Добавить</button>
+    <div class="col-md-2">
+        <label asp-for="Kpp" class="form-label">КПП</label>
+        <input asp-for="Kpp" class="form-control" placeholder="645001001" />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="LegalEntityKind" class="form-label">Тип</label>
+        <select asp-for="LegalEntityKind" class="form-select">
+            <option value="ЮридическоеЛицо">Юрлицо</option>
+            <option value="ФизическоеЛицо">Физлицо</option>
+            <option value="ИндивидуальныйПредприниматель">ИП</option>
+        </select>
+    </div>
+    <div class="col-md-5">
+        <label asp-for="FullName" class="form-label">Полное наименование 1С</label>
+        <input asp-for="FullName" class="form-control" placeholder="Заполнится кратким, если оставить пустым" />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="CountryOfRegistration" class="form-label">Страна</label>
+        <input asp-for="CountryOfRegistration" class="form-control" placeholder="Россия" />
+    </div>
+    <div class="col-md-2">
+        <label asp-for="Okpo" class="form-label">ОКПО</label>
+        <input asp-for="Okpo" class="form-control" />
+    </div>
+    <div class="col-md-3">
+        <label asp-for="MainContractName" class="form-label">Основной договор</label>
+        <input asp-for="MainContractName" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label asp-for="MainBankAccount" class="form-label">Основной банковский счет</label>
+        <input asp-for="MainBankAccount" class="form-control" placeholder="Расчетный счет или банк" />
+    </div>
+    <div class="col-md-4">
+        <label asp-for="ContactPerson" class="form-label">Контактное лицо</label>
+        <input asp-for="ContactPerson" class="form-control" />
+    </div>
+    <div class="col-md-4">
+        <label asp-for="AdditionalInfo" class="form-label">Дополнительная информация</label>
+        <input asp-for="AdditionalInfo" class="form-control" />
+    </div>
+    <div class="col-md-8">
+        <label asp-for="Comment" class="form-label">Комментарий</label>
+        <input asp-for="Comment" class="form-control" />
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Добавить поставщика</button>
     </div>
 </form>
 
+<div class="table-responsive">
 <table class="table table-striped align-middle">
     <thead>
         <tr>
             <th>Код</th>
             <th>Наименование</th>
+            <th>Полное наименование</th>
             <th>ИНН</th>
+            <th>КПП</th>
+            <th>Тип</th>
+            <th>Договор</th>
+            <th>Банк/контакт</th>
+            <th>Дополнительно</th>
             <th>Статус</th>
         </tr>
     </thead>
@@ -52,12 +103,22 @@
         <tr>
             <td>@supplier.Identifier</td>
             <td>@supplier.Name</td>
+            <td>@(string.IsNullOrWhiteSpace(supplier.FullName) ? "—" : supplier.FullName)</td>
             <td>@supplier.Inn</td>
+            <td>@(string.IsNullOrWhiteSpace(supplier.Kpp) ? "—" : supplier.Kpp)</td>
+            <td>@supplier.LegalEntityKind</td>
+            <td>@(string.IsNullOrWhiteSpace(supplier.MainContractName) ? "—" : supplier.MainContractName)</td>
+            <td>
+                <div>@(string.IsNullOrWhiteSpace(supplier.MainBankAccount) ? "—" : supplier.MainBankAccount)</div>
+                <div class="small text-muted">@(string.IsNullOrWhiteSpace(supplier.ContactPerson) ? "контакт не задан" : supplier.ContactPerson)</div>
+            </td>
+            <td>@(string.IsNullOrWhiteSpace(supplier.AdditionalInfo) ? "—" : supplier.AdditionalInfo)</td>
             <td>@(supplier.IsActive ? "Активен" : "Отключен")</td>
         </tr>
     }
     </tbody>
 </table>
+</div>
 
 @section Scripts
 {

@@ -16,7 +16,7 @@
     </a>
     @if (Model.HasOriginalDocument)
     {
-        <a class="btn btn-success" asp-controller="MetalWarehouse" asp-action="ReceiptOriginalDocument" asp-route-id="@Model.Id">Оригинал PDF</a>
+        <a class="btn btn-success" asp-controller="MetalWarehouse" asp-action="ReceiptOriginalDocument" asp-route-id="@Model.Id">Оригинал документа</a>
     }
 </div>
 
@@ -40,9 +40,22 @@ document.addEventListener("DOMContentLoaded", function () {
     <div class="card-body row g-3">
         <div class="col-md-3"><strong>Номер:</strong> @Model.ReceiptNumber</div>
         <div class="col-md-3"><strong>Дата:</strong> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div>
+        <div class="col-md-3"><strong>Организация:</strong> @Model.OrganizationName</div>
+        <div class="col-md-3"><strong>Склад:</strong> @Model.WarehouseName</div>
+        <div class="col-md-3"><strong>Операция 1С:</strong> @Model.OperationType</div>
+        <div class="col-md-3"><strong>Валюта:</strong> @Model.CurrencyCode</div>
         <div class="col-md-3"><strong>Документ поставщика:</strong> @(string.IsNullOrWhiteSpace(Model.SupplierDocumentNumber) ? "—" : Model.SupplierDocumentNumber)</div>
-        <div class="col-md-3"><strong>Цена, руб/кг:</strong> @Model.PricePerKg.ToString("0.####")</div>
+        <div class="col-md-3"><strong>Дата документа:</strong> @(Model.SupplierDocumentDate.HasValue ? Model.SupplierDocumentDate.Value.ToString("dd.MM.yyyy") : "—")</div>
+        <div class="col-md-3"><strong>УПД/накладная:</strong> @(string.IsNullOrWhiteSpace(Model.InvoiceOrUpiNumber) ? "—" : Model.InvoiceOrUpiNumber)</div>
+        <div class="col-md-3"><strong>Партия:</strong> @(string.IsNullOrWhiteSpace(Model.BatchNumber) ? "—" : Model.BatchNumber)</div>
+        <div class="col-md-3"><strong>Ответственный:</strong> @(string.IsNullOrWhiteSpace(Model.ResponsibleUserName) ? "—" : Model.ResponsibleUserName)</div>
+        <div class="col-md-3"><strong>Средняя цена, руб/кг:</strong> @Model.PricePerKg.ToString("0.####")</div>
         <div class="col-md-6"><strong>Поставщик:</strong> @(string.IsNullOrWhiteSpace(Model.SupplierDisplay) ? "—" : Model.SupplierDisplay)</div>
+        <div class="col-md-6"><strong>Договор:</strong> @(string.IsNullOrWhiteSpace(Model.ContractName) ? "—" : Model.ContractName)</div>
+        <div class="col-md-3"><strong>Счет учета:</strong> @Model.AccountingAccount</div>
+        <div class="col-md-3"><strong>Счет НДС:</strong> @Model.VatAccount</div>
+        <div class="col-md-3"><strong>Счет расчетов:</strong> @Model.SettlementAccount</div>
+        <div class="col-md-3"><strong>Счет авансов:</strong> @Model.AdvanceAccount</div>
         <div class="col-md-3"><strong>Сумма без НДС:</strong> @Model.AmountWithoutVat.ToString("0.00")</div>
         <div class="col-md-3"><strong>НДС @Model.VatRatePercent.ToString("0.##")%:</strong> @Model.VatAmount.ToString("0.00")</div>
         <div class="col-md-3"><strong>Всего с НДС:</strong> @Model.TotalAmountWithVat.ToString("0.00")</div>

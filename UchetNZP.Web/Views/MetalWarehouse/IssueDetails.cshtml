@@ -25,6 +25,10 @@
         <div class="col-md-6"><div class="text-muted small">Деталь</div><div class="fw-semibold">@Model.PartDisplay</div></div>
         <div class="col-md-3"><div class="text-muted small">Материал</div><div class="fw-semibold">@Model.MaterialDisplay</div></div>
         <div class="col-md-3"><div class="text-muted small">Количество деталей</div><div class="fw-semibold">@Model.Quantity.ToString("0.###")</div></div>
+        <div class="col-md-3"><div class="text-muted small">Создано</div><div class="fw-semibold">@Model.CreatedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</div></div>
+        <div class="col-md-3"><div class="text-muted small">Создал</div><div class="fw-semibold">@Model.CreatedBy</div></div>
+        <div class="col-md-3"><div class="text-muted small">Проведено</div><div class="fw-semibold">@(Model.CompletedAt.HasValue ? Model.CompletedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "—")</div></div>
+        <div class="col-md-3"><div class="text-muted small">Провел</div><div class="fw-semibold">@(string.IsNullOrWhiteSpace(Model.CompletedBy) ? "—" : Model.CompletedBy)</div></div>
         @if (!string.IsNullOrWhiteSpace(Model.Comment))
         {
             <div class="col-12"><div class="text-muted small">Комментарий</div><div>@Model.Comment</div></div>

@@ -419,7 +419,7 @@
     }
 
     function normalizeLineDecimalValues(line) {
-        line.querySelectorAll("[data-weight-input], [data-average-size-input], [data-unit-size]").forEach(input => {
+        line.querySelectorAll("[data-line-price-input], [data-weight-input], [data-average-size-input], [data-unit-size]").forEach(input => {
             normalizeDecimalInputValue(input);
         });
     }
@@ -731,6 +731,12 @@
 
     document.querySelector("[data-price-input]")?.addEventListener("input", updateFinancialSummary);
     itemsContainer.addEventListener("input", event => { if (event.target?.matches?.("[data-line-price-input]")) updateFinancialSummary(); });
+    itemsContainer.addEventListener("change", event => {
+        if (event.target?.matches?.("[data-line-price-input]")) {
+            normalizeDecimalInputValue(event.target);
+            updateFinancialSummary();
+        }
+    });
     document.querySelector("[data-price-input]")?.addEventListener("change", event => {
         normalizeDecimalInputValue(event.target);
         updateFinancialSummary();

@@ -30,11 +30,17 @@
                 <thead class="table-light">
                     <tr>
                         <th>Номер</th>
+                        <th>Дата</th>
+                        <th>Организация</th>
+                        <th>Склад</th>
                         <th>Поставщик</th>
                         <th>Документ</th>
+                        <th>Дата док.</th>
+                        <th>УПД/накладная</th>
+                        <th>Партия</th>
                         <th>Металл</th>
-                        <th>Количество, шт</th>
-                        <th>Вес, кг</th>
+                        <th>Ед. склада</th>
+                        <th>Кг</th>
                         <th>Цена</th>
                         <th>Сумма без НДС</th>
                         <th>НДС</th>
@@ -46,7 +52,7 @@
                     @if (Model.Receipts.Count == 0)
                     {
                         <tr>
-                            <td colspan="11" class="py-4">
+                            <td colspan="17" class="py-4">
                                 <div class="fw-semibold">Поступлений пока нет</div>
                                 <div class="text-muted">Когда вы добавите первый приход металла, он появится в этой таблице.</div>
                             </td>
@@ -58,8 +64,14 @@
                         {
                             <tr role="button" ondblclick="window.location='@Url.Action("ReceiptDetails", "MetalWarehouse", new { id = receipt.Id })'">
                                 <td class="fw-semibold">@receipt.ReceiptNumber</td>
+                                <td>@receipt.ReceiptDate.ToString("dd.MM.yyyy")</td>
+                                <td>@receipt.OrganizationName</td>
+                                <td>@receipt.WarehouseName</td>
                                 <td>@(string.IsNullOrWhiteSpace(receipt.SupplierDisplay) ? "—" : receipt.SupplierDisplay)</td>
                                 <td>@(string.IsNullOrWhiteSpace(receipt.SupplierDocumentNumber) ? "—" : receipt.SupplierDocumentNumber)</td>
+                                <td>@(receipt.SupplierDocumentDate.HasValue ? receipt.SupplierDocumentDate.Value.ToString("dd.MM.yyyy") : "—")</td>
+                                <td>@(string.IsNullOrWhiteSpace(receipt.InvoiceOrUpiNumber) ? "—" : receipt.InvoiceOrUpiNumber)</td>
+                                <td>@(string.IsNullOrWhiteSpace(receipt.BatchNumber) ? "—" : receipt.BatchNumber)</td>
                                 <td>@receipt.MaterialsSummary</td>
                                 <td>@receipt.TotalQuantity</td>
                                 <td>@receipt.TotalPassportWeightKg.ToString("0.###")</td>

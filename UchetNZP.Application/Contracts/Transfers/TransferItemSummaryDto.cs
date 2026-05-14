@@ -20,5 +20,8 @@ public record TransferItemSummaryDto(
     decimal? LabelQuantityBefore,
     decimal? LabelQuantityAfter,
     string? ResidualLabelNumber,
+    Guid? WarehouseItemId,
+    string? WarehouseDocumentNumber,
+    string? WarehouseControlCardNumber,
     bool IsReverted
 );

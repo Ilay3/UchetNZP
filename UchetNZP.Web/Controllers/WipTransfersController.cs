@@ -438,6 +438,9 @@ public class WipTransfersController : Controller
                                 item.LabelQuantityBefore,
                                 item.LabelQuantityAfter,
                                 item.ResidualLabelNumber,
+                                item.WarehouseItemId,
+                                item.WarehouseDocumentNumber,
+                                item.WarehouseControlCardNumber,
                                 item.IsReverted);
                         })
                         .ToList();

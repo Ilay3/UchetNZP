@@ -285,11 +285,17 @@ public class TransferService : ITransferService
 
                 if (isWarehouseTransfer)
                 {
+                    var warehouseDocumentNumber = BuildAutomaticWarehouseDocumentNumber(transferDate, transfer.Id);
                     warehouseItem = new WarehouseItem
                     {
                         Id = Guid.NewGuid(),
                         PartId = item.PartId,
                         TransferId = transfer.Id,
+                        MovementType = WarehouseMovementKind.Receipt,
+                        SourceType = WarehouseMovementKind.AutomaticTransfer,
+                        DocumentNumber = warehouseDocumentNumber,
+                        ControlCardNumber = warehouseDocumentNumber,
+                        CreatedByUserId = userId == Guid.Empty ? null : userId,
                         Quantity = item.Quantity,
                         AddedAt = transferDate,
                         CreatedAt = now,
@@ -390,6 +396,8 @@ public class TransferService : ITransferService
 
                     if (isWarehouseTransfer && warehouseItem is not null)
                     {
+                        warehouseItem.ControlCardNumber = transferLabelNumber;
+
                         var warehouseLabelItem = new WarehouseLabelItem
                         {
                             Id = Guid.NewGuid(),
@@ -577,6 +585,9 @@ public class TransferService : ITransferService
                     labelQuantityBefore,
                     labelQuantityAfter,
                     residualLabelNumber,
+                    warehouseItem?.Id,
+                    warehouseItem?.DocumentNumber,
+                    warehouseItem?.ControlCardNumber,
                     false));
             }
 
@@ -600,6 +611,13 @@ public class TransferService : ITransferService
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
             throw;
         }
+    }
+
+    private static string BuildAutomaticWarehouseDocumentNumber(DateTime transferDate, Guid transferId)
+    {
+        var date = transferDate.ToString("yyyyMMdd");
+        var suffix = transferId.ToString("N")[..8].ToUpperInvariant();
+        return $"AUTO-{date}-{suffix}";
     }
 
     private async Task EnsureWarehouseReferencesAsync(CancellationToken cancellationToken)

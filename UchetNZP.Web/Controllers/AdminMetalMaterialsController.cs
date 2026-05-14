@@ -46,7 +46,7 @@ public class AdminMetalMaterialsController : Controller
     public async Task<IActionResult> GetMaterials([FromQuery] string? search, CancellationToken cancellationToken)
     {
         var query = _dbContext.MetalMaterials.AsNoTracking().Where(x => x.IsActive);
-        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code);
+        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code, x => x.Article);
 
         var items = await query
             .OrderBy(x => x.Name)
@@ -71,17 +71,42 @@ public class AdminMetalMaterialsController : Controller
 
         var weight = input.WeightPerUnitKg!.Value;
         var coefficient = input.Coefficient!.Value;
+        var unitKind = NormalizeUnitKind(input.UnitKind);
+        var stockUnit = NormalizeOptional(input.StockUnit) ?? GetDefaultStockUnit(unitKind);
+        var massPerMeterKg = input.MassPerMeterKg.GetValueOrDefault();
+        var massPerSquareMeterKg = input.MassPerSquareMeterKg.GetValueOrDefault();
+        if (unitKind == "Meter" && massPerMeterKg <= 0m)
+        {
+            massPerMeterKg = weight;
+        }
+        if (unitKind == "SquareMeter" && massPerSquareMeterKg <= 0m)
+        {
+            massPerSquareMeterKg = weight;
+        }
+
         var material = new MetalMaterial
         {
             Id = Guid.NewGuid(),
             Name = input.Name.Trim(),
             Code = normalizedCode,
+            FullName = string.IsNullOrWhiteSpace(input.FullName) ? input.Name.Trim() : input.FullName.Trim(),
+            Article = NormalizeOptional(input.Article),
+            UnitOfMeasure = string.IsNullOrWhiteSpace(input.UnitOfMeasure) ? "кг" : input.UnitOfMeasure.Trim(),
+            NomenclatureType = NormalizeOptional(input.NomenclatureType) ?? "Материалы",
+            NomenclatureGroup = NormalizeOptional(input.NomenclatureGroup) ?? "Металл",
+            VatRateType = NormalizeOptional(input.VatRateType) ?? "НДС 22%",
+            CountryOfOrigin = NormalizeOptional(input.CountryOfOrigin),
+            CustomsDeclarationNumber = NormalizeOptional(input.CustomsDeclarationNumber),
+            Okpd2Code = NormalizeOptional(input.Okpd2Code),
+            TnVedCode = NormalizeOptional(input.TnVedCode),
+            Comment = NormalizeOptional(input.Comment),
+            IsService = input.IsService,
             DisplayName = input.Name.Trim(),
-            UnitKind = "Meter",
-            StockUnit = "m",
-            MassPerMeterKg = weight,
-            MassPerSquareMeterKg = weight,
-            CoefConsumption = 1m,
+            UnitKind = unitKind,
+            StockUnit = stockUnit,
+            MassPerMeterKg = massPerMeterKg,
+            MassPerSquareMeterKg = massPerSquareMeterKg,
+            CoefConsumption = input.CoefConsumption!.Value,
             Coefficient = coefficient,
             WeightPerUnitKg = weight,
             IsActive = input.IsActive,
@@ -114,13 +139,39 @@ public class AdminMetalMaterialsController : Controller
 
         var weight = input.WeightPerUnitKg!.Value;
         var coefficient = input.Coefficient!.Value;
+        var unitKind = NormalizeUnitKind(input.UnitKind);
+        var stockUnit = NormalizeOptional(input.StockUnit) ?? GetDefaultStockUnit(unitKind);
+        var massPerMeterKg = input.MassPerMeterKg.GetValueOrDefault();
+        var massPerSquareMeterKg = input.MassPerSquareMeterKg.GetValueOrDefault();
+        if (unitKind == "Meter" && massPerMeterKg <= 0m)
+        {
+            massPerMeterKg = weight;
+        }
+        if (unitKind == "SquareMeter" && massPerSquareMeterKg <= 0m)
+        {
+            massPerSquareMeterKg = weight;
+        }
+
         material.Name = input.Name.Trim();
         material.Code = normalizedCode;
+        material.FullName = string.IsNullOrWhiteSpace(input.FullName) ? input.Name.Trim() : input.FullName.Trim();
+        material.Article = NormalizeOptional(input.Article);
+        material.UnitOfMeasure = string.IsNullOrWhiteSpace(input.UnitOfMeasure) ? "кг" : input.UnitOfMeasure.Trim();
+        material.NomenclatureType = NormalizeOptional(input.NomenclatureType) ?? "Материалы";
+        material.NomenclatureGroup = NormalizeOptional(input.NomenclatureGroup) ?? "Металл";
+        material.VatRateType = NormalizeOptional(input.VatRateType) ?? "НДС 22%";
+        material.CountryOfOrigin = NormalizeOptional(input.CountryOfOrigin);
+        material.CustomsDeclarationNumber = NormalizeOptional(input.CustomsDeclarationNumber);
+        material.Okpd2Code = NormalizeOptional(input.Okpd2Code);
+        material.TnVedCode = NormalizeOptional(input.TnVedCode);
+        material.Comment = NormalizeOptional(input.Comment);
+        material.IsService = input.IsService;
         material.DisplayName = input.Name.Trim();
-        material.UnitKind = "Meter";
-        material.StockUnit = "m";
-        material.MassPerMeterKg = weight;
-        material.MassPerSquareMeterKg = weight;
+        material.UnitKind = unitKind;
+        material.StockUnit = stockUnit;
+        material.MassPerMeterKg = massPerMeterKg;
+        material.MassPerSquareMeterKg = massPerSquareMeterKg;
+        material.CoefConsumption = input.CoefConsumption!.Value;
         material.WeightPerUnitKg = weight;
         material.Coefficient = coefficient;
         material.IsActive = input.IsActive;
@@ -238,7 +289,24 @@ public class AdminMetalMaterialsController : Controller
             {
                 Id = x.Id,
                 Name = x.Name,
+                FullName = x.FullName,
                 Code = x.Code,
+                Article = x.Article,
+                UnitOfMeasure = x.UnitOfMeasure,
+                NomenclatureType = x.NomenclatureType,
+                NomenclatureGroup = x.NomenclatureGroup,
+                VatRateType = x.VatRateType,
+                CountryOfOrigin = x.CountryOfOrigin,
+                CustomsDeclarationNumber = x.CustomsDeclarationNumber,
+                TnVedCode = x.TnVedCode,
+                Okpd2Code = x.Okpd2Code,
+                Comment = x.Comment,
+                IsService = x.IsService,
+                UnitKind = x.UnitKind,
+                StockUnit = x.StockUnit,
+                MassPerMeterKg = x.MassPerMeterKg,
+                MassPerSquareMeterKg = x.MassPerSquareMeterKg,
+                CoefConsumption = x.CoefConsumption,
                 WeightPerUnitKg = (x.WeightPerUnitKg ?? 0m) > 0m ? x.WeightPerUnitKg!.Value : (x.MassPerMeterKg > 0m ? x.MassPerMeterKg : x.MassPerSquareMeterKg),
                 Coefficient = x.Coefficient,
                 IsActive = x.IsActive,
@@ -285,6 +353,11 @@ public class AdminMetalMaterialsController : Controller
             ModelState.AddModelError(nameof(input.Coefficient), "Укажите коэффициент металла больше 0.");
         }
 
+        if (!input.CoefConsumption.HasValue || input.CoefConsumption.Value <= 0m)
+        {
+            ModelState.AddModelError(nameof(input.CoefConsumption), "Укажите коэффициент расхода больше 0.");
+        }
+
         var normalizedCode = string.IsNullOrWhiteSpace(input.Code) ? null : input.Code.Trim();
         if (normalizedCode is not null)
         {
@@ -297,6 +370,33 @@ public class AdminMetalMaterialsController : Controller
         }
 
         return normalizedCode;
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string NormalizeUnitKind(string? value)
+    {
+        return value switch
+        {
+            "SquareMeter" => "SquareMeter",
+            "Kilogram" => "Kilogram",
+            "Piece" => "Piece",
+            _ => "Meter",
+        };
+    }
+
+    private static string GetDefaultStockUnit(string unitKind)
+    {
+        return unitKind switch
+        {
+            "SquareMeter" => "m2",
+            "Kilogram" => "kg",
+            "Piece" => "pcs",
+            _ => "m",
+        };
     }
 
     private static bool TryParseNorm(string? rawValue, out decimal result)

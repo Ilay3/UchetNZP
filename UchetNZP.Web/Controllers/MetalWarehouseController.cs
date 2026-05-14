@@ -97,11 +97,16 @@ public class MetalWarehouseController : Controller
                 x.Id,
                 x.ReceiptNumber,
                 x.ReceiptDate,
+                x.OrganizationName,
                 x.SupplierOrSource,
                 x.SupplierIdentifierSnapshot,
                 x.SupplierNameSnapshot,
                 x.SupplierInnSnapshot,
                 x.SupplierDocumentNumber,
+                x.SupplierDocumentDate,
+                x.InvoiceOrUpiNumber,
+                x.WarehouseName,
+                x.BatchNumber,
                 x.PricePerKg,
                 x.AmountWithoutVat,
                 x.VatAmount,
@@ -135,8 +140,14 @@ public class MetalWarehouseController : Controller
                 {
                     Id = x.Id,
                     ReceiptNumber = x.ReceiptNumber,
+                    ReceiptDate = x.ReceiptDate,
+                    OrganizationName = x.OrganizationName,
                     SupplierDisplay = BuildSupplierDisplay(x.SupplierIdentifierSnapshot, x.SupplierNameSnapshot, x.SupplierInnSnapshot, x.SupplierOrSource),
                     SupplierDocumentNumber = x.SupplierDocumentNumber,
+                    SupplierDocumentDate = x.SupplierDocumentDate,
+                    InvoiceOrUpiNumber = x.InvoiceOrUpiNumber,
+                    WarehouseName = x.WarehouseName,
+                    BatchNumber = x.BatchNumber,
                     MaterialsSummary = BuildMaterialsSummary(lines),
                     TotalQuantity = lines.Sum(line => line.Quantity),
                     TotalPassportWeightKg = lines.Sum(line => line.PassportWeightKg),
@@ -162,14 +173,23 @@ public class MetalWarehouseController : Controller
         var model = new MetalReceiptCreateViewModel
         {
             ReceiptDate = DateTime.Today,
+            SupplierDocumentDate = DateTime.Today,
+            OrganizationName = "НЗП",
+            WarehouseName = "Склад металла",
+            OperationType = "Поступление товаров",
+            CurrencyCode = "RUB",
+            ResponsibleUserName = GetCurrentUserContext().UserName,
             AccountingAccount = "10.01",
             VatAccount = "19.03",
+            SettlementAccount = "60.01",
+            AdvanceAccount = "60.02",
             VatRatePercent = await GetVatRatePercentAsync(cancellationToken),
             Items = new List<MetalReceiptLineInputViewModel>
             {
                 new()
                 {
                     Quantity = 1,
+                    UseAverageSize = true,
                     Units = new List<MetalReceiptUnitInputViewModel>
                     {
                         new() { ItemIndex = 1 },
@@ -206,6 +226,12 @@ public class MetalWarehouseController : Controller
             ModelState.AddModelError(nameof(model.Inn), "ИНН должен содержать 10 или 12 цифр.");
         }
 
+        var normalizedKpp = Regex.Replace(model.Kpp ?? string.Empty, @"\D", string.Empty);
+        if (!string.IsNullOrWhiteSpace(model.Kpp) && normalizedKpp.Length != 9)
+        {
+            ModelState.AddModelError(nameof(model.Kpp), "КПП должен содержать 9 цифр.");
+        }
+
         var duplicateExists = await _dbContext.MetalSuppliers
             .AsNoTracking()
             .AnyAsync(x => x.IsActive
@@ -229,7 +255,17 @@ public class MetalWarehouseController : Controller
             Id = Guid.NewGuid(),
             Identifier = model.Identifier.Trim(),
             Name = model.Name.Trim(),
+            FullName = NormalizeOptional(model.FullName) ?? model.Name.Trim(),
             Inn = normalizedInn,
+            Kpp = NormalizeOptional(normalizedKpp),
+            LegalEntityKind = string.IsNullOrWhiteSpace(model.LegalEntityKind) ? "ЮридическоеЛицо" : model.LegalEntityKind.Trim(),
+            CountryOfRegistration = NormalizeOptional(model.CountryOfRegistration),
+            Okpo = NormalizeOptional(model.Okpo),
+            MainBankAccount = NormalizeOptional(model.MainBankAccount),
+            MainContractName = NormalizeOptional(model.MainContractName),
+            ContactPerson = NormalizeOptional(model.ContactPerson),
+            AdditionalInfo = NormalizeOptional(model.AdditionalInfo),
+            Comment = NormalizeOptional(model.Comment),
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
         });
@@ -249,12 +285,13 @@ public class MetalWarehouseController : Controller
         NormalizeReceiptItems(model);
         var vatRatePercent = await GetVatRatePercentAsync(cancellationToken);
         RecalculateReceiptFinancials(model, vatRatePercent);
+        model.ResponsibleUserName = GetCurrentUserContext().UserName;
 
 
         var activeMaterials = await _dbContext.MetalMaterials
             .AsNoTracking()
             .Where(x => x.IsActive)
-            .Select(x => new { x.Id, x.Name, x.Code })
+            .Select(x => new { x.Id, x.Name, x.Code, x.Article })
             .ToListAsync(cancellationToken);
 
         foreach (var line in model.Items)
@@ -266,9 +303,10 @@ public class MetalWarehouseController : Controller
 
             var normalizedInput = NormalizeMaterialLookupText(line.MaterialInputText);
             var matches = activeMaterials
-                .Where(x => NormalizeMaterialLookupText($"{x.Name} ({x.Code})") == normalizedInput
+                .Where(x => NormalizeMaterialLookupText(BuildMaterialLookupDisplay(x.Name, x.Code, x.Article)) == normalizedInput
                     || NormalizeMaterialLookupText(x.Name) == normalizedInput
-                    || NormalizeMaterialLookupText(x.Code) == normalizedInput)
+                    || NormalizeMaterialLookupText(x.Code) == normalizedInput
+                    || NormalizeMaterialLookupText(x.Article) == normalizedInput)
                 .ToList();
 
             if (matches.Count == 1)
@@ -280,7 +318,7 @@ public class MetalWarehouseController : Controller
         var activeSuppliers = await _dbContext.MetalSuppliers
             .AsNoTracking()
             .Where(x => x.IsActive)
-            .Select(x => new { x.Id, x.Identifier, x.Name, x.Inn })
+            .Select(x => new { x.Id, x.Identifier, x.Name, x.Inn, x.MainContractName })
             .ToListAsync(cancellationToken);
 
         if (!model.SupplierId.HasValue && !string.IsNullOrWhiteSpace(model.SupplierInputText))
@@ -374,35 +412,46 @@ public class MetalWarehouseController : Controller
         }
 
         var now = DateTime.UtcNow;
+        var nowUser = GetCurrentUserContext();
         var nextNumber = await GetNextReceiptNumberAsync(model.ReceiptDate, cancellationToken);
         var supplierDisplay = BuildSupplierDisplay(supplier!.Identifier, supplier.Name, supplier.Inn);
+        var totalWeight = model.Items.Sum(x => x.PassportWeightKg ?? 0m);
         var receipt = new MetalReceipt
         {
             Id = Guid.NewGuid(),
             ReceiptNumber = nextNumber,
             ReceiptDate = ToUtcDate(model.ReceiptDate!.Value),
+            OrganizationName = NormalizeRequired(model.OrganizationName, "НЗП"),
+            WarehouseName = NormalizeRequired(model.WarehouseName, "Склад металла"),
+            OperationType = NormalizeRequired(model.OperationType, "Поступление товаров"),
+            CurrencyCode = NormalizeRequired(model.CurrencyCode, "RUB").ToUpperInvariant(),
+            ContractName = NormalizeOptional(model.ContractName) ?? NormalizeOptional(supplier.MainContractName),
             MetalSupplierId = supplier.Id,
             SupplierOrSource = supplierDisplay,
             SupplierIdentifierSnapshot = supplier.Identifier,
             SupplierNameSnapshot = supplier.Name,
             SupplierInnSnapshot = supplier.Inn,
             SupplierDocumentNumber = model.SupplierDocumentNumber?.Trim(),
+            SupplierDocumentDate = model.SupplierDocumentDate.HasValue ? ToUtcDate(model.SupplierDocumentDate.Value) : null,
             InvoiceOrUpiNumber = model.InvoiceOrUpiNumber?.Trim(),
-            AccountingAccount = "10.01",
-            VatAccount = "19.03",
-            PricePerKg = model.Items.FirstOrDefault()?.PricePerKg ?? model.PricePerKg ?? 0m,
+            AccountingAccount = NormalizeRequired(model.AccountingAccount, "10.01"),
+            VatAccount = NormalizeRequired(model.VatAccount, "19.03"),
+            SettlementAccount = NormalizeRequired(model.SettlementAccount, "60.01"),
+            AdvanceAccount = NormalizeRequired(model.AdvanceAccount, "60.02"),
+            PricePerKg = totalWeight > 0m ? Math.Round(model.AmountWithoutVat / totalWeight, 4, MidpointRounding.AwayFromZero) : model.Items.FirstOrDefault()?.PricePerKg ?? model.PricePerKg ?? 0m,
             AmountWithoutVat = model.AmountWithoutVat,
             VatRatePercent = model.VatRatePercent,
             VatAmount = model.VatAmount,
             TotalAmountWithVat = model.TotalAmountWithVat,
             Comment = model.Comment?.Trim(),
+            ResponsibleUserName = nowUser.UserName,
             OriginalDocumentFileName = originalDocument.FileName,
             OriginalDocumentContentType = originalDocument.ContentType,
             OriginalDocumentContent = originalDocument.Content,
             OriginalDocumentSizeBytes = originalDocument.SizeBytes,
             OriginalDocumentUploadedAt = originalDocument.Content is null ? null : now,
             CreatedAt = now,
-            BatchNumber = string.Empty,
+            BatchNumber = NormalizeOptional(model.BatchNumber) ?? string.Empty,
         };
 
         var receiptItemIndex = 1;
@@ -454,7 +503,6 @@ public class MetalWarehouseController : Controller
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         _dbContext.MetalReceipts.Add(receipt);
-        var nowUser = GetCurrentUserContext();
         foreach (var item in receipt.Items)
         {
             _dbContext.MetalStockMovements.Add(new MetalStockMovement
@@ -485,8 +533,12 @@ public class MetalWarehouseController : Controller
             new
             {
                 receipt.ReceiptDate,
+                receipt.OrganizationName,
+                receipt.WarehouseName,
+                receipt.OperationType,
                 Supplier = supplierDisplay,
                 receipt.SupplierDocumentNumber,
+                receipt.SupplierDocumentDate,
                 receipt.PricePerKg,
                 receipt.AmountWithoutVat,
                 receipt.VatRatePercent,
@@ -518,9 +570,15 @@ public class MetalWarehouseController : Controller
     public async Task<IActionResult> AddSupplierInline([FromBody] MetalSupplierInlineCreateModel model, CancellationToken cancellationToken)
     {
         var inn = Regex.Replace(model.Inn ?? string.Empty, @"\D", string.Empty);
+        var kpp = Regex.Replace(model.Kpp ?? string.Empty, @"\D", string.Empty);
         if (string.IsNullOrWhiteSpace(model.Identifier) || string.IsNullOrWhiteSpace(model.Name) || inn.Length is not (10 or 12))
         {
             return BadRequest(new { message = "Заполните код, наименование и корректный ИНН (10/12 цифр)." });
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.Kpp) && kpp.Length != 9)
+        {
+            return BadRequest(new { message = "КПП должен содержать 9 цифр." });
         }
 
         var supplier = new MetalSupplier
@@ -528,7 +586,11 @@ public class MetalWarehouseController : Controller
             Id = Guid.NewGuid(),
             Identifier = model.Identifier.Trim(),
             Name = model.Name.Trim(),
+            FullName = NormalizeOptional(model.FullName) ?? model.Name.Trim(),
             Inn = inn,
+            Kpp = NormalizeOptional(kpp),
+            LegalEntityKind = "ЮридическоеЛицо",
+            CountryOfRegistration = "Россия",
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
         };
@@ -552,7 +614,13 @@ public class MetalWarehouseController : Controller
         {
             Id = Guid.NewGuid(),
             Name = model.Name.Trim(),
+            FullName = model.Name.Trim(),
             Code = (model.Code ?? string.Empty).Trim(),
+            Article = NormalizeOptional(model.Article),
+            NomenclatureType = "Материалы",
+            UnitOfMeasure = string.IsNullOrWhiteSpace(model.UnitOfMeasure) ? "кг" : model.UnitOfMeasure.Trim(),
+            NomenclatureGroup = "Металл",
+            VatRateType = "НДС 22%",
             UnitKind = unitKind,
             MassPerMeterKg = unitKind == "Meter" ? weight : 0m,
             MassPerSquareMeterKg = unitKind == "SquareMeter" ? weight : 0m,
@@ -564,7 +632,7 @@ public class MetalWarehouseController : Controller
         };
         _dbContext.MetalMaterials.Add(material);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        return Json(new { id = material.Id, text = string.IsNullOrWhiteSpace(material.Code) ? material.Name : $"{material.Name} ({material.Code})", unitKind = material.UnitKind, weightPerUnitKg = weight, coefficient = 1m });
+        return Json(new { id = material.Id, text = BuildMaterialLookupDisplay(material.Name, material.Code, material.Article), unitKind = material.UnitKind, weightPerUnitKg = weight, coefficient = 1m });
     }
 
     [HttpPost("Receipts/Create")]
@@ -690,7 +758,7 @@ public class MetalWarehouseController : Controller
             return View("~/Views/MetalWarehouse/CreateReceipt.cshtml", model);
         }
 
-        receipt.BatchNumber = string.Empty;
+        receipt.BatchNumber = NormalizeOptional(model.BatchNumber) ?? string.Empty;
         for (var i = 0; i < quantity; i++)
         {
             var unit = model.Units[i];
@@ -776,11 +844,24 @@ public class MetalWarehouseController : Controller
                 x.Id,
                 x.ReceiptNumber,
                 x.ReceiptDate,
+                x.OrganizationName,
+                x.WarehouseName,
+                x.OperationType,
+                x.CurrencyCode,
+                x.ContractName,
                 x.SupplierOrSource,
                 x.SupplierIdentifierSnapshot,
                 x.SupplierNameSnapshot,
                 x.SupplierInnSnapshot,
                 x.SupplierDocumentNumber,
+                x.SupplierDocumentDate,
+                x.InvoiceOrUpiNumber,
+                x.AccountingAccount,
+                x.VatAccount,
+                x.SettlementAccount,
+                x.AdvanceAccount,
+                x.ResponsibleUserName,
+                x.BatchNumber,
                 x.PricePerKg,
                 x.AmountWithoutVat,
                 x.VatRatePercent,
@@ -827,8 +908,21 @@ public class MetalWarehouseController : Controller
             Id = receipt.Id,
             ReceiptNumber = receipt.ReceiptNumber,
             ReceiptDate = receipt.ReceiptDate,
+            OrganizationName = receipt.OrganizationName,
+            WarehouseName = receipt.WarehouseName,
+            OperationType = receipt.OperationType,
+            CurrencyCode = receipt.CurrencyCode,
+            ContractName = receipt.ContractName,
+            InvoiceOrUpiNumber = receipt.InvoiceOrUpiNumber,
+            AccountingAccount = receipt.AccountingAccount,
+            VatAccount = receipt.VatAccount,
+            SettlementAccount = receipt.SettlementAccount,
+            AdvanceAccount = receipt.AdvanceAccount,
+            ResponsibleUserName = receipt.ResponsibleUserName,
+            BatchNumber = receipt.BatchNumber,
             SupplierDisplay = BuildSupplierDisplay(receipt.SupplierIdentifierSnapshot, receipt.SupplierNameSnapshot, receipt.SupplierInnSnapshot, receipt.SupplierOrSource),
             SupplierDocumentNumber = receipt.SupplierDocumentNumber,
+            SupplierDocumentDate = receipt.SupplierDocumentDate,
             Comment = receipt.Comment,
             MaterialName = BuildMaterialsSummary(lines),
             PassportWeightKg = lines.Sum(x => x.PassportWeightKg),
@@ -2646,6 +2740,27 @@ public class MetalWarehouseController : Controller
         return NormalizeMaterialLookupText(value);
     }
 
+    private static string? NormalizeOptional(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string NormalizeRequired(string? value, string fallback)
+    {
+        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+    }
+
+    private static string BuildMaterialLookupDisplay(string name, string? code, string? article)
+    {
+        var parts = new[] { code, article }
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return parts.Count == 0 ? name : $"{name} ({string.Join(", ", parts)})";
+    }
+
     private static string BuildSupplierDisplay(string? identifier, string? name, string? inn, string? fallback = null)
     {
         if (string.IsNullOrWhiteSpace(identifier) && string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(inn))
@@ -2689,6 +2804,11 @@ public class MetalWarehouseController : Controller
 
         foreach (var line in model.Items)
         {
+            if (!line.PricePerKg.HasValue && model.PricePerKg.HasValue)
+            {
+                line.PricePerKg = model.PricePerKg;
+            }
+
             if (line.UseAverageSize)
             {
                 line.Units.Clear();
@@ -2743,9 +2863,12 @@ public class MetalWarehouseController : Controller
             return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл слишком большой. Максимум 25 МБ.");
         }
 
-        if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+        var extension = Path.GetExtension(file.FileName);
+        var isPdf = string.Equals(extension, ".pdf", StringComparison.OrdinalIgnoreCase);
+        var isDocx = string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase);
+        if (!isPdf && !isDocx)
         {
-            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Можно прикрепить только PDF-файл.");
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Можно прикрепить только PDF или DOCX.");
         }
 
         await using var stream = file.OpenReadStream();
@@ -2753,9 +2876,11 @@ public class MetalWarehouseController : Controller
         await stream.CopyToAsync(memory, cancellationToken);
         var content = memory.ToArray();
 
-        if (content.Length < 4 || content[0] != 0x25 || content[1] != 0x50 || content[2] != 0x44 || content[3] != 0x46)
+        var hasPdfSignature = content.Length >= 4 && content[0] == 0x25 && content[1] == 0x50 && content[2] == 0x44 && content[3] == 0x46;
+        var hasZipSignature = content.Length >= 4 && content[0] == 0x50 && content[1] == 0x4B && content[2] == 0x03 && content[3] == 0x04;
+        if ((isPdf && !hasPdfSignature) || (isDocx && !hasZipSignature))
         {
-            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл не похож на PDF. Проверьте, что выбран PDF-документ.");
+            return new OriginalReceiptDocumentReadResult(false, null, null, null, null, "Файл не похож на выбранный формат. Проверьте PDF/DOCX-документ.");
         }
 
         var safeFileName = Path.GetFileName(file.FileName);
@@ -2767,7 +2892,7 @@ public class MetalWarehouseController : Controller
         return new OriginalReceiptDocumentReadResult(
             true,
             safeFileName,
-            string.IsNullOrWhiteSpace(file.ContentType) ? "application/pdf" : file.ContentType,
+            string.IsNullOrWhiteSpace(file.ContentType) ? (isPdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document") : file.ContentType,
             content,
             file.Length,
             null);
@@ -2788,17 +2913,21 @@ public class MetalWarehouseController : Controller
             .Select(x => x.MetalMaterialId!.Value)
             .ToHashSet();
 
-        model.Materials = await _dbContext.MetalMaterials
+        var materials = await _dbContext.MetalMaterials
             .AsNoTracking()
             .Where(x => x.IsActive)
             .OrderBy(x => x.Name)
-            .Select(x => new Microsoft.AspNetCore.Mvc.Rendering.SelectListItem
+            .Select(x => new { x.Id, x.Name, x.Code, x.Article })
+            .ToListAsync(cancellationToken);
+
+        model.Materials = materials
+            .Select(x => new SelectListItem
             {
                 Value = x.Id.ToString(),
-                Text = string.IsNullOrWhiteSpace(x.Code) ? x.Name : $"{x.Name} ({x.Code})",
+                Text = BuildMaterialLookupDisplay(x.Name, x.Code, x.Article),
                 Selected = selectedMaterialIds.Contains(x.Id),
             })
-            .ToListAsync(cancellationToken);
+            .ToList();
 
         model.MaterialUnitKinds = await _dbContext.MetalMaterials
             .AsNoTracking()
@@ -2863,7 +2992,17 @@ public class MetalWarehouseController : Controller
                 Id = x.Id,
                 Identifier = x.Identifier,
                 Name = x.Name,
+                FullName = x.FullName,
                 Inn = x.Inn,
+                Kpp = x.Kpp,
+                LegalEntityKind = x.LegalEntityKind,
+                CountryOfRegistration = x.CountryOfRegistration,
+                Okpo = x.Okpo,
+                MainBankAccount = x.MainBankAccount,
+                MainContractName = x.MainContractName,
+                ContactPerson = x.ContactPerson,
+                AdditionalInfo = x.AdditionalInfo,
+                Comment = x.Comment,
                 IsActive = x.IsActive,
             })
             .ToListAsync(cancellationToken);
@@ -2878,7 +3017,7 @@ public class MetalWarehouseController : Controller
             : model.PassportWeightKg ?? 0m;
 
         var amountWithoutVat = model.Items.Count > 0
-            ? model.Items.Sum(x => (x.PassportWeightKg ?? 0m) * (x.PricePerKg ?? 0m))
+            ? model.Items.Sum(x => (x.PassportWeightKg ?? 0m) * (x.PricePerKg ?? model.PricePerKg ?? 0m))
             : passportWeightKg * (model.PricePerKg ?? 0m);
         model.AmountWithoutVat = Math.Round(amountWithoutVat, 2, MidpointRounding.AwayFromZero);
         model.VatAmount = Math.Round(model.AmountWithoutVat * vatRatePercent / 100m, 2, MidpointRounding.AwayFromZero);

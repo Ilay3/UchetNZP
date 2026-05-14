@@ -138,9 +138,21 @@ public class MetalReceiptListItemViewModel
 
     public string ReceiptNumber { get; init; } = string.Empty;
 
+    public DateTime ReceiptDate { get; init; }
+
+    public string OrganizationName { get; init; } = string.Empty;
+
     public string? SupplierDisplay { get; init; }
 
     public string? SupplierDocumentNumber { get; init; }
+
+    public DateTime? SupplierDocumentDate { get; init; }
+
+    public string? InvoiceOrUpiNumber { get; init; }
+
+    public string WarehouseName { get; init; } = string.Empty;
+
+    public string? BatchNumber { get; init; }
 
     public string MaterialsSummary { get; init; } = string.Empty;
 
@@ -214,9 +226,31 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
     public string? SupplierInputText { get; set; }
 
+    [Required(ErrorMessage = "Организация обязательна.")]
+    [StringLength(256, ErrorMessage = "Организация не должна превышать 256 символов.")]
+    public string OrganizationName { get; set; } = "ООО Промавтоматика";
+
+    [Required(ErrorMessage = "Склад обязателен.")]
+    [StringLength(128, ErrorMessage = "Склад не должен превышать 128 символов.")]
+    public string WarehouseName { get; set; } = "Склад металла";
+
+    [Required(ErrorMessage = "Вид операции обязателен.")]
+    [StringLength(64, ErrorMessage = "Вид операции не должен превышать 64 символа.")]
+    public string OperationType { get; set; } = "Поступление товаров";
+
+    [Required(ErrorMessage = "Валюта обязательна.")]
+    [StringLength(3, MinimumLength = 3, ErrorMessage = "Код валюты должен состоять из 3 символов.")]
+    public string CurrencyCode { get; set; } = "RUB";
+
+    [StringLength(256, ErrorMessage = "Договор не должен превышать 256 символов.")]
+    public string? ContractName { get; set; }
+
     [Required(ErrorMessage = "Номер документа поставщика обязателен.")]
     [StringLength(128, ErrorMessage = "Номер документа не должен превышать 128 символов.")]
     public string? SupplierDocumentNumber { get; set; }
+
+    [DataType(DataType.Date)]
+    public DateTime? SupplierDocumentDate { get; set; }
 
     [StringLength(128, ErrorMessage = "Накладная/УПД не должна превышать 128 символов.")]
     public string? InvoiceOrUpiNumber { get; set; }
@@ -224,6 +258,16 @@ public class MetalReceiptCreateViewModel : IValidatableObject
     public string AccountingAccount { get; set; } = "10.01";
 
     public string VatAccount { get; set; } = "19.03";
+
+    public string SettlementAccount { get; set; } = "60.01";
+
+    public string AdvanceAccount { get; set; } = "60.02";
+
+    [StringLength(128, ErrorMessage = "Ответственный не должен превышать 128 символов.")]
+    public string? ResponsibleUserName { get; set; }
+
+    [StringLength(32, ErrorMessage = "Партия не должна превышать 32 символа.")]
+    public string? BatchNumber { get; set; }
 
     public decimal? PricePerKg { get; set; }
 
@@ -279,10 +323,13 @@ public class MetalReceiptCreateViewModel : IValidatableObject
                     new[] { nameof(OriginalDocumentPdf) });
             }
 
-            if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase))
+            var extension = Path.GetExtension(file.FileName);
+            var allowedExtension = string.Equals(extension, ".pdf", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(extension, ".docx", StringComparison.OrdinalIgnoreCase);
+            if (!allowedExtension)
             {
                 yield return new ValidationResult(
-                    "Можно прикрепить только PDF-файл.",
+                    "Можно прикрепить только PDF или DOCX.",
                     new[] { nameof(OriginalDocumentPdf) });
             }
         }
@@ -333,7 +380,7 @@ public class MetalReceiptCreateViewModel : IValidatableObject
 
             if (line.UseAverageSize)
             {
-                if (!line.AverageSizeValue.HasValue || line.AverageSizeValue.Value <= 0m)
+                if (line.AverageSizeValue.HasValue && line.AverageSizeValue.Value <= 0m)
                 {
                     yield return new ValidationResult(
                         $"Укажите средний размер в строке {lineNumber}.",
@@ -422,7 +469,17 @@ public class MetalSupplierListItemViewModel
     public Guid Id { get; init; }
     public string Identifier { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
+    public string? FullName { get; init; }
     public string Inn { get; init; } = string.Empty;
+    public string? Kpp { get; init; }
+    public string LegalEntityKind { get; init; } = string.Empty;
+    public string? CountryOfRegistration { get; init; }
+    public string? Okpo { get; init; }
+    public string? MainBankAccount { get; init; }
+    public string? MainContractName { get; init; }
+    public string? ContactPerson { get; init; }
+    public string? AdditionalInfo { get; init; }
+    public string? Comment { get; init; }
     public bool IsActive { get; init; }
 }
 
@@ -436,9 +493,39 @@ public class MetalSuppliersDirectoryViewModel
     [StringLength(256)]
     public string Name { get; set; } = string.Empty;
 
+    [StringLength(512)]
+    public string? FullName { get; set; }
+
     [Required(ErrorMessage = "ИНН обязателен.")]
     [StringLength(12)]
     public string Inn { get; set; } = string.Empty;
+
+    [StringLength(9)]
+    public string? Kpp { get; set; }
+
+    [StringLength(64)]
+    public string LegalEntityKind { get; set; } = "ЮридическоеЛицо";
+
+    [StringLength(128)]
+    public string? CountryOfRegistration { get; set; } = "Россия";
+
+    [StringLength(16)]
+    public string? Okpo { get; set; }
+
+    [StringLength(128)]
+    public string? MainBankAccount { get; set; }
+
+    [StringLength(256)]
+    public string? MainContractName { get; set; }
+
+    [StringLength(256)]
+    public string? ContactPerson { get; set; }
+
+    [StringLength(1024)]
+    public string? AdditionalInfo { get; set; }
+
+    [StringLength(512)]
+    public string? Comment { get; set; }
 
     public IReadOnlyCollection<MetalSupplierListItemViewModel> Suppliers { get; set; } = Array.Empty<MetalSupplierListItemViewModel>();
 }
@@ -448,13 +535,17 @@ public class MetalSupplierInlineCreateModel
     public string Identifier { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Inn { get; set; } = string.Empty;
+    public string? Kpp { get; set; }
+    public string? FullName { get; set; }
 }
 
 public class MetalMaterialInlineCreateModel
 {
     public string Name { get; set; } = string.Empty;
     public string? Code { get; set; }
+    public string? Article { get; set; }
     public string UnitKind { get; set; } = "Meter";
+    public string UnitOfMeasure { get; set; } = "кг";
     public decimal WeightPerUnitKg { get; set; } = 1m;
 }
 
@@ -513,6 +604,32 @@ public class MetalReceiptDetailsViewModel
     public string SupplierDisplay { get; init; } = string.Empty;
 
     public string? SupplierDocumentNumber { get; init; }
+
+    public DateTime? SupplierDocumentDate { get; init; }
+
+    public string OrganizationName { get; init; } = string.Empty;
+
+    public string WarehouseName { get; init; } = string.Empty;
+
+    public string OperationType { get; init; } = string.Empty;
+
+    public string CurrencyCode { get; init; } = string.Empty;
+
+    public string? ContractName { get; init; }
+
+    public string? InvoiceOrUpiNumber { get; init; }
+
+    public string AccountingAccount { get; init; } = string.Empty;
+
+    public string VatAccount { get; init; } = string.Empty;
+
+    public string SettlementAccount { get; init; } = string.Empty;
+
+    public string AdvanceAccount { get; init; } = string.Empty;
+
+    public string? ResponsibleUserName { get; init; }
+
+    public string? BatchNumber { get; init; }
 
     public string? Comment { get; init; }
 

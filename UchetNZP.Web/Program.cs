@@ -75,6 +75,7 @@ builder.Services.AddSingleton<IWipBatchReportPdfExporter, WipBatchReportPdfExpor
 builder.Services.AddSingleton<IReceiptReportPdfExporter, ReceiptReportPdfExporter>();
 builder.Services.AddSingleton<IWipBatchInventoryDocumentExporter, WipBatchInventoryDocumentExporter>();
 builder.Services.AddScoped<IWipEscortLabelDocumentService, WipEscortLabelDocumentService>();
+builder.Services.AddScoped<IWarehouseControlCardDocumentService, WarehouseControlCardDocumentService>();
 builder.Services.AddScoped<IMetalRequirementWarehousePrintDocumentService, MetalRequirementWarehousePrintDocumentService>();
 builder.Services.AddScoped<IMetalReceiptItemLabelDocumentService, MetalReceiptItemLabelDocumentService>();
 builder.Services.AddScoped<IMetalReceiptDocumentService, MetalReceiptDocumentService>();
@@ -97,6 +98,8 @@ using (var scope = app.Services.CreateScope())
         await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
+        await EnsureMetalOneCStructureColumnsAsync(db, CancellationToken.None);
+        await EnsureWarehouseFinishedGoodsColumnsAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
     else
@@ -106,6 +109,8 @@ using (var scope = app.Services.CreateScope())
         await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
+        await EnsureMetalOneCStructureColumnsAsync(db, CancellationToken.None);
+        await EnsureWarehouseFinishedGoodsColumnsAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
 }
@@ -176,7 +181,7 @@ static async Task EnsureMetalReceiptFinanceColumnsAsync(AppDbContext in_db, Canc
             ADD COLUMN IF NOT EXISTS "AccountingAccount" character varying(16) NOT NULL DEFAULT '10.01';
 
         ALTER TABLE "MetalReceipts"
-            ADD COLUMN IF NOT EXISTS "VatAccount" character varying(16) NOT NULL DEFAULT '19.01';
+            ADD COLUMN IF NOT EXISTS "VatAccount" character varying(16) NOT NULL DEFAULT '19.03';
 
         DO $$
         BEGIN
@@ -213,6 +218,129 @@ static async Task EnsureMetalReceiptFinanceColumnsAsync(AppDbContext in_db, Canc
 
         in_cancellationToken);
 }
+
+static async Task EnsureMetalOneCStructureColumnsAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    await in_db.Database.ExecuteSqlRawAsync(
+        """
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "FullName" character varying(512);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "Kpp" character varying(9);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "LegalEntityKind" character varying(64) NOT NULL DEFAULT 'ЮридическоеЛицо';
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "CountryOfRegistration" character varying(128);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "Okpo" character varying(16);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "MainBankAccount" character varying(128);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "MainContractName" character varying(256);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "ContactPerson" character varying(256);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "AdditionalInfo" character varying(1024);
+        ALTER TABLE "MetalSuppliers" ADD COLUMN IF NOT EXISTS "Comment" character varying(512);
+
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "FullName" character varying(512);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "Article" character varying(128);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "NomenclatureType" character varying(128);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "UnitOfMeasure" character varying(32) NOT NULL DEFAULT 'кг';
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "NomenclatureGroup" character varying(128);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "VatRateType" character varying(64);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "CountryOfOrigin" character varying(128);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "CustomsDeclarationNumber" character varying(64);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "TnVedCode" character varying(32);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "Okpd2Code" character varying(32);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "Comment" character varying(1024);
+        ALTER TABLE "MetalMaterials" ADD COLUMN IF NOT EXISTS "IsService" boolean NOT NULL DEFAULT FALSE;
+
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "OrganizationName" character varying(256) NOT NULL DEFAULT 'НЗП';
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "WarehouseName" character varying(128) NOT NULL DEFAULT 'Склад металла';
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "OperationType" character varying(64) NOT NULL DEFAULT 'Поступление товаров';
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "CurrencyCode" character varying(3) NOT NULL DEFAULT 'RUB';
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "ContractName" character varying(256);
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "SupplierDocumentDate" timestamp with time zone;
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "SettlementAccount" character varying(16) NOT NULL DEFAULT '60.01';
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "AdvanceAccount" character varying(16) NOT NULL DEFAULT '60.02';
+        ALTER TABLE "MetalReceipts" ADD COLUMN IF NOT EXISTS "ResponsibleUserName" character varying(128);
+        """,
+        in_cancellationToken);
+}
+
+static async Task EnsureWarehouseFinishedGoodsColumnsAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
+{
+    await in_db.Database.ExecuteSqlRawAsync(
+        """
+        CREATE TABLE IF NOT EXISTS "WarehouseAssemblyUnits" (
+            "Id" uuid NOT NULL,
+            "Name" character varying(256) NOT NULL,
+            "NormalizedName" character varying(256) NOT NULL,
+            "CreatedByUserId" uuid,
+            "CreatedAt" timestamp with time zone NOT NULL,
+            "UpdatedAt" timestamp with time zone NOT NULL,
+            CONSTRAINT "PK_WarehouseAssemblyUnits" PRIMARY KEY ("Id")
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS "IX_WarehouseAssemblyUnits_NormalizedName"
+            ON "WarehouseAssemblyUnits" ("NormalizedName");
+
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "MovementType" character varying(32) NOT NULL DEFAULT 'Receipt';
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "SourceType" character varying(32) NOT NULL DEFAULT 'AutomaticTransfer';
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "DocumentNumber" character varying(64);
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "ControlCardNumber" character varying(64);
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "ControllerName" character varying(128);
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "MasterName" character varying(128);
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "AcceptedByName" character varying(128);
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "CreatedByUserId" uuid;
+        ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "AssemblyUnitId" uuid;
+
+        ALTER TABLE "WarehouseItems" ALTER COLUMN "PartId" DROP NOT NULL;
+
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'FK_WarehouseItems_Parts_PartId'
+                  AND conrelid = '"WarehouseItems"'::regclass
+                  AND confdeltype <> 'n'
+            ) THEN
+                ALTER TABLE "WarehouseItems" DROP CONSTRAINT "FK_WarehouseItems_Parts_PartId";
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'FK_WarehouseItems_Parts_PartId'
+                  AND conrelid = '"WarehouseItems"'::regclass
+            ) THEN
+                ALTER TABLE "WarehouseItems"
+                    ADD CONSTRAINT "FK_WarehouseItems_Parts_PartId"
+                    FOREIGN KEY ("PartId") REFERENCES "Parts" ("Id") ON DELETE SET NULL;
+            END IF;
+        END
+        $$;
+
+        CREATE INDEX IF NOT EXISTS "IX_WarehouseItems_MovementType"
+            ON "WarehouseItems" ("MovementType");
+
+        CREATE INDEX IF NOT EXISTS "IX_WarehouseItems_SourceType"
+            ON "WarehouseItems" ("SourceType");
+
+        CREATE INDEX IF NOT EXISTS "IX_WarehouseItems_AssemblyUnitId"
+            ON "WarehouseItems" ("AssemblyUnitId");
+
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'FK_WarehouseItems_WarehouseAssemblyUnits_AssemblyUnitId'
+                  AND conrelid = '"WarehouseItems"'::regclass
+            ) THEN
+                ALTER TABLE "WarehouseItems"
+                    ADD CONSTRAINT "FK_WarehouseItems_WarehouseAssemblyUnits_AssemblyUnitId"
+                    FOREIGN KEY ("AssemblyUnitId") REFERENCES "WarehouseAssemblyUnits" ("Id") ON DELETE SET NULL;
+            END IF;
+        END
+        $$;
+        """,
+        in_cancellationToken);
+}
+
 static async Task EnsureMetalMaterialsSeededAsync(AppDbContext in_db, CancellationToken in_cancellationToken)
 {
     if (await in_db.MetalMaterials.AnyAsync(in_cancellationToken))

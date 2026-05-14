@@ -363,5 +363,8 @@ public class MetalWarehouseControllerReceiptTests
     {
         public Task<MetalReceiptDocumentResult> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
             => Task.FromResult(new MetalReceiptDocumentResult("receipt.pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Array.Empty<byte>()));
+
+        public Task<MetalReceiptDocumentResult> BuildPdfAsync(Guid receiptId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new MetalReceiptDocumentResult("receipt.pdf", "application/pdf", Array.Empty<byte>()));
     }
 }

@@ -99,15 +99,127 @@
                     </div>
 
                     <div class="mb-3">
+                        <label asp-for="CreateModel.Article" class="form-label">Артикул</label>
+                        <input asp-for="CreateModel.Article" class="form-control" />
+                        <span asp-validation-for="CreateModel.Article" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="CreateModel.FullName" class="form-label">Полное наименование 1С</label>
+                        <input asp-for="CreateModel.FullName" class="form-control" placeholder="Если пусто, будет использовано название" />
+                        <span asp-validation-for="CreateModel.FullName" class="text-danger"></span>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.UnitOfMeasure" class="form-label">Ед. 1С</label>
+                            <input asp-for="CreateModel.UnitOfMeasure" class="form-control" />
+                            <span asp-validation-for="CreateModel.UnitOfMeasure" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.VatRateType" class="form-label">Ставка НДС</label>
+                            <input asp-for="CreateModel.VatRateType" class="form-control" />
+                            <span asp-validation-for="CreateModel.VatRateType" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.NomenclatureType" class="form-label">Вид номенклатуры</label>
+                            <input asp-for="CreateModel.NomenclatureType" class="form-control" />
+                            <span asp-validation-for="CreateModel.NomenclatureType" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.NomenclatureGroup" class="form-label">Группа</label>
+                            <input asp-for="CreateModel.NomenclatureGroup" class="form-control" />
+                            <span asp-validation-for="CreateModel.NomenclatureGroup" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.CountryOfOrigin" class="form-label">Страна происхождения</label>
+                            <input asp-for="CreateModel.CountryOfOrigin" class="form-control" placeholder="Россия" />
+                            <span asp-validation-for="CreateModel.CountryOfOrigin" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.CustomsDeclarationNumber" class="form-label">Номер ГТД</label>
+                            <input asp-for="CreateModel.CustomsDeclarationNumber" class="form-control" />
+                            <span asp-validation-for="CreateModel.CustomsDeclarationNumber" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.TnVedCode" class="form-label">Код ТН ВЭД</label>
+                            <input asp-for="CreateModel.TnVedCode" class="form-control" />
+                            <span asp-validation-for="CreateModel.TnVedCode" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.Okpd2Code" class="form-label">ОКПД2</label>
+                            <input asp-for="CreateModel.Okpd2Code" class="form-control" />
+                            <span asp-validation-for="CreateModel.Okpd2Code" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.UnitKind" class="form-label">Тип складской единицы</label>
+                            <select asp-for="CreateModel.UnitKind" class="form-select">
+                                <option value="Meter">Метры</option>
+                                <option value="SquareMeter">Квадратные метры</option>
+                                <option value="Kilogram">Килограммы</option>
+                                <option value="Piece">Штуки</option>
+                            </select>
+                            <span asp-validation-for="CreateModel.UnitKind" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.StockUnit" class="form-label">Складская единица</label>
+                            <input asp-for="CreateModel.StockUnit" class="form-control" placeholder="m, m2, kg, pcs" />
+                            <span asp-validation-for="CreateModel.StockUnit" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.MassPerMeterKg" class="form-label">Масса 1м, кг</label>
+                            <input asp-for="CreateModel.MassPerMeterKg" class="form-control" type="number" min="0" step="0.001" />
+                            <span asp-validation-for="CreateModel.MassPerMeterKg" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="CreateModel.MassPerSquareMeterKg" class="form-label">Масса 1м², кг</label>
+                            <input asp-for="CreateModel.MassPerSquareMeterKg" class="form-control" type="number" min="0" step="0.001" />
+                            <span asp-validation-for="CreateModel.MassPerSquareMeterKg" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <label asp-for="CreateModel.WeightPerUnitKg" class="form-label">Вес 1м / 1м², кг</label>
                         <input asp-for="CreateModel.WeightPerUnitKg" class="form-control" type="number" min="0.001" step="0.001" />
                         <span asp-validation-for="CreateModel.WeightPerUnitKg" class="text-danger"></span>
                     </div>
 
                     <div class="mb-3">
+                        <label asp-for="CreateModel.CoefConsumption" class="form-label">Коэффициент расхода</label>
+                        <input asp-for="CreateModel.CoefConsumption" class="form-control" type="number" min="0.001" step="0.001" />
+                        <span asp-validation-for="CreateModel.CoefConsumption" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
                         <label asp-for="CreateModel.Coefficient" class="form-label">Коэффициент металла</label>
                         <input asp-for="CreateModel.Coefficient" class="form-control" type="number" min="0.001" step="0.001" />
                         <span asp-validation-for="CreateModel.Coefficient" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="CreateModel.Comment" class="form-label">Комментарий</label>
+                        <textarea asp-for="CreateModel.Comment" class="form-control" rows="2"></textarea>
+                        <span asp-validation-for="CreateModel.Comment" class="text-danger"></span>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input asp-for="CreateModel.IsService" class="form-check-input" />
+                        <label asp-for="CreateModel.IsService" class="form-check-label">Услуга, не товар</label>
                     </div>
 
                     <div class="form-check mb-3">
@@ -145,7 +257,12 @@
                             <tr>
                                 <th>Название</th>
                                 <th>Код</th>
+                                <th>Артикул</th>
+                                <th>Ед. 1С</th>
+                                <th>Вид/группа</th>
+                                <th>1С-реквизиты</th>
                                 <th>Вес 1м / 1м², кг</th>
+                                <th>Склад</th>
                                 <th>Коэффициент</th>
                                 <th>Статус</th>
                                 <th class="text-end">Действия</th>
@@ -155,17 +272,38 @@
                             @if (Model.Materials.Count == 0)
                             {
                                 <tr>
-                                    <td colspan="6" class="text-muted">Материалы пока не добавлены.</td>
+                                    <td colspan="11" class="text-muted">Материалы пока не добавлены.</td>
                                 </tr>
                             }
                             else
                             {
                                 @foreach (var material in Model.Materials)
                                 {
-                                    <tr data-name="@material.Name.ToLowerInvariant()" data-code="@(material.Code?.ToLowerInvariant() ?? string.Empty)" data-weight="@material.WeightPerUnitKg.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                                    <tr data-name="@material.Name.ToLowerInvariant()" data-code="@(material.Code?.ToLowerInvariant() ?? string.Empty)" data-article="@(material.Article?.ToLowerInvariant() ?? string.Empty)" data-weight="@material.WeightPerUnitKg.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                                         <td class="fw-semibold">@material.Name</td>
                                         <td>@(string.IsNullOrWhiteSpace(material.Code) ? "—" : material.Code)</td>
+                                        <td>@(string.IsNullOrWhiteSpace(material.Article) ? "—" : material.Article)</td>
+                                        <td>@material.UnitOfMeasure</td>
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(material.NomenclatureType) ? "—" : material.NomenclatureType)</div>
+                                            <div class="small text-muted">@(string.IsNullOrWhiteSpace(material.NomenclatureGroup) ? "—" : material.NomenclatureGroup)</div>
+                                        </td>
+                                        <td>
+                                            <div>@(string.IsNullOrWhiteSpace(material.VatRateType) ? "НДС не задан" : material.VatRateType)</div>
+                                            <div class="small text-muted">Страна: @(string.IsNullOrWhiteSpace(material.CountryOfOrigin) ? "—" : material.CountryOfOrigin)</div>
+                                            <div class="small text-muted">ГТД: @(string.IsNullOrWhiteSpace(material.CustomsDeclarationNumber) ? "—" : material.CustomsDeclarationNumber)</div>
+                                            <div class="small text-muted">ТН ВЭД: @(string.IsNullOrWhiteSpace(material.TnVedCode) ? "—" : material.TnVedCode); ОКПД2: @(string.IsNullOrWhiteSpace(material.Okpd2Code) ? "—" : material.Okpd2Code)</div>
+                                        </td>
                                         <td>@material.WeightPerUnitKg.ToString("0.###")</td>
+                                        <td>
+                                            <div>@material.UnitKind / @material.StockUnit</div>
+                                            <div class="small text-muted">1м: @material.MassPerMeterKg.ToString("0.###") кг; 1м²: @material.MassPerSquareMeterKg.ToString("0.###") кг</div>
+                                            <div class="small text-muted">Расход: @material.CoefConsumption.ToString("0.###")</div>
+                                            @if (material.IsService)
+                                            {
+                                                <span class="badge text-bg-warning">Услуга</span>
+                                            }
+                                        </td>
                                         <td>@material.Coefficient.ToString("0.###")</td>
                                         <td>
                                             <span class=" @(material.IsActive ? "bg-success-subtle text-success-emphasis" : "bg-secondary-subtle text-secondary-emphasis")">
@@ -177,7 +315,24 @@
                                                     class="btn btn-sm btn-outline-primary js-edit-material"
                                                     data-id="@material.Id"
                                                     data-name="@material.Name"
+                                                    data-full-name="@material.FullName"
                                                     data-code="@material.Code"
+                                                    data-article="@material.Article"
+                                                    data-unit-of-measure="@material.UnitOfMeasure"
+                                                    data-nomenclature-type="@material.NomenclatureType"
+                                                    data-nomenclature-group="@material.NomenclatureGroup"
+                                                    data-vat-rate-type="@material.VatRateType"
+                                                    data-country-of-origin="@material.CountryOfOrigin"
+                                                    data-customs-declaration-number="@material.CustomsDeclarationNumber"
+                                                    data-tn-ved-code="@material.TnVedCode"
+                                                    data-okpd2-code="@material.Okpd2Code"
+                                                    data-comment="@material.Comment"
+                                                    data-is-service="@material.IsService.ToString().ToLowerInvariant()"
+                                                    data-unit-kind="@material.UnitKind"
+                                                    data-stock-unit="@material.StockUnit"
+                                                    data-mass-per-meter="@material.MassPerMeterKg.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
+                                                    data-mass-per-square-meter="@material.MassPerSquareMeterKg.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
+                                                    data-coef-consumption="@material.CoefConsumption.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
                                                     data-weight="@material.WeightPerUnitKg.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
                                                     data-coefficient="@material.Coefficient.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)"
                                                     data-active="@material.IsActive.ToString().ToLowerInvariant()">
@@ -205,7 +360,7 @@
 </div>
 
 <div class="modal fade" id="editMaterialModal" tabindex="-1" aria-labelledby="editMaterialModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="post" asp-action="Update" asp-controller="AdminMetalMaterials">
                 @Html.AntiForgeryToken()
@@ -224,12 +379,97 @@
                         <input asp-for="UpdateModel.Code" class="form-control" id="edit-code" />
                     </div>
                     <div class="mb-3">
+                        <label asp-for="UpdateModel.Article" class="form-label">Артикул</label>
+                        <input asp-for="UpdateModel.Article" class="form-control" id="edit-article" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="UpdateModel.FullName" class="form-label">Полное наименование 1С</label>
+                        <input asp-for="UpdateModel.FullName" class="form-control" id="edit-full-name" />
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.UnitOfMeasure" class="form-label">Ед. 1С</label>
+                            <input asp-for="UpdateModel.UnitOfMeasure" class="form-control" id="edit-unit-of-measure" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.VatRateType" class="form-label">Ставка НДС</label>
+                            <input asp-for="UpdateModel.VatRateType" class="form-control" id="edit-vat-rate-type" />
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.NomenclatureType" class="form-label">Вид номенклатуры</label>
+                            <input asp-for="UpdateModel.NomenclatureType" class="form-control" id="edit-nomenclature-type" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.NomenclatureGroup" class="form-label">Группа</label>
+                            <input asp-for="UpdateModel.NomenclatureGroup" class="form-control" id="edit-nomenclature-group" />
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.CountryOfOrigin" class="form-label">Страна происхождения</label>
+                            <input asp-for="UpdateModel.CountryOfOrigin" class="form-control" id="edit-country-of-origin" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.CustomsDeclarationNumber" class="form-label">Номер ГТД</label>
+                            <input asp-for="UpdateModel.CustomsDeclarationNumber" class="form-control" id="edit-customs-declaration-number" />
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.TnVedCode" class="form-label">Код ТН ВЭД</label>
+                            <input asp-for="UpdateModel.TnVedCode" class="form-control" id="edit-tn-ved-code" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.Okpd2Code" class="form-label">ОКПД2</label>
+                            <input asp-for="UpdateModel.Okpd2Code" class="form-control" id="edit-okpd2-code" />
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.UnitKind" class="form-label">Тип складской единицы</label>
+                            <select asp-for="UpdateModel.UnitKind" class="form-select" id="edit-unit-kind">
+                                <option value="Meter">Метры</option>
+                                <option value="SquareMeter">Квадратные метры</option>
+                                <option value="Kilogram">Килограммы</option>
+                                <option value="Piece">Штуки</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.StockUnit" class="form-label">Складская единица</label>
+                            <input asp-for="UpdateModel.StockUnit" class="form-control" id="edit-stock-unit" />
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.MassPerMeterKg" class="form-label">Масса 1м, кг</label>
+                            <input asp-for="UpdateModel.MassPerMeterKg" class="form-control" type="number" min="0" step="0.001" id="edit-mass-per-meter" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="UpdateModel.MassPerSquareMeterKg" class="form-label">Масса 1м², кг</label>
+                            <input asp-for="UpdateModel.MassPerSquareMeterKg" class="form-control" type="number" min="0" step="0.001" id="edit-mass-per-square-meter" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
                         <label asp-for="UpdateModel.WeightPerUnitKg" class="form-label">Вес 1м / 1м², кг</label>
                         <input asp-for="UpdateModel.WeightPerUnitKg" class="form-control" type="number" min="0.001" step="0.001" id="edit-weight" />
                     </div>
                     <div class="mb-3">
+                        <label asp-for="UpdateModel.CoefConsumption" class="form-label">Коэффициент расхода</label>
+                        <input asp-for="UpdateModel.CoefConsumption" class="form-control" type="number" min="0.001" step="0.001" id="edit-coef-consumption" />
+                    </div>
+                    <div class="mb-3">
                         <label asp-for="UpdateModel.Coefficient" class="form-label">Коэффициент металла</label>
                         <input asp-for="UpdateModel.Coefficient" class="form-control" type="number" min="0.001" step="0.001" id="edit-coefficient" />
+                    </div>
+                    <div class="mb-3">
+                        <label asp-for="UpdateModel.Comment" class="form-label">Комментарий</label>
+                        <textarea asp-for="UpdateModel.Comment" class="form-control" rows="2" id="edit-comment"></textarea>
+                    </div>
+                    <div class="form-check mb-1">
+                        <input asp-for="UpdateModel.IsService" class="form-check-input" id="edit-is-service" />
+                        <label asp-for="UpdateModel.IsService" class="form-check-label">Услуга, не товар</label>
                     </div>
                     <div class="form-check mb-1">
                         <input asp-for="UpdateModel.IsActive" class="form-check-input" id="edit-active" />
@@ -276,7 +516,24 @@
                 button.addEventListener("click", () => {
                     document.getElementById("edit-id").value = button.dataset.id || "";
                     document.getElementById("edit-name").value = button.dataset.name || "";
+                    document.getElementById("edit-full-name").value = button.dataset.fullName || "";
                     document.getElementById("edit-code").value = button.dataset.code || "";
+                    document.getElementById("edit-article").value = button.dataset.article || "";
+                    document.getElementById("edit-unit-of-measure").value = button.dataset.unitOfMeasure || "кг";
+                    document.getElementById("edit-nomenclature-type").value = button.dataset.nomenclatureType || "Материалы";
+                    document.getElementById("edit-nomenclature-group").value = button.dataset.nomenclatureGroup || "Металл";
+                    document.getElementById("edit-vat-rate-type").value = button.dataset.vatRateType || "НДС 22%";
+                    document.getElementById("edit-country-of-origin").value = button.dataset.countryOfOrigin || "";
+                    document.getElementById("edit-customs-declaration-number").value = button.dataset.customsDeclarationNumber || "";
+                    document.getElementById("edit-tn-ved-code").value = button.dataset.tnVedCode || "";
+                    document.getElementById("edit-okpd2-code").value = button.dataset.okpd2Code || "";
+                    document.getElementById("edit-comment").value = button.dataset.comment || "";
+                    document.getElementById("edit-is-service").checked = (button.dataset.isService || "") === "true";
+                    document.getElementById("edit-unit-kind").value = button.dataset.unitKind || "Meter";
+                    document.getElementById("edit-stock-unit").value = button.dataset.stockUnit || "m";
+                    document.getElementById("edit-mass-per-meter").value = button.dataset.massPerMeter || "";
+                    document.getElementById("edit-mass-per-square-meter").value = button.dataset.massPerSquareMeter || "";
+                    document.getElementById("edit-coef-consumption").value = button.dataset.coefConsumption || "1";
                     document.getElementById("edit-weight").value = button.dataset.weight || "";
                     document.getElementById("edit-coefficient").value = button.dataset.coefficient || "1";
                     document.getElementById("edit-active").checked = (button.dataset.active || "") === "true";
@@ -300,7 +557,8 @@
                     .filter(row => {
                         const name = row.dataset.name || "";
                         const code = row.dataset.code || "";
-                        return !term || name.includes(term) || code.includes(term);
+                        const article = row.dataset.article || "";
+                        return !term || name.includes(term) || code.includes(term) || article.includes(term);
                     })
                     .sort((a, b) => {
                         const mode = sortSelect?.value || "name-asc";

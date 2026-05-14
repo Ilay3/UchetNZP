@@ -10,6 +10,16 @@ public class MetalReceipt
 
     public DateTime ReceiptDate { get; set; }
 
+    public string OrganizationName { get; set; } = "ООО Промавтоматика";
+
+    public string WarehouseName { get; set; } = "Склад металла";
+
+    public string OperationType { get; set; } = "Поступление товаров";
+
+    public string CurrencyCode { get; set; } = "RUB";
+
+    public string? ContractName { get; set; }
+
     public string? SupplierOrSource { get; set; }
 
     public Guid? MetalSupplierId { get; set; }
@@ -21,9 +31,16 @@ public class MetalReceipt
     public string? SupplierInnSnapshot { get; set; }
 
     public string? SupplierDocumentNumber { get; set; }
+    public DateTime? SupplierDocumentDate { get; set; }
     public string? InvoiceOrUpiNumber { get; set; }
     public string AccountingAccount { get; set; } = "10.01";
     public string VatAccount { get; set; } = "19.03";
+
+    public string SettlementAccount { get; set; } = "60.01";
+
+    public string AdvanceAccount { get; set; } = "60.02";
+
+    public string? ResponsibleUserName { get; set; }
 
     public string BatchNumber { get; set; } = string.Empty;
 

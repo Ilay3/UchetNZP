@@ -38,6 +38,8 @@ public class AppDbContext : DbContext
 
     public DbSet<WarehouseItem> WarehouseItems => Set<WarehouseItem>();
 
+    public DbSet<WarehouseAssemblyUnit> WarehouseAssemblyUnits => Set<WarehouseAssemblyUnit>();
+
     public DbSet<WarehouseLabelItem> WarehouseLabelItems => Set<WarehouseLabelItem>();
 
     public DbSet<TransferAudit> TransferAudits => Set<TransferAudit>();

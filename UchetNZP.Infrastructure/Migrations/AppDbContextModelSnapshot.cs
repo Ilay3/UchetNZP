@@ -1680,6 +1680,39 @@ namespace UchetNZP.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseAssemblyUnit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("WarehouseAssemblyUnits", (string)null);
+                });
+
             modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1689,19 +1722,57 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Property<DateTime>("AddedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("AssemblyUnitId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Comment")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("AcceptedByName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ControlCardNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("PartId")
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ControllerName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("MasterName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("MovementType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("Receipt");
+
+                    b.Property<Guid?>("PartId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("AutomaticTransfer");
 
                     b.Property<Guid?>("TransferId")
                         .HasColumnType("uuid");
@@ -1711,7 +1782,13 @@ namespace UchetNZP.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AssemblyUnitId");
+
+                    b.HasIndex("MovementType");
+
                     b.HasIndex("PartId");
+
+                    b.HasIndex("SourceType");
 
                     b.HasIndex("TransferId")
                         .IsUnique();
@@ -2622,16 +2699,22 @@ namespace UchetNZP.Infrastructure.Migrations
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseItem", b =>
                 {
+                    b.HasOne("UchetNZP.Domain.Entities.WarehouseAssemblyUnit", "AssemblyUnit")
+                        .WithMany("WarehouseItems")
+                        .HasForeignKey("AssemblyUnitId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("UchetNZP.Domain.Entities.Part", "Part")
                         .WithMany("WarehouseItems")
                         .HasForeignKey("PartId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("UchetNZP.Domain.Entities.WipTransfer", "Transfer")
                         .WithOne("WarehouseItem")
                         .HasForeignKey("UchetNZP.Domain.Entities.WarehouseItem", "TransferId")
                         .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AssemblyUnit");
 
                     b.Navigation("Part");
 
@@ -2938,6 +3021,11 @@ namespace UchetNZP.Infrastructure.Migrations
             modelBuilder.Entity("UchetNZP.Domain.Entities.MetalSupplier", b =>
                 {
                     b.Navigation("Receipts");
+                });
+
+            modelBuilder.Entity("UchetNZP.Domain.Entities.WarehouseAssemblyUnit", b =>
+                {
+                    b.Navigation("WarehouseItems");
                 });
 
             modelBuilder.Entity("UchetNZP.Domain.Entities.Operation", b =>

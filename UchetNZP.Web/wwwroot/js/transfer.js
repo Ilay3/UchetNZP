@@ -1736,6 +1736,9 @@
             const quantityText = item.quantity.toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
             const fromBalanceText = formatBalanceChange(item.fromBalanceBefore, item.fromBalanceAfter);
             const toBalanceText = formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter);
+            const warehouseCardButton = item.warehouseItemId
+                ? `<a class="btn btn-outline-primary btn-sm" href="${getWarehouseControlCardUrl(item)}" target="_blank" rel="noopener">Карта контроля</a>`
+                : "";
             row.innerHTML = `
                 <td><span class="transfer-cell-date">${item.date}</span></td>
                 <td>
@@ -1757,6 +1760,7 @@
                 <td>${item.comment ? `<span class="transfer-comment-text">${escapeHtml(item.comment)}</span>` : "<span class=\"text-muted\">—</span>"}</td>
                 <td>${formatScrapCell(item)}</td>
                 <td class="text-center">
+                    ${warehouseCardButton}
                     <button type="button" class="btn btn-link btn-lg text-decoration-none" data-action="edit" data-index="${index}" aria-label="Изменить запись">✎</button>
                     <button type="button" class="btn btn-link btn-lg text-decoration-none text-danger" data-action="remove" data-index="${index}" aria-label="Удалить запись">✖</button>
                 </td>`;
@@ -1806,6 +1810,19 @@
         const element = document.createElement("div");
         element.textContent = value;
         return element.innerHTML;
+    }
+
+    function getWarehouseControlCardUrl(item) {
+        const id = item?.warehouseItemId;
+        return id ? `/warehouse/${encodeURIComponent(id)}/control-card` : "";
+    }
+
+    function openWarehouseControlCards(summary) {
+        const items = Array.isArray(summary?.items) ? summary.items : [];
+        items
+            .map(item => getWarehouseControlCardUrl(item))
+            .filter(url => url.length > 0)
+            .forEach(url => window.open(url, "_blank", "noopener"));
     }
 
     function normalizeLabelArray(source) {
@@ -2055,6 +2072,9 @@
                 labelQuantityBefore: item.labelQuantityBefore ?? cartItem?.labelQuantityBefore ?? null,
                 labelQuantityAfter: item.labelQuantityAfter ?? cartItem?.labelQuantityAfter ?? null,
                 residualLabelNumber: item.residualLabelNumber ?? cartItem?.residualLabelNumber ?? null,
+                warehouseItemId: item.warehouseItemId ?? null,
+                warehouseDocumentNumber: item.warehouseDocumentNumber ?? null,
+                warehouseControlCardNumber: item.warehouseControlCardNumber ?? null,
                 quantity: Number(item.quantity) || 0,
                 fromBalanceBefore: Number(item.fromBalanceBefore) || 0,
                 fromBalanceAfter: Number(item.fromBalanceAfter) || 0,
@@ -2393,6 +2413,7 @@
             const summary = await response.json();
             rememberRecentTransfers(summary, cartSnapshot);
             showSummary(summary);
+            openWarehouseControlCards(summary);
             pendingChanges.clear();
             labelPendingChanges.clear();
             updateBalancesAfterSave(summary);
@@ -2589,6 +2610,9 @@
             const scrapCell = formatScrapCell(scrapInfo ?? {});
             const labelSource = { ...cartItem, ...item };
             const labelsHtml = formatSelectedLabel(labelSource);
+            const warehouseCardLink = item.warehouseItemId
+                ? `<div><a href="${getWarehouseControlCardUrl(item)}" target="_blank" rel="noopener">Карта контроля</a></div>`
+                : "";
             row.innerHTML = `
                 <td>${partDisplay}</td>
                 <td>${fromText}</td>
@@ -2596,7 +2620,7 @@
                 <td>${labelsHtml}</td>
                 <td>${Number(item.quantity).toLocaleString("ru-RU", { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</td>
                 <td>${scrapCell}</td>
-                <td>${item.transferId}</td>`;
+                <td>${warehouseCardLink}<div class="small text-muted">${item.transferId}</div></td>`;
             summaryTableBody.appendChild(row);
         });
 

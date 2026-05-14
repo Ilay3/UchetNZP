@@ -147,6 +147,9 @@ public record TransferSummaryItemViewModel(
     decimal? LabelQuantityBefore,
     decimal? LabelQuantityAfter,
     string? ResidualLabelNumber,
+    Guid? WarehouseItemId,
+    string? WarehouseDocumentNumber,
+    string? WarehouseControlCardNumber,
     bool IsReverted);
 
 public record TransferBatchSummaryViewModel(int Saved, IReadOnlyList<TransferSummaryItemViewModel> Items);

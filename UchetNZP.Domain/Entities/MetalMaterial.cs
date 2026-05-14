@@ -10,6 +10,30 @@ public class MetalMaterial
 
     public string Name { get; set; } = string.Empty;
 
+    public string? FullName { get; set; }
+
+    public string? Article { get; set; }
+
+    public string? NomenclatureType { get; set; }
+
+    public string UnitOfMeasure { get; set; } = "кг";
+
+    public string? NomenclatureGroup { get; set; }
+
+    public string? VatRateType { get; set; }
+
+    public string? CountryOfOrigin { get; set; }
+
+    public string? CustomsDeclarationNumber { get; set; }
+
+    public string? TnVedCode { get; set; }
+
+    public string? Okpd2Code { get; set; }
+
+    public string? Comment { get; set; }
+
+    public bool IsService { get; set; }
+
     public decimal MassPerMeterKg { get; set; }
 
     public decimal MassPerSquareMeterKg { get; set; }

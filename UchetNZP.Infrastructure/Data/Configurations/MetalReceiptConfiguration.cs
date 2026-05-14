@@ -19,6 +19,25 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
         builder.Property(x => x.ReceiptDate)
             .IsRequired();
 
+        builder.Property(x => x.OrganizationName)
+            .IsRequired()
+            .HasMaxLength(256);
+
+        builder.Property(x => x.WarehouseName)
+            .IsRequired()
+            .HasMaxLength(128);
+
+        builder.Property(x => x.OperationType)
+            .IsRequired()
+            .HasMaxLength(64);
+
+        builder.Property(x => x.CurrencyCode)
+            .IsRequired()
+            .HasMaxLength(3);
+
+        builder.Property(x => x.ContractName)
+            .HasMaxLength(256);
+
         builder.Property(x => x.SupplierOrSource)
             .HasMaxLength(256);
 
@@ -33,6 +52,7 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
 
         builder.Property(x => x.SupplierDocumentNumber)
             .HasMaxLength(128);
+        builder.Property(x => x.SupplierDocumentDate);
         builder.Property(x => x.InvoiceOrUpiNumber)
             .HasMaxLength(128);
         builder.Property(x => x.AccountingAccount)
@@ -41,6 +61,14 @@ public class MetalReceiptConfiguration : IEntityTypeConfiguration<MetalReceipt>
         builder.Property(x => x.VatAccount)
             .IsRequired()
             .HasMaxLength(16);
+        builder.Property(x => x.SettlementAccount)
+            .IsRequired()
+            .HasMaxLength(16);
+        builder.Property(x => x.AdvanceAccount)
+            .IsRequired()
+            .HasMaxLength(16);
+        builder.Property(x => x.ResponsibleUserName)
+            .HasMaxLength(128);
 
         builder.Property(x => x.BatchNumber)
             .IsRequired()

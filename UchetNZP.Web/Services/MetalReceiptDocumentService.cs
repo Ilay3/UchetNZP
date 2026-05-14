@@ -44,6 +44,12 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
                 SupplierName = x.SupplierNameSnapshot ?? (x.MetalSupplier != null ? x.MetalSupplier.Name : null) ?? x.SupplierOrSource,
                 SupplierCode = x.SupplierIdentifierSnapshot ?? (x.MetalSupplier != null ? x.MetalSupplier.Identifier : null) ?? x.SupplierInnSnapshot,
                 SupplierDocumentNumber = x.SupplierDocumentNumber,
+                SupplierDocumentDate = x.SupplierDocumentDate,
+                OrganizationName = x.OrganizationName,
+                WarehouseName = x.WarehouseName,
+                ContractName = x.ContractName,
+                CurrencyCode = x.CurrencyCode,
+                VatRatePercent = x.VatRatePercent,
                 TotalAmountWithoutVat = x.AmountWithoutVat,
                 TotalVatAmount = x.VatAmount,
                 TotalAmountWithVat = x.TotalAmountWithVat,
@@ -53,6 +59,7 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
                     .ThenBy(i => i.CreatedAt)
                     .Select(i => new ReceiptItemProjection
                     {
+                        LineIndex = i.ReceiptLineIndex,
                         MaterialName = i.MetalMaterial != null ? i.MetalMaterial.Name : string.Empty,
                         MaterialCode = i.MetalMaterial != null ? i.MetalMaterial.Code : string.Empty,
                         WeightKg = i.TotalWeightKg,
@@ -74,10 +81,14 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         await templateStream.CopyToAsync(memoryStream, cancellationToken);
         memoryStream.Position = 0;
 
-        var itemRows = receipt.Items.Select((item, index) =>
+        var itemRows = receipt.Items
+            .GroupBy(item => new { item.LineIndex, item.MaterialName, item.MaterialCode, item.PricePerKg })
+            .OrderBy(group => group.Key.LineIndex)
+            .Select((group, index) =>
         {
+            var item = group.First();
             var amountWithoutVat = item.WeightKg * item.PricePerKg;
-            var vatAmount = amountWithoutVat * 0.22m;
+            var vatAmount = amountWithoutVat * receipt.VatRatePercent / 100m;
             return new ReceiptPrintItemRow
             {
                 RowNumber = (index + 1).ToString(CultureInfo.InvariantCulture),
@@ -168,6 +179,11 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
             ["{{supplier_name}}"] = receipt.SupplierName ?? string.Empty,
             ["{{supplier_code}}"] = receipt.SupplierCode ?? string.Empty,
             ["{{supplier_document_number}}"] = receipt.SupplierDocumentNumber ?? string.Empty,
+            ["{{supplier_document_date}}"] = receipt.SupplierDocumentDate?.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) ?? string.Empty,
+            ["{{organization_name}}"] = receipt.OrganizationName,
+            ["{{warehouse_name}}"] = receipt.WarehouseName,
+            ["{{contract_name}}"] = receipt.ContractName ?? string.Empty,
+            ["{{currency_code}}"] = receipt.CurrencyCode,
             ["{{total_weight_kg}}"] = FormatDecimal(totalWeight),
             ["{{total_amount_without_vat}}"] = FormatDecimal(receipt.TotalAmountWithoutVat),
             ["{{total_vat_amount}}"] = FormatDecimal(receipt.TotalVatAmount),
@@ -347,6 +363,12 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
         public string? SupplierName { get; init; }
         public string? SupplierCode { get; init; }
         public string? SupplierDocumentNumber { get; init; }
+        public DateTime? SupplierDocumentDate { get; init; }
+        public string OrganizationName { get; init; } = string.Empty;
+        public string WarehouseName { get; init; } = string.Empty;
+        public string? ContractName { get; init; }
+        public string CurrencyCode { get; init; } = string.Empty;
+        public decimal VatRatePercent { get; init; }
         public decimal TotalAmountWithoutVat { get; init; }
         public decimal TotalVatAmount { get; init; }
         public decimal TotalAmountWithVat { get; init; }
@@ -356,6 +378,7 @@ public class MetalReceiptDocumentService : IMetalReceiptDocumentService
     private sealed class ReceiptItemProjection
     {
         public string? MaterialName { get; init; }
+        public int LineIndex { get; init; }
         public string? MaterialCode { get; init; }
         public decimal WeightKg { get; init; }
         public decimal PricePerKg { get; init; }
