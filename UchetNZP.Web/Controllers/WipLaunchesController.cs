@@ -369,18 +369,46 @@ public class WipLaunchesController : Controller
         }
 
         var summary = await _launchService.AddLaunchesBatchAsync(dtos, cancellationToken).ConfigureAwait(false);
+        var launchIds = summary.Items.Select(x => x.LaunchId).ToArray();
+        var requirementsByLaunch = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => launchIds.Contains(x.WipLaunchId))
+            .Select(x => new
+            {
+                x.WipLaunchId,
+                x.Id,
+                x.RequirementNumber,
+                x.RequirementDate,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var latestRequirementsByLaunch = requirementsByLaunch
+            .GroupBy(x => x.WipLaunchId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(x => x.RequirementDate).ThenByDescending(x => x.Id).First());
 
         var model = new LaunchBatchSummaryViewModel(
             summary.Saved,
             summary.Items
-                .Select(x => new LaunchBatchItemViewModel(
-                    x.PartId,
-                    OperationNumber.Format(x.FromOpNumber),
-                    x.SectionId,
-                    x.Quantity,
-                    x.Remaining,
-                    x.SumHoursToFinish,
-                    x.LaunchId))
+                .Select(x =>
+                {
+                    latestRequirementsByLaunch.TryGetValue(x.LaunchId, out var requirement);
+                    return new LaunchBatchItemViewModel(
+                        x.PartId,
+                        OperationNumber.Format(x.FromOpNumber),
+                        x.SectionId,
+                        x.Quantity,
+                        x.Remaining,
+                        x.SumHoursToFinish,
+                        x.LaunchId,
+                        requirement?.Id,
+                        requirement?.RequirementNumber,
+                        requirement is null
+                            ? null
+                            : Url.Action("PrintRequirement", "MetalWarehouse", new { id = requirement.Id }));
+                })
                 .ToList());
 
         return Ok(model);

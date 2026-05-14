@@ -176,6 +176,11 @@
                                 <input type="hidden" id="warehouseManualAssemblyUnitId" name="AssemblyUnitId" />
                             </div>
                             <div class="col-lg-4">
+                                <label class="form-label" for="warehouseManualAssemblyLabel">Ярлык узла</label>
+                                <input id="warehouseManualAssemblyLabel" class="form-control" type="text" name="LabelNumber" list="warehouseManualAssemblyLabelOptions" maxlength="32" placeholder="Выберите или введите новый" autocomplete="off" />
+                                <datalist id="warehouseManualAssemblyLabelOptions"></datalist>
+                            </div>
+                            <div class="col-lg-4">
                                 <label class="form-label" for="warehouseManualAssemblyQuantity">Количество</label>
                                 <input id="warehouseManualAssemblyQuantity" class="form-control" type="number" name="Quantity" min="0.001" step="0.001" placeholder="10" required />
                             </div>
@@ -293,6 +298,11 @@
                                 <input id="warehouseIssueAssemblyUnit" class="form-control" type="text" name="AssemblyUnitName" list="warehouseIssueAssemblyUnitOptions" maxlength="256" placeholder="Наименование узла" autocomplete="off" required />
                                 <datalist id="warehouseIssueAssemblyUnitOptions"></datalist>
                                 <input type="hidden" id="warehouseIssueAssemblyUnitId" name="AssemblyUnitId" />
+                            </div>
+                            <div class="col-lg-4">
+                                <label class="form-label" for="warehouseIssueAssemblyLabel">Ярлык узла</label>
+                                <input id="warehouseIssueAssemblyLabel" class="form-control" type="text" name="LabelNumber" list="warehouseIssueAssemblyLabelOptions" maxlength="32" placeholder="Ярлык с остатком" autocomplete="off" />
+                                <datalist id="warehouseIssueAssemblyLabelOptions"></datalist>
                             </div>
                             <div class="col-lg-4">
                                 <label class="form-label" for="warehouseIssueAssemblyQuantity">Количество</label>

@@ -107,7 +107,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-sm table-hover align-middle mb-0">
+                <table class="table table-sm table-hover align-middle mb-0" data-app-pagination="true" data-app-page-size="25">
                     <thead class="table-light">
                         <tr>
                             <th>Код</th>
@@ -132,7 +132,7 @@
                             <td>@item.WeightKg.ToString("0.###")</td>
                             <td>@item.ReceiptNumber</td>
                             <td>@item.ReceiptDate.ToString("dd.MM.yyyy")</td>
-                            <td><span class="badge @(item.Status == "Израсходовано" ? "bg-secondary" : item.Status == "Частично использовано" ? "bg-warning text-dark" : item.Status == "Недоступно" ? "bg-danger" : "bg-success-subtle text-success-emphasis")">@item.Status</span></td>
+                            <td><span class="@UiDisplayText.StatusClass(item.Status)">@UiDisplayText.Status(item.Status)</span></td>
                             <td class="text-end">
                                 <a class="btn btn-sm btn-outline-primary"
                                    asp-controller="MetalWarehouse"

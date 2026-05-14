@@ -31,7 +31,7 @@
         </form>
 
         <div class="table-responsive">
-            <table class="table table-sm table-striped">
+            <table class="table table-sm table-striped" data-app-pagination="true" data-app-page-size="25">
                 <thead>
                     <tr><th>Деталь</th><th>Материал</th><th>Норма детали (только просмотр)</th><th></th></tr>
                 </thead>
@@ -301,12 +301,12 @@
                                             <div class="small text-muted">Расход: @material.CoefConsumption.ToString("0.###")</div>
                                             @if (material.IsService)
                                             {
-                                                <span class="badge text-bg-warning">Услуга</span>
+                                                <span class="app-status app-status--warning">Услуга</span>
                                             }
                                         </td>
                                         <td>@material.Coefficient.ToString("0.###")</td>
                                         <td>
-                                            <span class=" @(material.IsActive ? "bg-success-subtle text-success-emphasis" : "bg-secondary-subtle text-secondary-emphasis")">
+                                            <span class="@(material.IsActive ? "app-status app-status--success" : "app-status app-status--neutral")">
                                                 @(material.IsActive ? "Активен" : "Отключен")
                                             </span>
                                         </td>

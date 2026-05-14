@@ -160,6 +160,51 @@ public class WarehouseController : Controller
             x.AvailableQuantity)));
     }
 
+    [HttpGet("assembly-labels")]
+    public async Task<IActionResult> GetAssemblyLabels([FromQuery] Guid assemblyUnitId, [FromQuery] string? search, [FromQuery] string? mode, CancellationToken cancellationToken)
+    {
+        if (assemblyUnitId == Guid.Empty)
+        {
+            return Ok(Array.Empty<WarehouseAssemblyLabelLookupItemViewModel>());
+        }
+
+        var normalizedMode = string.Equals(mode, "issue", StringComparison.OrdinalIgnoreCase) ? "issue" : "receipt";
+        var normalizedSearch = NormalizeSearchText(search);
+
+        var query = _dbContext.WarehouseLabelItems
+            .AsNoTracking()
+            .Where(x =>
+                x.WarehouseItem != null &&
+                x.WarehouseItem.AssemblyUnitId == assemblyUnitId &&
+                x.LabelNumber != null &&
+                x.LabelNumber != string.Empty);
+
+        foreach (var term in NormalizeSearchTerms(normalizedSearch))
+        {
+            var searchTerm = term.ToLower();
+            query = query.Where(x => x.LabelNumber != null && x.LabelNumber.ToLower().Contains(searchTerm));
+        }
+
+        var items = await query
+            .GroupBy(x => x.LabelNumber!)
+            .Select(group => new
+            {
+                Number = group.Key,
+                Quantity = group.Where(x => x.Quantity > 0m).Sum(x => (decimal?)x.Quantity) ?? 0m,
+                AvailableQuantity = group.Sum(x => (decimal?)x.Quantity) ?? 0m,
+            })
+            .Where(x => normalizedMode != "issue" || x.AvailableQuantity > 0m)
+            .OrderBy(x => x.Number)
+            .Take(25)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items.Select(x => new WarehouseAssemblyLabelLookupItemViewModel(
+            x.Number,
+            x.Quantity,
+            x.AvailableQuantity)));
+    }
+
     [HttpPost("manual-receipt")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ManualReceipt(WarehouseManualReceiptModel model, CancellationToken cancellationToken)
@@ -267,7 +312,9 @@ public class WarehouseController : Controller
             var itemId = Guid.NewGuid();
             var addedAt = NormalizeToUtc(model.ReceiptDate == default ? DateTime.Today : model.ReceiptDate);
             var documentNumber = TrimOrNull(model.DocumentNumber) ?? BuildManualWarehouseDocumentNumber(addedAt, itemId);
-            var controlCardNumber = TrimOrNull(model.ControlCardNumber) ?? documentNumber;
+            var labelNumber = await ResolveAssemblyReceiptLabelNumberAsync(assemblyUnit.Id, model.LabelNumber, cancellationToken)
+                .ConfigureAwait(false);
+            var controlCardNumber = TrimOrNull(model.ControlCardNumber) ?? labelNumber ?? documentNumber;
             var userId = _currentUserService.UserId;
 
             var item = new WarehouseItem
@@ -290,6 +337,12 @@ public class WarehouseController : Controller
             };
 
             await _dbContext.WarehouseItems.AddAsync(item, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(labelNumber))
+            {
+                await AddWarehouseLabelItemAsync(item, labelNumber, model.Quantity, addedAt, now, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
             TempData["WarehouseMessage"] = $"Приход сборочного узла {documentNumber} создан.";
@@ -411,6 +464,8 @@ public class WarehouseController : Controller
             var itemId = Guid.NewGuid();
             var issueDate = NormalizeToUtc(model.IssueDate == default ? DateTime.Today : model.IssueDate);
             var documentNumber = TrimOrNull(model.DocumentNumber) ?? BuildManualWarehouseDocumentNumber(issueDate, itemId, "ISS");
+            var labelNumber = await ResolveAssemblyIssueLabelNumberAsync(assemblyUnit.Id, model.LabelNumber, model.Quantity, cancellationToken)
+                .ConfigureAwait(false);
             var userId = _currentUserService.UserId;
 
             var item = new WarehouseItem
@@ -430,6 +485,12 @@ public class WarehouseController : Controller
             };
 
             await _dbContext.WarehouseItems.AddAsync(item, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(labelNumber))
+            {
+                await AddWarehouseLabelItemAsync(item, labelNumber, -model.Quantity, issueDate, now, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
             TempData["WarehouseMessage"] = $"Расход сборочного узла {documentNumber} создан.";
@@ -705,7 +766,8 @@ public class WarehouseController : Controller
 
                 var labelGroups = group
                     .SelectMany(item => item.LabelRows)
-                    .GroupBy(label => label.LabelId)
+                    .Where(label => !string.IsNullOrWhiteSpace(label.LabelNumber))
+                    .GroupBy(label => new { label.LabelId, label.LabelNumber })
                     .Select(labelGroup =>
                     {
                         var labelItems = labelGroup.ToList();
@@ -727,7 +789,7 @@ public class WarehouseController : Controller
 
                         return new WarehouseLabelGroupViewModel
                         {
-                            LabelId = labelGroup.Key,
+                            LabelId = labelGroup.Key.LabelId,
                             LabelNumber = firstLabel.LabelNumber,
                             TotalQuantity = labelItems.Sum(x => x.Quantity),
                             FirstAddedAt = labelItems.Min(x => x.AddedAt),
@@ -815,7 +877,7 @@ public class WarehouseController : Controller
                 .Select(labelItem => new WarehouseLabelRowViewModel
                 {
                     LabelId = labelItem.WipLabelId,
-                    LabelNumber = labelItem.WipLabel != null ? labelItem.WipLabel.Number : string.Empty,
+                    LabelNumber = labelItem.WipLabel != null ? labelItem.WipLabel.Number : (labelItem.LabelNumber ?? string.Empty),
                     Quantity = labelItem.Quantity,
                     AddedAt = labelItem.AddedAt,
                     UpdatedAt = labelItem.UpdatedAt,
@@ -951,6 +1013,57 @@ public class WarehouseController : Controller
 
         await _dbContext.WarehouseAssemblyUnits.AddAsync(assemblyUnit, cancellationToken).ConfigureAwait(false);
         return assemblyUnit;
+    }
+
+    private async Task<string?> ResolveAssemblyReceiptLabelNumberAsync(Guid assemblyUnitId, string? labelNumber, CancellationToken cancellationToken)
+    {
+        var normalizedNumber = string.IsNullOrWhiteSpace(labelNumber) ? null : NormalizeLabelNumber(labelNumber);
+        if (string.IsNullOrWhiteSpace(normalizedNumber))
+        {
+            return null;
+        }
+
+        var isUsedByOtherAssembly = await _dbContext.WarehouseLabelItems
+            .AsNoTracking()
+            .AnyAsync(
+                x => x.LabelNumber == normalizedNumber &&
+                     x.WarehouseItem != null &&
+                     x.WarehouseItem.AssemblyUnitId.HasValue &&
+                     x.WarehouseItem.AssemblyUnitId != assemblyUnitId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (isUsedByOtherAssembly)
+        {
+            throw new InvalidOperationException($"Ярлык {normalizedNumber} уже используется другим сборочным узлом.");
+        }
+
+        return normalizedNumber;
+    }
+
+    private async Task<string?> ResolveAssemblyIssueLabelNumberAsync(Guid assemblyUnitId, string? labelNumber, decimal quantity, CancellationToken cancellationToken)
+    {
+        var normalizedNumber = string.IsNullOrWhiteSpace(labelNumber) ? null : NormalizeLabelNumber(labelNumber);
+        if (string.IsNullOrWhiteSpace(normalizedNumber))
+        {
+            return null;
+        }
+
+        var available = await _dbContext.WarehouseLabelItems
+            .AsNoTracking()
+            .Where(x =>
+                x.LabelNumber == normalizedNumber &&
+                x.WarehouseItem != null &&
+                x.WarehouseItem.AssemblyUnitId == assemblyUnitId)
+            .SumAsync(x => (decimal?)x.Quantity, cancellationToken)
+            .ConfigureAwait(false) ?? 0m;
+
+        if (available + 0.000001m < quantity)
+        {
+            throw new InvalidOperationException($"Недостаточно остатка по ярлыку {normalizedNumber}. Доступно {available:0.###}, требуется {quantity:0.###}.");
+        }
+
+        return normalizedNumber;
     }
 
     private async Task<WipLabel?> ResolveReceiptLabelAsync(
@@ -1147,6 +1260,29 @@ public class WarehouseController : Controller
             Id = Guid.NewGuid(),
             WarehouseItemId = warehouseItem.Id,
             WipLabelId = label.Id,
+            LabelNumber = label.Number,
+            Quantity = quantity,
+            AddedAt = addedAt,
+            UpdatedAt = now,
+        };
+
+        await _dbContext.WarehouseLabelItems.AddAsync(labelItem, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task AddWarehouseLabelItemAsync(
+        WarehouseItem warehouseItem,
+        string labelNumber,
+        decimal quantity,
+        DateTime addedAt,
+        DateTime now,
+        CancellationToken cancellationToken)
+    {
+        var labelItem = new WarehouseLabelItem
+        {
+            Id = Guid.NewGuid(),
+            WarehouseItemId = warehouseItem.Id,
+            WipLabelId = null,
+            LabelNumber = labelNumber,
             Quantity = quantity,
             AddedAt = addedAt,
             UpdatedAt = now,

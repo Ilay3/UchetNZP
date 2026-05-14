@@ -9,6 +9,7 @@ public static class UiDisplayText
             "active" => "Активно",
             "calculated" => "Рассчитан",
             "cancelled" => "Отменено",
+            "closed" => "Закрыто",
             "completed" => "Завершено",
             "consumed" => "Израсходовано",
             "created" => "Создано",
@@ -23,6 +24,7 @@ public static class UiDisplayText
             "readytoissue" => "Готово к выдаче",
             "reservecandidate" => "Резерв",
             "reverted" => "Отменено",
+            "scrapped" => "Брак",
             "updated" => "Обновлено",
             "вналичии" => "В наличии",
             "недоступно" => "Недоступно",
@@ -53,7 +55,7 @@ public static class UiDisplayText
             "active" or "completed" or "created" or "calculated" or "вналичии" or "активно" => "app-status app-status--success",
             "readytoissue" or "planned" or "updated" or "reservecandidate" => "app-status app-status--info",
             "draft" or "partialcut" or "partiallyused" or "частичноиспользовано" => "app-status app-status--warning",
-            "cancelled" or "consumed" or "deficit" or "hasdeficit" or "reverted" or "недоступно" or "израсходовано" or "отменено" => "app-status app-status--danger",
+            "cancelled" or "closed" or "consumed" or "deficit" or "hasdeficit" or "reverted" or "scrapped" or "недоступно" or "израсходовано" or "отменено" => "app-status app-status--danger",
             _ => "app-status app-status--neutral",
         };
     }

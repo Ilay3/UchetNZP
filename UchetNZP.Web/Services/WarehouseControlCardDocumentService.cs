@@ -76,7 +76,7 @@ public class WarehouseControlCardDocumentService : IWarehouseControlCardDocument
     private static WarehouseControlCardProjection BuildProjection(UchetNZP.Domain.Entities.WarehouseItem item)
     {
         var labelNumber = item.WarehouseLabelItems
-            .Select(x => x.WipLabel?.Number)
+            .Select(x => x.WipLabel?.Number ?? x.LabelNumber)
             .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
 
         var cardNumber = FirstNotBlank(item.ControlCardNumber, labelNumber, item.DocumentNumber, item.Id.ToString("N")[..8]);

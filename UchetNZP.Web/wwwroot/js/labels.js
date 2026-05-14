@@ -288,7 +288,12 @@
             row.appendChild(partCell);
 
             const statusCell = document.createElement("td");
-            statusCell.textContent = item.isAssigned ? "Назначен" : "Свободен";
+            const statusBadge = document.createElement("span");
+            statusBadge.className = item.isAssigned
+                ? "app-status app-status--success"
+                : "app-status app-status--neutral";
+            statusBadge.textContent = item.isAssigned ? "Назначен" : "Свободен";
+            statusCell.appendChild(statusBadge);
             row.appendChild(statusCell);
 
             const actionsCell = document.createElement("td");

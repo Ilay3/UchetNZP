@@ -86,7 +86,10 @@ public record LaunchBatchItemViewModel(
     decimal Quantity,
     decimal Remaining,
     decimal SumHoursToFinish,
-    Guid LaunchId);
+    Guid LaunchId,
+    Guid? MetalRequirementId,
+    string? MetalRequirementNumber,
+    string? MetalRequirementDownloadUrl);
 
 public record LaunchBatchSummaryViewModel(int Saved, IReadOnlyList<LaunchBatchItemViewModel> Items);
 

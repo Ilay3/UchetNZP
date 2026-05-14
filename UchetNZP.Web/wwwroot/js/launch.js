@@ -740,12 +740,20 @@
             const row = document.createElement("tr");
             const cartItem = cart.find(x => x.partId === summaryItem.partId && x.fromOp === summaryItem.fromOpNumber);
             const actualRemaining = Number(summaryItem.remaining ?? 0);
+            const requirementUrl = typeof summaryItem.metalRequirementDownloadUrl === "string"
+                ? summaryItem.metalRequirementDownloadUrl
+                : "";
+            const requirementNumber = summaryItem.metalRequirementNumber || "Требование";
+
             row.innerHTML = `
                 <td>${cartItem ? cartItem.partDisplay : summaryItem.partId}</td>
                 <td>${summaryItem.fromOpNumber}</td>
-                <td>${summaryItem.quantity.toFixed(3)}</td>
+                <td>${Number(summaryItem.quantity ?? 0).toFixed(3)}</td>
                 <td>${actualRemaining.toFixed(3)}</td>
-                <td>${summaryItem.sumHoursToFinish.toFixed(3)}</td>`;
+                <td>${Number(summaryItem.sumHoursToFinish ?? 0).toFixed(3)}</td>
+                <td>${requirementUrl
+                    ? `<a class="btn btn-outline-success btn-sm" href="${requirementUrl}">Скачать ${requirementNumber}</a>`
+                    : "<span class=\"text-muted\">Не создано</span>"}</td>`;
             summaryTableBody.appendChild(row);
         });
 

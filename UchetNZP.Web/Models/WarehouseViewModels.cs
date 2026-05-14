@@ -97,6 +97,11 @@ public record WarehouseLabelLookupItemViewModel(
     decimal Quantity,
     decimal AvailableQuantity);
 
+public record WarehouseAssemblyLabelLookupItemViewModel(
+    string Number,
+    decimal Quantity,
+    decimal AvailableQuantity);
+
 public class WarehouseItemRowViewModel
 {
     public Guid Id { get; init; }
@@ -181,7 +186,7 @@ public class WarehousePartGroupViewModel
 
 public class WarehouseLabelGroupViewModel
 {
-    public Guid LabelId { get; init; }
+    public Guid? LabelId { get; init; }
 
     public string LabelNumber { get; init; } = string.Empty;
 
@@ -194,7 +199,7 @@ public class WarehouseLabelGroupViewModel
 
 public class WarehouseLabelRowViewModel
 {
-    public Guid LabelId { get; init; }
+    public Guid? LabelId { get; init; }
 
     public string LabelNumber { get; init; } = string.Empty;
 
@@ -290,6 +295,9 @@ public class WarehouseAssemblyUnitReceiptModel
 {
     public Guid? AssemblyUnitId { get; set; }
 
+    [MaxLength(32)]
+    public string? LabelNumber { get; set; }
+
     [Required]
     [MaxLength(256)]
     public string? AssemblyUnitName { get; set; }
@@ -352,6 +360,9 @@ public class WarehouseManualIssueModel
 public class WarehouseAssemblyUnitIssueModel
 {
     public Guid? AssemblyUnitId { get; set; }
+
+    [MaxLength(32)]
+    public string? LabelNumber { get; set; }
 
     [Required]
     [MaxLength(256)]

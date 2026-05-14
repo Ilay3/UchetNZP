@@ -23,7 +23,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover align-middle" data-app-pagination="true" data-app-page-size="25">
                     <thead class="table-light">
                         <tr>
                             <th>Номер</th>
@@ -48,7 +48,7 @@
                                 <td>@item.MaterialDisplay</td>
                                 <td>@item.RequiredQty.ToString("0.###")</td>
                                 <td>@item.Unit</td>
-                                <td><span class="badge @(item.Status == "Completed" ? "bg-success" : item.Status == "Cancelled" ? "bg-danger" : item.Status == "ReadyToIssue" ? "bg-primary" : item.Status == "Planned" ? "bg-info text-dark" : "bg-secondary")">@item.Status</span></td>
+                                <td><span class="@UiDisplayText.StatusClass(item.Status)">@UiDisplayText.Status(item.Status)</span></td>
                                 <td class="text-end">
                                     <a class="btn btn-sm btn-outline-primary" asp-action="RequirementDetails" asp-route-id="@item.Id">Открыть</a>
                                 </td>

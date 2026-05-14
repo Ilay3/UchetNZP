@@ -49,6 +49,44 @@
     let lastDownloadedJobId = null;
     const pendingOperations = [];
 
+    function translateImportStatus(value) {
+        const normalized = String(value ?? "").trim().toLowerCase();
+        switch (normalized) {
+            case "created":
+            case "create":
+            case "new":
+                return "Создано";
+            case "updated":
+            case "update":
+                return "Обновлено";
+            case "skipped":
+            case "skip":
+                return "Пропущено";
+            case "error":
+            case "failed":
+                return "Ошибка";
+            case "ok":
+            case "parsed":
+            case "recognized":
+                return "Распознано";
+            default:
+                return value || "";
+        }
+    }
+
+    function importStatusBadge(value) {
+        const normalized = String(value ?? "").trim().toLowerCase();
+        const statusClass = normalized.includes("error") || normalized.includes("fail")
+            ? "app-status--danger"
+            : normalized.includes("skip")
+                ? "app-status--warning"
+                : normalized
+                    ? "app-status--success"
+                    : "app-status--neutral";
+
+        return `<span class="app-status ${statusClass}">${escapeHtml(translateImportStatus(value))}</span>`;
+    }
+
     addOperationButton.addEventListener("click", () => addOperationToList());
     saveButton.addEventListener("click", () => saveRoute());
     resetButton.addEventListener("click", () => resetForm());
@@ -528,7 +566,7 @@
                                 <td>${escapeHtml(row.code || "")}</td>
                                 <td>${escapeHtml(row.name || "")}</td>
                                 <td>${escapeHtml(row.displayName || "")}</td>
-                                <td>${escapeHtml(row.status || "")}</td>
+                                <td>${importStatusBadge(row.status || "")}</td>
                                 <td>${escapeHtml(row.unitKind || "")}</td>
                                 <td>${escapeHtml(row.stockUnit || "")}</td>
                                 <td>${escapeHtml((Array.isArray(row.warnings) ? row.warnings.join("; ") : "") || (row.unresolvedUnitType ? "Не определён тип единицы." : ""))}</td>
@@ -554,7 +592,7 @@
                                 <th>L</th>
                                 <th>Unit</th>
                                 <th>Value</th>
-                                <th>Status</th>
+                                <th>Статус</th>
                                 <th>Ошибка</th>
                             </tr>
                         </thead>
@@ -570,7 +608,7 @@
                                 <td>${formatNumber(row.lengthMm)}</td>
                                 <td>${escapeHtml(row.unitNorm || "")}</td>
                                 <td>${formatNumber(row.valueNorm)}</td>
-                                <td>${escapeHtml(row.parseStatus || "")}</td>
+                                <td>${importStatusBadge(row.parseStatus || "")}</td>
                                 <td>${escapeHtml(row.parseError || "")}</td>
                             </tr>`).join("")}
                         </tbody>

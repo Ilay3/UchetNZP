@@ -28,7 +28,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-striped align-middle" aria-describedby="adminWipLabelsCaption">
+                <table class="table table-striped align-middle" aria-describedby="adminWipLabelsCaption" data-app-pagination="true" data-app-page-size="25">
                     <caption id="adminWipLabelsCaption" class="visually-hidden">Ярлыки НЗП по текущему фильтру</caption>
                     <thead class="table-light">
                         <tr>
@@ -55,7 +55,7 @@
                                 <td>@label.PartDisplay</td>
                                 <td>@positionText</td>
                                 <td>
-                                    <span class="badge bg-secondary">@label.Status</span>
+                                    <span class="@UiDisplayText.StatusClass(label.Status)">@UiDisplayText.Status(label.Status)</span>
                                 </td>
                                 <td class="text-end">@label.Quantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
                                 <td class="text-end">@label.RemainingQuantity.ToString("0.###", CultureInfo.CurrentCulture)</td>
@@ -127,7 +127,7 @@
         else
         {
             <div class="table-responsive">
-                <table class="table table-striped align-middle" aria-describedby="adminWipTableCaption">
+                <table class="table table-striped align-middle" aria-describedby="adminWipTableCaption" data-app-pagination="true" data-app-page-size="25">
                     <caption id="adminWipTableCaption" class="visually-hidden">Текущие остатки НЗП по фильтру</caption>
                     <thead class="table-light">
                         <tr>

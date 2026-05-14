@@ -48,7 +48,7 @@
                         </a>
                         <a class="app-nav__link @(currentController == "WipReceipts" ? "active" : string.Empty)" asp-area="" asp-controller="WipReceipts" asp-action="Index">
                             <i class="bi bi-plus-square" aria-hidden="true"></i>
-                            <span>Запуск партии</span>
+                            <span>Приход НЗП</span>
                         </a>
                         <a class="app-nav__link @(currentController == "WipTransfers" ? "active" : string.Empty)" asp-area="" asp-controller="WipTransfers" asp-action="Index">
                             <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
@@ -57,6 +57,10 @@
                         <a class="app-nav__link @(currentController == "WipHistory" || (currentController == "WipLaunches" && currentAction == "History") ? "active" : string.Empty)" asp-area="" asp-controller="WipHistory" asp-action="Index">
                             <i class="bi bi-clock-history" aria-hidden="true"></i>
                             <span>История НЗП</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "WipLabels" ? "active" : string.Empty)" asp-area="" asp-controller="WipLabels" asp-action="Index">
+                            <i class="bi bi-tags" aria-hidden="true"></i>
+                            <span>Ярлыки НЗП</span>
                         </a>
                         <a class="app-nav__link @(currentController == "Warehouse" ? "active" : string.Empty)" asp-area="" asp-controller="Warehouse" asp-action="Index">
                             <i class="bi bi-box-seam" aria-hidden="true"></i>
@@ -74,6 +78,14 @@
                             <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
                             <span>Приход металла</span>
                         </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "CreateReceipt" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="CreateReceipt">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+                            <span>Новый приход</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Suppliers" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Suppliers">
+                            <i class="bi bi-building" aria-hidden="true"></i>
+                            <span>Поставщики</span>
+                        </a>
                         <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Stock" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Stock">
                             <i class="bi bi-layers" aria-hidden="true"></i>
                             <span>Остатки</span>
@@ -89,6 +101,14 @@
                         <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "Movements" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="Movements">
                             <i class="bi bi-activity" aria-hidden="true"></i>
                             <span>Движения</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "CuttingReports" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="CuttingReports">
+                            <i class="bi bi-scissors" aria-hidden="true"></i>
+                            <span>Факт раскроя</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "CuttingMaps" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="CuttingMaps">
+                            <i class="bi bi-map" aria-hidden="true"></i>
+                            <span>Карты раскроя</span>
                         </a>
                     </div>
 
@@ -115,9 +135,13 @@
                             <span>Движение ярлыка</span>
                         </a>
                        
-                        <a class="app-nav__link @(currentController == "Routes" ? "active" : string.Empty)" asp-area="" asp-controller="Routes" asp-action="Index">
+                        <a class="app-nav__link @(currentController == "Routes" && currentAction == "Index" ? "active" : string.Empty)" asp-area="" asp-controller="Routes" asp-action="Index">
                             <i class="bi bi-signpost-split" aria-hidden="true"></i>
                             <span>Маршруты</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Routes" && currentAction == "Import" ? "active" : string.Empty)" asp-area="" asp-controller="Routes" asp-action="Import">
+                            <i class="bi bi-upload" aria-hidden="true"></i>
+                            <span>Импорт маршрутов</span>
                         </a>
                         <a class="app-nav__link @(currentController == "AdminMetalMaterials" ? "active" : string.Empty)" asp-area="" asp-controller="AdminMetalMaterials" asp-action="Index">
                             <i class="bi bi-database-gear" aria-hidden="true"></i>
@@ -126,6 +150,10 @@
                         <a class="app-nav__link @(currentController == "AdminWip" ? "active" : string.Empty)" asp-area="" asp-controller="AdminWip" asp-action="Index">
                             <i class="bi bi-sliders" aria-hidden="true"></i>
                             <span>Админ НЗП</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Admin" ? "active" : string.Empty)" asp-area="" asp-controller="Admin" asp-action="Index">
+                            <i class="bi bi-table" aria-hidden="true"></i>
+                            <span>Справочники</span>
                         </a>
                     </div>
                 </nav>

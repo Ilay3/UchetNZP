@@ -1494,7 +1494,7 @@
 
         const data = await response.json();
         const h = data.header;
-        labelCardHeader.textContent = `№ ${h.number} • Quantity: ${formatQuantityText(h.quantity)} • Remaining: ${formatQuantityText(h.remainingQuantity)} • Part: ${h.part ?? '—'} • Статус: ${h.status}`;
+        labelCardHeader.textContent = `№ ${h.number} • Количество: ${formatQuantityText(h.quantity)} • Остаток: ${formatQuantityText(h.remainingQuantity)} • Деталь: ${h.part ?? '—'} • Статус: ${h.status}`;
         (data.historyRows ?? []).forEach(item => {
             const tr = document.createElement('tr');
             tr.innerHTML = `<td>${escapeHtml(String(item.date ?? '').slice(0,19).replace('T',' '))}</td><td>${escapeHtml(item.type ?? '')}</td><td>${escapeHtml(String(item.document ?? ''))}</td><td>${formatQuantityText(item.change ?? 0)}</td><td>${escapeHtml(item.comment ?? '')}</td>`;
@@ -1775,7 +1775,7 @@
             return '<span class="text-muted">Остаток на исходном ярлыке</span>';
         }
 
-        return `<span class="badge text-bg-success">${escapeHtml(residual)}</span>`;
+        return `<span class="app-status app-status--success">${escapeHtml(residual)}</span>`;
     }
 
     function formatBalanceCell(label, value) {
@@ -2011,7 +2011,7 @@
             const toBalanceText = formatBalanceChange(item.toBalanceBefore, item.toBalanceAfter);
             const fromName = item.fromOperationName ? `<div class=\"small text-muted\">${escapeHtml(item.fromOperationName)}</div>` : "";
             const toName = item.toOperationName ? `<div class=\"small text-muted\">${escapeHtml(item.toOperationName)}</div>` : "";
-            const statusBadge = `<span class=\"badge ${item.isReverted ? "bg-danger" : "bg-success"}\">${item.isReverted ? "Отменено" : "Активно"}</span>`;
+            const statusBadge = `<span class=\"app-status ${item.isReverted ? "app-status--danger" : "app-status--success"}\">${item.isReverted ? "Отменено" : "Активно"}</span>`;
 
             row.innerHTML = `
                 <td>${item.date ? escapeHtml(item.date) : ""}</td>

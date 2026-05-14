@@ -1805,6 +1805,10 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Property<DateTime>("AddedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("LabelNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 3)
                         .HasColumnType("numeric(12,3)");
@@ -1815,12 +1819,14 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.Property<Guid>("WarehouseItemId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("WipLabelId")
+                    b.Property<Guid?>("WipLabelId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("WarehouseItemId");
+
+                    b.HasIndex("LabelNumber");
 
                     b.HasIndex("WipLabelId");
 
@@ -2732,8 +2738,7 @@ namespace UchetNZP.Infrastructure.Migrations
                     b.HasOne("UchetNZP.Domain.Entities.WipLabel", "WipLabel")
                         .WithMany("WarehouseLabelItems")
                         .HasForeignKey("WipLabelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("WarehouseItem");
 

@@ -26,7 +26,7 @@
             <div class="col-md-6"><div><span class="text-muted">Номер прихода:</span> @Model.ReceiptNumber</div></div>
             <div class="col-md-6"><div><span class="text-muted">Дата прихода:</span> @Model.ReceiptDate.ToString("dd.MM.yyyy")</div></div>
             <div class="col-md-12"><div><span class="text-muted">Комментарий прихода:</span> @(string.IsNullOrWhiteSpace(Model.ReceiptComment) ? "—" : Model.ReceiptComment)</div></div>
-            <div class="col-md-12"><div><span class="text-muted">Статус:</span> <span class="badge bg-success-subtle text-success-emphasis">@Model.Status</span></div></div>
+            <div class="col-md-12"><div><span class="text-muted">Статус:</span> <span class="@UiDisplayText.StatusClass(Model.Status)">@UiDisplayText.Status(Model.Status)</span></div></div>
         </div>
     </div>
 </div>
@@ -35,7 +35,7 @@
     <div class="card-header bg-light fw-semibold">История движений</div>
     <div class="card-body">
         <div class="table-responsive">
-            <table class="table table-sm align-middle">
+            <table class="table table-sm align-middle" data-app-pagination="true" data-app-page-size="25">
                 <thead class="table-light"><tr><th>Событие</th><th>Документ</th><th>Дата</th><th>Пользователь</th><th>Комментарий</th></tr></thead>
                 <tbody>
                 @foreach (var entry in Model.History)

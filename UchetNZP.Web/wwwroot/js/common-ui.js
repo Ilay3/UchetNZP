@@ -632,4 +632,113 @@
         element.classList.add("d-none");
         element.textContent = "";
     };
+
+    globalNamespace.initClientPagination = function (table, options = {}) {
+        if (!(table instanceof HTMLTableElement) || table.dataset.paginationInitialized === "true") {
+            return null;
+        }
+
+        const tbody = table.tBodies && table.tBodies.length > 0 ? table.tBodies[0] : null;
+        if (!tbody) {
+            return null;
+        }
+
+        const pageSize = Math.max(1, Number(options.pageSize || table.dataset.appPageSize || 25));
+        const rows = Array.from(tbody.rows).filter(row => !row.matches("[data-pagination-fixed]"));
+        if (rows.length <= pageSize) {
+            return null;
+        }
+
+        table.dataset.paginationInitialized = "true";
+
+        const pager = document.createElement("div");
+        pager.className = "app-client-pager";
+
+        const summary = document.createElement("div");
+        summary.className = "app-client-pager__summary";
+
+        const nav = document.createElement("nav");
+        nav.setAttribute("aria-label", table.dataset.appPagerLabel || "Постраничная навигация");
+
+        const list = document.createElement("ul");
+        list.className = "pagination pagination-sm flex-wrap mb-0";
+        nav.appendChild(list);
+        pager.append(summary, nav);
+
+        const host = table.closest(".table-responsive") || table;
+        host.insertAdjacentElement("afterend", pager);
+
+        let currentPage = 1;
+        const totalPages = Math.ceil(rows.length / pageSize);
+
+        function createItem(label, page, disabled, active, ariaLabel) {
+            const item = document.createElement("li");
+            item.className = `page-item${disabled ? " disabled" : ""}${active ? " active" : ""}`;
+
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "page-link";
+            button.textContent = label;
+            if (ariaLabel) {
+                button.setAttribute("aria-label", ariaLabel);
+            }
+            button.disabled = disabled;
+            button.addEventListener("click", () => {
+                currentPage = page;
+                render();
+            });
+
+            item.appendChild(button);
+            return item;
+        }
+
+        function render() {
+            const start = (currentPage - 1) * pageSize;
+            const end = start + pageSize;
+            rows.forEach((row, index) => {
+                row.classList.toggle("d-none", index < start || index >= end);
+            });
+
+            summary.textContent = `Строки ${start + 1}-${Math.min(end, rows.length)} из ${rows.length}`;
+            list.innerHTML = "";
+            list.appendChild(createItem("‹", Math.max(1, currentPage - 1), currentPage === 1, false, "Предыдущая"));
+
+            const pageStart = Math.max(1, currentPage - 2);
+            const pageEnd = Math.min(totalPages, currentPage + 2);
+            if (pageStart > 1) {
+                list.appendChild(createItem("1", 1, false, currentPage === 1));
+                if (pageStart > 2) {
+                    const dots = document.createElement("li");
+                    dots.className = "page-item disabled";
+                    dots.innerHTML = '<span class="page-link">…</span>';
+                    list.appendChild(dots);
+                }
+            }
+
+            for (let page = pageStart; page <= pageEnd; page += 1) {
+                list.appendChild(createItem(String(page), page, false, page === currentPage));
+            }
+
+            if (pageEnd < totalPages) {
+                if (pageEnd < totalPages - 1) {
+                    const dots = document.createElement("li");
+                    dots.className = "page-item disabled";
+                    dots.innerHTML = '<span class="page-link">…</span>';
+                    list.appendChild(dots);
+                }
+                list.appendChild(createItem(String(totalPages), totalPages, false, currentPage === totalPages));
+            }
+
+            list.appendChild(createItem("›", Math.min(totalPages, currentPage + 1), currentPage === totalPages, false, "Следующая"));
+        }
+
+        render();
+        return { refresh: render };
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document
+            .querySelectorAll("table[data-app-pagination='true']")
+            .forEach(table => globalNamespace.initClientPagination(table));
+    });
 })();

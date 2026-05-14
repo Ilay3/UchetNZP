@@ -15,6 +15,9 @@ public class WarehouseLabelItemConfiguration : IEntityTypeConfiguration<Warehous
         builder.Property(x => x.Quantity)
             .HasPrecision(12, 3);
 
+        builder.Property(x => x.LabelNumber)
+            .HasMaxLength(32);
+
         builder.Property(x => x.AddedAt)
             .IsRequired();
 
@@ -26,6 +29,8 @@ public class WarehouseLabelItemConfiguration : IEntityTypeConfiguration<Warehous
         builder.HasOne(x => x.WipLabel)
             .WithMany(x => x.WarehouseLabelItems)
             .HasForeignKey(x => x.WipLabelId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(x => x.LabelNumber);
     }
 }

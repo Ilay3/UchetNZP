@@ -6,7 +6,9 @@ public class WarehouseLabelItem
 
     public Guid WarehouseItemId { get; set; }
 
-    public Guid WipLabelId { get; set; }
+    public Guid? WipLabelId { get; set; }
+
+    public string? LabelNumber { get; set; }
 
     public decimal Quantity { get; set; }
 

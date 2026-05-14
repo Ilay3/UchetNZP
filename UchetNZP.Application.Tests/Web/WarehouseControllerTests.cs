@@ -325,6 +325,95 @@ public class WarehouseControllerTests
     }
 
     [Fact]
+    public async Task ManualAssemblyUnitReceipt_WithLabelNumber_CreatesWarehouseLabelItem()
+    {
+        await using var dbContext = CreateContext();
+        var controller = CreateController(dbContext);
+
+        var result = await controller.ManualAssemblyUnitReceipt(
+            new WarehouseAssemblyUnitReceiptModel
+            {
+                AssemblyUnitName = "Assembly Unit 01",
+                Quantity = 6m,
+                ReceiptDate = new DateTime(2026, 5, 13),
+                LabelNumber = "123",
+            },
+            CancellationToken.None).ConfigureAwait(false);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(WarehouseController.Index), redirect.ActionName);
+
+        var item = Assert.Single(dbContext.WarehouseItems);
+        Assert.Equal("00123", item.ControlCardNumber);
+
+        var labelItem = Assert.Single(dbContext.WarehouseLabelItems);
+        Assert.Null(labelItem.WipLabelId);
+        Assert.Equal("00123", labelItem.LabelNumber);
+        Assert.Equal(6m, labelItem.Quantity);
+    }
+
+    [Fact]
+    public async Task ManualAssemblyUnitIssue_WithLabelNumber_ConsumesLabelBalance()
+    {
+        await using var dbContext = CreateContext();
+        var assemblyUnit = new WarehouseAssemblyUnit
+        {
+            Id = Guid.NewGuid(),
+            Name = "Assembly Unit 02",
+            NormalizedName = "ASSEMBLY UNIT 02",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+
+        var receipt = new WarehouseItem
+        {
+            Id = Guid.NewGuid(),
+            AssemblyUnitId = assemblyUnit.Id,
+            Quantity = 6m,
+            MovementType = WarehouseMovementKind.Receipt,
+            SourceType = WarehouseMovementKind.ManualReceipt,
+            AddedAt = DateTime.UtcNow,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        receipt.WarehouseLabelItems.Add(new WarehouseLabelItem
+        {
+            Id = Guid.NewGuid(),
+            WarehouseItemId = receipt.Id,
+            LabelNumber = "00123",
+            Quantity = 6m,
+            AddedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+
+        dbContext.WarehouseAssemblyUnits.Add(assemblyUnit);
+        dbContext.WarehouseItems.Add(receipt);
+        await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+        var controller = CreateController(dbContext);
+
+        var result = await controller.ManualAssemblyUnitIssue(
+            new WarehouseAssemblyUnitIssueModel
+            {
+                AssemblyUnitId = assemblyUnit.Id,
+                AssemblyUnitName = assemblyUnit.Name,
+                Quantity = 4m,
+                IssueDate = new DateTime(2026, 5, 13),
+                LabelNumber = "123",
+            },
+            CancellationToken.None).ConfigureAwait(false);
+
+        var redirect = Assert.IsType<RedirectToActionResult>(result);
+        Assert.Equal(nameof(WarehouseController.Index), redirect.ActionName);
+
+        var issueLabel = Assert.Single(dbContext.WarehouseLabelItems, x => x.Quantity < 0m);
+        Assert.Null(issueLabel.WipLabelId);
+        Assert.Equal("00123", issueLabel.LabelNumber);
+        Assert.Equal(-4m, issueLabel.Quantity);
+        Assert.Equal(2m, dbContext.WarehouseLabelItems.Where(x => x.LabelNumber == "00123").Sum(x => x.Quantity));
+    }
+
+    [Fact]
     public async Task ManualAssemblyUnitReceipt_ReusesExistingLocalAssemblyUnitByName()
     {
         await using var dbContext = CreateContext();

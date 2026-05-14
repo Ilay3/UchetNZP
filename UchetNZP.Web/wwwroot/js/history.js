@@ -191,8 +191,8 @@
         const statusBadge = entry.querySelector(".js-history-status");
         if (statusBadge) {
             statusBadge.textContent = "Отменено";
-            statusBadge.classList.remove("bg-success");
-            statusBadge.classList.add("bg-danger");
+            statusBadge.classList.remove("app-status--success", "app-status--info", "app-status--warning", "app-status--neutral");
+            statusBadge.classList.add("app-status", "app-status--danger");
         }
 
         disableEntryActions(entry);

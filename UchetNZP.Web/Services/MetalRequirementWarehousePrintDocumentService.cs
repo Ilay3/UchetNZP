@@ -38,6 +38,8 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
                 RequirementNumber = x.RequirementNumber,
                 RequirementDate = x.RequirementDate,
                 Status = x.Status,
+                CreatedBy = x.CreatedBy,
+                UpdatedBy = x.UpdatedBy,
                 WipLaunchId = x.WipLaunchId,
                 LaunchDate = x.WipLaunch != null ? x.WipLaunch.LaunchDate : (DateTime?)null,
                 PartCode = x.PartCode,
@@ -85,6 +87,7 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         {
             RowNumber = (index + 1).ToString(CultureInfo.InvariantCulture),
             Material = BuildMaterial(item.MaterialName, item.MaterialCode),
+            MaterialCode = item.MaterialCode ?? string.Empty,
             NormPerUnit = FormatDecimal(item.NormPerUnit > 0m ? item.NormPerUnit : item.ConsumptionPerUnit),
             Unit = Safe(item.Unit, item.ConsumptionUnit),
             TotalRequiredQty = FormatDecimal(item.TotalRequiredQty > 0m ? item.TotalRequiredQty : item.RequiredQty),
@@ -101,6 +104,7 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
             {
                 FillHeaderPlaceholders(body, requirement, items);
                 FillItemsTable(body, items);
+                FillM11Template(body, requirement, items);
                 mainDocument.Save();
             }
         }
@@ -179,6 +183,140 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         templateRow.Remove();
     }
 
+    private static void FillM11Template(Body body, RequirementProjection requirement, IReadOnlyList<RequirementPrintItem> items)
+    {
+        var tables = body.Elements<Table>().ToList();
+        if (tables.Count < 4)
+        {
+            return;
+        }
+
+        var titleRows = tables[0].Elements<TableRow>().ToList();
+        SetCellText(GetCell(titleRows, 0, 1), requirement.RequirementNumber);
+        SetCellText(GetCell(titleRows, 2, 1), "НЗП");
+
+        var metaRows = tables[1].Elements<TableRow>().ToList();
+        if (metaRows.Count > 2)
+        {
+            var values = new[]
+            {
+                requirement.RequirementDate.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
+                "10",
+                "Производство",
+                string.Empty,
+                "Склад металла",
+                string.Empty,
+                "10.01",
+                string.Empty,
+                "шт",
+            };
+
+            SetRowCellTexts(metaRows[2], values);
+        }
+
+        var approvalRows = tables[2].Elements<TableRow>().ToList();
+        if (approvalRows.Count > 0)
+        {
+            SetCellText(GetCell(approvalRows, 0, 1), requirement.CreatedBy);
+            SetCellText(GetCell(approvalRows, 0, 3), requirement.UpdatedBy);
+        }
+
+        var itemRows = tables[3].Elements<TableRow>().ToList();
+        if (itemRows.Count <= 3)
+        {
+            return;
+        }
+
+        var firstDataRowIndex = 3;
+        var templateRow = itemRows[firstDataRowIndex];
+        var parent = templateRow.Parent;
+        if (parent is null)
+        {
+            return;
+        }
+
+        while (itemRows.Count - firstDataRowIndex < items.Count)
+        {
+            var clone = (TableRow)templateRow.CloneNode(true);
+            ClearRow(clone);
+            parent.AppendChild(clone);
+            itemRows.Add(clone);
+        }
+
+        for (var index = 0; index < items.Count; index++)
+        {
+            var item = items[index];
+            var materialText = string.IsNullOrWhiteSpace(item.SizeOrNote)
+                ? item.Material
+                : $"{item.Material}; {item.SizeOrNote}";
+
+            SetRowCellTexts(itemRows[firstDataRowIndex + index], new[]
+            {
+                "10.01",
+                string.Empty,
+                materialText,
+                item.MaterialCode,
+                UnitCode(item.Unit),
+                item.Unit,
+                item.TotalRequiredQty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                item.RowNumber,
+            });
+        }
+    }
+
+    private static void SetRowCellTexts(TableRow row, IReadOnlyList<string> values)
+    {
+        var cells = row.Elements<TableCell>().ToList();
+        for (var index = 0; index < cells.Count && index < values.Count; index++)
+        {
+            SetCellText(cells[index], values[index]);
+        }
+    }
+
+    private static TableCell? GetCell(IReadOnlyList<TableRow> rows, int rowIndex, int cellIndex)
+    {
+        if (rowIndex < 0 || rowIndex >= rows.Count)
+        {
+            return null;
+        }
+
+        var cells = rows[rowIndex].Elements<TableCell>().ToList();
+        return cellIndex >= 0 && cellIndex < cells.Count ? cells[cellIndex] : null;
+    }
+
+    private static void ClearRow(TableRow row)
+    {
+        foreach (var cell in row.Elements<TableCell>())
+        {
+            SetCellText(cell, string.Empty);
+        }
+    }
+
+    private static void SetCellText(TableCell? cell, string? value)
+    {
+        if (cell is null)
+        {
+            return;
+        }
+
+        var texts = cell.Descendants<Text>().ToList();
+        if (texts.Count == 0)
+        {
+            cell.RemoveAllChildren<Paragraph>();
+            cell.Append(new Paragraph(new Run(new Text(value ?? string.Empty))));
+            return;
+        }
+
+        texts[0].Text = value ?? string.Empty;
+        for (var index = 1; index < texts.Count; index++)
+        {
+            texts[index].Text = string.Empty;
+        }
+    }
+
     private static void ReplaceToken(OpenXmlElement root, string token, string value)
     {
         foreach (var text in root.Descendants<Text>())
@@ -207,6 +345,18 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
             : (second ?? string.Empty);
     }
 
+    private static string UnitCode(string? unit)
+    {
+        return (unit ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "шт" or "pcs" => "796",
+            "кг" or "kg" => "166",
+            "м" or "m" => "006",
+            "м2" or "м²" or "m2" => "055",
+            _ => string.Empty,
+        };
+    }
+
     private static string FormatDecimal(decimal? value)
     {
         return value.HasValue ? value.Value.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty;
@@ -230,6 +380,8 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         public string RequirementNumber { get; init; } = string.Empty;
         public DateTime RequirementDate { get; init; }
         public string Status { get; init; } = string.Empty;
+        public string CreatedBy { get; init; } = string.Empty;
+        public string UpdatedBy { get; init; } = string.Empty;
         public Guid WipLaunchId { get; init; }
         public DateTime? LaunchDate { get; init; }
         public string PartCode { get; init; } = string.Empty;
@@ -258,6 +410,7 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
     {
         public string RowNumber { get; init; } = string.Empty;
         public string Material { get; init; } = string.Empty;
+        public string MaterialCode { get; init; } = string.Empty;
         public string NormPerUnit { get; init; } = string.Empty;
         public string Unit { get; init; } = string.Empty;
         public string TotalRequiredQty { get; init; } = string.Empty;

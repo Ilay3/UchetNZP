@@ -286,6 +286,14 @@ static async Task EnsureWarehouseFinishedGoodsColumnsAsync(AppDbContext in_db, C
         ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "AcceptedByName" character varying(128);
         ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "CreatedByUserId" uuid;
         ALTER TABLE "WarehouseItems" ADD COLUMN IF NOT EXISTS "AssemblyUnitId" uuid;
+        ALTER TABLE "WarehouseLabelItems" ADD COLUMN IF NOT EXISTS "LabelNumber" character varying(32);
+        ALTER TABLE "WarehouseLabelItems" ALTER COLUMN "WipLabelId" DROP NOT NULL;
+
+        UPDATE "WarehouseLabelItems" AS item
+        SET "LabelNumber" = label."Number"
+        FROM "WipLabels" AS label
+        WHERE item."WipLabelId" = label."Id"
+          AND (item."LabelNumber" IS NULL OR item."LabelNumber" = '');
 
         ALTER TABLE "WarehouseItems" ALTER COLUMN "PartId" DROP NOT NULL;
 
@@ -322,6 +330,34 @@ static async Task EnsureWarehouseFinishedGoodsColumnsAsync(AppDbContext in_db, C
 
         CREATE INDEX IF NOT EXISTS "IX_WarehouseItems_AssemblyUnitId"
             ON "WarehouseItems" ("AssemblyUnitId");
+
+        CREATE INDEX IF NOT EXISTS "IX_WarehouseLabelItems_LabelNumber"
+            ON "WarehouseLabelItems" ("LabelNumber");
+
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'FK_WarehouseLabelItems_WipLabels_WipLabelId'
+                  AND conrelid = '"WarehouseLabelItems"'::regclass
+                  AND confdeltype <> 'n'
+            ) THEN
+                ALTER TABLE "WarehouseLabelItems" DROP CONSTRAINT "FK_WarehouseLabelItems_WipLabels_WipLabelId";
+            END IF;
+
+            IF NOT EXISTS (
+                SELECT 1
+                FROM pg_constraint
+                WHERE conname = 'FK_WarehouseLabelItems_WipLabels_WipLabelId'
+                  AND conrelid = '"WarehouseLabelItems"'::regclass
+            ) THEN
+                ALTER TABLE "WarehouseLabelItems"
+                    ADD CONSTRAINT "FK_WarehouseLabelItems_WipLabels_WipLabelId"
+                    FOREIGN KEY ("WipLabelId") REFERENCES "WipLabels" ("Id") ON DELETE SET NULL;
+            END IF;
+        END
+        $$;
 
         DO $$
         BEGIN

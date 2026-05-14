@@ -403,6 +403,7 @@ public class TransferService : ITransferService
                             Id = Guid.NewGuid(),
                             WarehouseItemId = warehouseItem.Id,
                             WipLabelId = transferLabel.Id,
+                            LabelNumber = transferLabel.Number,
                             Quantity = item.Quantity,
                             AddedAt = transferDate,
                             UpdatedAt = now,

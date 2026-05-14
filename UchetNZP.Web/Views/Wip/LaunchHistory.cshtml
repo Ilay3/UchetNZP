@@ -204,8 +204,8 @@
                                                         {
                                                             <div class="small">Номер: @requirement.Number</div>
                                                             <div class="small">Дата: @requirement.Date.ToString("dd.MM.yyyy HH:mm")</div>
-                                                            <div class="small">Статус: <span class="badge @(requirement.Status == "Completed" ? "bg-success" : requirement.Status == "ReadyToIssue" ? "bg-primary" : requirement.Status == "Planned" ? "bg-info text-dark" : requirement.Status == "Cancelled" ? "bg-danger" : "bg-secondary")">@requirement.Status</span></div>
-                                                            <div class="small">План подбора: <span class="badge @((requirement.PlanIndicatorStatus ?? string.Empty).Contains("дефицит", StringComparison.OrdinalIgnoreCase) ? "bg-danger" : "bg-info text-dark")">@(requirement.PlanIndicatorStatus ?? "План не рассчитан")</span></div>
+                                                            <div class="small">Статус: <span class="@UiDisplayText.StatusClass(requirement.Status)">@UiDisplayText.Status(requirement.Status)</span></div>
+                                                            <div class="small">План подбора: <span class="@((requirement.PlanIndicatorStatus ?? string.Empty).Contains("дефицит", StringComparison.OrdinalIgnoreCase) ? "app-status app-status--danger" : "app-status app-status--info")">@(requirement.PlanIndicatorStatus ?? "План не рассчитан")</span></div>
                                                             @if (launch.MetalNeeds.Any())
                                                             {
                                                                 <div class="small">Материал: @string.Join(", ", launch.MetalNeeds.Select(x => x.MaterialDisplayName).Distinct())</div>
@@ -213,7 +213,10 @@
                                                                 <div class="small">Ед. изм.: @string.Join(", ", launch.MetalNeeds.Select(x => x.Unit).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct())</div>
                                                                 <div class="small">Итого кг: @launch.MetalNeeds.Sum(x => x.NeedKg).ToString("0.###")</div>
                                                             }
-                                                            <a class="btn btn-sm btn-outline-primary mt-2" asp-controller="MetalWarehouse" asp-action="RequirementDetails" asp-route-id="@requirement.Id">Открыть</a>
+                                                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                                                <a class="btn btn-sm btn-outline-primary" asp-controller="MetalWarehouse" asp-action="RequirementDetails" asp-route-id="@requirement.Id">Открыть</a>
+                                                                <a class="btn btn-sm btn-outline-primary" asp-controller="MetalWarehouse" asp-action="PrintRequirement" asp-route-id="@requirement.Id">Скачать требование-накладную</a>
+                                                            </div>
                                                         }
                                                         else
                                                         {
