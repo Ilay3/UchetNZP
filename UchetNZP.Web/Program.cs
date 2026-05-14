@@ -96,23 +96,23 @@ using (var scope = app.Services.CreateScope())
         await EnsureTransferAuditResidualColumnsAsync(db, CancellationToken.None);
         await EnsureMetalReceiptItemConsumptionColumnsAsync(db, CancellationToken.None);
         await RouteOperationNameSynchronizer.EnsureOperationNamesMatchSectionsAsync(db, CancellationToken.None);
+        await EnsureMetalOneCStructureColumnsAsync(db, CancellationToken.None);
+        await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
+        await EnsureWarehouseFinishedGoodsColumnsAsync(db, CancellationToken.None);
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
         await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
-        await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
-        await EnsureMetalOneCStructureColumnsAsync(db, CancellationToken.None);
-        await EnsureWarehouseFinishedGoodsColumnsAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
     else
     {
         await db.Database.EnsureCreatedAsync(CancellationToken.None);
+        await EnsureMetalOneCStructureColumnsAsync(db, CancellationToken.None);
+        await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
+        await EnsureWarehouseFinishedGoodsColumnsAsync(db, CancellationToken.None);
         await EnsureMetalMaterialsSeededAsync(db, CancellationToken.None);
         await EnsureMetalSuppliersSeededAsync(db, CancellationToken.None);
         await EnsureMetalReceiptParametersSeededAsync(db, CancellationToken.None);
-        await EnsureMetalReceiptFinanceColumnsAsync(db, CancellationToken.None);
-        await EnsureMetalOneCStructureColumnsAsync(db, CancellationToken.None);
-        await EnsureWarehouseFinishedGoodsColumnsAsync(db, CancellationToken.None);
         await EnsureMetalConsumptionNormsSeededAsync(db, CancellationToken.None);
     }
 }
