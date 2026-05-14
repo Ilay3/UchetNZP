@@ -1134,9 +1134,12 @@ public class MetalWarehouseController : Controller
         return View(model);
     }
 
+#pragma warning disable CS0162
     [HttpGet("CuttingReports")]
     public async Task<IActionResult> CuttingReports(CancellationToken cancellationToken)
     {
+        return NotFound();
+
         var plans = await _dbContext.CuttingPlans
             .AsNoTracking()
             .Where(x => x.IsCurrent)
@@ -1212,6 +1215,8 @@ public class MetalWarehouseController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateCuttingReport(CuttingReportCreateViewModel model, CancellationToken cancellationToken)
     {
+        return NotFound();
+
         var plan = await _dbContext.CuttingPlans
             .Include(x => x.MetalRequirement)
             .FirstOrDefaultAsync(x => x.Id == model.CuttingPlanId, cancellationToken);
@@ -1941,9 +1946,40 @@ public class MetalWarehouseController : Controller
         }
     }
 
+    [HttpGet("Requirements/Print/{id:guid}/pdf")]
+    public async Task<IActionResult> PrintRequirementPdf(Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор требования.");
+        }
+
+        try
+        {
+            var document = await _requirementWarehousePrintDocumentService.BuildPdfAsync(id, cancellationToken);
+            return File(document.Content, document.ContentType, document.FileName);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (FileNotFoundException ex)
+        {
+            _logger.LogError(ex, "Requirement PDF template or converter was not found for {RequirementId}.", id);
+            return StatusCode(500, ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogError(ex, "Requirement PDF conversion failed for {RequirementId}.", id);
+            return StatusCode(500, ex.Message);
+        }
+    }
+
     [HttpGet("CuttingMaps")]
     public async Task<IActionResult> CuttingMaps(CancellationToken cancellationToken)
     {
+        return NotFound();
+
         var plans = await _dbContext.CuttingPlans
             .AsNoTracking()
             .Where(x => x.IsCurrent)
@@ -1965,6 +2001,8 @@ public class MetalWarehouseController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateCuttingMapExecution(Guid planId, string executionStatus, decimal? actualResidual, CancellationToken cancellationToken)
     {
+        return NotFound();
+
         var plan = await _dbContext.CuttingPlans.FirstOrDefaultAsync(x => x.Id == planId, cancellationToken);
         if (plan is null)
         {
@@ -1987,6 +2025,8 @@ public class MetalWarehouseController : Controller
     [HttpGet("CuttingMaps/{planId:guid}/export/excel")]
     public async Task<IActionResult> ExportCuttingMapExcel(Guid planId, CancellationToken cancellationToken)
     {
+        return NotFound();
+
         var map = await BuildCuttingMapAsync(planId, cancellationToken);
         if (map is null)
         {
@@ -2000,6 +2040,8 @@ public class MetalWarehouseController : Controller
     [HttpGet("CuttingMaps/{planId:guid}/export/pdf")]
     public async Task<IActionResult> ExportCuttingMapPdf(Guid planId, CancellationToken cancellationToken)
     {
+        return NotFound();
+
         var map = await BuildCuttingMapAsync(planId, cancellationToken);
         if (map is null)
         {
@@ -2011,6 +2053,7 @@ public class MetalWarehouseController : Controller
     }
 
     [HttpGet("Movements")]
+#pragma warning restore CS0162
     public async Task<IActionResult> Movements([FromQuery] MetalMovementsFilterViewModel filter, CancellationToken cancellationToken)
     {
         var query = _dbContext.MetalStockMovements

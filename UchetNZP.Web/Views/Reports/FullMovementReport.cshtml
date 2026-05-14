@@ -1,0 +1,82 @@
+@using UchetNZP.Shared
+@model UchetNZP.Web.Models.FullMovementReportViewModel
+@{
+    ViewData["Title"] = "Полное движение партии";
+    var selectedLabels = string.Join(",", Model.Filter.LabelIds.Select(x => x.ToString()));
+}
+
+<div class="page-header mb-4">
+    <h1 class="display-5 fw-semibold">Полное движение партии</h1>
+    <p class="lead mb-0">Выберите деталь и один или несколько ярлыков, чтобы сформировать Excel-отчет по движению металла, НЗП, браку и сдаче на склад.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" action="/reports/full-movement/export" class="row g-3 align-items-end" autocomplete="off" id="fullMovementForm">
+            <input id="fullMovementSelectedLabels" type="hidden" value="@selectedLabels" />
+            <div class="col-lg-5">
+                <label class="form-label" for="fullMovementPartInput">Деталь</label>
+                <input id="fullMovementPartInput"
+                       class="form-control form-control-lg"
+                       type="text"
+                       list="fullMovementPartOptions"
+                       placeholder="Начните вводить деталь"
+                       autocomplete="off"
+                       value="@NameWithCodeFormatter.getNameWithCode(Model.Filter.PartName, Model.Filter.PartCode)" />
+                <datalist id="fullMovementPartOptions"></datalist>
+                <input id="fullMovementPartId" type="hidden" name="partId" value="@(Model.Filter.PartId?.ToString() ?? string.Empty)" />
+            </div>
+            <div class="col-lg-3 d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-lg flex-fill" id="fullMovementSelectAllButton" disabled>Все</button>
+                <button type="button" class="btn btn-outline-secondary btn-lg flex-fill" id="fullMovementClearButton" disabled>Снять</button>
+            </div>
+            <div class="col-lg-4 d-grid">
+                <button type="submit" class="btn btn-primary btn-lg" id="fullMovementExportButton" disabled>
+                    <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i>
+                    <span class="ms-2">Сформировать Excel</span>
+                </button>
+            </div>
+            <div id="fullMovementHiddenLabels"></div>
+            <div class="col-12">
+                <div id="fullMovementHint" class="form-text text-muted">Сначала выберите деталь.</div>
+                <div id="fullMovementError" class="alert alert-danger d-none mt-2 mb-0" role="alert"></div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-light fw-semibold d-flex justify-content-between align-items-center">
+        <span>Ярлыки детали</span>
+        <span class="small text-muted" id="fullMovementCountLabel">0 выбрано</span>
+    </div>
+    <div class="card-body">
+        <div id="fullMovementLoading" class="alert alert-info d-none align-items-center gap-2" role="status">
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            <span>Загружаются ярлыки...</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="fullMovementLabelsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" class="text-center">Выбор</th>
+                        <th scope="col">Ярлык</th>
+                        <th scope="col">Дата</th>
+                        <th scope="col">Количество</th>
+                        <th scope="col">Остаток</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Выберите деталь, чтобы увидеть ярлыки.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script src="~/js/full-movement-report.js" asp-append-version="true"></script>
+}

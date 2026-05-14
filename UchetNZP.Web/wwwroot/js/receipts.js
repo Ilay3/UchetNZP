@@ -25,6 +25,7 @@
     const cartTableBody = document.querySelector("#receiptCartTable tbody");
     const summaryTableBody = document.querySelector("#receiptSummaryTable tbody");
     const summaryIntro = document.getElementById("receiptSummaryIntro");
+    const documentLoading = document.getElementById("receiptDocumentLoading");
     const summaryModalElement = document.getElementById("receiptSummaryModal");
     const balanceLabel = document.getElementById("receiptBalanceLabel");
     const historyTableBody = document.querySelector("#receiptHistoryTable tbody");
@@ -479,22 +480,6 @@
             if (list.length === 1) {
                 materialSelect.value = list[0].id;
                 await loadMaterialStock(materialSelect.value);
-            } else if (list.length > 1) {
-                const available = [];
-                for (const m of list) {
-                    const stockResponse = await fetch(`/wip/receipts/material-stock?materialId=${encodeURIComponent(m.id)}`);
-                    if (!stockResponse.ok) {
-                        continue;
-                    }
-                    const stock = await stockResponse.json();
-                    if (Number(stock?.summary?.unitsCount ?? 0) > 0) {
-                        available.push(m);
-                    }
-                }
-                if (available.length === 1) {
-                    materialSelect.value = available[0].id;
-                    await loadMaterialStock(materialSelect.value);
-                }
             }
         } catch (error) {
             console.error(error);
@@ -1080,7 +1065,7 @@
                 <td>${item.quantity.toFixed(3)}</td>
                 <td>${item.become.toFixed(3)}</td>
                 <td>
-                    <a class="btn btn-link text-decoration-none" title="Скачать сопроводительный ярлык" href="/wip/receipts/${encodeURIComponent(item.receiptId)}/escort-label">🏷️</a>
+                    <a class="btn btn-link text-decoration-none" title="Скачать сопроводительный ярлык PDF" href="/wip/receipts/${encodeURIComponent(item.receiptId)}/escort-label/pdf"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i></a>
                 </td>
                 <td class="text-center">
                     <button type="button" class="btn btn-link text-danger text-decoration-none" data-action="cancel" data-receipt-id="${item.receiptId}">Отменить</button>
@@ -1598,9 +1583,39 @@
 
         history = [...newEntries, ...history].slice(0, 10);
         renderHistory();
-        newEntries.forEach(entry => {
-            window.open(`/wip/receipts/${encodeURIComponent(entry.receiptId)}/escort-label`, "_blank");
-        });
+        void downloadEscortLabels(newEntries);
+    }
+
+    async function downloadEscortLabels(entries) {
+        const downloader = namespace.downloadFile;
+        if (typeof downloader !== "function" || !Array.isArray(entries) || entries.length === 0) {
+            return;
+        }
+
+        if (documentLoading) {
+            documentLoading.classList.remove("d-none");
+            documentLoading.classList.add("d-flex");
+        }
+
+        try {
+            for (const entry of entries) {
+                const labelPart = entry.labelNumber || entry.receiptId;
+                await downloader(
+                    `/wip/receipts/${encodeURIComponent(entry.receiptId)}/escort-label/pdf`,
+                    `Сопроводительный_ярлык_${labelPart}.pdf`);
+            }
+            namespace.showToast?.("Сопроводительные ярлыки скачаны.", "success");
+        }
+        catch (error) {
+            console.error(error);
+            namespace.showToast?.("Не удалось скачать один из сопроводительных ярлыков. Откройте документ из таблицы.", "danger");
+        }
+        finally {
+            if (documentLoading) {
+                documentLoading.classList.add("d-none");
+                documentLoading.classList.remove("d-flex");
+            }
+        }
     }
 
     async function cancelSavedReceipt(receiptId, button, skipPrompt = false) {

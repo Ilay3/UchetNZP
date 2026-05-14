@@ -27,6 +27,7 @@ public class ReportsController : Controller
     private readonly IReceiptReportPdfExporter _receiptReportPdfExporter;
     private readonly IWipBatchInventoryDocumentExporter _wipBatchInventoryDocumentExporter;
     private readonly IWipLabelLookupService _labelLookupService;
+    private readonly IFullMovementReportExcelExporter _fullMovementReportExcelExporter;
 
     public ReportsController(
         AppDbContext dbContext,
@@ -38,7 +39,8 @@ public class ReportsController : Controller
         IWipBatchReportPdfExporter wipBatchReportPdfExporter,
         IReceiptReportPdfExporter receiptReportPdfExporter,
         IWipBatchInventoryDocumentExporter wipBatchInventoryDocumentExporter,
-        IWipLabelLookupService labelLookupService)
+        IWipLabelLookupService labelLookupService,
+        IFullMovementReportExcelExporter? fullMovementReportExcelExporter = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _scrapReportExcelExporter = scrapReportExcelExporter ?? throw new ArgumentNullException(nameof(scrapReportExcelExporter));
@@ -50,6 +52,7 @@ public class ReportsController : Controller
         _receiptReportPdfExporter = receiptReportPdfExporter ?? throw new ArgumentNullException(nameof(receiptReportPdfExporter));
         _wipBatchInventoryDocumentExporter = wipBatchInventoryDocumentExporter ?? throw new ArgumentNullException(nameof(wipBatchInventoryDocumentExporter));
         _labelLookupService = labelLookupService ?? throw new ArgumentNullException(nameof(labelLookupService));
+        _fullMovementReportExcelExporter = fullMovementReportExcelExporter ?? new FullMovementReportExcelExporter();
     }
 
     [HttpGet("receipts")]
@@ -719,6 +722,373 @@ public class ReportsController : Controller
             .ToList();
 
         return Ok(items);
+    }
+
+    [HttpGet("full-movement")]
+    public async Task<IActionResult> FullMovementReport([FromQuery] FullMovementReportQuery? query, CancellationToken cancellationToken)
+    {
+        var filter = new FullMovementReportFilterViewModel
+        {
+            PartId = query?.PartId,
+            LabelIds = query?.LabelIds ?? Array.Empty<Guid>(),
+        };
+
+        var labels = new List<FullMovementLabelOptionViewModel>();
+        if (query?.PartId is { } partId && partId != Guid.Empty)
+        {
+            var part = await _dbContext.Parts
+                .AsNoTracking()
+                .Where(x => x.Id == partId)
+                .Select(x => new { x.Id, x.Name, x.Code })
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (part is not null)
+            {
+                filter = new FullMovementReportFilterViewModel
+                {
+                    PartId = part.Id,
+                    PartName = part.Name,
+                    PartCode = part.Code,
+                    LabelIds = query.LabelIds ?? Array.Empty<Guid>(),
+                };
+
+                labels = await LoadFullMovementLabelOptionsAsync(part.Id, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return View("~/Views/Reports/FullMovementReport.cshtml", new FullMovementReportViewModel(filter, labels));
+    }
+
+    [HttpGet("full-movement/parts")]
+    public async Task<IActionResult> FullMovementParts([FromQuery] string? search, CancellationToken cancellationToken)
+    {
+        var query = _dbContext.Parts.AsNoTracking();
+        query = query.WhereMatchesLookup(search, x => x.Name, x => x.Code);
+
+        var items = await query
+            .OrderBy(x => x.Name)
+            .Take(25)
+            .Select(x => new LookupItemViewModel(x.Id, x.Name, x.Code))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Ok(items);
+    }
+
+    [HttpGet("full-movement/labels")]
+    public async Task<IActionResult> FullMovementLabels([FromQuery] Guid partId, CancellationToken cancellationToken)
+    {
+        if (partId == Guid.Empty)
+        {
+            return Ok(Array.Empty<object>());
+        }
+
+        var labels = await LoadFullMovementLabelOptionsAsync(partId, cancellationToken).ConfigureAwait(false);
+        return Ok(labels.Select(x => new
+        {
+            id = x.Id,
+            number = x.Number,
+            quantity = x.Quantity,
+            remainingQuantity = x.RemainingQuantity,
+            labelDate = x.LabelDate,
+        }));
+    }
+
+    [HttpGet("full-movement/export")]
+    public async Task<IActionResult> FullMovementExport(
+        [FromQuery] Guid partId,
+        [FromQuery] Guid[]? labelIds,
+        CancellationToken cancellationToken)
+    {
+        if (partId == Guid.Empty)
+        {
+            return BadRequest("Не выбрана деталь.");
+        }
+
+        var selectedLabelIds = (labelIds ?? Array.Empty<Guid>())
+            .Where(x => x != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        if (selectedLabelIds.Length == 0)
+        {
+            return BadRequest("Выберите хотя бы один ярлык.");
+        }
+
+        var rows = await LoadFullMovementRowsAsync(partId, selectedLabelIds, cancellationToken).ConfigureAwait(false);
+        var content = _fullMovementReportExcelExporter.Export(rows);
+        var fileName = $"full-movement-{DateTime.Now:yyyyMMdd-HHmm}.xlsx";
+        return File(content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    private async Task<List<FullMovementLabelOptionViewModel>> LoadFullMovementLabelOptionsAsync(Guid partId, CancellationToken cancellationToken)
+    {
+        var rawLabels = await _dbContext.WipLabels
+            .AsNoTracking()
+            .Where(x => x.PartId == partId)
+            .OrderByDescending(x => x.LabelDate)
+            .ThenBy(x => x.Number)
+            .Take(300)
+            .Select(x => new
+            {
+                x.Id,
+                x.Number,
+                x.Quantity,
+                x.RemainingQuantity,
+                x.LabelDate,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rawLabels
+            .Select(x => new FullMovementLabelOptionViewModel(
+                x.Id,
+                x.Number,
+                x.Quantity,
+                x.RemainingQuantity,
+                ConvertToLocal(x.LabelDate)))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<FullMovementReportRowViewModel>> LoadFullMovementRowsAsync(
+        Guid partId,
+        IReadOnlyCollection<Guid> labelIds,
+        CancellationToken cancellationToken)
+    {
+        var labels = await _dbContext.WipLabels
+            .AsNoTracking()
+            .Include(x => x.Part)
+            .Where(x => x.PartId == partId && labelIds.Contains(x.Id))
+            .OrderBy(x => x.Number)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (labels.Count == 0)
+        {
+            return Array.Empty<FullMovementReportRowViewModel>();
+        }
+
+        var normalizedLabelIds = labels.Select(x => x.Id).ToArray();
+        var receipts = await _dbContext.WipReceipts
+            .AsNoTracking()
+            .Include(x => x.MetalMaterial)
+            .Include(x => x.Section)
+            .Where(x => x.WipLabelId.HasValue && normalizedLabelIds.Contains(x.WipLabelId.Value))
+            .OrderBy(x => x.ReceiptDate)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var routes = await _dbContext.PartRoutes
+            .AsNoTracking()
+            .Where(x => x.PartId == partId)
+            .Include(x => x.Operation)
+            .Include(x => x.Section)
+            .OrderBy(x => x.OpNumber)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var audits = await _dbContext.TransferAudits
+            .AsNoTracking()
+            .Where(x => x.WipLabelId.HasValue && normalizedLabelIds.Contains(x.WipLabelId.Value) && !x.IsReverted)
+            .OrderBy(x => x.TransferDate)
+            .ThenBy(x => x.CreatedAt)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var norms = await _dbContext.MetalConsumptionNorms
+            .AsNoTracking()
+            .Where(x => x.PartId == partId && x.IsActive)
+            .Include(x => x.MetalMaterial)
+            .OrderBy(x => x.BaseConsumptionQty)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var requirements = await _dbContext.MetalRequirements
+            .AsNoTracking()
+            .Where(x => x.PartId == partId)
+            .Include(x => x.MetalMaterial)
+            .Include(x => x.Items)
+                .ThenInclude(x => x.MetalMaterial)
+            .OrderBy(x => x.RequirementDate)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var rows = new List<FullMovementReportRowViewModel>();
+        foreach (var label in labels)
+        {
+            var labelReceipts = receipts.Where(x => x.WipLabelId == label.Id).ToList();
+            var firstReceipt = labelReceipts.FirstOrDefault();
+            var labelAudits = audits.Where(x => x.WipLabelId == label.Id).ToList();
+            var reportDate = ConvertToLocal(firstReceipt?.ReceiptDate ?? label.LabelDate).Date;
+            var launchQuantity = firstReceipt?.Quantity ?? label.Quantity;
+            var norm = ResolveFullMovementNorm(norms, firstReceipt?.MetalMaterialId);
+            var materialDisplay = ResolveFullMovementMaterial(firstReceipt?.MetalMaterial, norm);
+            var requirement = ResolveFullMovementRequirement(requirements, firstReceipt?.ReceiptDate ?? label.LabelDate);
+            var partName = label.Part?.Name ?? string.Empty;
+            var partCode = label.Part?.Code;
+
+            rows.Add(new FullMovementReportRowViewModel(
+                label.Number,
+                reportDate,
+                partName,
+                partCode,
+                materialDisplay,
+                norm?.BaseConsumptionQty,
+                launchQuantity,
+                "-",
+                "Склад металла",
+                "Выдача металла в производство",
+                launchQuantity,
+                launchQuantity,
+                0m,
+                0m,
+                "-",
+                "-",
+                requirement is null ? "-" : $"М-11 {requirement.RequirementNumber}",
+                "Пройдено"));
+
+            var currentQuantity = launchQuantity;
+            var pendingReached = false;
+            foreach (var route in routes)
+            {
+                var routeAudits = labelAudits
+                    .Where(x => x.FromOpNumber == route.OpNumber)
+                    .ToList();
+
+                var hasActivity = routeAudits.Count > 0;
+                var inputQuantity = pendingReached && !hasActivity ? 0m : currentQuantity;
+                var transferredQuantity = routeAudits.Sum(x => x.Quantity);
+                var scrapQuantity = routeAudits.Sum(x => x.ScrapQuantity);
+                var operationName = route.Operation?.Name ?? string.Empty;
+                var stage = IsQualityStage(route.Section?.Name, operationName) ? "ОТК" : "Производство";
+                var status = scrapQuantity > 0m
+                    ? "Брак"
+                    : hasActivity
+                        ? "Пройдено"
+                        : inputQuantity > 0m ? "НЗП" : "Ожидает";
+
+                rows.Add(new FullMovementReportRowViewModel(
+                    label.Number,
+                    reportDate,
+                    partName,
+                    partCode,
+                    materialDisplay,
+                    norm?.BaseConsumptionQty,
+                    launchQuantity,
+                    OperationNumber.Format(route.OpNumber),
+                    stage,
+                    operationName,
+                    inputQuantity,
+                    transferredQuantity,
+                    0m,
+                    scrapQuantity,
+                    scrapQuantity > 0m ? $"{OperationNumber.Format(route.OpNumber)} {operationName}".Trim() : "-",
+                    ResolveScrapReason(routeAudits),
+                    $"СЯ №{label.Number}",
+                    status));
+
+                if (hasActivity)
+                {
+                    currentQuantity = transferredQuantity > 0m ? transferredQuantity : Math.Max(0m, inputQuantity - scrapQuantity);
+                }
+                else if (inputQuantity > 0m)
+                {
+                    pendingReached = true;
+                    currentQuantity = 0m;
+                }
+
+                foreach (var warehouseAudit in routeAudits.Where(x => x.IsWarehouseTransfer))
+                {
+                    rows.Add(new FullMovementReportRowViewModel(
+                        label.Number,
+                        ConvertToLocal(warehouseAudit.TransferDate).Date,
+                        partName,
+                        partCode,
+                        materialDisplay,
+                        norm?.BaseConsumptionQty,
+                        launchQuantity,
+                        "ГП",
+                        "СГДУ",
+                        "Сдача готовой детали на склад",
+                        warehouseAudit.Quantity,
+                        0m,
+                        warehouseAudit.Quantity,
+                        0m,
+                        "-",
+                        "-",
+                        "Карта контроля",
+                        "Сдано на склад ГП"));
+                    currentQuantity = 0m;
+                    pendingReached = true;
+                }
+            }
+        }
+
+        return rows
+            .OrderBy(x => x.LabelNumber, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(x => x.Date)
+            .ThenBy(x => x.OpNumber == "-" ? 0 : x.OpNumber == "ГП" ? 999999 : OperationNumber.TryParse(x.OpNumber, out var op) ? op : 999998)
+            .ToList();
+    }
+
+    private static MetalConsumptionNorm? ResolveFullMovementNorm(IReadOnlyList<MetalConsumptionNorm> norms, Guid? materialId)
+    {
+        if (materialId.HasValue)
+        {
+            var exact = norms.FirstOrDefault(x => x.MetalMaterialId == materialId.Value);
+            if (exact is not null)
+            {
+                return exact;
+            }
+        }
+
+        return norms.FirstOrDefault();
+    }
+
+    private static string ResolveFullMovementMaterial(MetalMaterial? receiptMaterial, MetalConsumptionNorm? norm)
+    {
+        var material = receiptMaterial ?? norm?.MetalMaterial;
+        if (material is null)
+        {
+            return string.Empty;
+        }
+
+        return string.IsNullOrWhiteSpace(material.Code)
+            ? material.Name
+            : $"{material.Name} / {material.Code}";
+    }
+
+    private static MetalRequirement? ResolveFullMovementRequirement(IReadOnlyList<MetalRequirement> requirements, DateTime referenceDate)
+    {
+        return requirements
+            .OrderBy(x => Math.Abs((EnsureUtc(x.RequirementDate) - EnsureUtc(referenceDate)).TotalDays))
+            .ThenByDescending(x => x.RequirementDate)
+            .FirstOrDefault();
+    }
+
+    private static string ResolveScrapReason(IReadOnlyList<TransferAudit> audits)
+    {
+        var scrapAudit = audits.FirstOrDefault(x => x.ScrapQuantity > 0m);
+        if (scrapAudit is null)
+        {
+            return "-";
+        }
+
+        if (!string.IsNullOrWhiteSpace(scrapAudit.ScrapComment))
+        {
+            return scrapAudit.ScrapComment.Trim();
+        }
+
+        return string.IsNullOrWhiteSpace(scrapAudit.Comment) ? "-" : scrapAudit.Comment.Trim();
+    }
+
+    private static bool IsQualityStage(string? sectionName, string? operationName)
+    {
+        var text = $"{sectionName} {operationName}".ToLowerInvariant();
+        return text.Contains("отк", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("контрол", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<Dictionary<Guid, decimal>> LoadActualLabelRemainingQuantitiesAsync(
@@ -1411,6 +1781,10 @@ public class ReportsController : Controller
         Guid? LabelId,
         string? Label,
         bool SplitOnly = false);
+
+    public sealed record FullMovementReportQuery(
+        Guid? PartId,
+        Guid[]? LabelIds);
 
     private sealed record TransferPeriodCell(Guid PartId, string PartName, string? PartCode, DateTime Date, string Text);
 

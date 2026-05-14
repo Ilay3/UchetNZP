@@ -178,5 +178,8 @@ public class WipReceiptsControllerTests
     {
         public Task<byte[]> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
             => Task.FromResult(Array.Empty<byte>());
+
+        public Task<WipEscortLabelDocumentResult> BuildPdfAsync(Guid receiptId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new WipEscortLabelDocumentResult("label.pdf", "application/pdf", Array.Empty<byte>()));
     }
 }

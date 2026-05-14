@@ -231,6 +231,33 @@ public class WipReceiptsController : Controller
         }
     }
 
+    [HttpGet("{id:guid}/escort-label/pdf")]
+    public async Task<IActionResult> DownloadEscortLabelPdf([FromRoute] Guid id, CancellationToken cancellationToken)
+    {
+        if (id == Guid.Empty)
+        {
+            return BadRequest("Некорректный идентификатор прихода.");
+        }
+
+        try
+        {
+            var document = await _escortLabelDocumentService.BuildPdfAsync(id, cancellationToken).ConfigureAwait(false);
+            return File(document.Content, document.ContentType, document.FileName);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound("Приход не найден.");
+        }
+        catch (FileNotFoundException ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(500, ex.Message);
+        }
+    }
+
     [HttpGet("material-stock")]
     public async Task<IActionResult> GetMaterialStock([FromQuery] Guid? materialId, CancellationToken cancellationToken)
     {

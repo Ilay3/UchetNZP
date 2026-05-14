@@ -54,9 +54,13 @@
                             <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
                             <span>Переход партии</span>
                         </a>
-                        <a class="app-nav__link @(currentController == "WipHistory" || (currentController == "WipLaunches" && currentAction == "History") ? "active" : string.Empty)" asp-area="" asp-controller="WipHistory" asp-action="Index">
+                        <a class="app-nav__link @(currentController == "WipHistory" || (currentController == "WipLaunches" && currentAction == "History") ? "active" : string.Empty)" href="/wip/history">
                             <i class="bi bi-clock-history" aria-hidden="true"></i>
                             <span>История НЗП</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "WipQuality" ? "active" : string.Empty)" asp-area="" asp-controller="WipQuality" asp-action="Index">
+                            <i class="bi bi-shield-check" aria-hidden="true"></i>
+                            <span>ОТК</span>
                         </a>
                         <a class="app-nav__link @(currentController == "WipLabels" ? "active" : string.Empty)" asp-area="" asp-controller="WipLabels" asp-action="Index">
                             <i class="bi bi-tags" aria-hidden="true"></i>
@@ -102,14 +106,6 @@
                             <i class="bi bi-activity" aria-hidden="true"></i>
                             <span>Движения</span>
                         </a>
-                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "CuttingReports" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="CuttingReports">
-                            <i class="bi bi-scissors" aria-hidden="true"></i>
-                            <span>Факт раскроя</span>
-                        </a>
-                        <a class="app-nav__link @(currentController == "MetalWarehouse" && currentAction == "CuttingMaps" ? "active" : string.Empty)" asp-area="" asp-controller="MetalWarehouse" asp-action="CuttingMaps">
-                            <i class="bi bi-map" aria-hidden="true"></i>
-                            <span>Карты раскроя</span>
-                        </a>
                     </div>
 
                     <div class="app-nav__section">
@@ -133,6 +129,10 @@
                         <a class="app-nav__link @(currentController == "Reports" && currentAction == "LabelMovementReport" ? "active" : string.Empty)" asp-area="" asp-controller="Reports" asp-action="LabelMovementReport">
                             <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
                             <span>Движение ярлыка</span>
+                        </a>
+                        <a class="app-nav__link @(currentController == "Reports" && currentAction == "FullMovementReport" ? "active" : string.Empty)" asp-area="" asp-controller="Reports" asp-action="FullMovementReport">
+                            <i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i>
+                            <span>Полное движение</span>
                         </a>
                        
                         <a class="app-nav__link @(currentController == "Routes" && currentAction == "Index" ? "active" : string.Empty)" asp-area="" asp-controller="Routes" asp-action="Index">
@@ -247,6 +247,8 @@
             const suggestions = document.getElementById("navbarLabelSearchOptions");
             const labelNumberPattern = /^\d{1,5}(?:\/\d{1,5})?$/;
             let suggestTimer = null;
+            let suggestAbortController = null;
+            const suggestionCache = new Map();
 
             function normalizeLabelNumber(rawValue) {
                 if (typeof rawValue !== "string") {
@@ -302,19 +304,46 @@
                     return;
                 }
 
+                const cacheKey = term.toLowerCase();
+                if (suggestionCache.has(cacheKey)) {
+                    renderSuggestions(suggestionCache.get(cacheKey));
+                    return;
+                }
+
+                if (suggestAbortController) {
+                    suggestAbortController.abort();
+                }
+
+                suggestAbortController = new AbortController();
+                const signal = suggestAbortController.signal;
+
                 try {
-                    const response = await fetch(`/reports/label-movement/suggest?search=${encodeURIComponent(term)}`);
+                    const response = await fetch(`/reports/label-movement/suggest?search=${encodeURIComponent(term)}`, { signal });
                     if (!response.ok) {
                         renderSuggestions([]);
                         return;
                     }
 
                     const data = await response.json();
-                    renderSuggestions(Array.isArray(data) ? data : []);
+                    const items = Array.isArray(data) ? data : [];
+                    suggestionCache.set(cacheKey, items);
+                    if (suggestionCache.size > 30) {
+                        suggestionCache.delete(suggestionCache.keys().next().value);
+                    }
+                    renderSuggestions(items);
                 }
                 catch (errorFetch) {
+                    if (signal.aborted) {
+                        return;
+                    }
+
                     console.error(errorFetch);
                     renderSuggestions([]);
+                }
+                finally {
+                    if (suggestAbortController?.signal === signal) {
+                        suggestAbortController = null;
+                    }
                 }
             }
 

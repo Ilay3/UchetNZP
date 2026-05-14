@@ -407,7 +407,7 @@ public class WipLaunchesController : Controller
                         requirement?.RequirementNumber,
                         requirement is null
                             ? null
-                            : Url.Action("PrintRequirement", "MetalWarehouse", new { id = requirement.Id }));
+                            : Url.Action("PrintRequirementPdf", "MetalWarehouse", new { id = requirement.Id }));
                 })
                 .ToList());
 

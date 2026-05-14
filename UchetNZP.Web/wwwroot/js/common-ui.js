@@ -91,6 +91,66 @@
 
     globalNamespace.showToast = showToast;
 
+    function getFileNameFromDisposition(disposition) {
+        if (!disposition) {
+            return null;
+        }
+
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match && utf8Match[1]) {
+            try {
+                return decodeURIComponent(utf8Match[1]);
+            }
+            catch (error) {
+                console.error(error);
+                return utf8Match[1];
+            }
+        }
+
+        const simpleMatch = disposition.match(/filename="?([^";]+)"?/i);
+        if (simpleMatch && simpleMatch[1]) {
+            return simpleMatch[1];
+        }
+
+        return null;
+    }
+
+    globalNamespace.getFileNameFromDisposition = getFileNameFromDisposition;
+
+    async function downloadFile(url, fallbackFileName) {
+        if (!url) {
+            throw new Error("Не указан адрес документа.");
+        }
+
+        const response = await fetch(url, {
+            headers: {
+                "Accept": "application/pdf,application/octet-stream,*/*",
+            },
+        });
+
+        if (!response.ok) {
+            const message = await response.text().catch(() => "");
+            throw new Error(message || `Не удалось скачать документ (${response.status}).`);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = getFileNameFromDisposition(response.headers.get("Content-Disposition")) || fallbackFileName || "document.pdf";
+        document.body.appendChild(link);
+        link.click();
+
+        window.setTimeout(() => {
+            URL.revokeObjectURL(objectUrl);
+            link.remove();
+        }, 0);
+
+        return link.download;
+    }
+
+    globalNamespace.downloadFile = downloadFile;
+
     function showDraftToast(action) {
         if (action === "restored") {
             showToast("Черновик восстановлен.", "info");
@@ -375,6 +435,8 @@
         let selectedItem = null;
         const customItems = [];
         let requestSequence = 0;
+        let activeAbortController = null;
+        const responseCache = new Map();
 
         function getAllItems() {
             return [...customItems, ...lastItems];
@@ -444,14 +506,34 @@
         }
 
         async function request(term) {
+            const cacheKey = (typeof term === "string" ? term.trim() : "").toLowerCase();
+            if (responseCache.has(cacheKey)) {
+                lastItems = responseCache.get(cacheKey);
+                render(lastItems);
+                if (typeof term === "string" && term.trim().length > 0) {
+                    updateSelectionFromValue(input.value.trim());
+                }
+                return;
+            }
+
             const requestId = ++requestSequence;
+            if (activeAbortController) {
+                activeAbortController.abort();
+            }
+
+            activeAbortController = new AbortController();
+            const signal = activeAbortController.signal;
+
             try {
                 const url = new URL(fetchUrl, window.location.origin);
                 if (term) {
                     url.searchParams.set("search", term);
                 }
 
-                const response = await fetch(url.toString(), { headers: { "Accept": "application/json" } });
+                const response = await fetch(url.toString(), {
+                    headers: { "Accept": "application/json" },
+                    signal,
+                });
                 if (!response.ok) {
                     throw new Error(`Ошибка загрузки данных (${response.status})`);
                 }
@@ -461,7 +543,11 @@
                     return;
                 }
 
-                lastItems = items;
+                lastItems = Array.isArray(items) ? items : [];
+                responseCache.set(cacheKey, lastItems);
+                if (responseCache.size > 30) {
+                    responseCache.delete(responseCache.keys().next().value);
+                }
                 render(lastItems);
                 if (typeof term === "string" && term.trim().length > 0) {
                     const currentInputValue = input.value.trim();
@@ -471,10 +557,19 @@
                 }
             }
             catch (error) {
+                if (signal.aborted) {
+                    return;
+                }
+
                 if (requestId !== requestSequence) {
                     return;
                 }
                 console.error(error);
+            }
+            finally {
+                if (requestId === requestSequence) {
+                    activeAbortController = null;
+                }
             }
         }
 

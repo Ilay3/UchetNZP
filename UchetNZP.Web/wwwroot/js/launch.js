@@ -49,6 +49,7 @@
     const summaryModalElement = document.getElementById("launchSummaryModal");
     const summaryTableBody = document.querySelector("#launchSummaryTable tbody");
     const summaryIntro = document.getElementById("launchSummaryIntro");
+    const documentLoading = document.getElementById("launchDocumentLoading");
 
     const bootstrapModal = summaryModalElement ? new bootstrap.Modal(summaryModalElement) : null;
     const draftStorage = typeof namespace.createDraftStorage === "function"
@@ -674,6 +675,7 @@
 
             const summary = await response.json();
             showSummary(summary);
+            void downloadRequirementDocuments(summary);
             updateRemaindersAfterSave(summary);
             pendingLaunches.clear();
             cart = [];
@@ -752,13 +754,53 @@
                 <td>${actualRemaining.toFixed(3)}</td>
                 <td>${Number(summaryItem.sumHoursToFinish ?? 0).toFixed(3)}</td>
                 <td>${requirementUrl
-                    ? `<a class="btn btn-outline-success btn-sm" href="${requirementUrl}">Скачать ${requirementNumber}</a>`
+                    ? `<a class="btn btn-outline-success btn-sm" href="${requirementUrl}">Скачать PDF ${requirementNumber}</a>`
                     : "<span class=\"text-muted\">Не создано</span>"}</td>`;
             summaryTableBody.appendChild(row);
         });
 
         if (bootstrapModal) {
             bootstrapModal.show();
+        }
+    }
+
+    async function downloadRequirementDocuments(summary) {
+        const downloader = namespace.downloadFile;
+        if (typeof downloader !== "function" || !summary || !Array.isArray(summary.items)) {
+            return;
+        }
+
+        const items = summary.items
+            .map(item => ({
+                url: typeof item.metalRequirementDownloadUrl === "string" ? item.metalRequirementDownloadUrl : "",
+                number: item.metalRequirementNumber || "requirement",
+            }))
+            .filter(item => item.url);
+
+        if (!items.length) {
+            return;
+        }
+
+        if (documentLoading) {
+            documentLoading.classList.remove("d-none");
+            documentLoading.classList.add("d-flex");
+        }
+
+        try {
+            for (const item of items) {
+                await downloader(item.url, `${item.number}.pdf`);
+            }
+            namespace.showToast?.("Требования-накладные скачаны.", "success");
+        }
+        catch (error) {
+            console.error(error);
+            namespace.showToast?.("Не удалось скачать одно из требований. Откройте документ по ссылке в сводке.", "danger");
+        }
+        finally {
+            if (documentLoading) {
+                documentLoading.classList.add("d-none");
+                documentLoading.classList.remove("d-flex");
+            }
         }
     }
 

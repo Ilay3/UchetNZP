@@ -135,6 +135,9 @@ public class MetalReceiptItemLabelDocumentServiceTests
     {
         public Task<MetalRequirementWarehousePrintDocumentResult> BuildAsync(Guid requirementId, CancellationToken cancellationToken = default)
             => Task.FromResult(new MetalRequirementWarehousePrintDocumentResult("dummy.docx", Array.Empty<byte>()));
+
+        public Task<MetalRequirementWarehousePrintDocumentResult> BuildPdfAsync(Guid requirementId, CancellationToken cancellationToken = default)
+            => Task.FromResult(new MetalRequirementWarehousePrintDocumentResult("dummy.pdf", Array.Empty<byte>(), "application/pdf"));
     }
 
     private sealed class NoOpMetalReceiptDocumentService : IMetalReceiptDocumentService

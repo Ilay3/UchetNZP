@@ -95,7 +95,7 @@
                                 <td>@item.Quantity.ToString("0.###")</td>
                                 <td>@(string.IsNullOrWhiteSpace(item.Comment) ? "—" : item.Comment)</td>
                                 <td class="text-center">
-                                    <a class="btn btn-link text-decoration-none" title="Скачать сопроводительный ярлык" href="/wip/receipts/@item.ReceiptId/escort-label">🏷️</a>
+                                    <a class="btn btn-link text-decoration-none" title="Скачать сопроводительный ярлык PDF" href="/wip/receipts/@item.ReceiptId/escort-label/pdf"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i></a>
                                 </td>
                             </tr>
                         }

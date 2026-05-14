@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
@@ -10,9 +11,13 @@ namespace UchetNZP.Web.Services;
 public interface IMetalRequirementWarehousePrintDocumentService
 {
     Task<MetalRequirementWarehousePrintDocumentResult> BuildAsync(Guid requirementId, CancellationToken cancellationToken = default);
+    Task<MetalRequirementWarehousePrintDocumentResult> BuildPdfAsync(Guid requirementId, CancellationToken cancellationToken = default);
 }
 
-public sealed record MetalRequirementWarehousePrintDocumentResult(string FileName, byte[] Content);
+public sealed record MetalRequirementWarehousePrintDocumentResult(
+    string FileName,
+    byte[] Content,
+    string ContentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
 public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWarehousePrintDocumentService
 {
@@ -20,11 +25,16 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
 
     private readonly AppDbContext _dbContext;
     private readonly IWebHostEnvironment _environment;
+    private readonly IWordToPdfConverter? _wordToPdfConverter;
 
-    public MetalRequirementWarehousePrintDocumentService(AppDbContext dbContext, IWebHostEnvironment environment)
+    public MetalRequirementWarehousePrintDocumentService(
+        AppDbContext dbContext,
+        IWebHostEnvironment environment,
+        IWordToPdfConverter? wordToPdfConverter = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+        _wordToPdfConverter = wordToPdfConverter;
     }
 
     public async Task<MetalRequirementWarehousePrintDocumentResult> BuildAsync(Guid requirementId, CancellationToken cancellationToken = default)
@@ -86,6 +96,7 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         var items = requirement.Items.Select((item, index) => new RequirementPrintItem
         {
             RowNumber = (index + 1).ToString(CultureInfo.InvariantCulture),
+            MaterialName = item.MaterialName ?? string.Empty,
             Material = BuildMaterial(item.MaterialName, item.MaterialCode),
             MaterialCode = item.MaterialCode ?? string.Empty,
             NormPerUnit = FormatDecimal(item.NormPerUnit > 0m ? item.NormPerUnit : item.ConsumptionPerUnit),
@@ -113,6 +124,21 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         var number = SanitizeFilePart(requirement.RequirementNumber);
         var fileName = $"Требование_на_склад_{number}_{date}.docx";
         return new MetalRequirementWarehousePrintDocumentResult(fileName, memoryStream.ToArray());
+    }
+
+    public async Task<MetalRequirementWarehousePrintDocumentResult> BuildPdfAsync(Guid requirementId, CancellationToken cancellationToken = default)
+    {
+        if (_wordToPdfConverter is null)
+        {
+            throw new InvalidOperationException("Word to PDF converter is not configured.");
+        }
+
+        var docx = await BuildAsync(requirementId, cancellationToken).ConfigureAwait(false);
+        var pdf = await _wordToPdfConverter
+            .ConvertAsync(docx.FileName, docx.Content, "requirements", cancellationToken)
+            .ConfigureAwait(false);
+
+        return new MetalRequirementWarehousePrintDocumentResult(pdf.FileName, pdf.Content, pdf.ContentType);
     }
 
     private static void FillHeaderPlaceholders(Body body, RequirementProjection requirement, IReadOnlyCollection<RequirementPrintItem> items)
@@ -192,8 +218,8 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         }
 
         var titleRows = tables[0].Elements<TableRow>().ToList();
-        SetCellText(GetCell(titleRows, 0, 1), requirement.RequirementNumber);
-        SetCellText(GetCell(titleRows, 2, 1), "НЗП");
+        SetCellText(GetCell(titleRows, 0, 1), FormatRequirementNumberForPrint(requirement.RequirementNumber));
+        SetCellText(GetCell(titleRows, 2, 1), "ООО Промавтоматика");
 
         var metaRows = tables[1].Elements<TableRow>().ToList();
         if (metaRows.Count > 2)
@@ -202,9 +228,9 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
             {
                 requirement.RequirementDate.ToLocalTime().ToString("dd.MM.yyyy", CultureInfo.InvariantCulture),
                 "10",
-                "Производство",
-                string.Empty,
                 "Склад металла",
+                string.Empty,
+                "Производство",
                 string.Empty,
                 "10.01",
                 string.Empty,
@@ -217,8 +243,8 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         var approvalRows = tables[2].Elements<TableRow>().ToList();
         if (approvalRows.Count > 0)
         {
-            SetCellText(GetCell(approvalRows, 0, 1), requirement.CreatedBy);
-            SetCellText(GetCell(approvalRows, 0, 3), requirement.UpdatedBy);
+            SetCellText(GetCell(approvalRows, 0, 1), string.Empty);
+            SetCellText(GetCell(approvalRows, 0, 3), string.Empty);
         }
 
         var itemRows = tables[3].Elements<TableRow>().ToList();
@@ -246,9 +272,7 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         for (var index = 0; index < items.Count; index++)
         {
             var item = items[index];
-            var materialText = string.IsNullOrWhiteSpace(item.SizeOrNote)
-                ? item.Material
-                : $"{item.Material}; {item.SizeOrNote}";
+            var materialText = item.MaterialName;
 
             SetRowCellTexts(itemRows[firstDataRowIndex + index], new[]
             {
@@ -262,7 +286,7 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
                 string.Empty,
                 string.Empty,
                 string.Empty,
-                item.RowNumber,
+                string.Empty,
             });
         }
     }
@@ -357,6 +381,18 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
         };
     }
 
+    private static string FormatRequirementNumberForPrint(string? requirementNumber)
+    {
+        if (string.IsNullOrWhiteSpace(requirementNumber))
+        {
+            return string.Empty;
+        }
+
+        var value = requirementNumber.Trim();
+        var lastDigits = Regex.Match(value, @"(?<number>\d+)\s*$", RegexOptions.CultureInvariant);
+        return lastDigits.Success ? lastDigits.Groups["number"].Value : value;
+    }
+
     private static string FormatDecimal(decimal? value)
     {
         return value.HasValue ? value.Value.ToString("0.###", CultureInfo.InvariantCulture) : string.Empty;
@@ -409,6 +445,7 @@ public class MetalRequirementWarehousePrintDocumentService : IMetalRequirementWa
     private sealed class RequirementPrintItem
     {
         public string RowNumber { get; init; } = string.Empty;
+        public string MaterialName { get; init; } = string.Empty;
         public string Material { get; init; } = string.Empty;
         public string MaterialCode { get; init; } = string.Empty;
         public string NormPerUnit { get; init; } = string.Empty;

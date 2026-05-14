@@ -150,6 +150,51 @@ public record LabelMovementReportViewModel(
     public bool HasData => Items.Count > 0;
 }
 
+public class FullMovementReportFilterViewModel
+{
+    public Guid? PartId { get; init; }
+
+    public string? PartName { get; init; }
+
+    public string? PartCode { get; init; }
+
+    public IReadOnlyList<Guid> LabelIds { get; init; } = Array.Empty<Guid>();
+}
+
+public record FullMovementLabelOptionViewModel(
+    Guid Id,
+    string Number,
+    decimal Quantity,
+    decimal RemainingQuantity,
+    DateTime LabelDate);
+
+public record FullMovementReportViewModel(
+    FullMovementReportFilterViewModel Filter,
+    IReadOnlyList<FullMovementLabelOptionViewModel> Labels)
+{
+    public bool HasPartSelection => Filter.PartId.HasValue;
+}
+
+public record FullMovementReportRowViewModel(
+    string LabelNumber,
+    DateTime Date,
+    string PartName,
+    string? PartCode,
+    string MaterialDisplay,
+    decimal? NormPerUnit,
+    decimal LaunchQuantity,
+    string OpNumber,
+    string Stage,
+    string OperationName,
+    decimal InputQuantity,
+    decimal TransferredQuantity,
+    decimal WarehouseQuantity,
+    decimal ScrapQuantity,
+    string ScrapOrigin,
+    string ScrapReason,
+    string DocumentName,
+    string Status);
+
 public class TransferPeriodReportFilterViewModel
 {
     public DateTime From { get; init; }

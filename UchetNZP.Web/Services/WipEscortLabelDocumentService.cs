@@ -11,18 +11,26 @@ namespace UchetNZP.Web.Services;
 public interface IWipEscortLabelDocumentService
 {
     Task<byte[]> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default);
+    Task<WipEscortLabelDocumentResult> BuildPdfAsync(Guid receiptId, CancellationToken cancellationToken = default);
 }
+
+public sealed record WipEscortLabelDocumentResult(string FileName, string ContentType, byte[] Content);
 
 public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
 {
     private const string TemplateRelativePath = "Templates/Documents/Сопроводительный ярлык.docx";
     private readonly AppDbContext _dbContext;
     private readonly IWebHostEnvironment _environment;
+    private readonly IWordToPdfConverter? _wordToPdfConverter;
 
-    public WipEscortLabelDocumentService(AppDbContext dbContext, IWebHostEnvironment environment)
+    public WipEscortLabelDocumentService(
+        AppDbContext dbContext,
+        IWebHostEnvironment environment,
+        IWordToPdfConverter? wordToPdfConverter = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+        _wordToPdfConverter = wordToPdfConverter;
     }
 
     public async Task<byte[]> BuildAsync(Guid receiptId, CancellationToken cancellationToken = default)
@@ -82,7 +90,7 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
 
         using (var document = WordprocessingDocument.Open(memoryStream, true))
         {
-            var body = document.MainDocumentPart?.Document.Body;
+            var body = document.MainDocumentPart?.Document?.Body;
             if (body is null)
             {
                 return memoryStream.ToArray();
@@ -95,10 +103,26 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
 
             FillOperationsTable(body, operations);
             ApplyTimesNewRoman8(body);
-            document.MainDocumentPart!.Document.Save();
+            document.MainDocumentPart?.Document?.Save();
         }
 
         return memoryStream.ToArray();
+    }
+
+    public async Task<WipEscortLabelDocumentResult> BuildPdfAsync(Guid receiptId, CancellationToken cancellationToken = default)
+    {
+        if (_wordToPdfConverter is null)
+        {
+            throw new InvalidOperationException("Word to PDF converter is not configured.");
+        }
+
+        var docx = await BuildAsync(receiptId, cancellationToken).ConfigureAwait(false);
+        var fileName = await ResolveDocumentFileNameAsync(receiptId, cancellationToken).ConfigureAwait(false);
+        var pdf = await _wordToPdfConverter
+            .ConvertAsync(fileName, docx, "escort-labels", cancellationToken)
+            .ConfigureAwait(false);
+
+        return new WipEscortLabelDocumentResult(pdf.FileName, pdf.ContentType, pdf.Content);
     }
 
     private static void FillOperationsTable(OpenXmlElement root, IReadOnlyList<EscortLabelOperationRow> operations)
@@ -203,6 +227,22 @@ public class WipEscortLabelDocumentService : IWipEscortLabelDocumentService
         return string.IsNullOrWhiteSpace(materialSize.SizeUnitText)
             ? sizeValueText
             : $"{sizeValueText} {materialSize.SizeUnitText}";
+    }
+
+    private async Task<string> ResolveDocumentFileNameAsync(Guid receiptId, CancellationToken cancellationToken)
+    {
+        var labelNumber = await _dbContext.WipReceipts
+            .AsNoTracking()
+            .Where(x => x.Id == receiptId)
+            .Select(x => x.WipLabel != null ? x.WipLabel.Number : null)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var suffix = string.IsNullOrWhiteSpace(labelNumber)
+            ? receiptId.ToString("N")
+            : labelNumber.Trim();
+
+        return $"Сопроводительный_ярлык_{suffix}.docx";
     }
 
     private static void ReplaceToken(OpenXmlElement root, string token, string value)
